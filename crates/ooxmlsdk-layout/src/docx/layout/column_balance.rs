@@ -222,6 +222,23 @@ pub(super) fn measured_section_heights(
       available_pt,
     );
   }
+  if matches!(document.compatibility_mode, 11 | 12 | 14)
+    && section.columns.count > 2
+    && root.current.footnote_reserved_height_pt == 0.0
+    && document
+      .sections
+      .get(section_index + 1)
+      .is_some_and(|next| next.break_kind == SectionBreakKind::Continuous)
+    && let Some(heights) =
+      uniform_paragraph_section_heights(root, section_index, start_y, end_y, flow, available_pt)
+  {
+    // Legacy 4-column controls also admit complete measured lines. A slot
+    // rounded to the default font can be just shorter than two real lines,
+    // leaving one in each earlier column and overflowing the final column.
+    // Reuse the uniform source endpoints; mixed/kept/obstructed text keeps
+    // its existing balance owner, including legacy two-column relaxation.
+    return Some(heights);
+  }
   if !matches!(document.compatibility_mode, 11 | 12 | 14)
     || section.columns.count != 2
     || flow.column_index >= 2
@@ -248,11 +265,27 @@ pub(super) fn measured_section_heights(
     return None;
   }
   let page_index = root.pages.len();
+  // Continuous sections can share an earlier section's physical page owner.
+  // The source checkpoint, rather than LayoutFrame.section_index, owns the
+  // new section's frame range. Retain the final-page lookup when its source
+  // checkpoint belongs to an earlier physical page.
   let first = root
-    .frames
+    .checkpoints
     .iter()
-    .rposition(|frame| frame.section_index != section_index || frame.page_index != page_index)
-    .map_or(0, |index| index + 1);
+    .rev()
+    .find(|checkpoint| {
+      checkpoint.section_index == section_index
+        && checkpoint.block_index == 0
+        && checkpoint.page_index == page_index
+    })
+    .map(|checkpoint| checkpoint.frames_len)
+    .unwrap_or_else(|| {
+      root
+        .frames
+        .iter()
+        .rposition(|frame| frame.section_index != section_index || frame.page_index != page_index)
+        .map_or(0, |index| index + 1)
+    });
   let frames = &root.frames[first..];
   let line_count = frames
     .iter()
@@ -385,6 +418,72 @@ pub(super) fn measured_section_heights(
   })
 }
 
+pub(super) fn occupied_paragraph_bottom(
+  root: &RootFrameLayout<'_>,
+  section: &crate::docx::ImportedSection,
+  first_frame: usize,
+  page_index: usize,
+) -> Option<f32> {
+  if !root.current.wrap_exclusions.is_empty()
+    || root.current.footnote_reserved_height_pt > 0.0
+    || section
+      .section_properties
+      .as_ref()
+      .and_then(super::super::section_vertical_text_flow)
+      .is_some()
+  {
+    return None;
+  }
+  let mut bottom: Option<f32> = None;
+  for frame in root.frames.get(first_frame..)? {
+    if frame.page_index != page_index {
+      continue;
+    }
+    let Block::Paragraph(paragraph) = section.blocks.get(frame.block_index?)? else {
+      return None;
+    };
+    if frame.kind != FollowFrameKind::Paragraph
+      || !frame.influences.is_empty()
+      || frame.fragments.is_empty()
+      || paragraph_frame(paragraph).is_some()
+      || !paragraph.footnote_reference_ids.is_empty()
+      || !paragraph.endnote_reference_ids.is_empty()
+      || paragraph.inlines.iter().any(|inline| {
+        !matches!(
+          inline,
+          InlineItem::Text(_)
+            | InlineItem::BookmarkStart(_)
+            | InlineItem::FormWidgetStart(_)
+            | InlineItem::FormWidgetEnd(_)
+            | InlineItem::LastRenderedPageBreak
+        )
+      })
+    {
+      return None;
+    }
+    for fragment in &frame.fragments {
+      let top = fragment.flow_top_pt?;
+      let advance = fragment.content_advance_pt?;
+      if fragment.kind != FrameFragmentKind::ParagraphLine
+        || !top.is_finite()
+        || !advance.is_finite()
+        || advance <= 0.0
+      {
+        return None;
+      }
+      // Paragraph lower spacing participates in the balance measurement but
+      // does not establish an occupied line end. Native ordinary-text controls
+      // close below every real line, even when the last column is shorter.
+      let end = top + advance;
+      if !end.is_finite() {
+        return None;
+      }
+      bottom = Some(bottom.map_or(end, |previous| previous.max(end)));
+    }
+  }
+  bottom
+}
+
 fn uniform_paragraph_section_heights(
   root: &RootFrameLayout<'_>,
   section_index: usize,
@@ -496,6 +595,203 @@ fn uniform_paragraph_section_heights(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::docx::{Paragraph, ParagraphFormat};
+
+  #[test]
+  fn continuous_columns_preserve_tallest_text_and_authored_lower_spacing() {
+    let page = PageSetup {
+      width_pt: 612.0,
+      height_pt: 792.0,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      margin_left_pt: 72.0,
+      margin_right_pt: 72.0,
+      ..Default::default()
+    };
+    let paragraph = |text: String, after: f32| {
+      let style = TextStyle {
+        font_family: Some("Calibri".into()),
+        font_size_pt: 11.0,
+        ..Default::default()
+      };
+      let run = TextRun {
+        text,
+        style: style.clone(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      };
+      Block::paragraph(Paragraph {
+        inlines: vec![InlineItem::Text(run.clone())],
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: style,
+        runs: vec![run],
+        format: Box::new(ParagraphFormat {
+          line_height_rule: LineHeightRule::Exact,
+          line_height_pt: Some(14.0),
+          spacing_after_pt: after,
+          widow_control: Some(false),
+          ..Default::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      })
+    };
+    let section = |count, break_kind, blocks| crate::docx::ImportedSection {
+      page,
+      columns: SectionColumns {
+        count,
+        ..Default::default()
+      },
+      break_kind,
+      discarded_carrier_spacing_after_pt: None,
+      section_properties: None,
+      title_page: false,
+      header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      even_header_blocks: Vec::new(),
+      even_footer_blocks: Vec::new(),
+      blocks,
+    };
+    // Independent Word controls cover odd tails, an unused last column and
+    // lower spacing that keeps the physical mean above occupied text. Every
+    // section shares page owner0: source section1 must use its checkpoint.
+    for (columns, count, after, expected_height) in [
+      (1, 3, 0.0, 42.0),
+      (2, 3, 0.0, 28.0),
+      (2, 4, 0.0, 28.0),
+      (2, 5, 0.0, 42.0),
+      (4, 5, 0.0, 28.0),
+      (4, 6, 0.0, 28.0),
+      (2, 2, 14.0, 28.0),
+      (2, 3, 14.0, 42.0),
+    ] {
+      let document = DocxDocument {
+        page,
+        page_background_pattern: None,
+        page_background_texture: None,
+        line_number_style: TextStyle::default(),
+        note_separator_style: TextStyle::default(),
+        footnote_separator_stories: Default::default(),
+        endnote_separator_stories: Default::default(),
+        default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+        hyphenation: Default::default(),
+        compatibility_mode: 14,
+        justify_lines_with_shrinking: false,
+        do_not_expand_shift_return: false,
+        suppress_top_spacing: false,
+        even_and_odd_headers: false,
+        split_page_break_and_paragraph_mark: false,
+        form_widgets: Vec::new(),
+        sections: vec![
+          section(
+            1,
+            SectionBreakKind::NextPage,
+            vec![paragraph("BEFORE".into(), 0.0)],
+          ),
+          section(
+            columns,
+            SectionBreakKind::Continuous,
+            (0..count)
+              .map(|index| paragraph(format!("LINE{index:02}"), after))
+              .collect(),
+          ),
+          section(
+            1,
+            SectionBreakKind::Continuous,
+            vec![paragraph("AFTER".into(), 0.0)],
+          ),
+        ],
+        toc_print_cache: None,
+        header_blocks: Vec::new(),
+        footer_blocks: Vec::new(),
+        first_header_blocks: Vec::new(),
+        first_footer_blocks: Vec::new(),
+        footnote_blocks: Vec::new(),
+        footnotes: Default::default(),
+        footnote_numbering: Vec::new(),
+        footnote_positions: Vec::new(),
+        endnotes: Default::default(),
+        endnote_numbering: Vec::new(),
+        endnote_position: w::EndnotePositionValues::DocumentEnd,
+        title_page: false,
+        num_pages_excludes_cover: false,
+        blocks: Vec::new(),
+      };
+      let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+      root.format_body_frames();
+      root.finish_current_page();
+      assert_eq!(root.pages.len(), 1);
+      assert!(root.frames.iter().all(|frame| frame.section_index == 0));
+      let text_y = |label: &str| {
+        root.pages[0]
+          .items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Text(text) if text.text == label => Some(text.y_pt),
+            _ => None,
+          })
+          .expect("all source text is present")
+      };
+      let actual = text_y("AFTER") - text_y("LINE00");
+      assert!(
+        (actual - expected_height).abs() < 0.001,
+        "columns={columns},count={count},after={after}: {actual} != {expected_height}",
+      );
+      if columns == 4 && after == 0.0 {
+        for line_height in [13.427_734, 14.0, 14.038_086] {
+          let mut measured = document.clone();
+          for section in &mut measured.sections {
+            for block in &mut section.blocks {
+              if let Block::Paragraph(paragraph) = block {
+                paragraph.format.line_height_pt = Some(line_height);
+              }
+            }
+          }
+          let mut measured_root = RootFrameLayout::new(&measured, &LayoutOptions::default());
+          measured_root.format_body_frames();
+          measured_root.finish_current_page();
+          assert_eq!(measured_root.pages.len(), 1);
+          let position = |label: &str| {
+            measured_root.pages[0]
+              .items
+              .iter()
+              .find_map(|item| match item {
+                PageItem::Text(text) if text.text == label => Some((text.x_pt, text.y_pt)),
+                _ => None,
+              })
+              .expect("all measured source text is present")
+          };
+          // Native five/six-line four-column controls occupy three columns
+          // in pairs. A default-font slot can preserve the final marker yet
+          // still split five lines as1/1/1/2, so check the actual partition.
+          assert_eq!(position("LINE00").0, position("LINE01").0);
+          assert!(position("LINE02").0 > position("LINE01").0);
+          assert_eq!(position("LINE02").0, position("LINE03").0);
+          assert!(position("LINE04").0 > position("LINE03").0);
+          if count == 6 {
+            assert_eq!(position("LINE04").0, position("LINE05").0);
+          }
+          assert!((position("LINE01").1 - position("LINE00").1 - line_height).abs() < 0.001);
+          assert!((position("AFTER").1 - position("LINE00").1 - 2.0 * line_height).abs() < 0.001);
+        }
+      }
+    }
+  }
 
   fn control(title: f64, body: f64, before: f64, count: usize, widow: bool) -> Vec<MeasuredLine> {
     paragraph_lines(&[(1, title, 0.0), (count, body, before)], widow)

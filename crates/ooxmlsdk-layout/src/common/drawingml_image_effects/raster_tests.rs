@@ -1,6 +1,80 @@
 use super::*;
 
 #[test]
+fn flat_word_shadow_blur_preserves_its_character_cell_alignment() {
+  // Native162 controls vary signed Y scale, blur, alignment, shear and font
+  // independently. Unlike a hosted padded texture, an ordinary character
+  // shadow keeps its transformed center as the physical blur grows.
+  let source = image::RgbaImage::from_fn(200, 200, |x, y| {
+    let alpha = if (76..98).contains(&x) && (72..86).contains(&y) {
+      255
+    } else {
+      0
+    };
+    image::Rgba([0, 0, 0, alpha])
+  });
+  let centroid = |image: &image::RgbaImage| {
+    let mut total = 0.0;
+    let mut position = [0.0, 0.0];
+    for (x, y, pixel) in image.enumerate_pixels() {
+      let alpha = f64::from(pixel[3]);
+      total += alpha;
+      position[0] += f64::from(x) * alpha;
+      position[1] += f64::from(y) * alpha;
+    }
+    assert!(total > 0.0);
+    position.map(|value| value / total)
+  };
+  for scale_y in [-0.3, 0.3, 1.0] {
+    for alignment in [0.0, 0.5, 1.0] {
+      let mut reference: Option<[f64; 2]> = None;
+      for blur_radius_px in [0.0, 4.0, 8.0] {
+        let output = outer_shadow_image(
+          &source,
+          OuterShadowOptions {
+            blur_radius_px,
+            blur_kernel: ShadowBlurKernel::WordTextBalanced {
+              prescale_divisor: 1,
+              align_padded_output: false,
+            },
+            distance_px: 0.0,
+            direction_degrees: 0.0,
+            distance_mode: ShadowDistanceMode::PreTransformOffset,
+            transform: ImageEffectTransform {
+              scale_x: 1.0,
+              scale_y,
+              skew_x: 0.0,
+              skew_y: 0.0,
+              shift_x_px: 0.0,
+              shift_y_px: 0.0,
+            },
+            alignment: (0.0, alignment),
+            color: ResolvedEffectColor {
+              color: RgbColor { r: 0, g: 0, b: 0 },
+              alpha: 255,
+            },
+            anchor_bounds: PixelBounds {
+              left: 40.0,
+              top: 40.0,
+              right: 150.0,
+              bottom: 150.0,
+            },
+          },
+        );
+        let actual = centroid(&output);
+        if let Some(expected) = reference {
+          for (actual, expected) in actual.into_iter().zip(expected) {
+            assert!((actual - expected).abs() < 0.1);
+          }
+        } else {
+          reference = Some(actual);
+        }
+      }
+    }
+  }
+}
+
+#[test]
 fn texture_source_removes_only_bitmap_guards_through_every_nested_container() {
   let glow = ImageEffect::Glow {
     radius_px: 12.0,
@@ -29,6 +103,7 @@ fn texture_source_removes_only_bitmap_guards_through_every_nested_container() {
     bounds_radius_offset_px: 0.24,
     blur_kernel: ShadowBlurKernel::WordTextBalanced {
       prescale_divisor: 3,
+      align_padded_output: true,
     },
     direction_degrees: 212.0,
     distance_mode: ShadowDistanceMode::PreTransformOffset,
@@ -370,6 +445,7 @@ fn mapped_shadow_uses_independent_gaussian_support_axes() {
       ShadowBlurKernel::Direct2dGaussian,
       ShadowBlurKernel::WordTextBalanced {
         prescale_divisor: 1,
+        align_padded_output: true,
       },
     ] {
       let output = outer_shadow_image_with_scale(

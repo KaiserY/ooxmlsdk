@@ -2,7 +2,8 @@
 //!
 //! Retained exact-option Word mesh captures at 0.5, 1 and 2 pt contain six
 //! circular section vertices, a constant section phase along each figure,
-//! and two-ring round caps. The figure starts at its topmost/leftmost point.
+//! and two-ring round caps. Text figures start at their topmost/leftmost point;
+//! widened shape figures retain the opposite traversal of the pen boundary.
 //! Horizontal joins depend on the realized segment angle, not on whether a
 //! vertex was authored or introduced by curve flattening.
 
@@ -13,6 +14,13 @@ type Vertex = [f32; 3];
 type Triangle = [Vertex; 3];
 const SECTION_COUNT: usize = 6;
 const LONGITUDINAL_CREASE_COSINE: f32 = 0.965_925_8; // cos(15 degrees)
+
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum Sweep {
+  Text,
+  Shape,
+  WidenedShape,
+}
 
 /// Office's contour producer divides a quarter turn into two arc segments,
 /// subtracting five degrees before rounding the count up. A bend requiring
@@ -187,7 +195,12 @@ fn cap(
 /// rotate the section or relocate that seam. Each segment keeps its inner
 /// rail: adjacent inner faces may overlap and are resolved by the common
 /// depth buffer. Smooth outer rails meet at their tangent intersection.
-pub(super) fn triangles(contour: &Static3dTextContour, radius: f32, z: f32) -> Vec<Triangle> {
+pub(super) fn triangles(
+  contour: &Static3dTextContour,
+  radius: f32,
+  z: f32,
+  sweep: Sweep,
+) -> Vec<Triangle> {
   if !radius.is_finite() || radius <= f32::EPSILON || !z.is_finite() {
     return Vec::new();
   }
@@ -196,7 +209,7 @@ pub(super) fn triangles(contour: &Static3dTextContour, radius: f32, z: f32) -> V
     return Vec::new();
   }
   let count = points.len();
-  let start = (0..count)
+  let top = (0..count)
     .min_by(|&a, &b| {
       points[a]
         .1
@@ -204,17 +217,36 @@ pub(super) fn triangles(contour: &Static3dTextContour, radius: f32, z: f32) -> V
         .then(points[a].0.total_cmp(&points[b].0))
     })
     .expect("nonempty contour");
+  // GFX's positive-pen boundary enumerator reverses a smooth convex outer
+  // figure and starts at the vertex following its top in that traversal.
+  // Read-only producer captures at three widths and three zooms distinguish
+  // this from the unexpanded shape and text paths. This is the sweep seam,
+  // not a rotation of the physical outline or of its material coordinates.
+  let step = if sweep == Sweep::WidenedShape && super::signed_contour_area(points) > 0.0 {
+    count - 1
+  } else {
+    1
+  };
+  let start = if sweep == Sweep::WidenedShape {
+    (top + step) % count
+  } else {
+    top
+  };
+  let end = |index| (index + step) % count;
   // Ignore zero-length edges without inventing a direction. Join selection
   // uses the adjacent realized segments, independently of source metadata.
   let edges = (0..count)
     .filter_map(|offset| {
-      let index = (start + offset) % count;
-      direction(points[index], points[(index + 1) % count]).map(|tangent| (index, tangent))
+      let index = (start + offset * step) % count;
+      direction(points[index], points[end(index)]).map(|tangent| (index, tangent))
     })
     .collect::<Vec<_>>();
   if edges.len() < 2 {
     return Vec::new();
   }
+  // Native WPS profile vertices and the projection matrix both put positive
+  // Z toward the front, as does this renderer. The extrusion's translated
+  // origin changes the depth offset, not its direction.
   let profile = section(radius, edges[0].1);
   let mut starts = edges
     .iter()
@@ -222,7 +254,7 @@ pub(super) fn triangles(contour: &Static3dTextContour, radius: f32, z: f32) -> V
     .collect::<Vec<_>>();
   let mut ends = edges
     .iter()
-    .map(|&(i, t)| ring(points[(i + 1) % count], (-t.1, t.0), z, &profile))
+    .map(|&(i, t)| ring(points[end(i)], (-t.1, t.0), z, &profile))
     .collect::<Vec<_>>();
   let mut triangles = Vec::with_capacity(edges.len() * SECTION_COUNT * 4);
   for next in 1..edges.len() {
@@ -295,7 +327,7 @@ pub(super) fn triangles(contour: &Static3dTextContour, radius: f32, z: f32) -> V
   );
   cap(
     &mut triangles,
-    points[(last.0 + 1) % count],
+    points[end(last.0)],
     last.1,
     1.0,
     radius,
@@ -328,6 +360,49 @@ mod tests {
         (10.0 * cos, 10.0 * sin)
       })
       .collect()
+  }
+
+  #[test]
+  fn widened_shape_sweep_preserves_native_start_section_and_depth() {
+    // Three successive native pen-boundary vertices in physical inches;
+    // the rest of this convex figure is immaterial to its first ring.
+    let mut c = contour(
+      [
+        (0.6179500222206116_f64, 0.0033475449308753014_f64),
+        (0.7002592086791992, -0.0095221484079957),
+        (0.7850949168205261, -0.01390873733907938),
+        (1.57, 0.77),
+        (0.78, 1.55),
+        (0.0, 0.77),
+      ]
+      .map(|(x, y)| ((x * 72.0) as f32, (y * 72.0) as f32))
+      .to_vec(),
+    );
+    let expected = triangles(&c, 2.0, 0.0, Sweep::WidenedShape);
+    // Actual GFX six-vertex full ring, converted from inches to points.
+    // Native Cross front-profile vertices have positive Z; its view matrix
+    // maps them toward the near plane. Preserve that direction here too.
+    for native in [
+      [50.6126232_f64, 0.5548979, 1.5567777],
+      [50.7239156, 1.2666764, -0.3089619],
+      [50.3073707, -1.397373, 1.8657399],
+      [50.1134105, -2.6378659, 0.3089617],
+      [50.2247028, -1.9260876, -1.5567773],
+      [50.5299554, 0.0261829, -1.86574],
+    ] {
+      assert!(expected.iter().flatten().any(|v| {
+        v.iter()
+          .zip(native)
+          .all(|(&actual, native)| (f64::from(actual) - native).abs() < 1.0e-5)
+      }));
+    }
+    for _ in 0..c.points.len() {
+      c.points.rotate_left(1);
+      assert_eq!(triangles(&c, 2.0, 0.0, Sweep::WidenedShape), expected);
+    }
+    c.points.reverse();
+    assert_eq!(triangles(&c, 2.0, 0.0, Sweep::WidenedShape), expected);
+    assert_ne!(triangles(&c, 2.0, 0.0, Sweep::Shape), expected);
   }
 
   #[test]
@@ -451,7 +526,7 @@ mod tests {
       );
       for radius in [0.25, 0.5, 1.0, 4.0] {
         c.longitudinal_contour_joins.fill(true);
-        let expected = triangles(&c, radius, 5.0);
+        let expected = triangles(&c, radius, 5.0, Sweep::Text);
         let steps = horizontal_join_steps((std::f32::consts::TAU / count as f32).cos());
         let join_triangles = if steps <= 1 { 0 } else { steps * SECTION_COUNT };
         assert_eq!(
@@ -459,11 +534,11 @@ mod tests {
           count * SECTION_COUNT * 2 + (count - 1) * join_triangles + 36
         );
         c.longitudinal_contour_joins.fill(false);
-        assert_eq!(triangles(&c, radius, 5.0), expected);
+        assert_eq!(triangles(&c, radius, 5.0, Sweep::Text), expected);
         for (index, crease) in c.longitudinal_contour_joins.iter_mut().enumerate() {
           *crease = index % 2 == 0;
         }
-        assert_eq!(triangles(&c, radius, 5.0), expected);
+        assert_eq!(triangles(&c, radius, 5.0, Sweep::Text), expected);
       }
     }
   }
@@ -514,10 +589,10 @@ mod tests {
   #[test]
   fn contour_mesh_cyclic_storage_does_not_move_seam_or_section() {
     let mut c = contour(vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]);
-    let expected = triangles(&c, 0.5, 5.0);
+    let expected = triangles(&c, 0.5, 5.0, Sweep::Text);
     for _ in 0..c.points.len() {
       c.points.rotate_left(1);
-      assert_eq!(triangles(&c, 0.5, 5.0), expected);
+      assert_eq!(triangles(&c, 0.5, 5.0, Sweep::Text), expected);
     }
     assert!(
       expected
@@ -536,7 +611,7 @@ mod tests {
   #[test]
   fn contour_mesh_reversal_keeps_its_outer_half_circle() {
     let c = contour(vec![(0.0, 0.0), (10.0, 0.0), (0.0, 0.0), (0.0, 10.0)]);
-    let mesh = triangles(&c, 0.5, 5.0);
+    let mesh = triangles(&c, 0.5, 5.0, Sweep::Text);
     assert!(mesh.iter().flatten().any(|v| {
       (v[0] - 10.5).abs() < 1.0e-6 && v[1].abs() < 1.0e-6 && (v[2] - 5.0).abs() < 1.0e-6
     }));
@@ -551,10 +626,10 @@ mod tests {
   #[test]
   fn contour_mesh_degenerate_inputs_do_not_invent_faces() {
     let c = contour(vec![(1.0, 1.0); 4]);
-    assert!(triangles(&c, 1.0, 0.0).is_empty());
+    assert!(triangles(&c, 1.0, 0.0, Sweep::Text).is_empty());
     let c = contour(vec![(0.0, 0.0), (10.0, 0.0), (0.0, 10.0)]);
     for radius in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-      assert!(triangles(&c, radius, 0.0).is_empty());
+      assert!(triangles(&c, radius, 0.0, Sweep::Text).is_empty());
     }
   }
 }

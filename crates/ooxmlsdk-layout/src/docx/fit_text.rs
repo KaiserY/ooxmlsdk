@@ -137,7 +137,8 @@ pub(super) fn resolve(inlines: &mut Vec<InlineItem>, field_events: &mut [Paragra
   for event in field_events {
     match event {
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
-      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
         *inline_offset = offsets[*inline_offset];
       }
       ParagraphFieldEvent::ReferenceResultSpan {

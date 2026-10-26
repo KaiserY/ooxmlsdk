@@ -368,7 +368,8 @@ pub(super) fn wordprocessing_math_zone_image<'a>(
   }
   let line_layout =
     office_math_line_layout(&root_parts, context, styles, &mut text_metrics).map(Arc::new);
-  let mut image = inline_image_from_math_box(math_box, node.semantic_text());
+  let font_line_height_pt = text_metrics.vertical_metrics(&line_style).line_height_pt();
+  let mut image = inline_image_from_math_box(math_box, node.semantic_text(), font_line_height_pt);
   image.office_math_line_layout = line_layout;
   image.office_math_display_layout = display_layout;
   Some(image)
@@ -437,7 +438,11 @@ pub(crate) fn drawingml_math_layout(
     width_pt: math_box.width_pt,
     ascent_pt: math_box.ascent_pt,
     descent_pt: math_box.descent_pt,
-    image: inline_image_from_math_box(math_box, node.semantic_text()),
+    image: inline_image_from_math_box(
+      math_box,
+      node.semantic_text(),
+      metrics.vertical_metrics(&style).line_height_pt(),
+    ),
     style,
     alignment,
     paint_padding_pt: MATH_CANVAS_PADDING_PT,
@@ -516,10 +521,16 @@ fn finish_math_box(
   math_box.pad_right(right_surround_pt);
 }
 
-fn inline_image_from_math_box(math_box: MathBox, semantic_text: String) -> InlineImage {
+fn inline_image_from_math_box(
+  math_box: MathBox,
+  semantic_text: String,
+  font_line_height_pt: f32,
+) -> InlineImage {
   let svg = math_box.to_svg();
   let padding = MATH_CANVAS_PADDING_PT;
   InlineImage {
+    contour_owned_wrap: None,
+    source_run_font_size_pt: None,
     data: Bytes::from(svg.into_bytes()),
     content_type: Some(OFFICE_MATH_SVG_CONTENT_TYPE.to_string()),
     blip_compression_state: crate::common::BlipCompressionState::Unspecified,
@@ -541,6 +552,10 @@ fn inline_image_from_math_box(math_box: MathBox, semantic_text: String) -> Inlin
     line_box: InlineImageLineBox::OfficeMathExternal,
     office_math_line_layout: None,
     office_math_display_layout: None,
+    office_math_metrics: Some(super::OfficeMathImageMetrics {
+      font_line_height_pt,
+      paint_padding_pt: padding,
+    }),
     crop: ImageCrop::default(),
     rotation_deg: 0.0,
     flip_horizontal: false,
@@ -609,13 +624,16 @@ fn office_math_line_layout(
   }
 
   // Normalize the complete root sequence before binary-break fragmentation.
+  // Like ellipsis, a clause separator depends on its preceding root atom.
+  // Use the same normalization as the unfragmented box so measurement and
+  // fragmented painting retain identical spacing semantics.
   // `m:brkBin="before"` may put U+2026 in a fragment whose local first atom
   // has no preceding operator, even though the authored root sequence has a
   // preceding `+`. The row-level normalizer must therefore see the complete
   // root context once; each fragment can then retain the resolved scalar when
   // it is rebuilt for PDF output. Explicit m:lit/m:nor classes remain
   // protected by the same override check as the normal display path.
-  normalize_row_automatic_math_ellipsis(&mut nodes);
+  normalize_row_automatic_math(&mut nodes);
 
   let classes = resolved_row_math_classes(&nodes);
   let mut boundaries = vec![None; nodes.len() + 1];
@@ -797,12 +815,48 @@ fn math_spacing_between_root_nodes(
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
 ) -> f32 {
+  let mut left = left;
+  let mut right = right;
+  let mut authored_space = false;
+  while classes[left].is_none_or(|classes| classes.class == MathClass::Space) {
+    if matches!(
+      run_background_base(&nodes[left]),
+      MathNode::UserSpace {
+        clause_separator: true,
+        ..
+      }
+    ) {
+      return 0.0;
+    }
+    authored_space |= classes[left].is_some();
+    let Some(previous) = left.checked_sub(1) else {
+      return 0.0;
+    };
+    left = previous;
+  }
+  while classes[right].is_none_or(|classes| classes.class == MathClass::Space) {
+    if matches!(
+      run_background_base(&nodes[right]),
+      MathNode::UserSpace {
+        clause_separator: true,
+        ..
+      }
+    ) {
+      return 0.0;
+    }
+    authored_space |= classes[right].is_some();
+    right += 1;
+    if right == nodes.len() {
+      return 0.0;
+    }
+  }
   match (classes[left], classes[right]) {
     (Some(left_classes), Some(right_classes)) => math_node_spacing(
       &nodes[left],
       &nodes[right],
       left_classes,
       right_classes,
+      authored_space,
       context,
       metrics,
     ),
@@ -819,20 +873,21 @@ fn math_operator_offsets(
 ) -> Vec<f32> {
   let mut offsets = Vec::new();
   let mut x = MATH_CANVAS_PADDING_PT + left_surround_pt.max(0.0);
-  let mut previous_spacing_node: Option<usize> = None;
-  for (index, node) in nodes.iter().enumerate() {
-    if let Some(right_classes) = classes[index] {
-      if let Some(previous_index) = previous_spacing_node {
-        x += math_node_spacing(
-          &nodes[previous_index],
-          node,
-          classes[previous_index].expect("spacing node has math classes"),
-          right_classes,
-          context,
-          metrics,
-        );
-      }
-      previous_spacing_node = Some(index);
+  for (index, (node, previous)) in nodes
+    .iter()
+    .zip(math_spacing_predecessors(nodes, classes))
+    .enumerate()
+  {
+    if let Some((previous_index, left_classes, authored_space)) = previous {
+      x += math_node_spacing(
+        &nodes[previous_index],
+        node,
+        left_classes,
+        classes[index].expect("spacing node has math classes"),
+        authored_space,
+        context,
+        metrics,
+      );
     }
     if math_classes_are_line_break_operator(classes[index]) {
       offsets.push(x);
@@ -862,7 +917,13 @@ fn render_math_line_fragment(
     metrics,
   );
   (math_box.width_pt > f32::EPSILON && math_box.ascent_pt + math_box.descent_pt > f32::EPSILON)
-    .then(|| inline_image_from_math_box(math_box, node.semantic_text()))
+    .then(|| {
+      inline_image_from_math_box(
+        math_box,
+        node.semantic_text(),
+        metrics.vertical_metrics(&line_style).line_height_pt(),
+      )
+    })
 }
 
 fn repeated_subtraction_characters(
@@ -1485,6 +1546,12 @@ impl MathParser<'_> {
       lower: Some(Box::new(self.sub_argument(&value.sub_argument))),
       upper: Some(Box::new(self.super_argument(&value.super_argument))),
       pre: true,
+      control_style: self.control_style(
+        value
+          .pre_sub_super_properties
+          .as_deref()
+          .and_then(|p| p.control_properties.as_deref()),
+      ),
     }
   }
 
@@ -1494,6 +1561,12 @@ impl MathParser<'_> {
       lower: Some(Box::new(self.sub_argument(&value.sub_argument))),
       upper: None,
       pre: false,
+      control_style: self.control_style(
+        value
+          .subscript_properties
+          .as_deref()
+          .and_then(|p| p.control_properties.as_deref()),
+      ),
     }
   }
 
@@ -1503,6 +1576,12 @@ impl MathParser<'_> {
       lower: Some(Box::new(self.sub_argument(&value.sub_argument))),
       upper: Some(Box::new(self.super_argument(&value.super_argument))),
       pre: false,
+      control_style: self.control_style(
+        value
+          .sub_superscript_properties
+          .as_deref()
+          .and_then(|p| p.control_properties.as_deref()),
+      ),
     }
   }
 
@@ -1512,6 +1591,12 @@ impl MathParser<'_> {
       lower: None,
       upper: Some(Box::new(self.super_argument(&value.super_argument))),
       pre: false,
+      control_style: self.control_style(
+        value
+          .superscript_properties
+          .as_deref()
+          .and_then(|p| p.control_properties.as_deref()),
+      ),
     }
   }
 }
@@ -1726,6 +1811,8 @@ enum MathNode {
     lower: Option<Box<Self>>,
     upper: Option<Box<Self>>,
     pre: bool,
+    /// Scripts inherit the paragraph control format before child run overrides.
+    control_style: TextStyle,
   },
   Limits {
     base: Box<Self>,
@@ -1812,8 +1899,7 @@ impl MathNode {
         node => output.push(node),
       }
     }
-    normalize_row_automatic_math_clause_separators(&mut output);
-    normalize_row_automatic_math_ellipsis(&mut output);
+    normalize_row_automatic_math(&mut output);
     match output.len() {
       0 => Self::Empty,
       1 => output.pop().unwrap_or(Self::Empty),
@@ -2252,6 +2338,11 @@ fn run_background_base_mut(node: &mut MathNode) -> &mut MathNode {
   }
 }
 
+fn normalize_row_automatic_math(nodes: &mut [MathNode]) {
+  normalize_row_automatic_math_clause_separators(nodes);
+  normalize_row_automatic_math_ellipsis(nodes);
+}
+
 fn normalize_row_automatic_math_clause_separators(nodes: &mut [MathNode]) {
   // UnicodeMath §3.14 assigns a separate clause-separator meaning to an
   // ASCII comma followed by two ASCII spaces. In built-up OMML, Word keeps
@@ -2274,7 +2365,9 @@ fn normalize_row_automatic_math_clause_separators(nodes: &mut [MathNode]) {
       clause_separator,
       ..
     } = run_background_base_mut(&mut nodes[index])
-      && text.chars().take(2).eq([' ', ' '])
+      // Word's clause separator is exactly two spaces. Three or more
+      // retain ordinary space advances, rather than extending the clause.
+      && text == "  "
     {
       *clause_separator = true;
     }
@@ -2534,6 +2627,15 @@ impl MathBox {
 
   fn script_base_ascent_pt(&self) -> f32 {
     self.script_base_ascent_pt.unwrap_or(self.ascent_pt)
+  }
+
+  fn text_size_pt(&self) -> Option<f32> {
+    self.items.iter().find_map(|item| match item {
+      MathPaintItem::Text { style, .. }
+      | MathPaintItem::GlyphPath { style, .. }
+      | MathPaintItem::SemanticText { style, .. } => Some(style.font_size_pt),
+      _ => None,
+    })
   }
 
   fn script_base_descent_pt(&self) -> f32 {
@@ -3086,6 +3188,7 @@ impl ParentFractionKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MathLayoutContext {
   style: MathLayoutStyle,
+  cramped: bool,
   display_math: bool,
   small_fraction: bool,
   explicit_math_paragraph: bool,
@@ -3102,6 +3205,7 @@ impl MathLayoutContext {
       } else {
         MathLayoutStyle::Text
       },
+      cramped: false,
       display_math,
       small_fraction,
       explicit_math_paragraph,
@@ -3139,6 +3243,13 @@ impl MathLayoutContext {
     self.script().script()
   }
 
+  const fn with_cramped(self) -> Self {
+    Self {
+      cramped: true,
+      ..self
+    }
+  }
+
   const fn argument_size(self, delta: i8) -> Self {
     Self {
       style: self.style.argument_size(delta),
@@ -3164,7 +3275,15 @@ impl MathLayoutContext {
     // size in an explicit display-math paragraph. A lone bare m:oMath promoted
     // to display by paragraph finalization is the structural counterexample:
     // it follows the standard Display -> Text -> Script -> ScriptScript chain.
-    let style = if nested_word_fraction && !self.small_fraction {
+    let style = if !self.drawingml_host && matches!(kind, m::FractionTypeValues::Skewed) {
+      // Word's bevelled arguments retain the current size, unlike stacked
+      // inline fractions. Display still becomes Text without reducing size.
+      // Native root/nested 10/12/14/20pt controls distinguish both producers.
+      match self.style {
+        MathLayoutStyle::Display => MathLayoutStyle::Text,
+        style => style,
+      }
+    } else if nested_word_fraction && !self.small_fraction {
       self.style
     } else {
       self.style.fraction_argument()
@@ -3218,11 +3337,13 @@ fn layout_node(node: &MathNode, context: MathLayoutContext, metrics: &mut TextMe
       lower,
       upper,
       pre,
+      control_style,
     } => layout_scripts(
       base,
       lower.as_deref(),
       upper.as_deref(),
       *pre,
+      control_style,
       context,
       metrics,
     ),
@@ -3441,17 +3562,11 @@ fn layout_user_space(
   }
 
   // Word realizes the two-space UnicodeMath clause separator as two nominal
-  // ems without emitting visible space glyphs. Any additional authored ASCII
-  // spaces retain their font advances after the clause separator.
+  // ems without emitting visible space glyphs.
+  debug_assert_eq!(text, "  ");
   let style = math_script_style(source_style, context, metrics);
-  let extra_spaces = text.chars().count().saturating_sub(2);
-  let extra_width_pt = if extra_spaces == 0 {
-    0.0
-  } else {
-    metrics.measure_text(&" ".repeat(extra_spaces), &style)
-  };
   let mut space = MathBox::empty();
-  space.width_pt = style.font_size_pt * MATH_CLAUSE_SEPARATOR_SPACE_EM + extra_width_pt;
+  space.width_pt = style.font_size_pt * MATH_CLAUSE_SEPARATOR_SPACE_EM;
   space
 }
 
@@ -4168,16 +4283,57 @@ fn automatic_math_spacing(
 
 fn row_has_automatic_math_spacing(nodes: &[MathNode], context: MathLayoutContext) -> bool {
   let classes = resolved_row_math_classes(nodes);
-  let mut previous: Option<MathAtomClasses> = None;
-  for classes in classes.into_iter().flatten() {
-    if let Some(left) = previous
-      && automatic_math_spacing(left.right, classes.left, context).is_some()
-    {
-      return true;
-    }
-    previous = Some(classes);
-  }
-  false
+  math_spacing_predecessors(nodes, &classes)
+    .enumerate()
+    .any(|(index, previous)| {
+      previous.is_some_and(|(previous_index, left, authored_space)| {
+        math_node_spacing_rule(
+          &nodes[previous_index],
+          &nodes[index],
+          left,
+          classes[index].expect("spacing node has math classes"),
+          authored_space,
+          context,
+        )
+        .is_some()
+      })
+    })
+}
+
+/// Keep explicit advances while resolving syntax between the surrounding
+/// atoms. A UnicodeMath clause separator is a boundary of its own.
+fn math_spacing_predecessors<'a>(
+  nodes: &'a [MathNode],
+  classes: &'a [Option<MathAtomClasses>],
+) -> impl Iterator<Item = Option<(usize, MathAtomClasses, bool)>> + 'a {
+  let mut previous: Option<(usize, MathAtomClasses)> = None;
+  let mut authored_space = false;
+  nodes
+    .iter()
+    .zip(classes)
+    .enumerate()
+    .map(move |(index, (node, classes))| {
+      let right = (*classes)?;
+      if right.class == MathClass::Space {
+        if matches!(
+          run_background_base(node),
+          MathNode::UserSpace {
+            clause_separator: true,
+            ..
+          }
+        ) {
+          previous = None;
+          authored_space = false;
+        } else {
+          authored_space = true;
+        }
+        return None;
+      }
+      let predecessor = previous.map(|(index, left)| (index, left, authored_space));
+      previous = Some((index, right));
+      authored_space = false;
+      predecessor
+    })
 }
 
 fn layout_row(
@@ -4197,27 +4353,38 @@ fn layout_row_with_classes(
 ) -> MathBox {
   debug_assert_eq!(nodes.len(), classes.len());
   let mut result = MathBox::empty();
+  let mut text_like = true;
+  let mut has_ink = false;
   let mut x = 0.0;
-  let mut previous_spacing_node: Option<usize> = None;
-  for (index, node) in nodes.iter().enumerate() {
-    if let Some(right_classes) = classes[index] {
-      if let Some(previous_index) = previous_spacing_node {
-        x += math_node_spacing(
-          &nodes[previous_index],
-          node,
-          classes[previous_index].expect("spacing node has math classes"),
-          right_classes,
-          context,
-          metrics,
-        );
-      }
-      previous_spacing_node = Some(index);
+  for (index, (node, previous)) in nodes
+    .iter()
+    .zip(math_spacing_predecessors(nodes, classes))
+    .enumerate()
+  {
+    if let Some((previous_index, left_classes, authored_space)) = previous {
+      x += math_node_spacing(
+        &nodes[previous_index],
+        node,
+        left_classes,
+        classes[index].expect("spacing node has math classes"),
+        authored_space,
+        context,
+        metrics,
+      );
     }
     let child = layout_node(node, context, metrics);
+    if child.ascent_pt + child.descent_pt > f32::EPSILON {
+      // A row of ordinary characters remains a text-like script base.
+      // Transparent spacing has no script geometry; a real extended shape
+      // or built-up child still contributes its baseline-drop constraints.
+      text_like &= child.text_like;
+      has_ink = true;
+    }
     result.append(child, x, 0.0);
     x = result.width_pt;
   }
   result.width_pt = x;
+  result.text_like = has_ink && text_like;
   result
 }
 
@@ -4229,19 +4396,18 @@ fn math_node_spacing(
   right: &MathNode,
   left_classes: MathAtomClasses,
   right_classes: MathAtomClasses,
+  authored_space: bool,
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
 ) -> f32 {
-  if math_node_is_function_application_marker(right) {
-    return 0.0;
-  }
-  let spacing = if math_node_is_function_application_marker(left) {
-    function_application_spacing(right, context)
-  } else {
-    automatic_math_spacing(left_classes.right, right_classes.left, context)
-      .or_else(|| office_math_object_surround_spacing(left, right, context))
-  };
-  let Some(spacing) = spacing else {
+  let Some(spacing) = math_node_spacing_rule(
+    left,
+    right,
+    left_classes,
+    right_classes,
+    authored_space,
+    context,
+  ) else {
     return 0.0;
   };
   let owner = match spacing.owner {
@@ -4251,6 +4417,47 @@ fn math_node_spacing(
   owner
     .map(|style| math_script_style(style, context, metrics).font_size_pt * spacing.em)
     .unwrap_or(0.0)
+}
+
+fn math_node_spacing_rule(
+  left: &MathNode,
+  right: &MathNode,
+  left_classes: MathAtomClasses,
+  right_classes: MathAtomClasses,
+  authored_space: bool,
+  context: MathLayoutContext,
+) -> Option<MathSpacing> {
+  if math_node_is_function_application_marker(right) {
+    return None;
+  }
+  if math_node_is_function_application_marker(left) {
+    return if authored_space {
+      None
+    } else {
+      function_application_spacing(right, context)
+    };
+  }
+  let automatic = automatic_math_spacing(left_classes.right, right_classes.left, context);
+  if automatic.is_some() {
+    // Native relation/binary glue survives authored spaces. Punctuation's
+    // weak glue keeps its separate explicit-space policy; it is not added
+    // again on top of an authored blank.
+    let strong_operator = match (
+      left_classes.right.syntax_class(),
+      right_classes.left.syntax_class(),
+    ) {
+      (MathClass::Punctuation, _) => false,
+      (MathClass::Relation | MathClass::Binary, _)
+      | (_, MathClass::Relation | MathClass::Binary) => true,
+      _ => false,
+    };
+    return if authored_space && !strong_operator {
+      None
+    } else {
+      automatic
+    };
+  }
+  office_math_object_surround_spacing(left, right, context)
 }
 
 fn math_node_is_function_application_marker(node: &MathNode) -> bool {
@@ -4271,18 +4478,18 @@ fn office_math_object_surround_spacing(
 ) -> Option<MathSpacing> {
   // Microsoft's *Mathematical Typesetting* describes an extended spacing
   // layer between built-up math-handler objects, above the TeX operator-class
-  // table. A vertical fraction is one such object. Its weak thin glue stays
+  // table. Vertical fractions and equation arrays are such objects. Thin glue stays
   // outside an enclosing delimiter and is naturally absent at a math-zone
   // edge; a stronger binary/relation spacing rule has already won above.
   if context.style.script_level() > 0 {
     return None;
   }
-  if math_node_is_vertical_fraction_object(right) {
+  if math_node_is_spaced_object(right) {
     Some(MathSpacing {
       em: MATH_THIN_SPACE_EM,
       owner: MathSpacingOwner::Right,
     })
-  } else if math_node_is_vertical_fraction_object(left) {
+  } else if math_node_is_spaced_object(left) {
     Some(MathSpacing {
       em: MATH_THIN_SPACE_EM,
       owner: MathSpacingOwner::Left,
@@ -4292,8 +4499,9 @@ fn office_math_object_surround_spacing(
   }
 }
 
-fn math_node_is_vertical_fraction_object(node: &MathNode) -> bool {
+fn math_node_is_spaced_object(node: &MathNode) -> bool {
   match node {
+    MathNode::EquationArray(_) => true,
     MathNode::Fraction { kind, .. } => matches!(
       kind,
       m::FractionTypeValues::Bar | m::FractionTypeValues::NoBar
@@ -4307,9 +4515,9 @@ fn math_node_is_vertical_fraction_object(node: &MathNode) -> bool {
     | MathNode::Bar { base, .. }
     | MathNode::GroupChar { base, .. }
     | MathNode::BorderBox { base, .. }
-    | MathNode::Phantom { base, .. } => math_node_is_vertical_fraction_object(base),
+    | MathNode::Phantom { base, .. } => math_node_is_spaced_object(base),
     MathNode::Delimiter { arguments, .. } => {
-      arguments.len() == 1 && math_node_is_vertical_fraction_object(&arguments[0])
+      arguments.len() == 1 && math_node_is_spaced_object(&arguments[0])
     }
     _ => false,
   }
@@ -4409,7 +4617,10 @@ fn layout_fraction(
   };
   let argument_context = context.fraction_argument(kind);
   let numerator = layout_node(numerator, argument_context, metrics);
-  let denominator = layout_node(denominator, argument_context, metrics);
+  // Office uses SuperscriptShiftUpCramped within a denominator and propagates
+  // it through nested arguments. Ordinary subscripts do not introduce that
+  // state themselves (native script/fraction/radical controls).
+  let denominator = layout_node(denominator, argument_context.with_cramped(), metrics);
   let effective_style = math_script_style(&style, context, metrics);
   let math = metrics.math_font_metrics(&effective_style);
 
@@ -4558,20 +4769,28 @@ fn layout_scripts(
   lower: Option<&MathNode>,
   upper: Option<&MathNode>,
   pre: bool,
+  control_style: &TextStyle,
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
 ) -> MathBox {
-  let base_box = layout_node(base, context, metrics);
+  let mut base_box = layout_node(base, context, metrics);
   let lower_box = lower.map(|node| layout_node(node, context.script(), metrics));
   let upper_box = upper.map(|node| layout_node(node, context.script(), metrics));
-  let Some(style) = representative_style(base)
-    .or_else(|| lower.and_then(representative_style))
-    .or_else(|| upper.and_then(representative_style))
-  else {
-    return base_box;
-  };
-  let math = metrics.math_font_metrics(style);
-  layout_scripts_around_box(base_box, lower_box, upper_box, pre, false, math)
+  // Native independent paragraph/control/base-size controls keep the
+  // control's MATH parameters even when the base run has an explicit size.
+  let effective_style = math_script_style(control_style, context, metrics);
+  if base_box.text_like
+    && base_box
+      .text_size_pt()
+      .is_some_and(|size| (size - effective_style.font_size_pt).abs() > f32::EPSILON)
+  {
+    // A differently sized run is a boxed base, not a simple character in the
+    // control font. Its real ink therefore participates in baseline-drop
+    // constraints; this is essential for enlarged bases and compact scripts.
+    base_box.text_like = false;
+  }
+  let math = metrics.math_font_metrics(&effective_style);
+  layout_scripts_around_box(base_box, lower_box, upper_box, pre, context.cramped, math)
 }
 
 fn side_script_math_kern(
@@ -4793,18 +5012,18 @@ fn layout_limits(
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
 ) -> MathBox {
-  if side {
-    return layout_scripts(base, lower, upper, false, context, metrics);
-  }
-  let base_box = layout_node(base, context, metrics);
-  let lower_box = lower.map(|node| layout_node(node, context.script(), metrics));
-  let upper_box = upper.map(|node| layout_node(node, context.script(), metrics));
   let Some(style) = representative_style(base)
     .or_else(|| lower.and_then(representative_style))
     .or_else(|| upper.and_then(representative_style))
   else {
-    return base_box;
+    return layout_node(base, context, metrics);
   };
+  if side {
+    return layout_scripts(base, lower, upper, false, style, context, metrics);
+  }
+  let base_box = layout_node(base, context, metrics);
+  let lower_box = lower.map(|node| layout_node(node, context.script(), metrics));
+  let upper_box = upper.map(|node| layout_node(node, context.script(), metrics));
   let math = metrics.math_font_metrics(style);
   layout_limits_around_box(base_box, lower_box, upper_box, math)
 }
@@ -4966,6 +5185,11 @@ fn layout_delimiter(
   } else {
     0.0
   };
+  // A normal closing glyph keeps ordinary script placement even around a
+  // tall fraction with grow=false. A stretched closing glyph instead makes
+  // this a boxed base: its complete content ink retains the MATH baseline-
+  // drop constraint, rather than using only the selected fence's ink.
+  let script_text_like = (!end.is_empty()).then_some(end_box.text_like);
 
   // All separators belong to the same delimiter object. Measure every
   // argument first so a tall later argument grows earlier separators to the
@@ -4992,6 +5216,9 @@ fn layout_delimiter(
   result.append(contents, begin_width, 0.0);
   let content_end = result.width_pt;
   result.append(end_box, content_end, delimiter_baseline_y_pt);
+  if let Some(text_like) = script_text_like {
+    result.text_like = text_like;
+  }
   result
 }
 
@@ -6525,18 +6752,15 @@ fn layout_radical(
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
 ) -> MathBox {
-  let base_box = layout_node(base, context, metrics);
+  let base_box = layout_node(base, context.with_cramped(), metrics);
   let Some(style) = control_style
     .or_else(|| representative_style(base))
     .or_else(|| degree.and_then(representative_style))
   else {
     return MathBox::empty();
   };
-  let drawingml_style = context
-    .drawingml_host
-    .then(|| math_script_style(style, context, metrics));
-  let effective_style = drawingml_style.as_ref().unwrap_or(style);
-  let math = metrics.math_font_metrics(effective_style);
+  let effective_style = math_script_style(style, context, metrics);
+  let math = metrics.math_font_metrics(&effective_style);
   let rule = math.radical_rule_thickness_pt;
   let radical_gap = if context.style == MathLayoutStyle::Display {
     math.radical_display_style_vertical_gap_pt
@@ -6550,7 +6774,7 @@ fn layout_radical(
     // do not apply the legacy normal-symbol tolerance on this host path.
     layout_vertical_math_variant(
       "\u{221a}",
-      effective_style,
+      &effective_style,
       radicand_height + radical_gap + rule,
       0.0,
       MathVariantSizePolicy::AtLeast,
@@ -6575,7 +6799,7 @@ fn layout_radical(
   if context.drawingml_host {
     drawingml_radical_control_paths(&mut radical, metrics);
   }
-  apply_control_background(&mut radical, effective_style);
+  apply_control_background(&mut radical, &effective_style);
   let radical_gap = if context.drawingml_host {
     // PowerPoint divides a prepared surd's surplus ink height equally above
     // and below its radicand, while retaining the specified minimum gap.
@@ -6629,7 +6853,7 @@ fn layout_radical(
     color: style.color,
     opacity: style.opacity,
   });
-  apply_control_background(&mut overbar, effective_style);
+  apply_control_background(&mut overbar, &effective_style);
   result.append(overbar, base_x, bar_y);
   if let Some(degree) = degree_box {
     let completed_radical_height = radicand_height + radical_gap + rule;
@@ -6960,16 +7184,16 @@ mod tests {
   use crate::text_metrics::{TextMetrics, TextVerticalMetrics};
 
   use super::{
-    MATH_MEDIUM_SPACE_EM, MATH_THICK_SPACE_EM, MATH_THIN_SPACE_EM, MATH_VERY_THICK_SPACE_EM,
-    MIN_RULE_WIDTH_PT, MathAssemblyPart, MathAtomClasses, MathBackgroundCoverage, MathBox,
-    MathGlyphAssembly, MathGlyphConstruction, MathGlyphKerns, MathGlyphVariant, MathLayoutContext,
-    MathLayoutStyle, MathNode, MathPaintItem, MathParser, MathSemanticTextPlacement, MathSpacing,
-    MathSpacingClass, MathSpacingOwner, MathStretchAxis, MathVariantSizePolicy, NaryLayoutPolicy,
-    NaryLimitLayout, apply_office_math_font_family, automatic_math_spacing,
-    function_application_spacing, group_character_aligns_character, layout_node, layout_user_space,
-    limit_baseline_distance_pt, math_argument_size_delta, math_background_coverage,
-    math_character_class, math_glyph_construction, math_glyph_kerns, math_is_extended_shape,
-    math_italics_correction, math_node_classes, math_node_is_vertical_fraction_object,
+    MATH_CANVAS_PADDING_PT, MATH_MEDIUM_SPACE_EM, MATH_THICK_SPACE_EM, MATH_THIN_SPACE_EM,
+    MATH_VERY_THICK_SPACE_EM, MIN_RULE_WIDTH_PT, MathAssemblyPart, MathAtomClasses,
+    MathBackgroundCoverage, MathBox, MathGlyphAssembly, MathGlyphConstruction, MathGlyphKerns,
+    MathGlyphVariant, MathLayoutContext, MathLayoutStyle, MathNode, MathPaintItem, MathParser,
+    MathSemanticTextPlacement, MathSpacing, MathSpacingClass, MathSpacingOwner, MathStretchAxis,
+    MathVariantSizePolicy, NaryLayoutPolicy, NaryLimitLayout, apply_office_math_font_family,
+    automatic_math_spacing, function_application_spacing, group_character_aligns_character,
+    layout_node, layout_user_space, limit_baseline_distance_pt, math_argument_size_delta,
+    math_background_coverage, math_character_class, math_glyph_construction, math_glyph_kerns,
+    math_is_extended_shape, math_italics_correction, math_node_classes, math_node_is_spaced_object,
     math_script_style, math_top_accent_attachment, matrix_inter_row_gap, nary_argument_spacing,
     nary_layout_policy, normalize_automatic_math_text, office_math_object_surround_spacing,
     open_type_math_line_extents, plan_math_glyph_assembly, prepared_math_variant_for_target,
@@ -8405,6 +8629,7 @@ mod tests {
   #[test]
   fn open_type_math_line_extents_keep_font_line_box_until_formula_ink_crosses_it() {
     let vertical = TextVerticalMetrics {
+      font_design_unit_pt: 0.0,
       ascent_pt: 9.0,
       descent_pt: 3.0,
       windows_line_height_pt: 12.0,
@@ -8422,6 +8647,369 @@ mod tests {
       open_type_math_line_extents(12.0, 5.0, vertical, 1.0),
       (13.0, 5.0)
     );
+  }
+
+  #[test]
+  fn authored_spaces_add_to_relation_and_binary_glue() {
+    let mut metrics = TextMetrics::new();
+    let context = MathLayoutContext::root(false, false, false);
+    for size in [14.0, 20.0] {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Cambria Math")),
+        font_size_pt: size,
+        ..TextStyle::default()
+      };
+      let text = |value: &str| MathNode::Text {
+        text: value.to_owned(),
+        style: style.clone(),
+        math_class_override: None,
+      };
+      let space = layout_node(&text(" "), context, &mut metrics).width_pt;
+      for operator in ["=", "+"] {
+        let plain = MathNode::row([text("𝑎"), text(operator), text("Ω")]);
+        let plain_width = layout_node(&plain, context, &mut metrics).width_pt;
+        for before in 0..=2 {
+          for after in 0..=2 {
+            let mut nodes = vec![text("𝑎")];
+            if before > 0 {
+              nodes.push(text(&" ".repeat(before)));
+            }
+            nodes.push(text(operator));
+            if after > 0 {
+              nodes.push(text(&" ".repeat(after)));
+            }
+            nodes.push(text("Ω"));
+            let spaced = MathNode::row(nodes);
+            assert!(spaced.needs_two_dimensional_layout());
+            let width = layout_node(&spaced, context, &mut metrics).width_pt;
+            assert!(
+              (width - plain_width - (before + after) as f32 * space).abs() < 0.001,
+              "size={size}, operator={operator}, spaces={before}/{after}: {width} vs {plain_width}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn equation_array_surrounds_yield_to_stronger_operator_glue() {
+    let mut metrics = TextMetrics::new();
+    let context = MathLayoutContext::root(false, false, false);
+    for size in [14.0, 20.0] {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Cambria Math")),
+        font_size_pt: size,
+        ..TextStyle::default()
+      };
+      let text = |value: &str| MathNode::Text {
+        text: value.to_owned(),
+        style: style.clone(),
+        math_class_override: None,
+      };
+      let array = MathNode::EquationArray(vec![text("Ω"), text("0")]);
+      let array_width = layout_node(&array, context, &mut metrics).width_pt;
+      for (prefix, expected_em) in [("𝑎", 1.0 / 6.0), ("=", 5.0 / 18.0)] {
+        let prefix_width = layout_node(&text(prefix), context, &mut metrics).width_pt;
+        let joined = MathNode::row([text(prefix), array.clone()]);
+        let joined_width = layout_node(&joined, context, &mut metrics).width_pt;
+        assert!((joined_width - prefix_width - array_width - size * expected_em).abs() < 0.001);
+      }
+    }
+  }
+
+  #[test]
+  fn office_math_cramped_state_survives_argument_size_changes() {
+    let root = MathLayoutContext::root(false, false, false);
+    assert!(!root.cramped);
+    assert!(!root.script().cramped);
+    let compact = root.with_cramped();
+    assert!(compact.cramped);
+    assert!(compact.script().cramped);
+    assert!(compact.argument_size(-1).cramped);
+    assert!(
+      compact
+        .fraction_argument(m::FractionTypeValues::Bar)
+        .cramped
+    );
+    assert_eq!(compact.script().style, root.script().style);
+  }
+
+  #[test]
+  fn word_skewed_fraction_arguments_retain_the_current_size() {
+    let root = MathLayoutContext::root(false, false, false);
+    for context in [root, root.script(), root.script_script()] {
+      assert_eq!(
+        context
+          .fraction_argument(m::FractionTypeValues::Skewed)
+          .style,
+        context.style
+      );
+    }
+    assert_eq!(
+      root.fraction_argument(m::FractionTypeValues::Bar).style,
+      MathLayoutStyle::Script
+    );
+    assert_eq!(
+      root
+        .with_drawingml_host()
+        .fraction_argument(m::FractionTypeValues::Skewed)
+        .style,
+      MathLayoutStyle::Script
+    );
+    assert_eq!(
+      MathLayoutContext::root(true, false, false)
+        .fraction_argument(m::FractionTypeValues::Skewed)
+        .style,
+      MathLayoutStyle::Text
+    );
+  }
+
+  #[test]
+  fn script_control_properties_override_the_paragraph_not_the_base_run() {
+    let styles = StylesCatalog::default();
+    let run = r#"<m:r><w:rPr><w:sz w:val="40"/></w:rPr><m:t>x</m:t></m:r>"#;
+    for paragraph_size in [14.0, 20.0] {
+      let base_style = TextStyle {
+        font_size_pt: paragraph_size,
+        ..TextStyle::default()
+      };
+      let parser = MathParser {
+        drawingml_properties: None,
+        base_style: &base_style,
+        styles: &styles,
+        math_font_family: Arc::from("Cambria Math"),
+      };
+      for (tag, properties, arguments) in [
+        (
+          "sSub",
+          "sSubPr",
+          format!("<m:e>{run}</m:e><m:sub>{run}</m:sub>"),
+        ),
+        (
+          "sSup",
+          "sSupPr",
+          format!("<m:e>{run}</m:e><m:sup>{run}</m:sup>"),
+        ),
+        (
+          "sSubSup",
+          "sSubSupPr",
+          format!("<m:e>{run}</m:e><m:sub>{run}</m:sub><m:sup>{run}</m:sup>"),
+        ),
+        (
+          "sPre",
+          "sPrePr",
+          format!("<m:sub>{run}</m:sub><m:sup>{run}</m:sup><m:e>{run}</m:e>"),
+        ),
+      ] {
+        for explicit in [None, Some(10.0), Some(14.0), Some(20.0)] {
+          let control = explicit.map_or_else(String::new, |size| format!(
+            r#"<m:{properties}><m:ctrlPr><w:rPr><w:sz w:val="{}"/></w:rPr></m:ctrlPr></m:{properties}>"#,
+            (size*2.0) as i32));
+          let source = format!(
+            r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:{tag}>{control}{arguments}</m:{tag}></m:oMath></w:p>"#
+          );
+          let paragraph = w::Paragraph::from_bytes(source.as_bytes()).unwrap();
+          let node = parser
+            .wordprocessing_choice(&paragraph.paragraph_choice[0])
+            .unwrap();
+          let MathNode::Scripts { control_style, .. } = node else {
+            panic!("script node")
+          };
+          assert_eq!(
+            control_style.font_size_pt,
+            explicit.unwrap_or(paragraph_size)
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn resized_script_bases_use_the_control_fonts_baseline_drop_constraint() {
+    let mut metrics = TextMetrics::new();
+    let context = MathLayoutContext::root(false, false, false);
+    let shifted = |base_size: f32, control_size: f32, metrics: &mut TextMetrics| {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Cambria Math")),
+        font_size_pt: base_size,
+        ..TextStyle::default()
+      };
+      let text = |value: &str| MathNode::Text {
+        text: value.to_owned(),
+        style: style.clone(),
+        math_class_override: None,
+      };
+      let node = MathNode::Scripts {
+        base: Box::new(text("Ω")),
+        lower: None,
+        upper: Some(Box::new(text("𝑝"))),
+        pre: false,
+        control_style: TextStyle {
+          font_size_pt: control_size,
+          ..style.clone()
+        },
+      };
+      layout_node(&node, context, metrics)
+        .items
+        .iter()
+        .find_map(|item| match item {
+          MathPaintItem::Text {
+            text,
+            baseline_y_pt,
+            ..
+          }
+          | MathPaintItem::SemanticText {
+            text,
+            baseline_y_pt,
+            ..
+          } if text == "𝑝" => Some(baseline_y_pt.abs()),
+          _ => None,
+        })
+        .unwrap()
+    };
+    // Native base20/control14:10.44pt; matching20/20:7.32pt. A small
+    // base10 instead follows its control's standard shift (14:5.16,10:3.72).
+    assert!(shifted(20.0, 14.0, &mut metrics) > shifted(20.0, 20.0, &mut metrics));
+    assert!(shifted(10.0, 14.0, &mut metrics) > shifted(10.0, 10.0, &mut metrics));
+  }
+
+  #[test]
+  fn ordinary_rows_and_fixed_fences_keep_text_script_placement() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Cambria Math")),
+      font_size_pt: 14.0,
+      ..TextStyle::default()
+    };
+    let text = |value: &str| MathNode::Text {
+      text: value.to_owned(),
+      style: style.clone(),
+      math_class_override: None,
+    };
+    let context = MathLayoutContext::root(false, false, false);
+    let mut metrics = TextMetrics::new();
+    let fraction = MathNode::Fraction {
+      numerator: Box::new(text("Ω")),
+      denominator: Box::new(text("1")),
+      kind: m::FractionTypeValues::NoBar,
+      control_style: Some(style.clone()),
+    };
+    let fence = |base: MathNode, grow| MathNode::Delimiter {
+      begin: "(".into(),
+      separator: "|".into(),
+      end: ")".into(),
+      grow,
+      shape: m::ShapeDelimiterValues::Centered,
+      arguments: vec![base],
+      control_style: Some(style.clone()),
+    };
+    for upper in [false, true] {
+      let shift = |base, metrics: &mut TextMetrics| {
+        let script = Box::new(text("𝑝"));
+        let node = MathNode::Scripts {
+          base: Box::new(base),
+          lower: (!upper).then(|| script.clone()),
+          upper: upper.then_some(script),
+          pre: false,
+          control_style: style.clone(),
+        };
+        layout_node(&node, context, metrics)
+          .items
+          .iter()
+          .find_map(|item| match item {
+            MathPaintItem::Text {
+              text,
+              baseline_y_pt,
+              ..
+            }
+            | MathPaintItem::SemanticText {
+              text,
+              baseline_y_pt,
+              ..
+            } if text == "𝑝" => Some(baseline_y_pt.abs()),
+            _ => None,
+          })
+          .unwrap()
+      };
+      let ordinary = shift(text("Ω"), &mut metrics);
+      for base in [
+        MathNode::Row(vec![text("("), text("Ω"), text(")")]),
+        fence(text("Ω"), false),
+        fence(text("Ω"), true),
+        fence(fraction.clone(), false),
+      ] {
+        assert!((shift(base, &mut metrics) - ordinary).abs() < 0.001);
+      }
+      assert!(shift(fence(fraction.clone(), true), &mut metrics) > ordinary);
+      // A real extended character keeps its own baseline-drop constraint.
+      assert!(shift(MathNode::Row(vec![text("Ω"), text("∫")]), &mut metrics) > ordinary);
+    }
+    let fixed = layout_node(&fence(fraction.clone(), false), context, &mut metrics);
+    let content = layout_node(&fraction, context, &mut metrics);
+    assert!(fixed.ascent_pt >= content.ascent_pt && fixed.descent_pt >= content.descent_pt);
+  }
+
+  #[test]
+  fn smaller_math_bases_use_smaller_side_script_shifts() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Cambria Math")),
+      font_size_pt: 14.0,
+      ..TextStyle::default()
+    };
+    let mut metrics = TextMetrics::new();
+    for drawingml in [false, true] {
+      for upper in [false, true] {
+        let base = MathNode::Text {
+          text: "Ω".to_owned(),
+          style: style.clone(),
+          math_class_override: None,
+        };
+        let script = MathNode::Text {
+          text: "𝑝".to_owned(),
+          style: style.clone(),
+          math_class_override: None,
+        };
+        let node = MathNode::Scripts {
+          base: Box::new(base),
+          lower: (!upper).then(|| Box::new(script.clone())),
+          upper: upper.then(|| Box::new(script)),
+          pre: false,
+          control_style: style.clone(),
+        };
+        let root = MathLayoutContext::root(false, false, false);
+        let root = if drawingml {
+          root.with_drawingml_host()
+        } else {
+          root
+        };
+        let mut shifts = Vec::new();
+        for context in [root, root.script()] {
+          let math_box = layout_node(&node, context, &mut metrics);
+          let shift = math_box
+            .items
+            .iter()
+            .find_map(|item| match item {
+              MathPaintItem::Text {
+                text,
+                baseline_y_pt,
+                ..
+              }
+              | MathPaintItem::SemanticText {
+                text,
+                baseline_y_pt,
+                ..
+              } if text == "𝑝" => Some(baseline_y_pt.abs()),
+              _ => None,
+            })
+            .expect("the script retains its text placement");
+          shifts.push(shift);
+        }
+        assert!(
+          shifts[1] < shifts[0],
+          "host={drawingml}, upper={upper}: {shifts:?}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -8612,6 +9200,70 @@ mod tests {
     // The remaining two MIN_RULE_WIDTH_PT insets only protect the SVG canvas
     // from clipping strokes and outlines; they are not OfficeMath glue.
     assert!((image.width_pt - content_width - MIN_RULE_WIDTH_PT * 2.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn office_math_break_fragments_retain_complete_clause_spacing() {
+    for punctuation in [',', '.'] {
+      for count in 0..=3 {
+        let spaces = " ".repeat(count);
+        let xml = format!(
+          r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMath><m:r><m:t>a{punctuation}</m:t></m:r><m:r><m:rPr><m:sty m:val="p"/></m:rPr><m:t xml:space="preserve">{spaces}</m:t></m:r><m:r><m:t>-x+z</m:t></m:r></m:oMath></m:oMathPara></w:p>"#
+        );
+        let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+        for policy in [
+          m::BreakBinaryOperatorValues::Before,
+          m::BreakBinaryOperatorValues::After,
+          m::BreakBinaryOperatorValues::Repeat,
+        ] {
+          let styles = StylesCatalog {
+            math_break_binary: Some(policy),
+            ..StylesCatalog::default()
+          };
+          let image = wordprocessing_math_zone_image(
+            paragraph.paragraph_choice.iter(),
+            &TextStyle::default(),
+            &styles,
+            true,
+          )
+          .unwrap();
+          let full_advance = image.width_pt - MATH_CANVAS_PADDING_PT * 2.0;
+          let line = image.office_math_line_layout.unwrap();
+          assert!(line.fragments.len() > 1);
+          let fragmented_advance = line
+            .fragments
+            .iter()
+            .map(|fragment| {
+              fragment.image.width_pt - MATH_CANVAS_PADDING_PT * 2.0 + fragment.same_line_gap_pt
+            })
+            .sum::<f32>();
+          assert!(
+            (fragmented_advance - full_advance).abs() < 0.001,
+            "{punctuation:?}, {count} spaces, {policy:?}: fragmented {fragmented_advance}, full {full_advance}"
+          );
+        }
+        let mut nodes = vec![
+          MathNode::Text {
+            text: punctuation.to_string(),
+            style: TextStyle::default(),
+            math_class_override: None,
+          },
+          MathNode::UserSpace {
+            text: spaces,
+            style: TextStyle::default(),
+            clause_separator: false,
+          },
+        ];
+        super::normalize_row_automatic_math(&mut nodes);
+        let MathNode::UserSpace {
+          clause_separator, ..
+        } = &nodes[1]
+        else {
+          unreachable!();
+        };
+        assert_eq!(*clause_separator, punctuation == ',' && count == 2);
+      }
+    }
   }
 
   #[test]
@@ -8807,12 +9459,12 @@ mod tests {
     let ordinary_delimiter = delimiter(MathNode::Empty);
     let delimited_fraction = delimiter(bar.clone());
 
-    assert!(math_node_is_vertical_fraction_object(&bar));
-    assert!(math_node_is_vertical_fraction_object(&no_bar));
-    assert!(math_node_is_vertical_fraction_object(&delimited_fraction));
-    assert!(!math_node_is_vertical_fraction_object(&linear));
-    assert!(!math_node_is_vertical_fraction_object(&skewed));
-    assert!(!math_node_is_vertical_fraction_object(&ordinary_delimiter));
+    assert!(math_node_is_spaced_object(&bar));
+    assert!(math_node_is_spaced_object(&no_bar));
+    assert!(math_node_is_spaced_object(&delimited_fraction));
+    assert!(!math_node_is_spaced_object(&linear));
+    assert!(!math_node_is_spaced_object(&skewed));
+    assert!(!math_node_is_spaced_object(&ordinary_delimiter));
 
     let text_context = MathLayoutContext::root(false, false, false);
     assert_eq!(
@@ -9085,6 +9737,46 @@ mod tests {
       automatic_math_spacing(ellipsis, Punctuation, script_context),
       None
     );
+  }
+
+  #[test]
+  fn office_math_image_retains_formula_metrics_independently_of_paragraph_mark() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMathPara><m:oMath><m:r><w:rPr><w:sz w:val="24"/></w:rPr><m:t>q</m:t></m:r></m:oMath></m:oMathPara></w:p>"#;
+    let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+    let mut observed = None;
+    for family in ["Times New Roman", "Cambria Math", "Calibri"] {
+      for size in [11.0, 12.0] {
+        let mark = TextStyle {
+          font_family: Some(std::sync::Arc::from(family)),
+          font_size_pt: size,
+          ..TextStyle::default()
+        };
+        let image = wordprocessing_math_zone_image(
+          paragraph.paragraph_choice.iter(),
+          &mark,
+          &StylesCatalog::default(),
+          true,
+        )
+        .unwrap();
+        let metrics = image.office_math_metrics.expect("realized formula metrics");
+        assert!(metrics.font_line_height_pt > 12.0);
+        assert_eq!(metrics.paint_padding_pt, super::MATH_CANVAS_PADDING_PT);
+        if let Some(previous) = observed {
+          assert_eq!(metrics.font_line_height_pt, previous);
+        }
+        observed = Some(metrics.font_line_height_pt);
+        for fragment in &image.office_math_line_layout.unwrap().fragments {
+          assert_eq!(
+            fragment
+              .image
+              .office_math_metrics
+              .unwrap()
+              .font_line_height_pt,
+            metrics.font_line_height_pt
+          );
+        }
+      }
+    }
   }
 
   fn office_math_break_layout(

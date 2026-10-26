@@ -249,13 +249,16 @@ pub enum MetafileFixedOutputProfile {
   LegacyExcelContentPreview { font_size_twips: u16 },
 }
 
-/// Compression state authored on a DrawingML `a:blip` source.
+/// Compression metadata of a DrawingML `a:blip`, or its absence on another producer.
 ///
 /// The value describes the stored source and remains separate from the PDF
 /// export quality selected by the host application.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum BlipCompressionState {
+  /// The producer has no DrawingML blip, for example a legacy VML picture.
   #[default]
+  NotApplicable,
+  /// A DrawingML blip exists without an authored compression attribute.
   Unspecified,
   Email,
   Screen,
@@ -749,9 +752,22 @@ pub struct TextStyle<'doc> {
   pub use_windows_font_metrics: bool,
   /// Select Common characters using the WordprocessingML rFonts slot table.
   pub wordprocessingml_font_slots: bool,
+  /// Alphabetic RTL numbering retains script-specific fonts and sizes while
+  /// sharing the complex-script weight with its Latin suffix.
+  pub wordprocessingml_complex_numbering: bool,
+  /// OOXML `w:noBreakHyphen`: retain U+2011 for line breaking, but use
+  /// the U+002D font slot and glyph. Literal U+2011 text remains distinct.
+  pub wordprocessingml_no_break_hyphen: bool,
+  /// Word's missing-Han fallback, independently of the shared font-slot table.
+  pub wordprocessingml_han_fallback: bool,
   /// Enable CJK-capable font line metrics for WordprocessingML documents
   /// carrying the `w:noLeading` compatibility setting.
   pub wordprocessingml_cjk_line_metrics: bool,
+  /// Resolved Word annotation ownership, independent of the body font.
+  pub wordprocessing_emphasis: Option<super::WordprocessingEmphasis>,
+  /// Omit extra font leading for legacy Word `w:noLeading`, independently
+  /// of CJK font-side leading or an authored paragraph line-spacing value.
+  pub wordprocessingml_no_leading: bool,
   /// Enable Word's document-level East Asian punctuation compression.
   pub cjk_punctuation_compression_ratio: f32,
   pub wordprocessing_justification_expansion_pt: Option<Arc<[f32]>>,
@@ -759,9 +775,15 @@ pub struct TextStyle<'doc> {
   pub wordprocessingml_legacy_punctuation_spacing: bool,
   /// Apply Word prose punctuation spacing independently of font-slot selection.
   pub wordprocessingml_punctuation_spacing: bool,
-  /// Balance qualifying ordinary spaces to half an ideographic em for the
-  /// WordprocessingML compatibility setting of the same name.
+  /// Balance qualifying ordinary spaces using the logical reference font for
+  /// the WordprocessingML compatibility setting of the same name.
   pub wordprocessingml_balance_single_byte_double_byte_width: bool,
+  /// This whitespace-only portion owns a source-qualified balanced blank.
+  /// Trial shaping boundaries never infer this qualification.
+  pub wordprocessingml_balanced_space_portion: bool,
+  /// Resolved reference face for Word's balanced-space metrics. It does not
+  /// replace any of the painted text's font slots.
+  pub wordprocessingml_balance_reference_font_family: Option<Arc<str>>,
   /// Paint glyph outlines instead of searchable PDF text. Office uses this
   /// for DrawingML text transforms that its fixed-format writer vectorizes.
   pub pdf_glyph_outlines: bool,
@@ -803,6 +825,9 @@ pub enum PdfGlyphDefinitionWidthBasis {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PdfGlyphOutlineOptions {
   pub semantic_text_overlay: bool,
+  /// Legacy VML textpath geometry retains the logical em while fitting the
+  /// parent shape. Printer font-size rounding belongs to ordinary text.
+  pub vml_fitted_text: bool,
   /// The outline came from WordprocessingML `w14:textOutline`. Word's PDF
   /// writer uses a different contour start and round `sysDot` dash from the
   /// PowerPoint/Excel DrawingML text path.
@@ -947,6 +972,9 @@ pub struct TextWarp {
   /// WordArt gradient or pattern coordinates to different shape/text frames.
   pub paint_bounds: Rect,
   pub boundaries: Vec<Vec<PathCommand>>,
+  /// Word's paired envelope realizes cubic contours and preserves the
+  /// interpolated boundary tangent when transporting their controls.
+  pub word_envelope: bool,
   /// A single DrawingML path carries complete, rigid glyphs. Its uniform
   /// fit is independent of the two-boundary contour-deformation contract.
   pub follow_path: Option<TextFollowPath>,

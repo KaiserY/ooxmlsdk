@@ -50,7 +50,16 @@ pub(super) struct ImageCatalog {
   pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
   pub(super) diagram_layouts_by_relationship_id: HashMap<String, dgm::LayoutDefinition>,
   pub(super) diagram_styles_by_relationship_id: HashMap<String, dgm::StyleDefinition>,
-  pub(super) diagram_drawings_by_relationship_id: HashMap<String, dsp::Drawing>,
+  pub(super) diagram_drawings_by_relationship_id: HashMap<String, DiagramDrawingResource>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DiagramDrawingResource {
+  pub(super) drawing: dsp::Drawing,
+  // Relationship IDs belong to the persisted drawing part, not its Word
+  // story. Keep the existing image resolver borrowed from that exact owner;
+  // equal IDs in another drawing or the main document must not alias.
+  pub(super) images: ImageCatalog,
 }
 
 #[derive(Clone, Debug)]
@@ -120,10 +129,19 @@ fn biff_default_font_size_twips(workbook: &[u8]) -> Option<u16> {
 pub(super) struct AltChunkResource {
   pub(super) data: Bytes,
   pub(super) content_type: Option<String>,
+  pub(super) wordprocessing_depth: usize,
 }
 
 impl AltChunkCatalog {
   pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
+    Self::load_at_depth(package, main, 0)
+  }
+
+  pub(super) fn load_at_depth(
+    package: &WordprocessingDocument,
+    main: &MainDocumentPart,
+    depth: usize,
+  ) -> Self {
     let by_relationship_id = main
       .related_parts_of_type::<_, AlternativeFormatImportPart>(package)
       .filter_map(|related| {
@@ -135,6 +153,7 @@ impl AltChunkCatalog {
           AltChunkResource {
             data,
             content_type: part.content_type(package).map(str::to_string),
+            wordprocessing_depth: depth,
           },
         ))
       })
@@ -774,13 +793,19 @@ impl ImageCatalog {
   fn diagram_drawing_parts<'a>(
     package: &WordprocessingDocument,
     parts: impl IntoIterator<Item = (String, DiagramPersistLayoutPart)> + 'a,
-  ) -> HashMap<String, dsp::Drawing> {
+  ) -> HashMap<String, DiagramDrawingResource> {
     let mut by_relationship_id = HashMap::new();
     for (relationship_id, part) in parts {
       let Ok(root) = part.root_element(package) else {
         continue;
       };
-      by_relationship_id.insert(relationship_id, root.clone());
+      by_relationship_id.insert(
+        relationship_id,
+        DiagramDrawingResource {
+          drawing: root.clone(),
+          images: Self::from_image_parts(package, part.related_parts_of_type(package)),
+        },
+      );
     }
     by_relationship_id
   }

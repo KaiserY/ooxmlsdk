@@ -1,6 +1,9 @@
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LayoutOptions {
   pub source_file_name: Option<String>,
+  /// Complete storage path used by Word's FILENAME \\p field. When supplied,
+  /// its final component also owns bare FILENAME; no filesystem access occurs.
+  pub source_file_path: Option<String>,
   /// BCP 47 user-interface language used for application-generated labels,
   /// such as an automatic chart title that is not persisted in the package.
   pub ui_language: Option<String>,

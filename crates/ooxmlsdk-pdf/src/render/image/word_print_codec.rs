@@ -337,6 +337,76 @@ mod tests {
   }
 
   #[test]
+  fn reduced_print_rgb_pngs_use_native_bitmap_codec_with_empty_trial_properties() {
+    // Actual native 600x400 RGB line-art/noise controls. The realized
+    // 600x264 and 236x131 surfaces select all three Print decision paths:
+    // rejected JPEG trial, accepted JPEG trial, and photographic shortcut.
+    // Source sRGB metadata disappears with the GDI+ resize surface. Pin the
+    // complete native lossless plane as well as representation and dimensions.
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    options.standards.push(PdfStandard::PdfA3a);
+    for photographic in [false, true] {
+      let source = image::RgbImage::from_fn(600, 400, |x, y| {
+        let index = x + y * 600;
+        let value = index.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        if !photographic && index % 20 < 17 {
+          image::Rgb([32; 3])
+        } else {
+          image::Rgb([value as u8, (value >> 8) as u8, (value >> 16) as u8])
+        }
+      });
+      for srgb in [false, true] {
+        let mut encoded = Vec::new();
+        {
+          let mut encoder = png::Encoder::new(&mut encoded, 600, 400);
+          encoder.set_color(png::ColorType::Rgb);
+          encoder.set_depth(png::BitDepth::Eight);
+          if srgb {
+            encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
+          }
+          encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(source.as_raw())
+            .unwrap();
+        }
+        for (display_width, display_height, expected_size, lossless) in [
+          (216.05, 95.05, (600, 264), !photographic),
+          (85.3, 47.525, (236, 131), false),
+        ] {
+          let actual = decode_image(
+            &encoded,
+            Some("image/png"),
+            RasterExportOptions::new(&options, display_width, display_height),
+            None,
+          )
+          .unwrap();
+          let image = actual.direct();
+          assert_eq!((image.width, image.height), expected_size);
+          match &image.encoding {
+            DirectRasterEncoding::Sampled { pixels } => {
+              assert!(lossless);
+              let mut crc = flate2::Crc::new();
+              crc.update(&pixels.rgb);
+              assert_eq!(crc.sum(), 0x1046_46af);
+              assert!(pixels.icc_profile.is_none());
+            }
+            DirectRasterEncoding::Dct {
+              alpha, icc_profile, ..
+            } => {
+              assert!(!lossless);
+              assert!(alpha.is_none() && icc_profile.is_none());
+            }
+            _ => panic!("native reduced RGB PNG is either sampled RGB or JPEG"),
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn tiff_trial_metadata_counts_native_external_values_and_rejects_uncovered_owners() {
     // Native 15-property, six-strip TIFF: Exif cost274. A different number of
     // strips changes the cost even when the rendered color samples agree.

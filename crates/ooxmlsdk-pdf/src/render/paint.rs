@@ -29,6 +29,8 @@ mod embedded_fonts;
 mod word_advances;
 #[path = "paint_word_baselines.rs"]
 mod word_baselines;
+#[path = "paint_word_emphasis.rs"]
+mod word_emphasis;
 
 type PaintTextPortionRanges = SmallVec<[(PaintTextPortionKind, Range<usize>); 2]>;
 pub(super) type PaintGlyphFontRuns = SmallVec<[PaintGlyphFontRun; 2]>;
@@ -267,7 +269,11 @@ pub(super) struct TextStyle<'doc> {
   line_vertical_alignment: common::LineVerticalAlignment,
   use_windows_font_metrics: bool,
   wordprocessingml_font_slots: bool,
+  wordprocessingml_complex_numbering: bool,
+  wordprocessingml_no_break_hyphen: bool,
+  wordprocessingml_han_fallback: bool,
   wordprocessingml_cjk_line_metrics: bool,
+  wordprocessing_emphasis: Option<common::WordprocessingEmphasis>,
   wordprocessingml_font_hint: Option<ooxmlsdk_fonts::WordprocessingFontTypeHint>,
   wordprocessingml_resolved_font_slot: Option<ooxmlsdk_fonts::WordprocessingFontSlot>,
   wordprocessingml_east_asia_language_is_chinese: bool,
@@ -285,6 +291,8 @@ pub(super) struct TextStyle<'doc> {
   wordprocessingml_legacy_punctuation_spacing: bool,
   wordprocessingml_punctuation_spacing: bool,
   wordprocessingml_balance_single_byte_double_byte_width: bool,
+  wordprocessingml_balanced_space_portion: bool,
+  wordprocessingml_balance_reference_font_family: Option<&'doc str>,
   pub(super) pdf_glyph_outlines: bool,
   pub(super) pdf_glyph_outline_options: Option<common::PdfGlyphOutlineOptions>,
   pub(super) bold: bool,
@@ -461,9 +469,23 @@ impl FontStyleRef for TextStyle<'_> {
   fn wordprocessingml_font_slots(&self) -> bool {
     self.wordprocessingml_font_slots
   }
+  fn wordprocessingml_complex_numbering(&self) -> bool {
+    self.wordprocessingml_complex_numbering
+  }
+
+  fn wordprocessingml_no_break_hyphen(&self) -> bool {
+    self.wordprocessingml_no_break_hyphen
+  }
+
+  fn wordprocessingml_han_fallback(&self) -> bool {
+    self.wordprocessingml_han_fallback
+  }
 
   fn wordprocessingml_cjk_line_metrics(&self) -> bool {
     self.wordprocessingml_cjk_line_metrics
+  }
+  fn wordprocessing_emphasis(&self) -> Option<common::WordprocessingEmphasis> {
+    self.wordprocessing_emphasis
   }
 
   fn wordprocessingml_font_hint(&self) -> Option<ooxmlsdk_fonts::WordprocessingFontTypeHint> {
@@ -531,6 +553,17 @@ impl FontStyleRef for TextStyle<'_> {
 
   fn wordprocessingml_balance_single_byte_double_byte_width(&self) -> bool {
     self.wordprocessingml_balance_single_byte_double_byte_width
+  }
+
+  fn wordprocessingml_balanced_space_portion(&self) -> bool {
+    self.wordprocessingml_balanced_space_portion
+  }
+
+  fn wordprocessingml_balance_reference_font_family(&self) -> Option<&str> {
+    self
+      .wordprocessingml_balance_single_byte_double_byte_width
+      .then_some(self.wordprocessingml_balance_reference_font_family)
+      .flatten()
   }
 
   fn kerning_enabled(&self) -> bool {
@@ -1679,6 +1712,7 @@ impl<'doc> PaintDocument<'doc> {
     let conversion = super::metafile::word_wmf_conversion_profile(options);
     let separate_path_fill_and_stroke = document.engine_kind == common::LayoutEngineKind::Pptx;
     let mut natural_metrics = word_advances::NaturalMetricsCache::default();
+    let mut emphasis = word_emphasis::EmphasisCache::default();
     let mut font_bitmaps = embedded_fonts::FontBitmaps::default();
     let word_fixed_output = matches!(
       options.images.optimization_policy,
@@ -1795,15 +1829,18 @@ impl<'doc> PaintDocument<'doc> {
           .collect();
         if word_fixed_output {
           word_advances::realize(&mut items, &mut natural_metrics);
-          if options.bitmap_missing_fonts {
-            font_bitmaps.realize(
-              &mut items,
-              options.optimize_for,
-              page.setup.size.width.0,
-              page.setup.size.height.0,
-              text_metrics,
-            );
-          }
+        }
+        // Emphasis is authored text semantics, independent of image policy.
+        // Consume final Word cells when available, then precede bitmap fallback.
+        emphasis.realize(&mut items, text_metrics, &mut natural_metrics);
+        if word_fixed_output && options.bitmap_missing_fonts {
+          font_bitmaps.realize(
+            &mut items,
+            options.optimize_for,
+            page.setup.size.width.0,
+            page.setup.size.height.0,
+            text_metrics,
+          );
         }
         PaintPage {
           width_pt: pdf_page_dimension(document.engine_kind, page.setup.size.width.0),
@@ -2013,7 +2050,7 @@ fn expand_metafile_semantic_text_item<'doc>(
           flip_vertical: layer.flip_vertical,
           data: Cow::Owned(data),
           content_type: Some(Cow::Borrowed(layer.content_type)),
-          blip_compression_state: common::BlipCompressionState::Unspecified,
+          blip_compression_state: common::BlipCompressionState::NotApplicable,
           metafile_monochrome_dib_palette_override: None,
           metafile_background_color: None,
           metafile_external_header: None,
@@ -2084,7 +2121,14 @@ fn expand_metafile_semantic_text_item<'doc>(
               font_size_pt,
               bold: run.bold,
               italic: run.italic,
-              color: if native_picture_transform.is_some() {
+              // MS-EMF's text records use the current DC text color. Once
+              // the text is visibly lifted out of the raster, keep that color
+              // for cached content previews as well as ordinary VML pictures.
+              // Legacy Excel regenerates text from BIFF, so its existing
+              // workbook-owned color policy must not follow the cached EMF.
+              color: if native_picture_transform.is_some()
+                || (paint_native_text && workbook_font_size_pt.is_none())
+              {
                 RgbColor {
                   r: run.color[0],
                   g: run.color[1],
@@ -2134,8 +2178,42 @@ fn expand_metafile_semantic_text_item<'doc>(
             "image/emf" | "image/x-emf" | "application/emf" | "application/x-emf"
           )
         });
-      let mut items =
-        Vec::with_capacity(solid_rects.len() + bitmap_layers.len() + semantic_runs.len() + 1);
+      let host_background = if paint_native_text && image.clip_path.is_empty() {
+        image.metafile_background_color.take().map(|color| {
+          // The host fill is behind the complete metafile, including lifted
+          // cells and text. Leaving it on the residual Image would cover
+          // vector rectangles already emitted before that Image.
+          // A host fill also disables native-size painting; preserve that
+          // decision after transferring the fill to its own first item.
+          image.metafile_native_size = false;
+          PageItem::Rect(RectItem {
+            x_pt: image.x_pt,
+            y_pt: image.y_pt,
+            width_pt: image.width_pt,
+            height_pt: image.height_pt,
+            fill: Some(RectFill::Solid {
+              color: RgbColor {
+                r: color[0],
+                g: color[1],
+                b: color[2],
+              },
+              opacity: 1.0,
+            }),
+            stroke: None,
+            stroke_opacity: 1.0,
+          })
+        })
+      } else {
+        None
+      };
+      let mut items = Vec::with_capacity(
+        solid_rects.len()
+          + bitmap_layers.len()
+          + semantic_runs.len()
+          + 1
+          + usize::from(host_background.is_some()),
+      );
+      items.extend(host_background);
       items.extend(solid_rects);
       items.extend(bitmap_layers);
       items.push(PageItem::Image(image));
@@ -2831,7 +2909,11 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     line_vertical_alignment: style.line_vertical_alignment,
     use_windows_font_metrics: style.use_windows_font_metrics,
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
+    wordprocessingml_complex_numbering: style.wordprocessingml_complex_numbering,
+    wordprocessingml_no_break_hyphen: style.wordprocessingml_no_break_hyphen,
+    wordprocessingml_han_fallback: style.wordprocessingml_han_fallback,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
+    wordprocessing_emphasis: style.wordprocessing_emphasis,
     wordprocessingml_font_hint: style.wordprocessingml_font_hint,
     wordprocessingml_resolved_font_slot: style.wordprocessingml_resolved_font_slot,
     wordprocessingml_east_asia_language_is_chinese: style
@@ -2853,6 +2935,15 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     wordprocessingml_punctuation_spacing: style.wordprocessingml_punctuation_spacing,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,
+    wordprocessingml_balanced_space_portion: style.wordprocessingml_balanced_space_portion,
+    wordprocessingml_balance_reference_font_family: style
+      .wordprocessingml_balance_single_byte_double_byte_width
+      .then_some(
+        style
+          .wordprocessingml_balance_reference_font_family
+          .as_deref(),
+      )
+      .flatten(),
     pdf_glyph_outlines: style.pdf_glyph_outlines,
     pdf_glyph_outline_options: style.pdf_glyph_outline_options.as_deref().cloned(),
     bold: style.bold,
@@ -4460,6 +4551,285 @@ mod tests {
   };
   use ooxmlsdk_layout::common;
 
+  fn colored_metafile_preview(paint_text: bool) -> super::ImageItem<'static> {
+    use emfsdk::emf::{EmfMetafile, EmfRecord, EmfRecordData, EmrBitBlt, EmrExtTextOut, EmrText};
+    use emfsdk::string::{SdkEncoding, SdkString};
+    use emfsdk::types::{ColorRef, PointL, RectL, SizeL, XForm};
+    let mut header = vec![0; 100];
+    for (offset, value) in [
+      (8, 95i32),
+      (12, 95),
+      (24, 2500),
+      (28, 2500),
+      (64, 96),
+      (68, 96),
+      (72, 25),
+      (76, 25),
+    ] {
+      header[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+    header[32..36].copy_from_slice(&emfsdk::emf::EMF_SIGNATURE.to_le_bytes());
+    let mut font = vec![0; 96];
+    font[..4].copy_from_slice(&1u32.to_le_bytes());
+    font[4..8].copy_from_slice(&(-13i32).to_le_bytes());
+    for (i, unit) in "Arial".encode_utf16().enumerate() {
+      font[32 + i * 2..34 + i * 2].copy_from_slice(&unit.to_le_bytes());
+    }
+    let cell = EmfRecordData::BitBlt(EmrBitBlt {
+      bounds: RectL {
+        left: 0,
+        top: 0,
+        right: 48,
+        bottom: 48,
+      },
+      dest: PointL::default(),
+      dest_size: SizeL { cx: 48, cy: 48 },
+      raster_operation: 0x00f0_0021, // PATCOPY: the selected solid brush.
+      source: PointL::default(),
+      xform_source: XForm {
+        m11: 1.0,
+        m22: 1.0,
+        ..XForm::default()
+      },
+      background_color_source: ColorRef::default(),
+      color_usage: 0,
+      bitmap: None,
+      padding: Vec::new(),
+    })
+    .to_record()
+    .unwrap();
+    let text = EmfRecordData::ExtTextOutW(EmrExtTextOut {
+      bounds: RectL {
+        left: 20,
+        top: 20,
+        right: 40,
+        bottom: 40,
+      },
+      graphics_mode: 1,
+      ex_scale: 1.0,
+      ey_scale: 1.0,
+      text: EmrText {
+        reference: PointL { x: 20, y: 20 },
+        options: emfsdk::emf::ExtTextOutOptions::empty(),
+        // Match Office's complete EMRTEXT descriptor and emfsdk's
+        // ext_text_out_w_record fixture. With neither CLIPPED nor OPAQUE,
+        // the rectangle is present in the record but has no painting effect.
+        rectangle: Some(RectL::default()),
+        text: SdkString::raw(vec![b'A', 0], SdkEncoding::Utf16Le),
+        undefined_space_before_string: Vec::new(),
+        dx_buffer_present: true,
+        undefined_space_before_dx: Vec::new(),
+        dx: vec![8],
+      },
+      padding: Vec::new(),
+    })
+    .to_record()
+    .unwrap();
+    let data = EmfMetafile {
+      records: vec![
+        EmfRecord::new(1, header),
+        EmfRecord::new(
+          39,
+          [2u32, 0, 0x00ce_c7ff, 0]
+            .into_iter()
+            .flat_map(u32::to_le_bytes)
+            .collect(),
+        ),
+        EmfRecord::new(37, 2u32.to_le_bytes().to_vec()),
+        cell,
+        EmfRecord::new(82, font),
+        EmfRecord::new(37, 1u32.to_le_bytes().to_vec()),
+        EmfRecord::new(24, 0x0000_6100u32.to_le_bytes().to_vec()),
+        text,
+        EmfRecord::new(14, vec![0; 12]),
+      ],
+      trailing_data: Vec::new(),
+    }
+    .to_bytes()
+    .unwrap();
+    let runs = emfsdk::render::extract_metafile_text_runs(&data, Some("image/x-emf"));
+    assert_eq!(
+      runs.len(),
+      1,
+      "fixture must provide a real cached text layer"
+    );
+    assert_eq!(runs[0].text, "A");
+    assert_eq!(runs[0].color, [0, 97, 0]);
+    super::ImageItem {
+      font_bitmap: None,
+      x_pt: 10.0,
+      y_pt: 20.0,
+      width_pt: 72.0,
+      height_pt: 72.0,
+      crop: super::ImageCrop::default(),
+      clip_path: &[],
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      data: Cow::Owned(data),
+      content_type: Some(Cow::Borrowed("image/x-emf")),
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
+      metafile_monochrome_dib_palette_override: None,
+      metafile_background_color: Some([51, 102, 204]),
+      metafile_external_header: None,
+      metafile_fixed_output_profile: common::MetafileFixedOutputProfile::Default,
+      alt_text: None,
+      hyperlink_url: None,
+      semantic_metafile_text: true,
+      metafile_semantic_text_includes_raster_backdrop: paint_text,
+      signature_line: None,
+      metafile_native_size: true,
+    }
+  }
+
+  #[test]
+  fn lifted_metafile_cells_and_text_remain_above_the_colored_host() {
+    use super::{PageItem, RectFill};
+    for native_transform in [false, true] {
+      let mut image = colored_metafile_preview(true);
+      if native_transform {
+        image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::WordVmlEmfPicture;
+      }
+      let PageItem::Group {
+        items, transform, ..
+      } = super::expand_metafile_semantic_text_item(PageItem::Image(image), None, None, None)
+      else {
+        panic!("visible metafile layers");
+      };
+      let [
+        PageItem::Rect(host),
+        PageItem::Rect(cell),
+        PageItem::Image(backdrop),
+        PageItem::Text(text),
+      ] = items.as_slice()
+      else {
+        panic!("host, cached cell, residual raster, then visible text");
+      };
+      let Some(RectFill::Solid { color, .. }) = host.fill else {
+        panic!("host fill");
+      };
+      assert_eq!((color.r, color.g, color.b), (51, 102, 204));
+      let Some(RectFill::Solid { color, .. }) = cell.fill else {
+        panic!("cached cell fill");
+      };
+      assert_eq!((color.r, color.g, color.b), (255, 199, 206));
+      assert_eq!(backdrop.metafile_background_color, None);
+      assert!(
+        !backdrop.metafile_native_size,
+        "host frame still controls the residual raster"
+      );
+      assert!(
+        super::super::metafile::render_options_for_image(backdrop, &crate::PdfOptions::default())
+          .transparent_background
+      );
+      assert_eq!(
+        (text.style.color.r, text.style.color.g, text.style.color.b),
+        (0, 97, 0)
+      );
+      assert!(!text.style.semantic_only);
+      assert_eq!(text.text, "A");
+      assert_eq!(
+        (host.x_pt, host.y_pt, host.width_pt, host.height_pt),
+        (
+          backdrop.x_pt,
+          backdrop.y_pt,
+          backdrop.width_pt,
+          backdrop.height_pt
+        )
+      );
+      assert_eq!(transform.is_some(), native_transform);
+      if let Some(transform) = transform {
+        assert_eq!((host.x_pt, host.y_pt), (0.0, 0.0));
+        assert_eq!((transform.dx.0, transform.dy.0), (10.0, 20.0));
+        assert!((host.width_pt * transform.m11 - 72.0).abs() < 0.001);
+        assert!((host.height_pt * transform.m22 - 72.0).abs() < 0.001);
+      }
+    }
+  }
+
+  #[test]
+  fn semantic_only_metafile_keeps_host_background_and_invisible_text_policy() {
+    let super::PageItem::Group { items, .. } = super::expand_metafile_semantic_text_item(
+      super::PageItem::Image(colored_metafile_preview(false)),
+      None,
+      None,
+      None,
+    ) else {
+      panic!("semantic-only preview");
+    };
+    let [super::PageItem::Image(image), super::PageItem::Text(text)] = items.as_slice() else {
+      panic!("unchanged preview with invisible semantic text");
+    };
+    assert_eq!(image.metafile_background_color, Some([51, 102, 204]));
+    assert!(image.metafile_native_size);
+    assert!(text.style.semantic_only);
+    assert_eq!(
+      (text.style.color.r, text.style.color.g, text.style.color.b),
+      (0, 0, 0)
+    );
+  }
+
+  #[test]
+  fn metafile_host_with_shape_clip_keeps_its_image_owned_background() {
+    const CLIP: [common::PathCommand; 4] = [
+      common::PathCommand::MoveTo(common::Point {
+        x: common::Pt(0.0),
+        y: common::Pt(0.0),
+      }),
+      common::PathCommand::LineTo(common::Point {
+        x: common::Pt(72.0),
+        y: common::Pt(0.0),
+      }),
+      common::PathCommand::LineTo(common::Point {
+        x: common::Pt(0.0),
+        y: common::Pt(72.0),
+      }),
+      common::PathCommand::Close,
+    ];
+    let mut image = colored_metafile_preview(true);
+    image.clip_path = &CLIP;
+    let super::PageItem::Group { items, .. } =
+      super::expand_metafile_semantic_text_item(super::PageItem::Image(image), None, None, None)
+    else {
+      panic!("clipped metafile preview");
+    };
+    let [
+      super::PageItem::Rect(_),
+      super::PageItem::Image(image),
+      super::PageItem::Text(_),
+    ] = items.as_slice()
+    else {
+      panic!("no unclipped host rectangle inserted");
+    };
+    assert_eq!(image.metafile_background_color, Some([51, 102, 204]));
+    assert_eq!(image.clip_path.len(), 4);
+    assert!(image.metafile_native_size);
+  }
+
+  #[test]
+  fn regenerated_legacy_excel_text_does_not_adopt_cached_metafile_color() {
+    let mut image = colored_metafile_preview(true);
+    image.metafile_fixed_output_profile =
+      common::MetafileFixedOutputProfile::LegacyExcelContentPreview {
+        font_size_twips: 220,
+      };
+    let super::PageItem::Group { items, .. } =
+      super::expand_metafile_semantic_text_item(super::PageItem::Image(image), None, None, None)
+    else {
+      panic!("legacy workbook preview");
+    };
+    let Some(super::PageItem::Text(text)) = items.last() else {
+      panic!("workbook-owned text");
+    };
+    assert!(!text.style.semantic_only);
+    assert_eq!(text.style.font_size_pt, 11.0);
+    assert_eq!(text.style.semantic_character_advances_pt, None);
+    assert_eq!(
+      (text.style.color.r, text.style.color.g, text.style.color.b),
+      (0, 0, 0)
+    );
+  }
+
   #[test]
   fn exact_and_word_device_widths_do_not_share_a_font_resource() {
     let style = super::TextStyle {
@@ -4708,6 +5078,116 @@ mod tests {
   }
 
   #[test]
+  fn balanced_source_spaces_survive_pdf_coalescing_and_final_word_advances() {
+    let mut metrics = super::TextMetrics::new();
+    let common::DisplayItem::Text(mut template) = text_item(point(60.96, 100.0), None, 0.0) else {
+      unreachable!()
+    };
+    template.origin_is_baseline = true;
+    template.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    template.style = common::TextStyle {
+      font_family: Some(Cow::Borrowed("Times New Roman")),
+      font_size: common::Pt(8.04),
+      layout_font_sizes: Some(common::LayoutFontSizes {
+        primary: common::Pt(8.0),
+        complex: None,
+      }),
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      wordprocessingml_balance_single_byte_double_byte_width: true,
+      ..Default::default()
+    };
+    let owner = Some(super::PaintLineOwner {
+      frame_index: 1,
+      line_index: 0,
+      frame_kind: super::FollowFrameKind::Paragraph,
+      clip: None,
+    });
+    let mut paint = |parts: &[(&'static str, bool)]| {
+      let mut x = template.origin.x.0;
+      let mut runs = Vec::new();
+      for &(text, qualified) in parts {
+        let mut item = template.clone();
+        item.origin.x.0 = x;
+        item.text = Cow::Borrowed(text);
+        item.style.wordprocessingml_balanced_space_portion = qualified;
+        let common_item = super::text_item_from_common(&item);
+        assert_eq!(
+          common_item.style.wordprocessingml_balanced_space_portion,
+          qualified
+        );
+        x += super::text_layout_glyphs(&common_item.text, &common_item.style, 0.0, &mut metrics)
+          .unwrap()
+          .width_pt;
+        runs.push(item);
+      }
+      let source = runs.iter().map(|item| {
+        (
+          super::PageItem::Text(Box::new(super::text_item_from_common(item))),
+          owner,
+        )
+      });
+      let (items, owners) = super::coalesced_writer_text_items(source, &mut metrics);
+      let count = items.len();
+      let mut painted = items
+        .into_iter()
+        .zip(owners)
+        .map(|(item, owner)| {
+          let super::PageItem::Text(item) = item else {
+            unreachable!()
+          };
+          super::PaintItem::Text(Box::new(super::PaintText::from_layout_text(
+            *item,
+            owner,
+            None,
+            612.0,
+            &mut metrics,
+          )))
+        })
+        .collect::<Vec<_>>();
+      super::word_advances::realize(
+        &mut painted,
+        &mut super::word_advances::NaturalMetricsCache::default(),
+      );
+      let mut glyphs = Vec::new();
+      for item in painted {
+        let super::PaintItem::Text(text) = item else {
+          unreachable!()
+        };
+        for portion in text.portions {
+          for run in portion.glyphs.unwrap() {
+            let mut x = portion.x_pt + run.x_offset_pt;
+            for glyph in run.glyphs {
+              let width = glyph.x_advance * run.font_size_pt;
+              glyphs.push((x, width));
+              x += width;
+            }
+          }
+        }
+      }
+      (count, glyphs)
+    };
+    let (_, joined) = paint(&[("  A", false)]);
+    let (split_count, split) = paint(&[(" ", true), (" ", true), ("A", false)]);
+    assert_eq!(
+      split_count, 2,
+      "qualified blanks can join each other but not ordinary text"
+    );
+    assert_eq!(joined.len(), 3);
+    assert_eq!(split.len(), joined.len());
+    for ((x, width), (expected_x, expected_width)) in split.iter().zip(&joined) {
+      assert!((x - expected_x).abs() < 0.0001);
+      assert!((width - expected_width).abs() < 0.0001);
+    }
+    let (_, ordinary) = paint(&[(" A", false)]);
+    let (_, qualified) = paint(&[(" ", true), ("A", false)]);
+    assert!(
+      qualified[1].0 - ordinary[1].0 > 1.0,
+      "final device realization must retain the source-qualified ideal blank"
+    );
+  }
+
+  #[test]
   fn cell_text_array_owner_survives_the_common_pdf_style_adapter() {
     let common_style = common::TextStyle {
       office_text_array: true,
@@ -4725,6 +5205,97 @@ mod tests {
       ..common_style
     };
     assert!(!super::text_style_from_common(&semantic_only_owner).office_text_array);
+  }
+
+  #[test]
+  fn no_break_hyphen_control_keeps_its_glyph_through_pdf_style_transport() {
+    let mut common_style = common::TextStyle {
+      font_family: Some("Arial".into()),
+      high_ansi_font_family: Some("Times New Roman".into()),
+      font_size: common::Pt(12.0),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut metrics = super::TextMetrics::new();
+    for control in [false, true, false, true] {
+      common_style.wordprocessingml_no_break_hyphen = control;
+      let painted = super::text_style_from_common(&common_style);
+      assert_eq!(painted.wordprocessingml_no_break_hyphen, control);
+      let glyphs = super::shaped_pdf_glyphs("\u{2011}", &painted, 0.0, &mut metrics).unwrap();
+      assert_eq!(glyphs.font_runs.len(), 1);
+      assert!(glyphs.font_runs[0].font_face.id().contains(if control {
+        "Arial"
+      } else {
+        "TimesNewRoman"
+      }));
+    }
+  }
+
+  #[test]
+  fn complex_numbering_keeps_its_font_slots_through_pdf_paint_and_cache() {
+    let mut common_style = common::TextStyle {
+      font_family: Some("Calibri".into()),
+      complex_font_family: Some("Arial".into()),
+      font_size: common::Pt(11.0),
+      complex_font_size: Some(common::Pt(16.0)),
+      complex_script: Some(true),
+      complex_bold: Some(true),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut metrics = super::TextMetrics::new();
+    for numbered in [false, true, false, true] {
+      common_style.wordprocessingml_complex_numbering = numbered;
+      let painted = super::text_style_from_common(&common_style);
+      assert_eq!(painted.wordprocessingml_complex_numbering, numbered);
+      let glyphs = super::shaped_pdf_glyphs("א.", &painted, 0.0, &mut metrics).unwrap();
+      if numbered {
+        assert_eq!(glyphs.font_runs.len(), 2);
+        assert!(glyphs.font_runs[0].font_face.id().contains("Arial"));
+        assert!(glyphs.font_runs[1].font_face.id().contains("Calibri"));
+        assert_eq!(glyphs.font_runs[0].font_size_pt, 16.0);
+        assert_eq!(glyphs.font_runs[1].font_size_pt, 11.0);
+      } else {
+        assert_eq!(glyphs.font_runs.len(), 1);
+        assert!(glyphs.font_runs[0].font_face.id().contains("Arial"));
+        assert_eq!(glyphs.font_runs[0].font_size_pt, 16.0);
+      }
+    }
+  }
+
+  #[test]
+  fn word_han_fallback_reaches_pdf_glyphs_without_changing_drawingml_or_cjk_faces() {
+    let mut metrics = super::TextMetrics::new();
+    let mut common_style = common::TextStyle {
+      font_family: Some("Calibri".into()),
+      east_asia_font_family: Some("Calibri".into()),
+      font_size: common::Pt(12.0),
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    // Word and DrawingML use the same slot dispatch and PDF adapter. Reuse
+    // one resolver across both policies to exercise the actual paint cache.
+    for word in [true, false, true, false] {
+      common_style.wordprocessingml_han_fallback = word;
+      let painted = super::text_style_from_common(&common_style);
+      let glyphs = super::shaped_pdf_glyphs("地址块", &painted, 0.0, &mut metrics).unwrap();
+      let expected = if word { "SimSun" } else { "MicrosoftYaHei" };
+      assert!(glyphs.font_runs.iter().all(|run| {
+        run.font_face.id().contains(expected) && run.glyphs.iter().all(|glyph| glyph.glyph_id != 0)
+      }));
+    }
+    common_style.wordprocessingml_han_fallback = true;
+    common_style.east_asia_font_family = Some("MS Mincho".into());
+    let painted = super::text_style_from_common(&common_style);
+    let glyphs = super::shaped_pdf_glyphs("地块", &painted, 0.0, &mut metrics).unwrap();
+    assert_eq!(glyphs.font_runs.len(), 2);
+    assert!(glyphs.font_runs[0].font_face.id().contains("MS-Mincho"));
+    assert!(
+      glyphs.font_runs[1]
+        .font_face
+        .id()
+        .contains("MicrosoftYaHei")
+    );
   }
 
   #[test]
@@ -4921,6 +5492,7 @@ mod tests {
     // accidentally produce the Windows result. Scale without a fitted offset.
     for scale in [0.5, 1.0, 2.0, 4.0] {
       let metrics = TextVerticalMetrics {
+        font_design_unit_pt: 0.0,
         ascent_pt: 8.0 * scale,
         descent_pt: 2.0 * scale,
         windows_line_height_pt: 13.0 * scale,
@@ -5010,6 +5582,71 @@ mod tests {
   }
 
   #[test]
+  fn word_emphasis_paints_with_requested_and_office_image_policies() {
+    let common::DisplayItem::Text(mut text) = text_item(point(72.0, 90.0), None, 0.0) else {
+      unreachable!()
+    };
+    text.text = Cow::Borrowed("Ai \u{a0}、");
+    text.origin_is_baseline = true;
+    text.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    text.style = common::TextStyle {
+      font_family: Some(Cow::Borrowed("Calibri")),
+      font_size: common::Pt(11.04),
+      wordprocessingml_font_slots: true,
+      use_windows_font_metrics: true,
+      wordprocessing_emphasis: Some(common::WordprocessingEmphasis::new(
+        common::EmphasisMark::Dot,
+        Some("ja-JP"),
+      )),
+      ..common::TextStyle::default()
+    };
+    let document = common::LayoutDocument {
+      pages: vec![common::DisplayPage {
+        setup: common::PageSetup {
+          size: common::Size {
+            width: common::Pt(612.0),
+            height: common::Pt(792.0),
+          },
+          ..Default::default()
+        },
+        items: vec![common::DisplayItem::Text(text)],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    for policy in [
+      crate::PdfImageOptimizationPolicy::Requested,
+      crate::PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx),
+    ] {
+      let mut options = crate::PdfOptions::default();
+      options.images.optimization_policy = policy;
+      let paint = super::prepare_for_direct(&document, &options);
+      let texts = paint.pages[0]
+        .items
+        .iter()
+        .filter_map(|item| match item {
+          super::PaintItem::Text(text) => Some(text.as_ref()),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(texts.len(), 2);
+      assert_eq!(texts[0].item.text, "Ai \u{a0}、");
+      assert_eq!(
+        texts[1].item.text, "．．．",
+        "spaces are unmarked; punctuation is marked"
+      );
+      assert_eq!(texts[1].portions.len(), 3);
+      for portion in &texts[1].portions {
+        let runs = portion.glyphs.as_ref().unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].glyphs.len(), 1);
+        assert!((runs[0].font_size_pt - 11.04).abs() < 0.001);
+        assert!((portion.baseline_y - (texts[0].baseline_y - 11.16)).abs() < 0.001);
+      }
+    }
+  }
+
+  #[test]
   fn split_text_paint_retains_carried_decorations_without_repeating_blanks() {
     let mut metrics = super::TextMetrics::new();
     for contents in ["     ", "  text  "] {
@@ -5064,6 +5701,193 @@ mod tests {
           pair[1].strikethrough.as_ref().unwrap().x1_pt
         );
       }
+    }
+  }
+
+  #[test]
+  fn detached_word_lines_keep_native_advances_and_independent_group_owners() {
+    fn glyph_advances(items: &[super::PaintItem<'_>]) -> Vec<f32> {
+      items
+        .iter()
+        .flat_map(|item| {
+          let super::PaintItem::Text(text) = item else {
+            panic!("test line must contain text");
+          };
+          text.portions.iter().flat_map(|portion| {
+            portion.glyphs.iter().flatten().flat_map(|run| {
+              run
+                .glyphs
+                .iter()
+                .map(|glyph| glyph.x_advance * run.font_size_pt)
+            })
+          })
+        })
+        .collect()
+    }
+    fn positions(items: &[super::PaintItem<'_>]) -> Vec<f32> {
+      items
+        .iter()
+        .flat_map(|item| {
+          let super::PaintItem::Text(text) = item else {
+            panic!("test line must contain text");
+          };
+          text.portions.iter().flat_map(|portion| {
+            [portion.x_pt, portion.baseline_y, portion.width_pt]
+              .into_iter()
+              .chain(portion.glyphs.iter().flatten().flat_map(|run| {
+                run
+                  .glyphs
+                  .iter()
+                  .map(|glyph| glyph.x_advance * run.font_size_pt)
+              }))
+          })
+        })
+        .collect()
+    }
+    fn group(items: Vec<super::PaintItem<'_>>) -> super::PaintItem<'_> {
+      super::PaintItem::Group {
+        mask: None,
+        clip: None,
+        transform: None,
+        blend_mode: common::BlendMode::Normal,
+        opacity: 1.0,
+        flatten_identity: false,
+        items,
+      }
+    }
+    let mut metrics = super::TextMetrics::new();
+    let common::DisplayItem::Text(mut first) = text_item(point(60.96, 100.0), None, 0.0) else {
+      unreachable!()
+    };
+    first.text = Cow::Borrowed("Universal PROBE ");
+    first.origin_is_baseline = true;
+    first.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    first.style = common::TextStyle {
+      font_family: Some(Cow::Borrowed("Calibri")),
+      font_size: common::Pt(14.04),
+      layout_font_sizes: Some(common::LayoutFontSizes {
+        primary: common::Pt(14.0),
+        complex: None,
+      }),
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      ..common::TextStyle::default()
+    };
+    let logical_width = super::text_layout_glyphs(
+      &first.text,
+      &super::text_style_from_common(&first.style),
+      0.0,
+      &mut metrics,
+    )
+    .unwrap()
+    .width_pt;
+    let mut second = first.clone();
+    second.text = Cow::Borrowed("minimum WHITE 01234");
+    second.origin.x.0 += logical_width;
+    second.color.r = 255;
+    let runs = [first, second];
+    let mut paint = |owner| {
+      runs
+        .iter()
+        .map(|run| {
+          super::PaintItem::Text(Box::new(super::PaintText::from_layout_text(
+            super::text_item_from_common(run),
+            owner,
+            None,
+            612.0,
+            &mut metrics,
+          )))
+        })
+        .collect::<Vec<_>>()
+    };
+    let mut owned = paint(Some(super::PaintLineOwner {
+      frame_index: 7,
+      line_index: 3,
+      frame_kind: super::FollowFrameKind::Paragraph,
+      clip: None,
+    }));
+    let mut detached = paint(None);
+    let before = positions(&detached);
+    let advances_before = glyph_advances(&detached);
+    let mut separate_stories = vec![group(paint(None)), group(paint(None))];
+    let mut separate_clips = Vec::new();
+    for x_pt in [0.0, 1.0] {
+      let mut clipped = paint(None);
+      for item in &mut clipped {
+        let super::PaintItem::Text(text) = item else {
+          unreachable!()
+        };
+        for portion in &mut text.portions {
+          portion.clip = Some(super::PaintClipRect {
+            x_pt,
+            y_pt: 0.0,
+            width_pt: 612.0,
+            height_pt: 792.0,
+          });
+        }
+      }
+      separate_clips.extend(clipped);
+    }
+    // Flattened cells may share their group, baseline and clip without
+    // sharing a logical line. A real gap must not move either origin.
+    let mut separate_cells = paint(None);
+    for (item, offset) in separate_cells.iter_mut().zip([8.19, 100.0]) {
+      let super::PaintItem::Text(text) = item else {
+        unreachable!()
+      };
+      text.item.x_pt += offset;
+      for portion in &mut text.portions {
+        portion.x_pt += offset;
+      }
+    }
+    let cells_before = positions(&separate_cells);
+    let mut opposites = paint(None);
+    for item in &mut opposites {
+      let super::PaintItem::Text(text) = item else {
+        unreachable!()
+      };
+      text.item.origin_is_baseline = false;
+    }
+    let mut cache = super::word_advances::NaturalMetricsCache::default();
+    for items in [
+      &mut owned,
+      &mut detached,
+      &mut separate_stories,
+      &mut separate_clips,
+      &mut separate_cells,
+      &mut opposites,
+    ] {
+      super::word_advances::realize(items, &mut cache);
+    }
+    let expected = positions(&owned);
+    assert_ne!(
+      glyph_advances(&owned),
+      advances_before,
+      "native advance path must run independently of origin rounding"
+    );
+    assert_eq!(positions(&detached), expected);
+    assert_eq!(positions(&opposites), before);
+    assert_eq!(positions(&separate_cells), cells_before);
+    for items in separate_clips.chunks_exact(runs.len()) {
+      assert_eq!(positions(items), expected, "distinct clips stay separate");
+    }
+    for item in separate_stories {
+      let super::PaintItem::Group { items, .. } = item else {
+        unreachable!()
+      };
+      assert_eq!(
+        positions(&items),
+        expected,
+        "overlapping stories stay separate"
+      );
+    }
+    for item in detached {
+      let super::PaintItem::Text(text) = item else {
+        unreachable!()
+      };
+      assert_eq!(text.source_frame_index, None);
+      assert_eq!(text.source_line_index, None);
+      assert_eq!(text.baseline_y, 100.0);
     }
   }
 
@@ -5355,6 +6179,61 @@ mod tests {
     assert_eq!(remapped[0].text_range, 0..4);
     assert_eq!(remapped[1].text_range, 4..5);
     assert!(remap_glyph_text_ranges(&[glyph(0..1)], "A", "AA").is_none());
+  }
+
+  #[test]
+  fn word_balance_reference_survives_pdf_style_adapter_and_distinguishes_styles() {
+    use ooxmlsdk_layout::fonts::FontStyleRef;
+    use std::sync::Arc;
+
+    let plain = common::TextStyle {
+      font_family: Some(Cow::Borrowed("Times New Roman")),
+      east_asia_font_family: Some(Cow::Borrowed("Microsoft YaHei")),
+      wordprocessingml_balance_single_byte_double_byte_width: true,
+      ..Default::default()
+    };
+    let plain_paint = text_style_from_common(&plain);
+    assert_eq!(
+      plain_paint.wordprocessingml_balance_reference_font_family(),
+      None
+    );
+    for family in ["SimSun", "Times New Roman"] {
+      let common = common::TextStyle {
+        wordprocessingml_balance_reference_font_family: Some(Arc::from(family)),
+        ..plain.clone()
+      };
+      let paint = text_style_from_common(&common);
+      assert_eq!(
+        paint.wordprocessingml_balance_reference_font_family(),
+        Some(family)
+      );
+      assert_eq!(paint.font_family(), plain_paint.font_family());
+      assert_eq!(
+        paint.east_asia_font_family(),
+        plain_paint.east_asia_font_family()
+      );
+      assert_ne!(paint, plain_paint);
+      assert!(std::ptr::eq(
+        paint
+          .wordprocessingml_balance_reference_font_family()
+          .unwrap()
+          .as_ptr(),
+        common
+          .wordprocessingml_balance_reference_font_family
+          .as_ref()
+          .unwrap()
+          .as_ptr(),
+      ));
+    }
+    let disabled = common::TextStyle {
+      wordprocessingml_balance_reference_font_family: Some(Arc::from("SimSun")),
+      wordprocessingml_balance_single_byte_double_byte_width: false,
+      ..plain
+    };
+    assert_eq!(
+      text_style_from_common(&disabled).wordprocessingml_balance_reference_font_family(),
+      None
+    );
   }
 
   #[test]

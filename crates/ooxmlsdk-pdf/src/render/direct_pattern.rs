@@ -198,10 +198,10 @@ impl DirectPatternSet {
     // is equivalent to anchoring the adjacent cell's top there. This is the
     // Word texture brush representation, including its intrinsic pixel grid.
     let matrix = [
-      texture.tile_size.width.0 / width,
+      texture_matrix_scale(self.engine_kind, texture.tile_size.width.0 / width),
       0.0,
       0.0,
-      texture.tile_size.height.0 / height,
+      texture_matrix_scale(self.engine_kind, texture.tile_size.height.0 / height),
       texture.origin.x.0,
       page_height_pt - texture.origin.y.0,
     ];
@@ -297,6 +297,20 @@ impl DirectPatternSet {
     }
     Ok(())
   }
+}
+
+fn texture_matrix_scale(engine: common::LayoutEngineKind, scale: f32) -> f32 {
+  if engine != common::LayoutEngineKind::Docx {
+    return scale;
+  }
+  // Word serializes texture scales to five decimal places, as for its 6/7
+  // hatch lattice. Native image controls include 90/128 -> .70312 (ties-even)
+  // and radial page brushes 61.44/81 -> .75852. Retaining the longer binary
+  // quotient changes PDFium's discrete tile sampling, even when the nominal
+  // physical period differs by much less than a pixel. Keep the writer's
+  // precision at this owner; do not adjust the authored tile or its image.
+  let rounded = ((f64::from(scale) * 100_000.0).round_ties_even() / 100_000.0) as f32;
+  if rounded > 0.0 { rounded } else { scale }
 }
 
 fn resolved_pattern_geometry(
@@ -421,6 +435,35 @@ mod tests {
 
   fn color(r: u8, g: u8, b: u8, a: u8) -> common::Color {
     common::Color { r, g, b, a }
+  }
+
+  #[test]
+  fn word_texture_matrix_matches_native_decimal_sampling() {
+    // Independent native controls: a gradient tile, an explicit-size bitmap,
+    // and the general radial tile. Decimal ties belong to the PDF serializer.
+    for (period, pixels, expected) in [
+      (61.44, 81.0, 0.758_52),
+      (46.08, 61.0, 0.755_41),
+      (90.0, 128.0, 0.703_12),
+      (92.28, 123.0, 0.750_24),
+    ] {
+      let scale = period / pixels;
+      assert_eq!(
+        texture_matrix_scale(common::LayoutEngineKind::Docx, scale),
+        expected
+      );
+      for engine in [
+        common::LayoutEngineKind::Xlsx,
+        common::LayoutEngineKind::Pptx,
+      ] {
+        assert_eq!(texture_matrix_scale(engine, scale), scale);
+      }
+    }
+    // Preserve a valid nonzero transform below the legacy decimal lattice.
+    assert_eq!(
+      texture_matrix_scale(common::LayoutEngineKind::Docx, 1e-7),
+      1e-7
+    );
   }
 
   #[test]

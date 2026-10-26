@@ -64,19 +64,21 @@ impl BoundaryWinding {
   }
 
   pub(super) fn contains(&self, point: (f32, f32)) -> bool {
+    self.winding(point) != 0
+  }
+
+  pub(super) fn winding(&self, point: (f32, f32)) -> i32 {
     if self.buckets.is_empty() || !point.1.is_finite() {
       return self
         .edges
         .iter()
         .map(|edge| edge_winding(edge, point))
-        .sum::<i32>()
-        != 0;
+        .sum::<i32>();
     }
     self.buckets[self.bucket(point.1)]
       .iter()
       .map(|&index| edge_winding(&self.edges[index], point))
       .sum::<i32>()
-      != 0
   }
 }
 

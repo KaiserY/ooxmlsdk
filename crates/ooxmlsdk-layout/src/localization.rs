@@ -3,6 +3,78 @@ use std::sync::Arc;
 use icu_locale::fallback::LocaleFallbacker;
 use icu_locale::{DataLocale, Locale, LocaleCanonicalizer, LocaleDirectionality, LocaleExpander};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct OfficeNumberSeparators {
+  pub decimal: char,
+  pub grouping: char,
+}
+
+impl Default for OfficeNumberSeparators {
+  fn default() -> Self {
+    Self {
+      decimal: '.',
+      grouping: ',',
+    }
+  }
+}
+
+impl OfficeNumberSeparators {
+  fn for_format_locale(locale: Option<&str>) -> Self {
+    use icu_decimal::{DecimalFormatter, input::Decimal, parts};
+    use std::fmt;
+    use writeable::{Part, PartsWrite, Writeable};
+
+    // Consume ICU's annotated symbols, independently of its digit shapes,
+    // signs and grouping sizes. This happens once at document import; text
+    // measurement retains its existing per-layout width cache.
+    struct Symbols {
+      value: OfficeNumberSeparators,
+      part: Option<Part>,
+    }
+    impl fmt::Write for Symbols {
+      fn write_str(&mut self, text: &str) -> fmt::Result {
+        if let Some(character) = text.chars().next() {
+          match self.part {
+            Some(parts::DECIMAL) => self.value.decimal = character,
+            Some(parts::GROUP) => self.value.grouping = character,
+            _ => {}
+          }
+        }
+        Ok(())
+      }
+    }
+    impl PartsWrite for Symbols {
+      type SubPartsWrite = Self;
+
+      fn with_part(
+        &mut self,
+        part: Part,
+        mut write: impl FnMut(&mut Self) -> fmt::Result,
+      ) -> fmt::Result {
+        let previous = self.part.replace(part);
+        let result = write(self);
+        self.part = previous;
+        result
+      }
+    }
+
+    let Some(locale) = locale.and_then(canonical_locale) else {
+      return Self::default();
+    };
+    let Ok(formatter) = DecimalFormatter::try_new(locale.into(), Default::default()) else {
+      return Self::default();
+    };
+    let mut number = Decimal::from(1234567);
+    number.multiply_pow10(-1);
+    let mut symbols = Symbols {
+      value: Self::default(),
+      part: None,
+    };
+    let _ = formatter.format(&number).write_to_parts(&mut symbols);
+    symbols.value
+  }
+}
+
 /// The locale dimensions needed while reproducing application output.
 ///
 /// Office UI resources, value formatting, and document authoring defaults
@@ -47,6 +119,12 @@ impl OfficeLocaleContext {
     self.format_locale.as_deref()
   }
 
+  pub(crate) fn number_separators(&self) -> OfficeNumberSeparators {
+    // Word decimal tabs follow the system's number format, not w:lang or
+    // w:decimalSymbol (the latter belongs to field-code evaluation).
+    OfficeNumberSeparators::for_format_locale(self.format_locale())
+  }
+
   pub(crate) fn default_document_language(&self) -> Option<&str> {
     self.default_document_language.as_deref()
   }
@@ -88,6 +166,7 @@ impl OfficeLocaleContext {
 struct OfficeUiStringOverrides {
   language: &'static str,
   chart_title: Option<&'static str>,
+  word_chart_series_prefix: Option<&'static str>,
   chart_axis_title: Option<&'static str>,
   waterfall_legend: Option<[&'static str; 3]>,
   boolean_values: Option<[&'static str; 2]>,
@@ -99,6 +178,7 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
     // Current Office UI exports: tdf137505 and testCustomPosDataLabels.
     language: "es",
     chart_title: Some("Título del gráfico"),
+    word_chart_series_prefix: None,
     // Current Of16-06.docx Office PDF, automatic ChartEx axis/legend text.
     chart_axis_title: Some("Título del eje"),
     waterfall_legend: Some(["Aumento", "Disminución", "Total"]),
@@ -109,6 +189,7 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
     // Current Office UI export: tdf127777.
     language: "fr",
     chart_title: Some("Titre du graphique"),
+    word_chart_series_prefix: Some("Série"),
     chart_axis_title: None,
     waterfall_legend: None,
     boolean_values: Some(["FAUX", "VRAI"]),
@@ -118,6 +199,7 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
     language: "de",
     // Current Office tdf121744.docx PDF, automatic c:title without c:tx.
     chart_title: Some("Diagrammtitel"),
+    word_chart_series_prefix: Some("Datenreihen"),
     // Current Office DisplayUnits.docx PDF, automatic c:catAx/c:title.
     chart_axis_title: Some("Achsentitel"),
     waterfall_legend: None,
@@ -127,6 +209,7 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
   OfficeUiStringOverrides {
     language: "ja",
     chart_title: Some("グラフ タイトル"),
+    word_chart_series_prefix: Some("系列"),
     // Current Office testChartDataTable.docx PDF, automatic bare c:catAx/c:title.
     chart_axis_title: Some("軸ラベル"),
     waterfall_legend: None,
@@ -139,6 +222,7 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
     language: "ko",
     // Current Office legend_manual_layout.xlsx chart-sheet PDF.
     chart_title: Some("차트 제목"),
+    word_chart_series_prefix: Some("계열"),
     chart_axis_title: None,
     waterfall_legend: None,
     boolean_values: None,
@@ -157,6 +241,14 @@ pub(crate) fn office_automatic_chart_title(ui_language: Option<&str>) -> &'stati
   ui_string_overrides(ui_language)
     .and_then(|strings| strings.chart_title)
     .unwrap_or_else(|| OfficeStringCatalog::for_ui_language(ui_language).chart_title())
+}
+
+pub(crate) fn office_word_chart_series_prefix(ui_language: Option<&str>) -> &'static str {
+  // Native Word chart controls resolve absent c:tx from UI resources, not
+  // c:lang or the embedded workbook. Spanish uses the English Series prefix.
+  ui_string_overrides(ui_language)
+    .and_then(|strings| strings.word_chart_series_prefix)
+    .unwrap_or_else(|| OfficeStringCatalog::for_ui_language(ui_language).chart_series)
 }
 
 pub(crate) fn office_automatic_chart_axis_title(ui_language: Option<&str>) -> &'static str {
@@ -711,6 +803,33 @@ fn resolve_resource_locale(ui_language: Option<&str>) -> OfficeResourceLocale {
       _ => {}
     }
     fallback.step();
+  }
+}
+
+#[cfg(test)]
+mod number_separator_tests {
+  use super::*;
+
+  #[test]
+  fn decimal_tab_symbols_follow_format_locale_independently_of_text_and_ui() {
+    for (format, decimal, grouping) in [
+      ("zh-CN", '.', ','),
+      ("en-US", '.', ','),
+      ("fr-FR", ',', '\u{202f}'),
+      ("de-DE", ',', '.'),
+      ("ar-EG", '\u{066b}', '\u{066c}'),
+    ] {
+      let context = OfficeLocaleContext::new(Some("ja-JP"), Some(format), Some("fr-FR"));
+      assert_eq!(
+        context.number_separators(),
+        OfficeNumberSeparators { decimal, grouping },
+        "{format}",
+      );
+    }
+    assert_eq!(
+      OfficeLocaleContext::default().number_separators(),
+      OfficeNumberSeparators::default()
+    );
   }
 }
 

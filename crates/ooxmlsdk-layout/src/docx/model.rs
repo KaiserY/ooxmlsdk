@@ -37,6 +37,9 @@ pub(crate) struct DocxDocument {
   pub split_page_break_and_paragraph_mark: bool,
   pub form_widgets: Vec<FormWidget>,
   pub sections: Vec<ImportedSection>,
+  /// Print-time TOC reconstruction reads reference pages from the original
+  /// cached story. Its bookmark destinations still use the final story.
+  pub toc_print_cache: Option<Box<TocPrintCache>>,
   pub header_blocks: Vec<Block>,
   pub footer_blocks: Vec<Block>,
   pub first_header_blocks: Vec<Block>,
@@ -49,7 +52,15 @@ pub(crate) struct DocxDocument {
   pub endnote_numbering: Vec<NoteNumberingSpec>,
   pub endnote_position: w::EndnotePositionValues,
   pub title_page: bool,
+  /// A Cover Pages building block with first-section numbering from zero
+  /// contributes a physical page, but Word excludes it from NUMPAGES.
+  pub num_pages_excludes_cover: bool,
   pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TocPrintCache {
+  pub source_blocks: Vec<Vec<Block>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -191,6 +202,9 @@ impl Block {
 #[derive(Clone, Debug)]
 pub(crate) struct FloatingFrame {
   pub blocks: Vec<Block>,
+  /// A drop-cap paragraph owns its own frame, even next to another frame
+  /// with identical coordinates (ECMA-376 Part 1 §17.3.1.11).
+  pub drop_cap: bool,
   /// The effective `w:pageBreakBefore` from the paragraph which starts this
   /// frame. Word applies the break to the frame's anchor in the outer story,
   /// not to the paragraph after it has moved into the frame story.
@@ -260,7 +274,7 @@ pub(crate) struct ListLabelImage {
   pub follow: Option<char>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ParagraphFieldEvent {
   /// Visible story content. Field scanning uses this marker to distinguish a
   /// field that owns its boundary paragraphs from one embedded in surrounding
@@ -274,14 +288,20 @@ pub(crate) enum ParagraphFieldEvent {
   Begin {
     locked: bool,
     dirty: bool,
+    inserted: bool,
   },
   Instruction(String),
-  Separate,
+  Separate {
+    /// Resolved character context for a reconstructed ordinary empty TOC.
+    /// Only TOC separators retain a style; other field syntax stays small.
+    style: Option<Box<TextStyle>>,
+  },
   End,
   Simple {
     instruction: String,
     locked: bool,
     dirty: bool,
+    inserted: bool,
   },
   BookmarkStart {
     id: String,
@@ -325,6 +345,14 @@ pub(crate) enum ParagraphFieldEvent {
   /// Word's fixed-format exporter refreshes this span from the referenced
   /// bookmark without mutating the open document. Keep the span internal to
   /// import/refresh so unrelated cached fields remain authoritative.
+  /// Exact imported run owning a top-level complex PAGEREF result. A missing
+  /// bookmark's application diagnostic takes the separator's character
+  /// properties, independently of the successful result's code/cache style.
+  /// Consumed by the main-story structural refresh before line layout.
+  PageReferenceResultStyle {
+    inline_offset: usize,
+    style: Box<TextStyle>,
+  },
   ReferenceResultSpan {
     field_id: u64,
     bookmark_name: String,
@@ -586,6 +614,10 @@ pub(crate) struct ParagraphFormat {
   pub vml_text_path: bool,
   pub style_id: Option<Arc<str>>,
   pub numbering_id: Option<i32>,
+  /// Resolved level after style-linked `ilvl` selection and instance overrides.
+  /// TOC reconstruction needs its direct symbol properties without consuming
+  /// another list counter or copying the heading's inherited run style.
+  pub numbering_level_index: Option<i32>,
   /// Absolute and line-unit spacing remain independent through the style
   /// hierarchy. Word gives a nonzero line-unit value precedence at final
   /// resolution, while a later zero line-unit value exposes the inherited or
@@ -629,6 +661,10 @@ pub(crate) struct ParagraphFormat {
   /// otherwise empty line on the mark, while direct paragraph-mark formatting
   /// remains authoritative over application-recovered compatibility metrics.
   pub paragraph_mark_font_size_set: bool,
+  /// The final paragraph belongs to a real table cell with `w:hideMark`.
+  /// Its terminal mark has no line box, including after an authored soft break.
+  /// This is cell ownership, not an inherited paragraph-style property.
+  pub hidden_cell_end_mark: bool,
   /// An empty continuous-section ending follows only floating tables in
   /// this section. It can own a real mark in a side lane, but merges into
   /// the preceding table anchor when that fly covers the whole body origin.
@@ -694,15 +730,22 @@ pub(crate) struct ParagraphFormat {
   pub tab_stops: Vec<TabStop>,
   pub tab_stop_clear_positions_pt: Vec<f32>,
   pub tab_stops_set: bool,
+  /// Leader of the last authored tab declaration, before positional sorting.
+  /// A TOC's opening code paragraph supplies the print-time default leader.
+  /// This is independent of the generated entry style's own tab stops.
+  pub toc_default_tab_leader: Option<TabLeader>,
   pub list_label_width_aware_tab: bool,
   pub list_label_uses_explicit_tab_stop: bool,
+  /// w:doNotUseIndentAsNumberingTabStop disables the hanging indent's
+  /// virtual stop when the numbering suffix advances to an authored tab.
+  pub list_label_ignores_indent_tab_stop: bool,
   /// Intrinsic cell sizing has no flow frame; retain the same document tab
   /// grid used to place an overflowing numbering suffix in actual layout.
   pub list_label_default_tab_stop_pt: Option<f32>,
-  /// Paragraph-authored left tabs before the numbered text indent. Word can
-  /// use one of these for the list suffix even when the level also has a
-  /// numbering tab at the indent; inherited style tabs do not have this role.
-  pub list_label_direct_tabs_before_indent_pt: Vec<f32>,
+  /// The numbering suffix's ruler, merged from style, level and direct tabs.
+  /// It remains separate from the ordinary text ruler so a direct paragraph
+  /// tab does not discard unrelated numbering-level stops.
+  pub list_label_suffix_tab_stops: Vec<TabStop>,
   /// A visible picture-bullet level whose referenced image cannot be
   /// resolved still owns Word's zero-width numbering margin. It paints
   /// neither the image nor `w:lvlText`, but its body starts at the effective
@@ -744,6 +787,8 @@ pub(crate) struct ParagraphFormat {
   pub suppress_overlap: Option<bool>,
   pub auto_space_de: Option<bool>,
   pub auto_space_dn: Option<bool>,
+  /// MS-DOCX 2.3.3 document-level OpenType feature dispatch, omitted as false.
+  pub enable_open_type_features: bool,
   /// Document-level Word 95 fullwidth/kana auto-spacing compatibility.
   pub auto_space_like_word95: bool,
   /// Apply the strict Japanese Kinsoku list only to Japanese-language text.
@@ -883,6 +928,7 @@ pub(crate) enum TabStopAlignment {
   Left,
   Center,
   Right,
+  Decimal(crate::localization::OfficeNumberSeparators),
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1229,6 +1275,10 @@ pub(crate) struct InlineDrawingGroup {
 pub(crate) struct InlineLockedCanvasViewport {
   pub width_pt: f32,
   pub height_pt: f32,
+  /// The inline host's effectExtent precedes the bitmap. Child paint bounds
+  /// determine its source viewport, not its position in the paragraph.
+  pub content_offset_x_pt: f32,
+  pub content_offset_y_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1296,6 +1346,13 @@ pub(crate) enum OfficeMathDisplayAlignment {
   Right,
 }
 
+/// Formula-owned line metrics, separate from the padded SVG paint surface.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct OfficeMathImageMetrics {
+  pub font_line_height_pt: f32,
+  pub paint_padding_pt: f32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct OfficeMathDisplayLayout {
   /// `None` means that Word's `m:dispDef=off` path delegates horizontal
@@ -1307,6 +1364,9 @@ pub(crate) struct OfficeMathDisplayLayout {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineImage {
+  /// Logical font em of the owning DrawingML run, before picture realization.
+  /// Word uses this for a leading inline picture's firstLineChars indent.
+  pub source_run_font_size_pt: Option<f32>,
   pub run_border: Option<BorderStyle>,
   pub data: Bytes,
   pub content_type: Option<String>,
@@ -1344,6 +1404,7 @@ pub(crate) struct InlineImage {
   /// Keep it on the realized OfficeMath object so only its physical lines are
   /// adjusted; ordinary text lines in the same `w:p` remain untouched.
   pub office_math_display_layout: Option<OfficeMathDisplayLayout>,
+  pub office_math_metrics: Option<OfficeMathImageMetrics>,
   pub crop: ImageCrop,
   pub rotation_deg: f32,
   pub flip_horizontal: bool,
@@ -1366,6 +1427,10 @@ pub(crate) struct InlineImage {
   pub metafile_native_size: bool,
   pub metafile_fixed_output_profile: common::MetafileFixedOutputProfile,
   pub placement: ImagePlacement,
+  /// Authored wrapping retained when a polygon proxy owns line exclusions.
+  /// Table-wide picture clearance still needs this source mode even though
+  /// the paint host must not add another rectangular text exclusion.
+  pub contour_owned_wrap: Option<ImageWrapMode>,
 }
 
 #[derive(Clone, Debug)]
@@ -1418,13 +1483,23 @@ pub(crate) struct InlineShape {
   pub horizontal_rule: Option<InlineHorizontalRule>,
   pub placement: ImagePlacement,
   pub chart: Option<Box<InlineChart>>,
-  /// Children of an atomic WordprocessingCanvas. Their coordinates are local
-  /// to this host; even an empty canvas retains its authored inline extent.
+  /// Children of an atomic WordprocessingCanvas or multi-child Word group.
+  /// Their coordinates are local to this host; an empty canvas retains its extent.
   pub canvas_children: Option<Vec<InlineItem>>,
+  /// The inline container came from `wpc:wpc`, whose authored effect extents
+  /// move all child paint and text together. WPG containers have another policy.
+  pub wordprocessing_canvas_host: bool,
+  /// A legacy locked canvas rasterizes its sharp child shadows together with
+  /// the foreground, rather than first allocating separate effect bitmaps.
+  pub legacy_locked_canvas: bool,
   pub text_warp: Option<Box<a::PresetTextWarp>>,
+  /// Parent-realized authored WPG frame for a single-path WPS text story.
+  /// Ordinary paint geometry retains its independent DrawingML transform.
+  pub wordprocessing_text_warp_frame: Option<Box<WordprocessingTextWarpFrame>>,
   /// The unpainted root box of an inline VML group still supplies the
   /// character baseline shared with text following that group.
   pub vml_group_flow_frame: bool,
+  pub vml_text_fit_shape: bool,
   pub vml_text_fit_path: bool,
   pub vml_text_trim: bool,
   pub text_fill: Option<Box<common::Fill<'static>>>,
@@ -1439,6 +1514,12 @@ pub(crate) struct InlineShape {
   /// quantization contract. Keep that provenance after import instead of
   /// inferring it later from fill, textbox, or effect content.
   pub wordprocessing_shape_host: bool,
+  /// SmartArt uses Word's effect sampling bounds without the WPS canvas's
+  /// far-edge transport extension. Preserve this independently of text layout.
+  pub wordprocessing_diagram_host: bool,
+  /// Exact authored pen width and physical basis for a standalone WPS effect.
+  /// The foreground and each effect surface realize their own device widths.
+  pub wordprocessing_shape_effect_pen: Option<Box<common::DrawingMlDeviceStroke>>,
   /// Half the effective WPS outline width added to the text frame insets.
   /// Retain it even for `a:noFill`, whose outline has no drawable stroke.
   pub wordprocessing_shape_outline_text_inset_pt: f32,
@@ -1466,6 +1547,8 @@ pub(crate) struct InlineShape {
   /// Legacy VML distances before the shape's inscribed text rectangle is
   /// applied. The original inline margins also expand its text paint clip.
   pub vml_text_box: Option<VmlTextBox>,
+  /// Authored WPS story/sequence identity; independent of drawing order.
+  pub text_box_link: Option<TextBoxLink>,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,
   pub text_inset_top_pt: f32,
@@ -1476,6 +1559,17 @@ pub(crate) struct InlineShape {
   pub text_box_word_wrap: bool,
   pub text_box_clip_vertical_overflow: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct WordprocessingTextWarpFrame {
+  pub bounds_emu: [i64; 4],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct TextBoxLink {
+  pub story_id: u16,
+  pub sequence: u16,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1539,6 +1633,9 @@ pub(crate) struct InlineChart {
   pub ui_language: Option<String>,
   pub format_locale: Option<String>,
   pub automatic_title: String,
+  /// Resolved using the source application's chart defaults, independently
+  /// of Word's paragraph compatibility mode.
+  pub title_overlay: bool,
   pub title_style: TextStyle,
   /// Legend text. Axis titles and tick labels have independent OOXML text
   /// bodies and therefore use the role-specific styles below.
@@ -1638,6 +1735,12 @@ pub(crate) struct InlineShapeImageFill {
 #[derive(Clone, Debug)]
 pub(crate) enum InlineShapeImageFillMode {
   Stretch,
+  DrawingMlStretch {
+    left: f32,
+    top: f32,
+    right: f32,
+    bottom: f32,
+  },
   Contain,
   Cover,
   DrawingMlTile(Box<a::Tile>),
@@ -1655,6 +1758,10 @@ pub(crate) enum InlineShapeGeometry {
   Path {
     paths: Vec<common::DrawingPath>,
     outline: Option<Box<a::Outline>>,
+    /// Preserve semantic presets through resolution. A preset rectangle can
+    /// use Word's rectangle paint primitive; an authored custom rectangle
+    /// retains its own path start and dash direction.
+    preset: Option<a::ShapeTypeValues>,
   },
   Polyline {
     points: Vec<(f32, f32)>,

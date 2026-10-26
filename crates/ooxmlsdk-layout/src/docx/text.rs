@@ -183,12 +183,14 @@ fn paragraph_model_with_base_impl<'a>(
   let has_direct_justification = direct_paragraph_properties
     .as_ref()
     .is_some_and(|properties| properties.justification().is_some());
-  let style_outline_level = styles
-    .paragraph_format_with_base(style_id, base.format.clone())
-    .outline_level;
+  let inherited_format = styles.paragraph_format_with_base(style_id, base.format.clone());
+  let style_outline_level = inherited_format.outline_level;
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   format.list_label_default_tab_stop_pt = styles.default_tab_stop_pt;
+  format.list_label_ignores_indent_tab_stop = styles
+    .import_settings
+    .do_not_use_indent_as_numbering_tab_stop;
   format.additive_paragraph_spacing = styles.import_settings.fixed_html_paragraph_auto_spacing;
   // The Word-compatible proportional-gap path is driven by the paragraph's
   // directly authored line spacing. A line value inherited from a style still
@@ -284,6 +286,11 @@ fn paragraph_model_with_base_impl<'a>(
   // twice, incorrectly reversing its toggle properties on the second pass.
   let numbering_base_style = run_style.clone();
   let style_tab_stop_pt = format.tab_stops.last().map(|stop| stop.position_pt);
+  format.list_label_suffix_tab_stops = if numbering_reference.is_some() {
+    inherited_format.tab_stops
+  } else {
+    Vec::new()
+  };
   let numbering_label = numbering_reference.and_then(|reference| {
     let matched_style_indent_context = styles.numbering_matched_style_indent_context(style_id);
     numbering.next_label(
@@ -341,30 +348,28 @@ fn paragraph_model_with_base_impl<'a>(
     },
   );
   format.list_label_width_aware_tab = list_label_width_aware_tab;
-  format.list_label_uses_explicit_tab_stop =
-    style_indent_overrides_numbering && numbering_list_tab_stop_pt.is_some();
   format.list_label_justification = list_label_justification;
   let has_numbering_label = list_label.is_some() || numbering_image.is_some();
-  if has_numbering_label {
-    format.list_label_direct_tabs_before_indent_pt = direct_paragraph_properties
+  if has_numbering_label
+    && let Some(tabs) = direct_paragraph_properties
       .as_ref()
       .and_then(|properties| properties.tabs())
-      .map(|tabs| {
-        tabs
-          .tab_stop
-          .iter()
-          .filter(|tab| {
-            matches!(
-              tab.val,
-              w::TabStopValues::Left | w::TabStopValues::Start | w::TabStopValues::Number
-            )
-          })
-          .filter_map(|tab| super::signed_twips_measure_to_points(&tab.position))
-          .filter(|stop| stop.is_finite() && *stop >= 0.0 && *stop < format.indent_left_pt)
-          .collect()
-      })
-      .unwrap_or_default();
+  {
+    super::apply_numbering_suffix_tabs(
+      &mut format.list_label_suffix_tab_stops,
+      tabs,
+      styles.import_settings.decimal_tab_symbols,
+    );
   }
+  format.list_label_uses_explicit_tab_stop = style_indent_overrides_numbering
+    && numbering_list_tab_stop_pt.is_some_and(|position| {
+      // RTL retains its existing logical-ruler path. The LTR suffix must not
+      // revive a level stop removed by a higher-priority paragraph clear.
+      format.bidi
+        || format.list_label_suffix_tab_stops.iter().any(|stop| {
+          stop.position_pt == position && matches!(stop.alignment, super::TabStopAlignment::Left)
+        })
+    });
   let blank_numbering_label = list_label
     .as_deref()
     .is_some_and(|label| label.chars().all(char::is_whitespace));
@@ -448,6 +453,7 @@ fn paragraph_model_with_base_impl<'a>(
   }
   fill_character_style_ref_texts(&mut inlines);
   let style_ref_keys = style_id
+    .or(styles.default_paragraph_style_id.as_deref())
     .map(|style_id| styles.style_ref_keys(style_id))
     .unwrap_or_default();
   let style_ref_text = paragraph_style_ref_text(&inlines);
@@ -573,8 +579,9 @@ fn paragraph_model_with_base_impl<'a>(
   {
     // Native Word uses the initial text's em for firstLineChars/hangingChars,
     // unlike leftChars/rightChars. A leading space owns this size too; the
-    // paragraph mark and a later larger run do not replace it. Keep non-text
-    // leading objects on their existing default-unit path.
+    // paragraph mark and a later larger run do not replace it. Native inline
+    // picture controls use the owning drawing run's em for positive indents;
+    // floating pictures and other object kinds keep their existing owner.
     let first = inlines.iter().find(|inline| match inline {
       super::InlineItem::BookmarkStart(_) | super::InlineItem::LastRenderedPageBreak => false,
       super::InlineItem::Text(run) => !run.text.is_empty(),
@@ -582,12 +589,25 @@ fn paragraph_model_with_base_impl<'a>(
     });
     if let Some(super::InlineItem::Text(run)) = first {
       format.first_line_character_indent_unit_pt = Some(effective_font_size_pt(&run.style, None));
+    } else if let Some(super::InlineItem::Image(image)) = first
+      && matches!(image.placement, super::ImagePlacement::Inline)
+      && format
+        .first_line_indent_character_units
+        .is_some_and(|units| units > 0.0)
+    {
+      format.first_line_character_indent_unit_pt = image.source_run_font_size_pt;
     }
   }
   super::fit_text::resolve(&mut inlines, &mut field_events);
+  styles
+    .automatic_escapement_fonts
+    .resolve_inlines(&mut inlines, &mut field_events);
   merge_adjacent_continuous_text_runs(&mut inlines, &mut field_events);
   resolve_wordprocessingml_rtl_font_portions(&mut inlines, &mut field_events);
   preserve_interior_direction_control_metrics(&mut inlines, &mut field_events);
+  if !format.bidi {
+    resolve_balanced_space_portions(&mut inlines, &mut field_events);
+  }
   attach_arabic_leading_mark_context(&mut inlines);
   if let Some(background) = format.shading.and_then(super::ShadingPaint::solid_color) {
     super::apply_legacy_text_effect_background_to_paragraph_parts(
@@ -637,6 +657,143 @@ fn paragraph_model_with_base_impl<'a>(
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt,
   }
+}
+
+fn resolve_balanced_space_portions(
+  inlines: &mut Vec<super::InlineItem>,
+  field_events: &mut [super::ParagraphFieldEvent],
+) {
+  use super::{InlineItem, ParagraphFieldEvent};
+
+  fn eligible(run: &TextRun) -> bool {
+    run
+      .style
+      .wordprocessingml_balance_single_byte_double_byte_width
+      && run.style.wordprocessingml_font_slots
+      && run.style.right_to_left != Some(true)
+      && run.style.wordprocessing_bidi_scopes.is_none()
+      && run.style.shaping_context.is_none()
+      && !run.style.wordprocessingml_field_group
+      && !run.preserve_text_portion
+      && run.dynamic_field.is_none()
+  }
+  // No new storage on the ordinary document path. Only a single edge blank
+  // needs source context; adjacent blanks inside a portion already balance.
+  if !inlines.iter().any(|item| {
+    matches!(item, InlineItem::Text(run) if eligible(run)
+      && ((run.text.starts_with(' ') && !run.text.starts_with("  "))
+        || (run.text.ends_with(' ') && !run.text.ends_with("  "))))
+  }) {
+    return;
+  }
+
+  // Borrow just each portion's source edge. Native joined/bookmarked controls
+  // preserve half-em spaces across formatting boundaries; a true paragraph
+  // start also qualifies. A trial prefix or terminal isolated blank does not.
+  let mut edges = vec![(false, false); inlines.len()];
+  let mut previous = None;
+  for (item, edge) in inlines.iter().zip(&mut edges) {
+    match item {
+      InlineItem::BookmarkStart(_) | InlineItem::LastRenderedPageBreak => {}
+      InlineItem::Text(run) if run.text.is_empty() && eligible(run) => {}
+      InlineItem::Text(run) => {
+        edge.0 = eligible(run)
+          && run.text.starts_with(' ')
+          && !run.text.starts_with("  ")
+          && previous.is_none_or(|byte| byte == b' ');
+        previous = if eligible(run) {
+          run.text.as_bytes().last().copied()
+        } else {
+          Some(0)
+        };
+      }
+      _ => previous = Some(0),
+    }
+  }
+  let mut next = None;
+  for (item, edge) in inlines.iter().zip(&mut edges).rev() {
+    match item {
+      InlineItem::BookmarkStart(_) | InlineItem::LastRenderedPageBreak => {}
+      InlineItem::Text(run) if run.text.is_empty() && eligible(run) => {}
+      InlineItem::Text(run) => {
+        edge.1 = eligible(run)
+          && run.text.ends_with(' ')
+          && !run.text.ends_with("  ")
+          && next == Some(b' ');
+        next = if eligible(run) {
+          run.text.as_bytes().first().copied()
+        } else {
+          Some(0)
+        };
+      }
+      _ => next = Some(0),
+    }
+  }
+  if edges
+    .iter()
+    .all(|&(leading, trailing)| !leading && !trailing)
+  {
+    return;
+  }
+
+  let mut output = Vec::with_capacity(inlines.len());
+  let mut offsets = Vec::with_capacity(inlines.len() + 1);
+  for (mut item, (leading, trailing)) in inlines.drain(..).zip(edges) {
+    offsets.push(output.len());
+    if !leading && !trailing {
+      output.push(item);
+      continue;
+    }
+    let InlineItem::Text(run) = &mut item else {
+      unreachable!("only source text owns a balanced blank")
+    };
+    if run.text == " " {
+      run.style.wordprocessingml_balanced_space_portion = true;
+      output.push(item);
+      continue;
+    }
+    let end = run.text.len() - usize::from(trailing);
+    if leading {
+      let mut blank = run.clone();
+      blank.text = " ".to_owned();
+      blank.style.wordprocessingml_balanced_space_portion = true;
+      output.push(InlineItem::Text(blank));
+    }
+    let terminal = trailing.then(|| {
+      let mut blank = run.clone();
+      blank.text = " ".to_owned();
+      blank.style.wordprocessingml_balanced_space_portion = true;
+      InlineItem::Text(blank)
+    });
+    run.text.truncate(end);
+    if leading {
+      run.text.remove(0);
+    }
+    if !run.text.is_empty() {
+      output.push(item);
+    }
+    output.extend(terminal);
+  }
+  offsets.push(output.len());
+  for event in field_events {
+    match event {
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
+        *inline_offset = offsets[*inline_offset];
+      }
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      } => {
+        *inline_start = offsets[*inline_start];
+        *inline_end = offsets[*inline_end];
+      }
+      _ => {}
+    }
+  }
+  *inlines = output;
 }
 
 fn attach_arabic_leading_mark_context(inlines: &mut [super::InlineItem]) {
@@ -797,7 +954,8 @@ fn preserve_interior_direction_control_metrics(
   for event in field_events {
     match event {
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
-      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
         *inline_offset = offsets[*inline_offset];
       }
       ParagraphFieldEvent::ReferenceResultSpan {
@@ -948,7 +1106,8 @@ fn merge_adjacent_continuous_text_runs(
     for event in field_events.iter() {
       match event {
         ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
-        | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+        | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+        | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
           if let Some(boundary) = boundaries.get_mut(*inline_offset) {
             *boundary = true;
           }
@@ -990,7 +1149,8 @@ fn merge_adjacent_continuous_text_runs(
     for event in field_events.iter_mut() {
       match event {
         ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
-        | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+        | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+        | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
           *inline_offset = offsets[*inline_offset];
         }
         ParagraphFieldEvent::ReferenceResultSpan {
@@ -1074,7 +1234,8 @@ fn resolve_wordprocessingml_rtl_font_portions(
   for event in field_events {
     match event {
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
-      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. } => {
+      | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
         *inline_offset = offsets[*inline_offset];
       }
       ParagraphFieldEvent::ReferenceResultSpan {
@@ -1244,6 +1405,215 @@ mod tests {
     FloatingImagePlacement, FloatingPaintOrder, HorizontalImageReference, ImagePlacement,
     ImageWrapMode, ImageWrapSide, ParagraphAdjust, ParagraphJustification, VerticalImageReference,
   };
+
+  #[test]
+  fn initial_inline_picture_character_indent_preserves_its_source_run_em() {
+    use ooxmlsdk::sdk::SdkType;
+
+    for default_size in [11.0, 16.0] {
+      let mut styles = StylesCatalog::default();
+      styles.doc_default_run.font_size_pt = default_size;
+      for size in [6.0, 10.5, 14.0, 24.0] {
+        for units in [0.0, 2.0] {
+          let xml = format!(
+            r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:pPr><w:ind w:firstLineChars="{}" w:firstLine="420"/></w:pPr><w:r><w:rPr><w:sz w:val="{}"/></w:rPr><w:drawing><wp:inline><wp:extent cx="2285365" cy="219075"/><wp:docPr id="1" name="Picture"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Picture"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip/></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2285365" cy="219075"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r><w:r><w:rPr><w:sz w:val="14"/></w:rPr><w:t>LABEL</w:t></w:r></w:p>"#,
+            (units * 100.0) as i32,
+            (size * 2.0) as i32,
+          );
+          let source = w::Paragraph::from_bytes(xml.as_bytes()).expect("picture paragraph");
+          let paragraph = paragraph_model(
+            &source,
+            &styles,
+            &mut NumberingCatalog::default(),
+            &ImageCatalog::default(),
+            &HyperlinkCatalog::default(),
+            &CustomXmlBindings::default(),
+            &mut FormWidgetIdAllocator::default(),
+          );
+          let super::super::InlineItem::Image(image) = &paragraph.inlines[0] else {
+            panic!("leading picture")
+          };
+          assert_eq!(image.source_run_font_size_pt, Some(size));
+          assert_eq!(
+            paragraph.format.first_line_character_indent_unit_pt,
+            (units > 0.0).then_some(size)
+          );
+          assert_eq!(
+            paragraph.format.character_indent_unit_pt,
+            (units != 0.0).then_some(default_size)
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn balanced_source_spaces_keep_text_bookmarks_and_field_offsets() {
+    use crate::docx::{InlineItem, ParagraphFieldEvent};
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle {
+          wordprocessingml_font_slots: true,
+          wordprocessingml_balance_single_byte_double_byte_width: true,
+          ..Default::default()
+        },
+        hyperlink_url: Some("https://example.com/".into()),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    for (parts, expected) in [
+      (vec![" A B "], vec![(" ", true), ("A B ", false)]),
+      (
+        vec!["A ", " B"],
+        vec![("A", false), (" ", true), (" ", true), ("B", false)],
+      ),
+      (
+        vec!["A", " ", "B"],
+        vec![("A", false), (" ", false), ("B", false)],
+      ),
+      (
+        vec![" ", " ", " B"],
+        vec![(" ", true), (" ", true), (" ", true), ("B", false)],
+      ),
+      (vec!["A\n", " B"], vec![("A\n", false), (" B", false)]),
+      (vec!["A\t", " B"], vec![("A\t", false), (" B", false)]),
+    ] {
+      for bookmarked in [false, true] {
+        let original = parts.concat();
+        let mut inlines = Vec::new();
+        for part in &parts {
+          if bookmarked {
+            inlines.push(InlineItem::BookmarkStart("anchor".into()));
+          }
+          inlines.push(run(part));
+        }
+        let old_end = inlines.len();
+        let mut events = vec![
+          ParagraphFieldEvent::DeferredParagraphBreak {
+            inline_offset: old_end,
+          },
+          ParagraphFieldEvent::ReferenceResultSpan {
+            field_id: 7,
+            bookmark_name: "target".into(),
+            inline_start: 0,
+            inline_end: old_end,
+            merge_format: false,
+          },
+        ];
+        resolve_balanced_space_portions(&mut inlines, &mut events);
+        let actual = inlines
+          .iter()
+          .filter_map(|item| match item {
+            InlineItem::Text(run) => {
+              assert_eq!(run.hyperlink_url.as_deref(), Some("https://example.com/"));
+              Some((
+                run.text.as_str(),
+                run.style.wordprocessingml_balanced_space_portion,
+              ))
+            }
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+        assert_eq!(
+          actual.iter().map(|(text, _)| *text).collect::<String>(),
+          original
+        );
+        assert_eq!(
+          inlines
+            .iter()
+            .filter(|item| matches!(item, InlineItem::BookmarkStart(_)))
+            .count(),
+          if bookmarked { parts.len() } else { 0 }
+        );
+        assert!(
+          matches!(events[0], ParagraphFieldEvent::DeferredParagraphBreak { inline_offset } if inline_offset == inlines.len())
+        );
+        assert!(
+          matches!(events[1], ParagraphFieldEvent::ReferenceResultSpan { inline_start: 0, inline_end, .. } if inline_end == inlines.len())
+        );
+      }
+    }
+    // A source boundary inside an existing reference span moves with its
+    // owned text; splitting a leading blank must not pull in the next run.
+    let mut inlines = vec![
+      run(" A"),
+      InlineItem::BookmarkStart("anchor".into()),
+      run("B"),
+    ];
+    let mut events = vec![
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 },
+      ParagraphFieldEvent::ReferenceResultSpan {
+        field_id: 3,
+        bookmark_name: "anchor".into(),
+        inline_start: 1,
+        inline_end: 2,
+        merge_format: false,
+      },
+    ];
+    resolve_balanced_space_portions(&mut inlines, &mut events);
+    assert!(matches!(
+      events[0],
+      ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 2 }
+    ));
+    assert!(matches!(
+      events[1],
+      ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start: 2,
+        inline_end: 3,
+        ..
+      }
+    ));
+    assert!(matches!(&inlines[2], InlineItem::BookmarkStart(name) if name == "anchor"));
+
+    for variant in 0..5 {
+      let mut item = run(" AB");
+      let InlineItem::Text(text) = &mut item else {
+        unreachable!()
+      };
+      match variant {
+        0 => {
+          text
+            .style
+            .wordprocessingml_balance_single_byte_double_byte_width = false
+        }
+        1 => text.style.right_to_left = Some(true),
+        2 => text.style.wordprocessingml_field_group = true,
+        3 => text.preserve_text_portion = true,
+        _ => {
+          text.dynamic_field = Some(crate::model::DynamicFieldKind::Page {
+            number_format: crate::model::FieldNumberFormat::Decimal,
+          })
+        }
+      }
+      let mut inlines = vec![item];
+      let address = inlines.as_ptr();
+      resolve_balanced_space_portions(&mut inlines, &mut []);
+      assert_eq!(inlines.as_ptr(), address);
+      let InlineItem::Text(text) = &inlines[0] else {
+        unreachable!()
+      };
+      assert_eq!(text.text, " AB");
+      assert!(!text.style.wordprocessingml_balanced_space_portion);
+
+      // Unproved RTL/field/semantic neighbors are barriers. Their blanks
+      // cannot qualify a different ordinary portion on either side.
+      let mut barrier = inlines.pop().unwrap();
+      let InlineItem::Text(text) = &mut barrier else {
+        unreachable!()
+      };
+      text.text = " ".into();
+      let mut inlines = vec![run("A "), barrier, run(" B")];
+      resolve_balanced_space_portions(&mut inlines, &mut []);
+      assert_eq!(inlines.len(), 3);
+      assert!(inlines.iter().all(|item| matches!(item, InlineItem::Text(text) if !text.style.wordprocessingml_balanced_space_portion)));
+    }
+  }
 
   #[test]
   fn rtl_font_portions_preserve_source_context_and_field_boundaries() {

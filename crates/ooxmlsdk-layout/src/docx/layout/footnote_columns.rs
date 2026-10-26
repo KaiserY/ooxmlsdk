@@ -147,7 +147,7 @@ fn trial(
   let mut page = empty_section_page(setup, flow.section_index, flow.section_page_index);
   let mut pages = Vec::new();
   let mut note_flow = flow_with_column(
-    note_story_flow(FlowContext {
+    footnote_story_flow(FlowContext {
       setup,
       columns,
       column_index: 0,
@@ -259,7 +259,7 @@ fn build(
   let mut separator = empty_section_page(flow.setup, flow.section_index, flow.section_page_index);
   let mut unused_pages = Vec::new();
   let separator_flow = flow_with_column(
-    note_story_flow(FlowContext {
+    footnote_story_flow(FlowContext {
       columns,
       column_index: 0,
       content_top_pt: 0.0,

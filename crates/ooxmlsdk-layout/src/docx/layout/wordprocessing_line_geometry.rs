@@ -237,6 +237,7 @@ pub(super) fn bind(
   placement: Placement,
   text_metrics: &mut TextMetrics,
 ) {
+  wordprocessing_auto_gap::materialize(items, &paragraph.format, flow, text_metrics);
   // Native Line Services receives the complete line box for natural,
   // minimum-height and ordinary fixed-height text, including text numbers.
   // Story, grid and object lines keep their separate baseline contracts.
@@ -289,6 +290,39 @@ pub(super) fn bind(
     && paragraph.list_label_image.is_some()
     && paragraph.format.vertical_text_flow.is_none()
     && placement.text_extents.has_text;
+  // Flat character effects enlarge the completed line, not each foreground
+  // independently. Native glow/shadow/reflection controls, with plain text
+  // on either side and compressed/single/expanded auto spacing, all retain
+  // one baseline. Reuse the reference-device outsets already accumulated
+  // during flow; hosted/3-D/rotated effect stories retain their own owner.
+  let flat_effect_line = matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && flow.text_segmentation == TextSegmentation::Body
+    && paragraph.format.vertical_text_flow.is_none()
+    && paragraph.list_label.is_none()
+    && paragraph.list_label_image.is_none()
+    && items.iter().any(|item| {
+      matches!(item, PageItem::Text(text)
+        if text.style.text_glow.is_some()
+          || text.style.text_shadow.is_some()
+          || text.style.text_reflection.is_some())
+    })
+    && items.iter().all(|item| match item {
+      PageItem::Text(text) => {
+        text.style.use_windows_font_metrics
+          && text.style.rotation_deg == 0.0
+          && !text.origin_is_baseline
+          && text.wordprocessing_effect_host.is_none()
+          && text.style.wordprocessing_text_3d_parts.is_none()
+          && text.style.drawingml_text_static3d.is_none()
+          && text.style.drawingml_text_effects.is_none()
+          && text.style.pdf_glyph_outline_options.is_none()
+          && matches!(
+            text.style.line_vertical_alignment,
+            common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
+          )
+      }
+      _ => true,
+    });
   let text_owned = if minimum || numbered_body || picture_body || exact_line {
     (paragraph.list_label_image.is_none() || picture_body)
       && paragraph
@@ -321,9 +355,8 @@ pub(super) fn bind(
     || items
       .iter()
       .any(|item| inline_alignment_image(item).is_some())
-    // Modern effect lines carry additional surface outsets and are realized
-    // while materializing their effect geometry, before ordinary PDF paint.
-    || items.iter().any(|item| {
+    // Hosted and transformed effects still have a separate surface owner.
+    || (!flat_effect_line && items.iter().any(|item| {
       matches!(item, PageItem::Text(text)
         if text.style.text_glow.is_some()
           || text.style.text_shadow.is_some()
@@ -331,7 +364,7 @@ pub(super) fn bind(
           || text.style.wordprocessing_text_3d_parts.is_some()
           || text.style.drawingml_text_effects.is_some()
           || text.style.pdf_glyph_outline_options.is_some())
-    })
+    }))
   {
     return;
   }
@@ -360,7 +393,19 @@ pub(super) fn bind(
     }
     return;
   }
-  let metrics = if numbered_body || picture_body {
+  let metrics = if flat_effect_line {
+    Some(WordprocessingLineMetrics {
+      ascent_pt: placement
+        .text_extents
+        .ascent_pt
+        .max(placement.text_extents.effect_ascent_pt),
+      descent_pt: placement
+        .text_extents
+        .descent_pt
+        .max(placement.text_extents.effect_descent_pt),
+      top_aligned: false,
+    })
+  } else if numbered_body || picture_body {
     Some(WordprocessingLineMetrics {
       ascent_pt: placement.text_extents.font_ascent_pt,
       descent_pt: placement.text_extents.font_descent_pt,

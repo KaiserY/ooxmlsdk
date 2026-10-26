@@ -75,6 +75,7 @@ hypher = "0.1.7"
 icu_collator = { version = "2.2.1", features = ["compiled_data"] }
 icu_calendar = { version = "2.2.1", features = ["compiled_data"] }
 icu_datetime = { version = "2.2.0", features = ["compiled_data"] }
+icu_decimal = { version = "2.2.0", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 icu_properties = { version = "2.2.0", features = ["compiled_data"] }
 icu_segmenter = { version = "2.2.0", features = ["compiled_data"] }

@@ -718,6 +718,9 @@ pub struct PieChartModel<'a> {
   /// here so every host can lower the same authored scene semantics.
   pub view_3d: Option<Chart3DView>,
   pub title: Option<ChartTitleText>,
+  /// Whether the title overlays the plot instead of reserving a title band.
+  /// Word treats an omitted overlay element on an authored title as enabled.
+  pub title_overlay: bool,
   pub title_layout: Option<ChartManualLayout>,
   pub title_text_body_properties: Option<&'a a::BodyProperties>,
   pub title_rotation_deg: f32,
@@ -766,6 +769,10 @@ pub struct PieChartModel<'a> {
   /// Hosts may need the source bit to distinguish an application fallback
   /// from an ordinary visible data label.
   pub series_data_labels_deleted: bool,
+  /// An active label container owns automatic layout clearance even when
+  /// it produces no strings. Explicitly disabling all five content flags
+  /// removes that reservation; an omitted flag remains distinct from false.
+  pub data_label_layout_present: bool,
   /// Series/group label placement before individual point overrides. Word
   /// reserves automatic label space from this setting, even when a doughnut
   /// resolves its individual labels to Center.
@@ -2348,15 +2355,21 @@ fn append_cartesian_series<'a>(
   let (host, ui_language) = host_locale;
   let (categories, category_hierarchy) = category_state;
   let (kind, grouping, is_3d) = series_spec;
+  let word_series_prefix = matches!(host, ChartHostApplication::Wordprocessing)
+    .then(|| crate::localization::office_word_chart_series_prefix(ui_language));
   for source in sources {
     let series_index = target.len() + 1;
-    let explicit_name = source
-      .series_text
-      .map(series_text_value)
-      .filter(|value| !value.is_empty());
-    let name = explicit_name
-      .clone()
-      .unwrap_or_else(|| default_series_label(source, series_index, ui_language));
+    let explicit_name = source.series_text.map(series_text_value);
+    let has_nonempty_explicit_name = explicit_name.as_ref().is_some_and(|name| !name.is_empty());
+    let name = match (word_series_prefix, explicit_name) {
+      // A present name reference without a cache remains empty in Word.
+      // Missing c:tx instead uses a UI prefix and the stable c:idx + 1,
+      // independently of display order. Resolve it before data-label text.
+      (Some(_), Some(name)) => name,
+      (Some(prefix), None) => format!("{prefix}{}", source.formatting_index as u64 + 1),
+      (None, Some(name)) if !name.is_empty() => name,
+      (None, _) => default_series_label(source, series_index, ui_language),
+    };
     let source_labels = source
       .category_axis_data
       .map(indexed_category_axis_labels)
@@ -2385,7 +2398,7 @@ fn append_cartesian_series<'a>(
       formatting_index: source.formatting_index,
       name: name.clone(),
       has_explicit_name: source.series_text.is_some(),
-      has_nonempty_explicit_name: explicit_name.is_some(),
+      has_nonempty_explicit_name,
       shape_properties: source.chart_shape_properties,
       data_points: source.data_points,
       name_formula: series_name_formula(source),
@@ -3135,6 +3148,14 @@ pub fn pie_chart_model_for_host(
     kind: radial_kind,
     view_3d,
     title,
+    title_overlay: chart_space.chart.title.as_deref().is_some_and(|title| {
+      title
+        .overlay
+        .as_ref()
+        .map_or(host == ChartHostApplication::Wordprocessing, |overlay| {
+          overlay.val.is_none_or(|value| value.as_bool())
+        })
+    }),
     title_layout: chart_title_layout(&chart_space.chart),
     title_text_body_properties: chart_title_body_properties(&chart_space.chart),
     title_rotation_deg: chart_title_rotation_degrees(&chart_space.chart),
@@ -3179,6 +3200,11 @@ pub fn pie_chart_model_for_host(
     legend_layout: legend.and_then(|legend| chart_layout(legend.layout.as_deref())),
     plot_layout: chart_layout(chart_space.chart.plot_area.layout.as_deref()),
     series_data_labels_deleted: series_labels_deleted,
+    data_label_layout_present: series
+      .data_labels
+      .as_deref()
+      .or(chart_group_labels)
+      .is_some_and(data_labels_reserve_automatic_space),
     data_label_default_position: series
       .data_labels
       .as_deref()
@@ -3836,6 +3862,32 @@ fn data_labels_text_properties(labels: &c::DataLabels) -> Option<&c::TextPropert
   match labels.data_labels_choice.as_ref() {
     Some(c::DataLabelsChoice::Sequence(sequence)) => sequence.text_properties.as_deref(),
     _ => None,
+  }
+}
+
+fn data_labels_reserve_automatic_space(labels: &c::DataLabels) -> bool {
+  match labels.data_labels_choice.as_ref() {
+    Some(c::DataLabelsChoice::Delete(delete)) => !delete.val.is_none_or(|value| value.as_bool()),
+    Some(c::DataLabelsChoice::Sequence(sequence)) => {
+      // Word distinguishes an empty label container from explicitly disabling
+      // every content component, including bubble size on a pie. Native
+      // single-omission controls retain clearance for each missing content
+      // flag; the legend-key and leader-line flags do not own this clearance.
+      // MS-OE376 §5.7.2.185 likewise makes a legend key depend on label content.
+      [
+        sequence.show_value.as_ref().and_then(|show| show.val),
+        sequence
+          .show_category_name
+          .as_ref()
+          .and_then(|show| show.val),
+        sequence.show_series_name.as_ref().and_then(|show| show.val),
+        sequence.show_percent.as_ref().and_then(|show| show.val),
+        sequence.show_bubble_size.as_ref().and_then(|show| show.val),
+      ]
+      .iter()
+      .any(|value| value.is_none_or(|value| value.as_bool()))
+    }
+    None => true,
   }
 }
 
@@ -8300,6 +8352,110 @@ mod tests {
     assert_eq!(automatic_series_title(Some("en-US"), 3), "Series 3");
   }
 
+  fn word_series_name_test_source(names: [&str; 3]) -> c::ChartSpace {
+    let series = names
+      .iter()
+      .enumerate()
+      .map(|(index, name)| {
+        let formatting_index = [5, 9, 15][index];
+        let order = 2 - index;
+        format!(
+          r#"<c:ser><c:idx val="{formatting_index}"/><c:order val="{order}"/>{name}
+          <c:cat><c:strLit><c:pt idx="0"><c:v>A</c:v></c:pt></c:strLit></c:cat>
+          <c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser>"#
+        )
+      })
+      .collect::<String>();
+    let xml = format!(
+      r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+      <c:lang val="hu-HU"/><c:chart><c:plotArea><c:barChart><c:barDir val="col"/>{series}
+      <c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/>
+        <c:showSerName val="1"/><c:showPercent val="0"/></c:dLbls>
+      </c:barChart></c:plotArea></c:chart></c:chartSpace>"#
+    );
+    c::ChartSpace::from_bytes(xml.as_bytes()).expect("owned series-name source")
+  }
+
+  #[test]
+  fn word_generated_series_names_share_ui_and_stable_indices_with_data_labels() {
+    let source = word_series_name_test_source(["", "", ""]);
+    for (ui, prefix) in [
+      ("en-US", "Series"),
+      ("zh-CN", "系列"),
+      ("de-DE", "Datenreihen"),
+      ("fr-CA", "Série"),
+      ("es-MX", "Series"),
+      ("ja-JP", "系列"),
+      ("ko-KR", "계열"),
+    ] {
+      let chart = super::cartesian_chart_for_host_locales(
+        &source,
+        super::ChartHostApplication::Wordprocessing,
+        Some(ui),
+        Some("zh-CN"),
+      )
+      .expect("Word chart");
+      assert_eq!(chart.series.len(), 3);
+      for (series, index) in chart.series.iter().zip([6, 10, 16]) {
+        let expected = format!("{prefix}{index}");
+        assert_eq!(series.name, expected, "{ui}");
+        assert!(!series.has_explicit_name);
+        assert!(!series.has_nonempty_explicit_name);
+        assert_eq!(series.data_labels.len(), 1);
+        assert_eq!(series.data_labels[0].text, expected, "{ui}");
+      }
+    }
+  }
+
+  #[test]
+  fn word_series_names_preserve_duplicate_explicit_and_empty_reference_owners() {
+    let source = word_series_name_test_source([
+      "<c:tx><c:v>SAME</c:v></c:tx>",
+      "<c:tx><c:v>SAME</c:v></c:tx>",
+      "",
+    ]);
+    let chart = super::cartesian_chart_for_host_locales(
+      &source,
+      super::ChartHostApplication::Wordprocessing,
+      Some("de-DE"),
+      None,
+    )
+    .expect("Word chart");
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.name.as_str())
+        .collect::<Vec<_>>(),
+      ["SAME", "SAME", "Datenreihen16"]
+    );
+    let source = word_series_name_test_source([
+      "<c:tx><c:strRef><c:f>Sheet1!$B$1</c:f></c:strRef></c:tx>",
+      "<c:tx><c:v/></c:tx>",
+      "",
+    ]);
+    let chart = super::cartesian_chart_for_host_locales(
+      &source,
+      super::ChartHostApplication::Wordprocessing,
+      Some("de-DE"),
+      None,
+    )
+    .expect("Word chart");
+    assert_eq!(
+      chart
+        .series
+        .iter()
+        .map(|series| series.name.as_str())
+        .collect::<Vec<_>>(),
+      ["", "", "Datenreihen16"]
+    );
+    for series in &chart.series[..2] {
+      assert!(series.has_explicit_name);
+      assert!(!series.has_nonempty_explicit_name);
+      assert!(series.data_labels.iter().all(|label| label.text.is_empty()));
+    }
+  }
+
   #[test]
   fn automatic_power_trendline_title_uses_the_japanese_ui_resource() {
     let trendline = c::Trendline::from_bytes(
@@ -8982,6 +9138,49 @@ mod tests {
     )
     .expect("chart space");
     assert!(ordinary_clustered_column_chart(&painted).is_none());
+  }
+
+  #[test]
+  fn radial_label_reservation_distinguishes_disabled_and_omitted_content_flags() {
+    let flags = [
+      "showVal",
+      "showCatName",
+      "showSerName",
+      "showPercent",
+      "showBubbleSize",
+    ];
+    for owner in ["group", "series"] {
+      for omitted in 0..=flags.len() {
+        for value in [None, Some("0"), Some("1"), Some("")] {
+          let mut labels = String::from("<c:dLbls>");
+          for (index, name) in flags.iter().enumerate() {
+            match if index == omitted { value } else { Some("0") } {
+              None => (),
+              Some("") => labels.push_str(&format!("<c:{name}/>")),
+              Some(value) => labels.push_str(&format!("<c:{name} val=\"{value}\"/>")),
+            }
+          }
+          labels.push_str("<c:showLeaderLines val=\"1\"/></c:dLbls>");
+          let (series, group) = if owner == "series" {
+            (labels.as_str(), "")
+          } else {
+            ("", labels.as_str())
+          };
+          let xml = format!(
+            r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/>{series}<c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser>{group}</c:pieChart></c:plotArea></c:chart></c:chartSpace>"#
+          );
+          let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+          let chart =
+            super::pie_chart_model_for_host(&source, super::ChartHostApplication::Wordprocessing)
+              .unwrap();
+          assert_eq!(
+            chart.data_label_layout_present,
+            omitted < flags.len() && value != Some("0"),
+            "{owner}: {omitted} {value:?}"
+          );
+        }
+      }
+    }
   }
 
   #[test]

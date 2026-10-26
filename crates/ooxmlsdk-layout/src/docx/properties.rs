@@ -276,6 +276,140 @@ pub(super) fn merge_run_style(
   );
 }
 
+pub(super) fn toc_numbering_run_style(
+  base: &TextStyle,
+  properties: &w::NumberingSymbolRunProperties,
+  styles: &StylesCatalog,
+) -> TextStyle {
+  // ECMA-376 §17.9.24 gives numbering its own direct run properties. Word's
+  // TOC reconstruction copies active direct font/character effects onto the
+  // number only; its size, color and underline still belong to the TOC style.
+  // Native Word XML controls distinguish positive toggles from explicit false
+  // resets, inherited heading effects, neutral W14 defaults, and follow tabs.
+  let enabled =
+    |value: Option<ooxmlsdk::simple_type::OnOffValue>| value.is_none_or(|value| value.as_bool());
+  let selected = w::NumberingSymbolRunProperties {
+    run_fonts: properties.run_fonts.clone(),
+    bold: properties.bold.as_ref().filter(|p| enabled(p.val)).cloned(),
+    bold_complex_script: properties
+      .bold_complex_script
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    italic: properties
+      .italic
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    italic_complex_script: properties
+      .italic_complex_script
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    caps: properties.caps.as_ref().filter(|p| enabled(p.val)).cloned(),
+    small_caps: properties
+      .small_caps
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    strike: properties
+      .strike
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    double_strike: properties
+      .double_strike
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    outline: properties
+      .outline
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    shadow: properties
+      .shadow
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    emboss: properties
+      .emboss
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    imprint: properties
+      .imprint
+      .as_ref()
+      .filter(|p| enabled(p.val))
+      .cloned(),
+    spacing: properties.spacing.as_ref().filter(|p| p.val != 0).cloned(),
+    character_scale: properties
+      .character_scale
+      .as_ref()
+      .filter(|p| p.val.is_some_and(|v| v != 100))
+      .cloned(),
+    kern: properties.kern.as_ref().filter(|p| p.val != 0).cloned(),
+    position: properties
+      .position
+      .as_ref()
+      .filter(|p| p.val.to_points() != 0.0)
+      .cloned(),
+    vertical_text_alignment: properties
+      .vertical_text_alignment
+      .as_ref()
+      .filter(|p| p.val != w::VerticalPositionValues::Baseline)
+      .cloned(),
+    glow: properties
+      .glow
+      .as_ref()
+      .filter(|p| p.glow_radius.unwrap_or_default() > 0)
+      .cloned(),
+    shadow14: properties
+      .shadow14
+      .as_ref()
+      .filter(|p| {
+        p.blur_radius.unwrap_or_default() != 0
+          || p.distance_from_text.unwrap_or_default() != 0
+          || p.horizontal_scaling_factor.unwrap_or(100_000) != 0
+          || p.vertical_scaling_factor.unwrap_or(100_000) != 0
+      })
+      .cloned(),
+    reflection: properties
+      .reflection
+      .as_ref()
+      .filter(|p| {
+        p.starting_opacity.unwrap_or(100_000) != 0 || p.ending_opacity.unwrap_or_default() != 0
+      })
+      .cloned(),
+    text_outline_effect: properties
+      .text_outline_effect
+      .as_ref()
+      .filter(|p| p.line_width.unwrap_or_default() > 0)
+      .cloned(),
+    scene3_d: properties.scene3_d.clone(),
+    properties3_d: properties
+      .properties3_d
+      .as_ref()
+      .filter(|p| {
+        let (shape, _, _) = wordprocessing_text_shape_3d(p, &styles.theme_colors);
+        common::drawingml_3d::wordprocessing_text_shape_has_effective_3d_geometry(&shape)
+          || shape.preset_material.is_some()
+      })
+      .cloned(),
+    ..w::NumberingSymbolRunProperties::default()
+  };
+  let mut style = base.clone();
+  merge_run_style(
+    &mut style,
+    Some(RunProps::Numbering(&selected)),
+    &styles.theme_fonts,
+    &styles.theme_colors,
+  );
+  styles.apply_word_font_table_mappings(&mut style, selected.run_fonts.first());
+  styles.automatic_escapement_fonts.resolve(&mut style);
+  style
+}
+
 fn merge_run_style_with_policy(
   style: &mut TextStyle,
   properties: Option<RunProps<'_>>,
@@ -287,6 +421,7 @@ fn merge_run_style_with_policy(
   // classifier even for styles constructed outside the document-default
   // style chain (for example cached field-result runs).
   style.wordprocessingml_font_slots = true;
+  style.wordprocessingml_han_fallback = true;
   let Some(properties) = properties else {
     return;
   };
@@ -318,6 +453,22 @@ fn merge_run_style_with_policy(
       style.high_ansi_font_family_class = None;
       style.high_ansi_font_charset = None;
       style.high_ansi_font_pitch = None;
+    }
+    // Keep source identity independent of the ordinary paint-font resolver.
+    // An authored theme can use the configured document language later even
+    // when the paint resolver recovers a fallback at this import stage.
+    if fonts.east_asia_theme.is_some()
+      || fonts
+        .east_asia
+        .as_deref()
+        .is_some_and(|family| !family.trim().is_empty())
+    {
+      style.wordprocessingml_balance_reference_theme = fonts.east_asia_theme;
+      style.wordprocessingml_balance_reference_font_family = if fonts.east_asia_theme.is_some() {
+        None
+      } else {
+        fonts.east_asia.as_deref().map(Arc::from)
+      };
     }
     if let Some(font_family) = resolve_word_run_font(
       fonts.east_asia.as_deref(),
@@ -806,6 +957,9 @@ fn merge_run_style_with_policy(
   {
     style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));
   }
+  if let Some(emphasis) = properties.emphasis() {
+    style.wordprocessing_emphasis_mark = Some(emphasis.val);
+  }
   if let Some(strike) = properties.strike() {
     style.strikethrough = strike.val.is_none_or(|value| value.as_bool());
   }
@@ -993,6 +1147,20 @@ pub(super) fn merge_doc_default_run_style(
     theme_fonts,
     theme_colors,
   );
+  if effective.run_fonts.as_ref().is_some_and(|fonts| {
+    fonts.east_asia_theme.is_none()
+      && fonts
+        .east_asia
+        .as_deref()
+        .is_some_and(|family| family.trim().eq_ignore_ascii_case("Times New Roman"))
+  }) {
+    // Native WordOpenXML readback recovers this docDefaults EA sentinel as
+    // minorEastAsia. Normal/direct TNR and a non-TNR docDefault remain named
+    // references. Keep this observed recovery confined to space balancing;
+    // the ordinary character-slot font inheritance is unchanged.
+    style.wordprocessingml_balance_reference_font_family = None;
+    style.wordprocessingml_balance_reference_theme = Some(w::ThemeFontValues::MinorEastAsia);
+  }
   if style.color_is_automatic
     && let Some(background) = effective
       .shading
@@ -1034,7 +1202,10 @@ fn wordprocessing_text_scene_3d(scene: &w14::Scene3D) -> Option<a::Scene3DType> 
   Some(a::Scene3DType {
     xmlns: Vec::new(),
     camera: Box::new(a::Camera {
-      preset: cast_sdk_enum(&scene.camera.preset_camera_type)?,
+      // MS-DOCX2.6.3.2, product behavior51: Word ignores w14:camera/@prst
+      // on input and writes orthographicFront. Native inherited/direct run
+      // controls agree. DrawingML a:camera has its separate full semantics.
+      preset: a::PresetCameraValues::OrthographicFront,
       field_of_view: None,
       zoom: None,
       rotation: None,
@@ -1269,6 +1440,70 @@ fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
 mod tests {
   use super::*;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn toc_numbering_keeps_style_size_and_paint_while_copying_direct_font_and_effects() {
+    let raw = w::NumberingSymbolRunProperties::from_bytes(
+      br#"
+      <w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+        <w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>
+        <w:b w:val="0"/><w:i w:val="0"/><w:caps w:val="0"/>
+        <w:color w:val="FF0000"/><w:spacing w:val="0"/><w:position w:val="0"/>
+        <w:sz w:val="40"/><w:u w:val="single"/><w:vertAlign w:val="baseline"/>
+        <w14:glow w14:rad="0"><w14:srgbClr w14:val="000000"/></w14:glow>
+        <w14:shadow w14:blurRad="0" w14:dist="0" w14:sx="0" w14:sy="0"/>
+        <w14:reflection w14:stA="0" w14:endA="0" w14:sx="0" w14:sy="0"/>
+        <w14:textOutline w14:w="0"><w14:noFill/></w14:textOutline>
+        <w14:scene3d><w14:camera w14:prst="orthographicFront"/>
+          <w14:lightRig w14:rig="threePt" w14:dir="t"/></w14:scene3d>
+        <w14:props3d w14:extrusionH="0" w14:contourW="0" w14:prstMaterial="none"/>
+      </w:rPr>"#,
+    )
+    .unwrap();
+    let base = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 9.0,
+      bold: true,
+      italic: true,
+      uppercase: true,
+      ..TextStyle::default()
+    };
+    let style = toc_numbering_run_style(&base, &raw, &StylesCatalog::default());
+    assert_eq!(style.font_family.as_deref(), Some("Courier New"));
+    assert_eq!(style.font_size_pt, 9.0);
+    assert!(style.bold && style.italic && style.uppercase);
+    assert_eq!(style.color, base.color);
+    assert_eq!(style.underline, base.underline);
+    assert_eq!(style.baseline_shift_pt, base.baseline_shift_pt);
+    assert!(
+      style.text_glow.is_none() && style.text_shadow.is_none() && style.text_reflection.is_none()
+    );
+    let parts = style.wordprocessing_text_3d_parts.unwrap();
+    assert!(parts.scene.is_some() && parts.shape.is_none());
+
+    let active = w::NumberingSymbolRunProperties::from_bytes(
+      br#"
+      <w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+        <w:b/><w:i/><w:spacing w:val="40"/><w:kern w:val="24"/>
+        <w14:glow w14:rad="12700"><w14:srgbClr w14:val="000000"/></w14:glow>
+        <w14:shadow w14:dist="12700" w14:sx="100000" w14:sy="100000">
+          <w14:srgbClr w14:val="000000"/></w14:shadow>
+        <w14:reflection w14:stA="70000" w14:endA="0"/>
+        <w14:props3d w14:extrusionH="12700"/>
+      </w:rPr>"#,
+    )
+    .unwrap();
+    let style = toc_numbering_run_style(&TextStyle::default(), &active, &StylesCatalog::default());
+    assert!(style.bold && style.italic);
+    assert_eq!(style.character_spacing_pt, 2.0);
+    assert_eq!(style.kerning_minimum_size_pt, Some(12.0));
+    assert!(
+      style.text_glow.is_some() && style.text_shadow.is_some() && style.text_reflection.is_some()
+    );
+    assert!(style.wordprocessing_text_3d_parts.unwrap().shape.is_some());
+  }
 
   #[test]
   fn word_font_names_do_not_use_css_inheritance_keywords() {

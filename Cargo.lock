@@ -1376,6 +1376,7 @@ dependencies = [
  "hypher",
  "icu_calendar",
  "icu_datetime",
+ "icu_decimal",
  "icu_locale",
  "icu_properties",
  "icu_segmenter",

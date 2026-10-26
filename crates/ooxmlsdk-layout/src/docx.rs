@@ -1,4 +1,5 @@
 mod automatic_escapement;
+mod border_3d;
 mod custom_xml;
 mod diagram;
 mod drawing;
@@ -6,17 +7,20 @@ mod drawing_position_recovery;
 mod embedded_fonts;
 mod eq;
 mod field_localization;
+mod field_statistics;
 mod fit_text;
 mod floating_paint_order;
 mod html;
 mod hyphenation;
 mod layout;
+mod linked_textboxes;
 mod math;
 pub(crate) use math::{DrawingmlMathLayout, drawingml_math_layout};
 mod math_type;
 mod model;
 mod ograph;
 mod package;
+mod page_background;
 mod picture_bullet;
 mod properties;
 mod revision_recovery;
@@ -27,6 +31,7 @@ mod toc;
 mod vml_autoshape;
 mod vml_picture;
 mod vml_recovery;
+mod wordprocessing_chunk;
 
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -70,7 +75,8 @@ use crate::common::drawingml_image_effects::{
 use crate::error::Result;
 use crate::field_datetime;
 use crate::localization::{
-  OfficeLocaleContext, OfficeResourceLocale, OfficeStringCatalog, locale_is_right_to_left,
+  OfficeLocaleContext, OfficeNumberSeparators, OfficeResourceLocale, OfficeStringCatalog,
+  locale_is_right_to_left,
 };
 use crate::model::{common_rgb, drawingml_kerning_minimum_size_pt};
 use crate::options::{
@@ -88,9 +94,10 @@ use crate::units;
 
 pub(crate) use custom_xml::CustomXmlBindings;
 use field_localization::{
-  FieldMessage, apply_bidi_outline_missing_context_style, apply_generated_field_message_style,
-  apply_japanese_diagnostic_font_slots, apply_traditional_chinese_diagnostic_font_slots,
-  localized_clean_empty_toc_message, localized_field_message,
+  FieldMessage, ScalarFieldError, apply_bidi_outline_missing_context_style,
+  apply_generated_field_message_style, apply_japanese_diagnostic_font_slots,
+  apply_traditional_chinese_diagnostic_font_slots, localized_clean_empty_toc_message,
+  localized_field_message, localized_scalar_field_error,
 };
 pub(crate) use model::*;
 use package::{
@@ -238,18 +245,23 @@ const OFFICE_AUTOMATIC_LINE_NUMBER_DISTANCE_PT: f32 = 18.0;
 #[derive(Clone, Copy, Debug, Default)]
 struct ImportSettings {
   has_settings_part: bool,
+  decimal_tab_symbols: OfficeNumberSeparators,
   compatibility_mode: u16,
   justify_lines_with_shrinking: bool,
   use_far_east_layout: bool,
   word97_escapement_rounding: bool,
+  enable_open_type_features: bool,
   auto_space_like_word95: bool,
   strict_first_and_last_chars: bool,
   no_punctuation_kerning: bool,
   fixed_html_paragraph_auto_spacing: bool,
   do_not_break_wrapped_tables: bool,
   do_not_expand_shift_return: bool,
+  do_not_use_indent_as_numbering_tab_stop: bool,
+  differentiate_multirow_table_headers: bool,
   balance_single_byte_double_byte_width: bool,
   wordprocessingml_cjk_line_metrics: bool,
+  wordprocessingml_no_leading: bool,
   field_update_datetime: Option<FieldUpdateDateTime>,
   document_created_datetime: Option<FieldUpdateDateTime>,
   exchange_left_right: bool,
@@ -305,13 +317,23 @@ pub(crate) fn extract(
   let use_far_east_layout = use_far_east_layout(package, &main);
   let balance_single_byte_double_byte_width = balance_single_byte_double_byte_width(package, &main);
   let wordprocessingml_cjk_line_metrics = no_leading(package, &main);
+  // Native mode14/15 controls and Word's compatibility behavior retain this
+  // font-leading switch only before Word2013. CJK side leading is separate.
+  let wordprocessingml_no_leading = wordprocessingml_cjk_line_metrics && compatibility_mode < 15;
   let document_math_settings = document_math_settings(package, &main);
   let document_created_datetime = document_created_datetime(package, options);
+  let locales = OfficeLocaleContext::new(
+    options.ui_language.as_deref(),
+    options.format_locale.as_deref(),
+    options.default_document_language.as_deref(),
+  );
   let import_settings = ImportSettings {
     has_settings_part,
+    decimal_tab_symbols: locales.number_separators(),
     compatibility_mode,
     justify_lines_with_shrinking: compatibility_mode >= 15,
     use_far_east_layout,
+    enable_open_type_features: settings::enable_open_type_features(package, &main),
     auto_space_like_word95: settings::auto_space_like_word95(package, &main),
     strict_first_and_last_chars: settings::strict_first_and_last_chars(package, &main),
     no_punctuation_kerning: settings::no_punctuation_kerning(package, &main),
@@ -320,21 +342,33 @@ pub(crate) fn extract(
     fixed_html_paragraph_auto_spacing,
     do_not_break_wrapped_tables,
     do_not_expand_shift_return,
+    do_not_use_indent_as_numbering_tab_stop: settings::do_not_use_indent_as_numbering_tab_stop(
+      package, &main,
+    ),
+    differentiate_multirow_table_headers: settings::differentiate_multirow_table_headers(
+      package,
+      &main,
+      compatibility_mode,
+    ),
     balance_single_byte_double_byte_width,
     wordprocessingml_cjk_line_metrics,
+    wordprocessingml_no_leading,
     field_update_datetime: options.field_update_datetime,
     document_created_datetime,
     ..Default::default()
   };
   let explicit_default_tab_stop_pt = explicit_default_tab_stop_pt(package, &main);
-  let locales = OfficeLocaleContext::new(
-    options.ui_language.as_deref(),
-    options.format_locale.as_deref(),
-    options.default_document_language.as_deref(),
-  );
   let mut styles = StylesCatalog::load(package, &main, import_settings, &locales)?;
+  if import_settings.field_update_datetime.is_some() {
+    styles.cached_character_count = main
+      .data_as_str(package)
+      .ok()
+      .flatten()
+      .and_then(|xml| field_statistics::character_count(xml, &styles));
+  }
   styles.doc_default_run.embedded_fonts = embedded_fonts::load(package, &main);
   styles.source_file_name = options.source_file_name.clone();
+  styles.source_file_path = options.source_file_path.clone();
   styles.display_math_alignment = document_math_settings.display_alignment;
   styles.math_font_family = document_math_settings.font_family;
   styles.math_break_binary = Some(document_math_settings.break_binary);
@@ -366,6 +400,7 @@ pub(crate) fn extract(
   let update_fields_on_open = update_fields_on_open(package, &main);
   let mirror_margins = mirror_margins(package, &main);
   let gutter_at_top = gutter_at_top(package, &main);
+  let print_two_on_one = print_two_on_one(package, &main);
   let document = drawing_position_recovery::root(&main.try_data_bytes(package)?, || {
     main.root_element(package)
   })?;
@@ -423,7 +458,7 @@ pub(crate) fn extract(
       )
     })
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
-  refresh_tables_of_contents(
+  let mut toc_print_cache = refresh_tables_of_contents(
     &mut sections,
     &body_styles,
     update_fields_on_open,
@@ -486,6 +521,7 @@ pub(crate) fn extract(
     section.page.background = page_background;
     section.page.mirror_margins = mirror_margins;
     section.page.gutter_at_top = gutter_at_top;
+    section.page.print_two_on_one = print_two_on_one;
     section.page.adjust_table_line_heights_to_grid |= adjust_line_height_in_table;
   }
   if mirror_margins
@@ -537,6 +573,13 @@ pub(crate) fn extract(
   )?;
   apply_note_reference_labels(&mut sections, &footnote_labels, &endnote_labels);
   floating_paint_order::normalize_sections(&mut sections);
+  if let Some(cache) = toc_print_cache.as_mut() {
+    for blocks in &mut cache.source_blocks {
+      normalize_complex_field_paragraph_breaks(blocks);
+      apply_note_reference_labels_to_blocks(blocks, &footnote_labels, &endnote_labels);
+      floating_paint_order::normalize_story(blocks);
+    }
+  }
   for notes in [&mut footnotes, &mut endnotes] {
     floating_paint_order::normalize_story(notes.values_mut().flatten());
   }
@@ -581,11 +624,15 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.title_page)
     .unwrap_or(false);
+  let num_pages_excludes_cover = document
+    .body
+    .as_deref()
+    .is_some_and(|body| page.page_number_start == Some(0) && body_has_cover_page(body));
   let form_widgets = form_widget_ids.into_widgets();
   let note_separator_style =
     styles.run_style_with_base(None, TextStyle::default(), RunStyleOverrides::default());
 
-  Ok(DocxDocument {
+  let mut imported = DocxDocument {
     page,
     page_background_pattern,
     page_background_texture,
@@ -606,6 +653,7 @@ pub(crate) fn extract(
     split_page_break_and_paragraph_mark,
     form_widgets,
     sections,
+    toc_print_cache,
     header_blocks,
     footer_blocks,
     first_header_blocks,
@@ -618,8 +666,55 @@ pub(crate) fn extract(
     endnote_numbering,
     endnote_position,
     title_page,
+    num_pages_excludes_cover,
     blocks,
+  };
+  linked_textboxes::advance_fixed_height_heads(&mut imported);
+  Ok(imported)
+}
+
+fn body_has_cover_page(body: &w::Body) -> bool {
+  body.body_choice.iter().any(|choice| match choice {
+    w::BodyChoice::SdtBlock(sdt) => sdt_block_has_cover_page(sdt),
+    w::BodyChoice::CustomXmlBlock(custom_xml) => custom_xml_block_has_cover_page(custom_xml),
+    _ => false,
   })
+}
+
+fn sdt_block_has_cover_page(sdt: &w::SdtBlock) -> bool {
+  // MS-OI29500 §2.1.489 describes the NUMPAGES cover-page adjustment.
+  // Native Word controls distinguish a Cover Pages docPartObj from an
+  // ordinary titlePg, or a docPartList that merely offers that gallery.
+  // The cover marker can occur after other blocks or inside another SDT.
+  sdt.sdt_properties.as_ref().is_some_and(|properties| {
+    properties.sdt_properties_choice.iter().any(|choice| {
+      matches!(choice, w::SdtPropertiesChoice::SdtContentDocPartObject(part)
+        if part.doc_part_gallery.as_ref().map(|gallery| gallery.val.as_str())
+          == Some("Cover Pages"))
+    })
+  }) || sdt.sdt_content_block.as_ref().is_some_and(|content| {
+    content
+      .sdt_content_block_choice
+      .iter()
+      .any(|choice| match choice {
+        w::SdtContentBlockChoice::SdtBlock(nested) => sdt_block_has_cover_page(nested),
+        w::SdtContentBlockChoice::CustomXmlBlock(custom_xml) => {
+          custom_xml_block_has_cover_page(custom_xml)
+        }
+        _ => false,
+      })
+  })
+}
+
+fn custom_xml_block_has_cover_page(custom_xml: &w::CustomXmlBlock) -> bool {
+  custom_xml
+    .custom_xml_block_choice
+    .iter()
+    .any(|choice| match choice {
+      w::CustomXmlBlockChoice::SdtBlock(sdt) => sdt_block_has_cover_page(sdt),
+      w::CustomXmlBlockChoice::CustomXmlBlock(nested) => custom_xml_block_has_cover_page(nested),
+      _ => false,
+    })
 }
 
 fn effective_default_tab_stop_pt(
@@ -679,6 +774,7 @@ pub fn layout_anchor_pages(
   let document = extract(package, options)?;
   let anchor_options = LayoutOptions {
     source_file_name: None,
+    source_file_path: None,
     ui_language: options.ui_language.clone(),
     format_locale: options.format_locale.clone(),
     default_document_language: options.default_document_language.clone(),
@@ -755,6 +851,8 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
 fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> Block {
   Block::paragraph(Paragraph {
     inlines: vec![InlineItem::Image(InlineImage {
+      contour_owned_wrap: None,
+      source_run_font_size_pt: None,
       data: image.data,
       content_type: image.content_type,
       blip_compression_state: image.blip_compression_state,
@@ -776,6 +874,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
       line_box: InlineImageLineBox::CharacterLike,
       office_math_line_layout: None,
       office_math_display_layout: None,
+      office_math_metrics: None,
       crop: image.crop,
       rotation_deg: image.rotation_deg,
       flip_horizontal: image.flip_horizontal,
@@ -877,6 +976,19 @@ fn gutter_at_top(package: &WordprocessingDocument, main: &MainDocumentPart) -> b
     .and_then(|settings| {
       settings
         .gutter_at_top
+        .as_ref()
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+    .unwrap_or(false)
+}
+
+fn print_two_on_one(package: &WordprocessingDocument, main: &MainDocumentPart) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .print_two_on_one
         .as_ref()
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
@@ -1213,6 +1325,11 @@ impl BlockBoundaryBookmarks {
         )
       })
       .count();
+    shift_page_reference_style_offsets(
+      &mut paragraph.field_events,
+      anchor_index,
+      anchor_names.len(),
+    );
     paragraph.inlines.splice(
       anchor_index..anchor_index,
       anchor_names.into_iter().map(InlineItem::BookmarkStart),
@@ -1356,6 +1473,128 @@ fn last_table_cell_paragraph_mut(cells: &mut [TableCell]) -> Option<&mut Paragra
   None
 }
 
+// Block SDTs and custom XML are containers in the main story, not separate
+// stories (ECMA-376 17.5.2.34, 17.5.1.6). A paragraph's sectPr still closes
+// the containing document section (17.6.18). Keep the section-aware path in
+// body_sections shared with direct paragraphs; importing only Vec<Block>
+// would discard the section, its headers and its field-closing carrier.
+enum BodySectionChoice<'a> {
+  Paragraph(&'a w::Paragraph),
+  Table(&'a w::Table),
+  AltChunk(&'a w::AltChunk),
+  SdtBlock(&'a w::SdtBlock),
+  CustomXmlBlock(&'a w::CustomXmlBlock),
+  Break(&'a w::Break),
+  BookmarkStart(&'a w::BookmarkStart),
+  BookmarkEnd(&'a w::BookmarkEnd),
+  Other,
+}
+
+macro_rules! body_section_choice_from {
+  ($source:ident $(, $extra:ident)*) => {
+    impl<'a> From<&'a w::$source> for BodySectionChoice<'a> {
+      fn from(choice: &'a w::$source) -> Self {
+        match choice {
+          w::$source::Paragraph(value) => Self::Paragraph(value),
+          w::$source::Table(value) => Self::Table(value),
+          w::$source::SdtBlock(value) => Self::SdtBlock(value),
+          w::$source::CustomXmlBlock(value) => Self::CustomXmlBlock(value),
+          w::$source::BookmarkStart(value) => Self::BookmarkStart(value),
+          w::$source::BookmarkEnd(value) => Self::BookmarkEnd(value),
+          $(w::$source::$extra(value) => Self::$extra(value),)*
+          _ => Self::Other,
+        }
+      }
+    }
+  };
+}
+
+body_section_choice_from!(BodyChoice, AltChunk, Break);
+body_section_choice_from!(SdtContentBlockChoice);
+body_section_choice_from!(CustomXmlBlockChoice);
+
+impl BodySectionChoice<'_> {
+  fn contains_section(&self, bindings: &CustomXmlBindings) -> bool {
+    match self {
+      Self::Paragraph(paragraph) => paragraph
+        .paragraph_properties
+        .as_ref()
+        .is_some_and(|properties| properties.section_properties.is_some()),
+      Self::SdtBlock(sdt) => {
+        sdt.sdt_content_block.as_ref().is_some_and(|content| {
+          content
+            .sdt_content_block_choice
+            .iter()
+            .any(|choice| BodySectionChoice::from(choice).contains_section(bindings))
+        }) && !sdt
+          .sdt_properties
+          .as_ref()
+          .is_some_and(|properties| sdt_bound_replacement(bindings, properties).is_some())
+          && sdt_glossary_hyperlink_placeholder(sdt, bindings).is_none()
+      }
+      Self::CustomXmlBlock(custom_xml) => custom_xml
+        .custom_xml_block_choice
+        .iter()
+        .any(|choice| BodySectionChoice::from(choice).contains_section(bindings)),
+      // A table cell (and any textbox in a run) owns another story. Its
+      // paragraphs must never split the containing main-story section.
+      _ => false,
+    }
+  }
+}
+
+struct BodySectionChoices<'a> {
+  body: std::slice::Iter<'a, w::BodyChoice>,
+  pending: Vec<BodySectionChoice<'a>>,
+  bindings: &'a CustomXmlBindings,
+}
+
+impl<'a> BodySectionChoices<'a> {
+  fn new(body: &'a w::Body, bindings: &'a CustomXmlBindings) -> Self {
+    Self {
+      body: body.body_choice.iter(),
+      pending: Vec::new(),
+      bindings,
+    }
+  }
+}
+
+impl<'a> Iterator for BodySectionChoices<'a> {
+  type Item = BodySectionChoice<'a>;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    loop {
+      let choice = self
+        .pending
+        .pop()
+        .or_else(|| self.body.next().map(BodySectionChoice::from))?;
+      match &choice {
+        BodySectionChoice::SdtBlock(sdt) if choice.contains_section(self.bindings) => {
+          if let Some(content) = &sdt.sdt_content_block {
+            self.pending.extend(
+              content
+                .sdt_content_block_choice
+                .iter()
+                .rev()
+                .map(BodySectionChoice::from),
+            );
+          }
+        }
+        BodySectionChoice::CustomXmlBlock(custom_xml) if choice.contains_section(self.bindings) => {
+          self.pending.extend(
+            custom_xml
+              .custom_xml_block_choice
+              .iter()
+              .rev()
+              .map(BodySectionChoice::from),
+          );
+        }
+        _ => return Some(choice),
+      }
+    }
+  }
+}
+
 fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection> {
   let recovered_body = vml_recovery::body(body, env.images);
   let body = recovered_body.as_ref().unwrap_or(body);
@@ -1364,7 +1603,6 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
   let mut boundary_bookmarks = BlockBoundaryBookmarks::default();
   let mut previous_properties = None;
   let mut previous_section_has_floating_table_anchor = false;
-  let mut pending_drop_cap_text = None;
   let mut pending_out_of_place_breaks = Vec::new();
   let BodySectionEnv {
     styles,
@@ -1379,15 +1617,21 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
   } = env;
   let mut complex_fields = ComplexFieldImportState::default();
 
-  for choice in &body.body_choice {
+  for choice in BodySectionChoices::new(body, custom_xml_bindings) {
     match choice {
-      w::BodyChoice::Paragraph(paragraph) => {
+      BodySectionChoice::Paragraph(paragraph) => {
+        let deleted_paragraph_mark = paragraph_mark_is_deleted(paragraph);
         let section_properties = paragraph
           .paragraph_properties
           .as_deref()
           .and_then(|properties| properties.section_properties.as_deref())
+          // A tracked deletion of the section delimiter merges its text into
+          // the following section, whose page/header/footer properties win.
+          // Word's Sections COM collection retains the revision boundary,
+          // but its final PDF does not. Filter it before section closure and
+          // let the ordinary deleted-paragraph path retain/join visible text.
+          .filter(|_| !deleted_paragraph_mark)
           .cloned();
-        let deleted_paragraph_mark = paragraph_mark_is_deleted(paragraph);
         let numbering_state = (section_properties.is_some() || deleted_paragraph_mark)
           .then(|| numbering.counter_state());
         let mut model = paragraph_model_in_story(
@@ -1405,13 +1649,6 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         }
         model.format.deleted_separator =
           section_properties.is_none() && paragraph_mark_joins_following(paragraph);
-        if paragraph_has_drop_cap_frame(&model) {
-          pending_drop_cap_text = paragraph_drop_cap_text(&model);
-          continue;
-        }
-        if let Some(text) = pending_drop_cap_text.take() {
-          prepend_drop_cap_text(&mut model, text);
-        }
         if deleted_paragraph_mark
           && section_properties.is_none()
           && paragraph_body_is_effectively_empty(&model)
@@ -1436,10 +1673,10 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           let suppresses_numbering = had_numbering_label
             && empty_section_carrier_suppresses_numbering(paragraph, section_break);
           if suppresses_numbering {
-            // Directly numbered, directly indented, continuous, and deleted
+            // Directly numbered, directly indented, and continuous
             // content-less sectPr paragraphs do not paint or consume a list
-            // label. Continuous breaks retain one unnumbered flow line; page
-            // breaks and deleted marks leave only section metadata
+            // label. Continuous breaks retain one unnumbered flow line;
+            // page breaks leave only section metadata
             // (tdf#97417, tdf#113608, tdf#138892).
             numbering.restore_counter_state(
               numbering_state.expect("section paragraph captured numbering state"),
@@ -1502,19 +1739,27 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
             floating_table_body_anchor = keeps_floating_table_anchor;
             model.format.floating_table_section_end =
               !had_numbering_label && keeps_floating_table_anchor && !current_blocks.is_empty();
-            let keeps_authored_paragraph_mark_height = section_break
+            // w:type places this section relative to its predecessor
+            // (ECMA-376 17.6.22). The opening NextPage/default section has
+            // no incoming page boundary that can absorb its sole authored
+            // paragraph mark. Word retains its height independently of the
+            // following section's start type (fdo52208; Native 8/24pt controls).
+            // Existing text still absorbs a trailing empty carrier, and the
+            // helper preserves the separate unformatted/default-mark policy.
+            let keeps_authored_paragraph_mark_height = (section_break
               == SectionBreakKind::Continuous
+              || (sections.is_empty() && section_break == SectionBreakKind::NextPage))
               && empty_section_carrier_has_authored_paragraph_mark_height(
                 &model,
                 styles,
                 current_blocks.is_empty(),
               );
             section_metadata_only = !had_numbering_label
-              && !(section_break == SectionBreakKind::Continuous
-                && (keeps_empty_multicolumn_section
-                  || follows_column_break
-                  || keeps_floating_table_anchor
-                  || keeps_authored_paragraph_mark_height));
+              && !(keeps_authored_paragraph_mark_height
+                || (section_break == SectionBreakKind::Continuous
+                  && (keeps_empty_multicolumn_section
+                    || follows_column_break
+                    || keeps_floating_table_anchor)));
           }
           if section_metadata_only {
             promote_preceding_table_to_anchored_frame(&mut current_blocks, &model);
@@ -1574,7 +1819,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
           push_body_paragraph(&mut current_blocks, model);
         }
       }
-      w::BodyChoice::Table(table) => {
+      BodySectionChoice::Table(table) => {
         discard_empty_hidden_paragraph_before_table(&mut current_blocks);
         let mut block = Block::Table(table_model(
           table,
@@ -1599,15 +1844,46 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         ) {
           pending_out_of_place_breaks.clear();
         }
-        current_blocks.push(block);
+        push_body_table_block(&mut current_blocks, block);
       }
-      w::BodyChoice::AltChunk(alt_chunk) => {
+      BodySectionChoice::AltChunk(alt_chunk) => {
         let Some(relationship_id) = alt_chunk.id.as_deref() else {
           continue;
         };
         let Some(resource) = alt_chunks.by_relationship_id.get(relationship_id) else {
           continue;
         };
+        if let Some(imported) = wordprocessing_chunk::import(
+          resource,
+          alt_chunk,
+          styles,
+          form_widget_ids,
+          no_column_balance,
+        ) {
+          for mut section in imported.sections {
+            boundary_bookmarks.attach_to_new_blocks(&mut section.blocks);
+            if prepend_out_of_place_breaks_to_first_character_group(
+              &mut section.blocks,
+              &pending_out_of_place_breaks,
+            ) {
+              pending_out_of_place_breaks.clear();
+            }
+            current_blocks.append(&mut section.blocks);
+            section.blocks = std::mem::take(&mut current_blocks);
+            previous_properties.clone_from(&section.section_properties);
+            sections.push(section);
+          }
+          let mut blocks = imported.trailing_blocks;
+          boundary_bookmarks.attach_to_new_blocks(&mut blocks);
+          if prepend_out_of_place_breaks_to_first_character_group(
+            &mut blocks,
+            &pending_out_of_place_breaks,
+          ) {
+            pending_out_of_place_breaks.clear();
+          }
+          current_blocks.extend(blocks);
+          continue;
+        }
         let block_start = current_blocks.len();
         current_blocks.extend(alt_chunk_blocks(
           resource,
@@ -1616,7 +1892,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         ));
         boundary_bookmarks.attach_to_new_blocks(&mut current_blocks[block_start..]);
       }
-      w::BodyChoice::SdtBlock(sdt) => {
+      BodySectionChoice::SdtBlock(sdt) => {
         let mut blocks = sdt_block_blocks(
           sdt,
           styles,
@@ -1640,7 +1916,7 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         }
         current_blocks.extend(blocks);
       }
-      w::BodyChoice::CustomXmlBlock(custom_xml) => {
+      BodySectionChoice::CustomXmlBlock(custom_xml) => {
         let mut blocks = custom_xml_block_blocks_with_base(
           custom_xml,
           styles,
@@ -1665,15 +1941,17 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
         }
         current_blocks.extend(blocks);
       }
-      w::BodyChoice::Break(br) => {
+      BodySectionChoice::Break(br) => {
         // Word postpones a non-conformant block-level break until the next
         // character group. Empty paragraphs therefore remain before a page
         // break, and a break immediately before a table becomes the first
         // character in its first populated cell (tdf#108714 Office golden).
         pending_out_of_place_breaks.push(br.clone());
       }
-      w::BodyChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
-      w::BodyChoice::BookmarkEnd(bookmark) => boundary_bookmarks.end(bookmark, &mut current_blocks),
+      BodySectionChoice::BookmarkStart(bookmark) => boundary_bookmarks.start(bookmark),
+      BodySectionChoice::BookmarkEnd(bookmark) => {
+        boundary_bookmarks.end(bookmark, &mut current_blocks)
+      }
       _ => {}
     }
   }
@@ -1719,6 +1997,12 @@ fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection
     }
   }
 
+  linked_textboxes::advance_zero_area_heads(
+    sections
+      .iter_mut()
+      .map(|section| section.blocks.as_mut_slice()),
+    styles.default_tab_stop_pt.unwrap_or(DEFAULT_TAB_STOP_PT),
+  );
   sections
 }
 
@@ -1787,6 +2071,20 @@ fn html_content_type_charset(content_type: &str) -> Option<&str> {
   })
 }
 
+fn shift_page_reference_style_offsets(
+  events: &mut [ParagraphFieldEvent],
+  insertion: usize,
+  count: usize,
+) {
+  for event in events {
+    if let ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } = event
+      && *inline_offset >= insertion
+    {
+      *inline_offset += count;
+    }
+  }
+}
+
 fn push_body_paragraph(blocks: &mut Vec<Block>, paragraph: Paragraph) {
   push_joined_paragraph(blocks, paragraph, true);
 }
@@ -1847,6 +2145,7 @@ fn push_joined_paragraph(
       // Retain its bookmarks and cached-break position with the joined stream.
       let starts_after_last_rendered_page_break = previous.starts_after_last_rendered_page_break;
       let mut inlines = std::mem::take(&mut previous.inlines);
+      shift_page_reference_style_offsets(&mut paragraph.field_events, 0, inlines.len());
       inlines.append(&mut paragraph.inlines);
       paragraph.inlines = inlines;
       let mut field_events = std::mem::take(&mut previous.field_events);
@@ -1888,6 +2187,7 @@ fn push_joined_paragraph(
     previous
       .endnote_reference_ids
       .append(&mut paragraph.endnote_reference_ids);
+    shift_page_reference_style_offsets(&mut paragraph.field_events, 0, previous.inlines.len());
     previous.field_events.append(&mut paragraph.field_events);
     previous.inlines.append(&mut paragraph.inlines);
     return;
@@ -1950,7 +2250,8 @@ fn normalize_complex_field_paragraph_breaks(blocks: &mut Vec<Block>) {
         deferred_offsets.push(*inline_offset);
         false
       }
-      ParagraphFieldEvent::ReferenceResultSpan { .. } => false,
+      ParagraphFieldEvent::ReferenceResultSpan { .. }
+      | ParagraphFieldEvent::PageReferenceResultStyle { .. } => false,
       _ => true,
     });
     deferred_offsets.sort_unstable();
@@ -2067,6 +2368,52 @@ fn refresh_paragraph_story_derivatives(paragraph: &mut Paragraph) {
   }
 }
 
+fn push_body_table_block(blocks: &mut Vec<Block>, mut block: Block) {
+  // Word's framePr range can contain a table between framed paragraphs.
+  // The existing frame owns the table when all cell frames identify that
+  // same range. Native F/table-G/H controls distinguish a missing cell frame
+  // from a following paragraph with only a one-twip placement difference.
+  // Do not create a new table frame or change unrelated inline/tblpPr cells.
+  if let (Some(Block::Frame(frame)), Block::Table(table)) = (blocks.last_mut(), &mut block)
+    && !frame.drop_cap
+    && frame.vertical_text_flow.is_none()
+    && table.placement.is_none()
+    && !table.page_break_before
+    && !table.rows.is_empty()
+    && table.rows.iter().all(|row| {
+      !row.cells.is_empty()
+        && row.cells.iter().all(|cell| {
+          !cell.blocks.is_empty()
+            && cell.blocks.iter().all(|block| {
+              matches!(block, Block::Frame(cell_frame)
+              if !cell_frame.drop_cap
+                && !cell_frame.page_break_before
+                && !cell_frame.blocks.is_empty()
+                && cell_frame.blocks.iter().all(|block| matches!(block,
+                  Block::Paragraph(paragraph) if !paragraph.format.page_break_before))
+                && frame_geometry_matches(
+                  frame,
+                  cell_frame.width_pt,
+                  cell_frame.height_pt,
+                  cell_frame.height_rule,
+                  cell_frame.placement,
+                  cell_frame.vertical_text_flow,
+                  cell_frame.suppress_overlap,
+                ))
+            })
+        })
+    })
+  {
+    // The admitted table is now inside the existing floating story. Reuse
+    // its established cell-frame normalization, retaining text, borders,
+    // bookmarks and authored table widths in the ordinary table model.
+    flatten_floating_table_cell_frames(&mut table.rows);
+    frame.blocks.push(block);
+  } else {
+    blocks.push(block);
+  }
+}
+
 fn push_story_paragraph(
   blocks: &mut Vec<Block>,
   mut paragraph: Paragraph,
@@ -2090,6 +2437,7 @@ fn push_story_paragraph(
     }
     blocks.push(Block::Frame(FloatingFrame {
       blocks: vec![Block::paragraph(paragraph)],
+      drop_cap: frame.drop_cap,
       page_break_before,
       width_pt: frame.width_pt,
       height_pt: frame.height_pt,
@@ -2197,6 +2545,7 @@ fn promote_preceding_table_to_anchored_frame(blocks: &mut Vec<Block>, anchor: &P
   flatten_floating_table_cell_frames(&mut table.rows);
   blocks.push(Block::Frame(FloatingFrame {
     blocks: vec![Block::Table(table)],
+    drop_cap: frame.drop_cap,
     page_break_before: anchor.format.page_break_before,
     width_pt: frame.width_pt,
     height_pt: frame.height_pt,
@@ -2245,11 +2594,33 @@ fn paragraph_belongs_to_frame(
   suppress_overlap: bool,
   vertical_text_flow: Option<VerticalTextFlow>,
 ) -> bool {
-  frame.width_pt == properties.width_pt
-    && frame.height_pt == properties.height_pt
-    && frame.height_rule == properties.height_rule
+  !frame.drop_cap
+    && !properties.drop_cap
+    && frame_geometry_matches(
+      frame,
+      properties.width_pt,
+      properties.height_pt,
+      properties.height_rule,
+      properties.placement,
+      vertical_text_flow,
+      suppress_overlap,
+    )
+}
+
+fn frame_geometry_matches(
+  frame: &FloatingFrame,
+  width_pt: Option<f32>,
+  height_pt: Option<f32>,
+  height_rule: FrameHeightRule,
+  placement: FloatingFramePlacement,
+  vertical_text_flow: Option<VerticalTextFlow>,
+  suppress_overlap: bool,
+) -> bool {
+  frame.width_pt == width_pt
+    && frame.height_pt == height_pt
+    && frame.height_rule == height_rule
     && frame.vertical_text_flow == vertical_text_flow
-    && frame.placement == properties.placement
+    && frame.placement == placement
     && frame.suppress_overlap == suppress_overlap
 }
 
@@ -2358,69 +2729,6 @@ fn empty_section_carrier_has_authored_paragraph_mark_height(
     .unwrap_or(styles.doc_default_run.font_size_pt);
   (paragraph.base_style.font_size_pt - styles.doc_default_run.font_size_pt).abs() > 0.001
     || (paragraph_complex_size - default_complex_size).abs() > 0.001
-}
-
-fn paragraph_has_drop_cap_frame(paragraph: &Paragraph) -> bool {
-  paragraph.format.frame.is_some_and(|frame| frame.drop_cap)
-}
-
-fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
-  let text = paragraph
-    .inlines
-    .iter()
-    .filter_map(|inline| match inline {
-      InlineItem::Text(run) => Some(run.text.as_str()),
-      InlineItem::NoteReferenceMark(_) => None,
-      InlineItem::NoteSeparatorMark(_) => None,
-      InlineItem::Ruby(ruby) => ruby.base.first().map(|run| run.text.as_str()),
-      InlineItem::Overstrike(overstrike) => overstrike
-        .operands
-        .iter()
-        .flatten()
-        .next()
-        .map(|run| run.text.as_str()),
-      InlineItem::PositionalTab(_) => None,
-      InlineItem::Image(_)
-      | InlineItem::Shape(_)
-      | InlineItem::LegacyFormCheckBox(_)
-      | InlineItem::BookmarkStart(_)
-      | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_)
-      | InlineItem::DrawingGroupStart(_)
-      | InlineItem::DrawingGroupEnd
-      | InlineItem::LastRenderedPageBreak
-      | InlineItem::ClearLineBreak(_)
-      | InlineItem::PageBreak
-      | InlineItem::ColumnBreak => None,
-    })
-    .collect::<String>();
-  (!text.is_empty()).then_some(text)
-}
-
-fn prepend_drop_cap_text(paragraph: &mut Paragraph, text: String) {
-  // saves DOCX framePr/dropCap paragraphs and applies them to the following
-  // paragraph as DropCapFormat instead of converting them to text frames.
-  if let Some(InlineItem::Text(run)) = paragraph
-    .inlines
-    .iter_mut()
-    .find(|inline| matches!(inline, InlineItem::Text(_)))
-  {
-    run.text.insert_str(0, &text);
-    return;
-  }
-  paragraph.inlines.insert(
-    0,
-    InlineItem::Text(TextRun {
-      text,
-      style: paragraph.base_style.clone(),
-      hyperlink_url: None,
-      dynamic_field: None,
-      style_ref_keys: Vec::new(),
-      style_ref_text: None,
-      style_ref_numbering_text: None,
-      preserve_text_portion: false,
-    }),
-  );
 }
 
 fn close_section(
@@ -2548,6 +2856,8 @@ fn normalized_section_break(
         .map(|previous| {
           section_column_count(section) <= 1
             || section_column_count(previous) != section_column_count(section)
+            || section_orientation(previous) != section_orientation(section)
+            || section_page_size_differs(previous, section)
         })
         .unwrap_or(true) =>
     {
@@ -2814,12 +3124,7 @@ fn sdt_block_blocks_with_base(
   // glossary paragraph as the source of truth when there is no bound value;
   // this keeps the hyperlink relationship and its run formatting intact.
   if bound_value.is_none()
-    && sdt_block_has_empty_hyperlink(sdt)
-    && let Some(name) = sdt_properties
-      .filter(|properties| sdt_showing_placeholder(properties))
-      .and_then(sdt_placeholder_doc_part)
-    && let Some(body) = custom_xml_bindings.glossary_placeholder(name)
-    && glossary_placeholder_has_nonempty_hyperlink(body)
+    && let Some(body) = sdt_glossary_hyperlink_placeholder(sdt, custom_xml_bindings)
   {
     let mut glossary_blocks = Vec::new();
     for choice in &body.doc_part_body_choice {
@@ -2939,6 +3244,23 @@ fn sdt_block_blocks_with_base(
     replace_sdt_block_text(&mut blocks, value, sdt_properties, styles);
   }
   blocks
+}
+
+fn sdt_glossary_hyperlink_placeholder<'a>(
+  sdt: &w::SdtBlock,
+  bindings: &'a CustomXmlBindings,
+) -> Option<&'a w::DocPartBody> {
+  if !sdt_block_has_empty_hyperlink(sdt) {
+    return None;
+  }
+  let name = sdt
+    .sdt_properties
+    .as_ref()
+    .filter(|properties| sdt_showing_placeholder(properties))
+    .and_then(sdt_placeholder_doc_part)?;
+  bindings
+    .glossary_placeholder(name)
+    .filter(|body| glossary_placeholder_has_nonempty_hyperlink(body))
 }
 
 fn sdt_block_has_empty_hyperlink(sdt: &w::SdtBlock) -> bool {
@@ -3148,7 +3470,7 @@ fn block_content_paragraph_model(
 
 fn replace_sdt_block_text(
   blocks: &mut [Block],
-  value: String,
+  value: SdtBoundReplacement,
   properties: Option<&w::SdtProperties>,
   styles: &StylesCatalog,
 ) {
@@ -3156,6 +3478,7 @@ fn replace_sdt_block_text(
     blocks: &mut [Block],
     value: &mut Option<String>,
     run_properties: Option<&w::RunProperties>,
+    default_placeholder: bool,
     styles: &StylesCatalog,
   ) {
     for block in blocks {
@@ -3164,15 +3487,22 @@ fn replace_sdt_block_text(
           for inline in canvas_content_inlines_mut(&mut paragraph.inlines) {
             match inline {
               InlineItem::Text(run) => {
+                if default_placeholder {
+                  run.style = paragraph.base_style.clone();
+                }
                 if let Some(run_properties) = run_properties {
                   run.style =
                     properties::run_style(Some(run_properties), run.style.clone(), styles);
                 }
                 run.text = run_display_text(value.take().unwrap_or_default(), run.style.clone());
               }
-              InlineItem::Shape(shape) => {
-                replace(&mut shape.text_box_blocks, value, run_properties, styles)
-              }
+              InlineItem::Shape(shape) => replace(
+                &mut shape.text_box_blocks,
+                value,
+                run_properties,
+                default_placeholder,
+                styles,
+              ),
               _ => {}
             }
           }
@@ -3180,19 +3510,38 @@ fn replace_sdt_block_text(
         Block::Table(table) => {
           for row in &mut table.rows {
             for cell in &mut row.cells {
-              replace(&mut cell.blocks, value, run_properties, styles);
+              replace(
+                &mut cell.blocks,
+                value,
+                run_properties,
+                default_placeholder,
+                styles,
+              );
             }
           }
         }
-        Block::Frame(frame) => replace(&mut frame.blocks, value, run_properties, styles),
+        Block::Frame(frame) => replace(
+          &mut frame.blocks,
+          value,
+          run_properties,
+          default_placeholder,
+          styles,
+        ),
       }
     }
   }
 
+  let default_placeholder = matches!(value, SdtBoundReplacement::DefaultPlaceholder);
+  let run_properties = if default_placeholder {
+    properties.and_then(sdt_contents_run_properties)
+  } else {
+    sdt_placeholder_replacement_run_properties(properties)
+  };
   replace(
     blocks,
-    &mut Some(value),
-    sdt_placeholder_replacement_run_properties(properties),
+    &mut Some(value.into_text()),
+    run_properties,
+    default_placeholder,
     styles,
   );
 }
@@ -3348,7 +3697,7 @@ fn header_blocks(
       .get_id_of_part(package, part)
       .is_ok_and(|id| id == relationship_id)
   })?;
-  let images = ImageCatalog::load_from_header(package, &header_part);
+  let mut images = ImageCatalog::load_from_header(package, &header_part);
   let hyperlinks = HyperlinkCatalog::load(package, &header_part);
   let header = drawing_position_recovery::root(&header_part.try_data_bytes(package).ok()?, || {
     header_part.root_element(package)
@@ -3365,6 +3714,7 @@ fn header_blocks(
     let block_start = blocks.len();
     match choice {
       w::HeaderChoice::Paragraph(paragraph) => {
+        retain_vml_paragraph_shape_types(paragraph, &mut images);
         let mut model = paragraph_model_in_story(
           paragraph,
           styles,
@@ -3435,6 +3785,10 @@ fn header_blocks(
   normalize_complex_field_paragraph_breaks(&mut blocks);
   apply_recovered_repeating_story_paragraph_defaults(styles, &mut blocks);
   normalize_repeating_story_frames(&mut blocks);
+  linked_textboxes::advance_zero_area_heads(
+    std::iter::once(blocks.as_mut_slice()),
+    styles.default_tab_stop_pt.unwrap_or(DEFAULT_TAB_STOP_PT),
+  );
   Some(blocks)
 }
 
@@ -3484,7 +3838,7 @@ fn footer_blocks(
       .get_id_of_part(package, part)
       .is_ok_and(|id| id == relationship_id)
   })?;
-  let images = ImageCatalog::load_from_footer(package, &footer_part);
+  let mut images = ImageCatalog::load_from_footer(package, &footer_part);
   let hyperlinks = HyperlinkCatalog::load(package, &footer_part);
   let footer = drawing_position_recovery::root(&footer_part.try_data_bytes(package).ok()?, || {
     footer_part.root_element(package)
@@ -3500,6 +3854,7 @@ fn footer_blocks(
     let block_start = blocks.len();
     match choice {
       w::FooterChoice::Paragraph(paragraph) => {
+        retain_vml_paragraph_shape_types(paragraph, &mut images);
         let mut model = paragraph_model_in_story(
           paragraph,
           styles,
@@ -3570,6 +3925,10 @@ fn footer_blocks(
   normalize_complex_field_paragraph_breaks(&mut blocks);
   apply_recovered_repeating_story_paragraph_defaults(styles, &mut blocks);
   normalize_repeating_story_frames(&mut blocks);
+  linked_textboxes::advance_zero_area_heads(
+    std::iter::once(blocks.as_mut_slice()),
+    styles.default_tab_stop_pt.unwrap_or(DEFAULT_TAB_STOP_PT),
+  );
   Some(blocks)
 }
 
@@ -4707,6 +5066,31 @@ fn table_model(
   let explicit_no_repeat_header = source_rows.first().is_some_and(|row| {
     direct_table_row_style(row.table_row_properties.as_deref()).repeat_header == Some(false)
   });
+  let leading_header_count = source_rows
+    .iter()
+    .enumerate()
+    .take_while(|(index, row)| {
+      let mut style = table_row_style_for(
+        &table_style,
+        table_row_look(row, table_look),
+        *index,
+        row_count,
+        table_row_explicit_first_row(row.table_row_properties.as_deref()),
+      );
+      merge_table_row_style(
+        &mut style,
+        &direct_table_row_style(row.table_row_properties.as_deref()),
+      );
+      style.repeat_header.unwrap_or(false)
+    })
+    .count();
+  // An all-header table has no repeating prefix. Keep its authored cnfStyle
+  // regions separate, as in the Office all-rows-tblHeader controls.
+  let first_row_header_count = if leading_header_count < row_count {
+    leading_header_count
+  } else {
+    0
+  };
   let mut rows = {
     let mut context = TableImportContext {
       styles: env.styles,
@@ -4723,6 +5107,7 @@ fn table_model(
       table_style: &table_style,
       table_look,
       row_count,
+      first_row_header_count,
       nested_table_level: model_context.nested_table_level,
       in_header_footer: model_context.in_header_footer,
     };
@@ -4759,8 +5144,9 @@ fn table_model(
   // LibreOffice `ooxmlexport8.cxx::testTablePagebreak` records the table
   // boundary explicitly: a `w:br w:type="page"` in a table cell is ignored,
   // while the same break in the body remains a real page break.  Remove only
-  // the cell-contained inline break after import; paragraph-level
-  // `page_break_before` and body-story breaks keep their normal semantics.
+  // the cell-contained inline break and its field-scanning event after
+  // import; paragraph-level `page_break_before` and body-story breaks keep
+  // their normal semantics.
   for row in &mut rows {
     for cell in &mut row.cells {
       strip_table_cell_page_breaks(&mut cell.blocks);
@@ -4831,7 +5217,26 @@ fn table_model(
       .and_then(|properties| properties.table_indentation.as_ref())
       .and_then(table_indentation_to_points)
       .or(table_style.indent_left_pt)
-      .unwrap_or(0.0),
+      .unwrap_or_else(|| {
+        // Word distinguishes an omitted tblInd from an authored/inherited
+        // zero. For legacy top-level LTR tables in body flow, its implicit
+        // indent is the first cell's padding, cancelling the legacy origin
+        // shift without changing the width policy. Native mode 12/14/15,
+        // direct/style indentation and floating-table controls establish
+        // these boundaries (also Writer's testN780853 / tdf#170208).
+        if env.styles.import_settings.compatibility_mode < 15
+          && model_context.nested_table_level == 1
+          && placement.is_none()
+          && !right_to_left
+        {
+          rows
+            .first()
+            .and_then(|row| row.cells.first())
+            .map_or(0.0, |cell| cell.margins.left_pt)
+        } else {
+          0.0
+        }
+      }),
     alignment: properties
       .and_then(|properties| properties.table_justification.as_ref())
       .map(table_alignment)
@@ -4900,6 +5305,12 @@ fn strip_table_cell_page_breaks(blocks: &mut [Block]) {
         paragraph
           .inlines
           .retain(|inline| !matches!(inline, InlineItem::PageBreak));
+        // The ignored break cannot retain a field-layout boundary either.
+        // Otherwise ordinary cell text is rejected by exact line measurement
+        // even though its formatter no longer sees a physical page break.
+        paragraph
+          .field_events
+          .retain(|event| !matches!(event, ParagraphFieldEvent::PageBreak));
       }
       Block::Table(table) => {
         for row in &mut table.rows {
@@ -4995,31 +5406,19 @@ fn resolved_table_style_cell_margins(
           .as_deref()
           .is_some_and(|name| name.eq_ignore_ascii_case("Normal Table"))
     });
-  // A producer can reference Word's built-in TableGrid without serializing
-  // that style. Word still resolves its TableNormal base; preserve an
-  // authored default table style's margins for that unresolved explicit
-  // built-in reference (table-auto-column-fixed-size2.docx).
-  let unresolved_explicit_table_grid_base_margins = table_style_id
-    .filter(|style_id| style_id.eq_ignore_ascii_case("TableGrid"))
-    .filter(|style_id| !styles.has_table_style(style_id))
-    .and_then(|_| styles.table_style(None).cell_margins);
-  table_style
-    .cell_margins
-    .or(unresolved_explicit_table_grid_base_margins)
-    .unwrap_or_else(|| {
-      // Without a serialized default/base style carrying the TableNormal
-      // 108/115-twip padding, keep the existing zero-margin recovery for
-      // implicit or resolved TableGrid. settings/defaultTableStyle is a
-      // creation preference and does not supply that serialized default.
-      if serialized_style_has_zero_margin_base
-        || effective_table_style_id
-          .is_none_or(|style_id| style_id.eq_ignore_ascii_case("TableGrid"))
-      {
-        CellMargins::zero()
-      } else {
-        default_table_cell_margins(styles.has_styles_part)
-      }
-    })
+  table_style.cell_margins.unwrap_or_else(|| {
+    // Without a serialized default/base style carrying the TableNormal
+    // 108/115-twip padding, keep the existing zero-margin recovery for
+    // implicit or resolved TableGrid. settings/defaultTableStyle is a
+    // creation preference and does not supply that serialized default.
+    if serialized_style_has_zero_margin_base
+      || effective_table_style_id.is_none_or(|style_id| style_id.eq_ignore_ascii_case("TableGrid"))
+    {
+      CellMargins::zero()
+    } else {
+      default_table_cell_margins(styles.has_styles_part)
+    }
+  })
 }
 
 fn table_starts_after_last_rendered_page_break(rows: &[TableRow]) -> bool {
@@ -5221,7 +5620,8 @@ fn table_row_model(
   // row carries tblHeader.
   let row_table_look = table_row_look(row, context.table_look);
   let direct_row_style = direct_table_row_style(row.table_row_properties.as_deref());
-  let explicit_first_row = table_row_explicit_first_row(row.table_row_properties.as_deref());
+  let explicit_first_row = table_row_explicit_first_row(row.table_row_properties.as_deref())
+    || row_index < context.first_row_header_count;
   let mut row_style = table_row_style_for(
     context.table_style,
     row_table_look,
@@ -5261,6 +5661,15 @@ fn table_row_model(
               cell_index: cells.len(),
               cell_count,
               explicit_first_row,
+              first_row_group_size: if context
+                .styles
+                .import_settings
+                .differentiate_multirow_table_headers
+              {
+                context.first_row_header_count
+              } else {
+                0
+              },
             },
           ),
         );
@@ -5516,6 +5925,7 @@ struct TableCellStyleContext {
   cell_index: usize,
   cell_count: usize,
   explicit_first_row: bool,
+  first_row_group_size: usize,
 }
 
 fn table_cell_style_for(
@@ -5568,6 +5978,12 @@ fn table_cell_style_for(
         merge_cell_borders(&mut borders, &conditional_style.borders);
         conditional_style.borders = borders;
       }
+      conditional_style.borders = multirow_header_cell_borders_for_region(
+        conditional_style.borders,
+        conditional_style.inside_horizontal_border,
+        *condition,
+        context,
+      );
       merge_table_cell_style(&mut style, &conditional_style);
     }
   }
@@ -5820,6 +6236,9 @@ fn table_cell_model(
       paragraph.format.style_id.as_deref().is_none_or(|style_id| {
         Some(style_id) == context.styles.default_paragraph_style_id.as_deref()
       });
+    paragraph.format.hidden_cell_end_mark = properties
+      .and_then(|properties| properties.hide_mark.as_ref())
+      .is_some_and(|hide_mark| on_off_only_value(hide_mark.val));
   }
   let text_rotation_deg = properties.and_then(table_cell_text_rotation_degrees);
   if let Some(rotation_deg) = text_rotation_deg {
@@ -6628,6 +7047,38 @@ fn conditional_cell_borders_for_region(
   borders
 }
 
+fn multirow_header_cell_borders_for_region(
+  mut borders: CellBordersModel,
+  inside_horizontal: Option<BorderStyle>,
+  condition: w::TableStyleOverrideValues,
+  context: TableCellStyleContext,
+) -> CellBordersModel {
+  if context.first_row_group_size > 1
+    && context.row_index < context.first_row_group_size
+    && matches!(
+      condition,
+      w::TableStyleOverrideValues::FirstRow
+        | w::TableStyleOverrideValues::NorthWestCell
+        | w::TableStyleOverrideValues::NorthEastCell
+    )
+  {
+    // MS-DOCX 2.3.4: a multi-row header is a conditional cell region.
+    // Its internal horizontal edges use insideH; copying the region's
+    // outer top/bottom onto every row adds a border strip to every height.
+    borders.top = if context.row_index == 0 {
+      borders.top
+    } else {
+      inside_horizontal
+    };
+    borders.bottom = if context.row_index + 1 == context.first_row_group_size {
+      borders.bottom
+    } else {
+      inside_horizontal
+    };
+  }
+  borders
+}
+
 fn merge_cell_borders(target: &mut CellBordersModel, source: &CellBordersModel) {
   if source.top.is_some() {
     target.top = source.top;
@@ -6784,7 +7235,7 @@ fn page_border_style(
   color: Option<&str>,
   shadow: Option<ooxmlsdk::simple_type::OnOffValue>,
 ) -> Option<BorderStyle> {
-  let mut style = border_style(value, size, space, color, shadow)?;
+  let mut style = compound_border_style(value, size, space, color, shadow)?;
   if matches!(
     value,
     w::BorderValues::BasicWideMidline | w::BorderValues::MapleMuffins
@@ -6839,7 +7290,7 @@ macro_rules! border_style_fn {
 macro_rules! border_override_fn {
   ($name:ident, $ty:ty) => {
     fn $name(border: &$ty) -> Option<BorderStyle> {
-      border_style(
+      compound_border_style(
         border.val,
         border.size,
         border.space,
@@ -6891,7 +7342,7 @@ fn table_border_style(
   color: Option<&str>,
   shadow: Option<ooxmlsdk::simple_type::OnOffValue>,
 ) -> Option<BorderStyle> {
-  let mut border = border_style(value, size, space, color, shadow)?;
+  let mut border = compound_border_style(value, size, space, color, shadow)?;
   if value == w::BorderValues::Single && size.unwrap_or(0) == 0 {
     // CT_Border's omitted sz is application-defined (ECMA-376 §17.3.4).
     // Native table controls equate omitted/zero sz, write back sz=0, reserve
@@ -6900,6 +7351,24 @@ fn table_border_style(
     // one false border allowance to every row. Explicit positive widths and
     // independently owned paragraph/run/page borders keep their policies.
     border.width_pt = 0.0;
+  }
+  Some(border)
+}
+
+fn compound_border_style(
+  value: w::BorderValues,
+  size: Option<u32>,
+  space: Option<u32>,
+  color: Option<&str>,
+  shadow: Option<ooxmlsdk::simple_type::OnOffValue>,
+) -> Option<BorderStyle> {
+  let mut border = border_style(value, size, space, color, shadow)?;
+  // Page, direct tcBorders and inherited table edges share the same three-D
+  // source widths. Keep story-specific single/hairline policies separate.
+  if let Some((width, pattern)) = border_3d::extent(value, border.width_pt) {
+    border.width_pt = width;
+    border.compound_pattern = pattern;
+    border.compound = true;
   }
   Some(border)
 }
@@ -7009,6 +7478,16 @@ fn border_value_is_compound(value: w::BorderValues) -> bool {
 }
 
 fn document_background_color(background: &w::DocumentBackground) -> Option<RgbColor> {
+  // A disabled VML page brush disables the color carrier as well. Native
+  // radial, pattern, texture and solid controls all leave the page unpainted;
+  // w:color is not a separate fallback layer for an explicitly disabled fill.
+  if background
+    .background
+    .as_deref()
+    .is_some_and(|background| !vml_background_fill_enabled(background))
+  {
+    return None;
+  }
   background
     .background
     .as_deref()
@@ -7021,7 +7500,11 @@ fn document_background_image(
   images: &ImageCatalog,
 ) -> Option<InlineShapeImageFill> {
   background.color.as_ref()?;
-  let fill = background.background.as_deref()?.fill.as_deref()?;
+  let shape = background.background.as_deref()?;
+  if !vml_background_fill_enabled(shape) {
+    return None;
+  }
+  let fill = shape.fill.as_deref()?;
   if fill.r#type != Some(v::FillTypeValues::Frame) {
     return None;
   }
@@ -7036,13 +7519,11 @@ fn document_background_pattern(
   // background color carrier (tdf126533_noPageBitmap).
   background.color.as_ref()?;
   let shape = background.background.as_deref()?;
-  if shape.filled.is_some_and(|value| !value.as_bool()) {
+  if !vml_background_fill_enabled(shape) {
     return None;
   }
   let fill = shape.fill.as_deref()?;
-  if fill.r#type != Some(v::FillTypeValues::Pattern)
-    || fill.on.is_some_and(|value| !value.as_bool())
-  {
+  if fill.r#type != Some(v::FillTypeValues::Pattern) {
     return None;
   }
   let relationship_id = fill.relationship_id.as_ref().or(fill.id.as_ref())?;
@@ -7058,10 +7539,13 @@ fn document_background_texture(
   background.color.as_ref()?;
   let shape = background.background.as_deref()?;
   let fill = shape.fill.as_deref()?;
-  if shape.filled.is_some_and(|value| !value.as_bool())
-    || fill.on.is_some_and(|value| !value.as_bool())
-    || fill.r#type != Some(v::FillTypeValues::Tile)
-  {
+  if !vml_background_fill_enabled(shape) {
+    return None;
+  }
+  if let Some(texture) = page_background::radial_gradient_texture(shape) {
+    return Some(texture);
+  }
+  if fill.r#type != Some(v::FillTypeValues::Tile) {
     return None;
   }
   vml_fill_image(fill, None, images)
@@ -7134,13 +7618,11 @@ fn vml_pattern_fill_from_data(
 }
 
 fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> {
-  if background.filled.is_some_and(|value| !value.as_bool()) {
+  if !vml_background_fill_enabled(background) {
     return None;
   }
   let fill = background.fill.as_deref()?;
-  if fill.r#type != Some(v::FillTypeValues::Pattern)
-    || fill.on.is_some_and(|value| !value.as_bool())
-  {
+  if fill.r#type != Some(v::FillTypeValues::Pattern) {
     return None;
   }
   fill
@@ -7150,12 +7632,22 @@ fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> 
     .or_else(|| background.fillcolor.as_deref().and_then(parse_vml_color))
 }
 
+fn vml_background_fill_enabled(background: &v::Background) -> bool {
+  background.filled.is_none_or(|value| value.as_bool())
+    && background
+      .fill
+      .as_deref()
+      .and_then(|fill| fill.on)
+      .is_none_or(|value| value.as_bool())
+}
+
 fn merge_paragraph_format_with_theme(
   format: &mut ParagraphFormat,
   properties: Option<ParagraphProps<'_>>,
   import_settings: ImportSettings,
   theme_colors: &ThemeColors,
 ) {
+  format.enable_open_type_features = import_settings.enable_open_type_features;
   format.auto_space_like_word95 = import_settings.auto_space_like_word95;
   format.strict_first_and_last_chars = import_settings.strict_first_and_last_chars;
   let Some(properties) = properties else {
@@ -7382,7 +7874,7 @@ fn merge_paragraph_format_with_theme(
     // paragraph style, then DomainMapper_Impl::IncorporateTabStop() applies
     // each direct tab. A w:val="clear" entry removes an inherited tab at the
     // same position instead of being ignored.
-    apply_tab_stops(format, tabs);
+    apply_tab_stops(format, tabs, import_settings.decimal_tab_symbols);
     format.tab_stops_set = true;
   }
 
@@ -7720,14 +8212,23 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
 // Tab positions are normalized from authored integral twips by the same unit
 // conversion. Neighboring twips retain distinct identities for replacement
 // and clear operations; a geometric tolerance merges valid Word stops.
-fn apply_tab_stops(format: &mut ParagraphFormat, tabs: &w::Tabs) {
+fn apply_tab_stops(
+  format: &mut ParagraphFormat,
+  tabs: &w::Tabs,
+  decimal_symbols: OfficeNumberSeparators,
+) {
+  format.toc_default_tab_leader = tabs
+    .tab_stop
+    .last()
+    .and_then(|tab| tab_stop_model(tab, decimal_symbols))
+    .map(|stop| stop.leader);
   for tab in &tabs.tab_stop {
-    let Some(position_pt) = signed_twips_measure_to_points(&tab.position)
-      .filter(|position| position.is_finite() && *position >= 0.0)
-    else {
-      continue;
-    };
     if matches!(tab.val, w::TabStopValues::Clear) {
+      let Some(position_pt) = signed_twips_measure_to_points(&tab.position)
+        .filter(|position| position.is_finite() && *position >= 0.0)
+      else {
+        continue;
+      };
       format
         .tab_stops
         .retain(|stop| stop.position_pt != position_pt);
@@ -7736,20 +8237,10 @@ fn apply_tab_stops(format: &mut ParagraphFormat, tabs: &w::Tabs) {
       }
       continue;
     }
-    let alignment = match tab.val {
-      w::TabStopValues::Left | w::TabStopValues::Start | w::TabStopValues::Decimal => {
-        TabStopAlignment::Left
-      }
-      w::TabStopValues::Center => TabStopAlignment::Center,
-      w::TabStopValues::Right | w::TabStopValues::End => TabStopAlignment::Right,
-      // A direct paragraph `w:tab w:val="num"` is the numbering-aligned
-      // left tab used by Word to place the following text at the authored
-      // position.  The numbering-level `num` tab is normalized separately
-      // below; treating this direct form as a right tab makes a following
-      // run look like an overflowing aligned-tab continuation (WordOK.docx).
-      w::TabStopValues::Number => TabStopAlignment::Left,
-      w::TabStopValues::Clear | w::TabStopValues::Bar => continue,
+    let Some(stop) = tab_stop_model(tab, decimal_symbols) else {
+      continue;
     };
+    let position_pt = stop.position_pt;
     format
       .tab_stop_clear_positions_pt
       .retain(|clear| *clear != position_pt);
@@ -7758,14 +8249,9 @@ fn apply_tab_stops(format: &mut ParagraphFormat, tabs: &w::Tabs) {
       .iter_mut()
       .find(|stop| stop.position_pt == position_pt)
     {
-      existing.alignment = alignment;
-      existing.leader = tab.leader.map(tab_leader).unwrap_or_default();
+      *existing = stop;
     } else {
-      format.tab_stops.push(TabStop {
-        position_pt,
-        alignment,
-        leader: tab.leader.map(tab_leader).unwrap_or_default(),
-      });
+      format.tab_stops.push(stop);
     }
   }
   format
@@ -7778,7 +8264,74 @@ fn apply_tab_stops(format: &mut ParagraphFormat, tabs: &w::Tabs) {
   format.tab_stop_clear_positions_pt.dedup_by(|a, b| *a == *b);
 }
 
+fn tab_stop_model(tab: &w::TabStop, decimal_symbols: OfficeNumberSeparators) -> Option<TabStop> {
+  let position_pt = signed_twips_measure_to_points(&tab.position)
+    .filter(|position| position.is_finite() && *position >= 0.0)?;
+  let alignment = match tab.val {
+    w::TabStopValues::Left | w::TabStopValues::Start => TabStopAlignment::Left,
+    w::TabStopValues::Decimal => TabStopAlignment::Decimal(decimal_symbols),
+    w::TabStopValues::Center => TabStopAlignment::Center,
+    w::TabStopValues::Right | w::TabStopValues::End => TabStopAlignment::Right,
+    // A direct paragraph `w:tab w:val="num"` is the numbering-aligned
+    // left tab used by Word to place the following text at the authored
+    // position.  The numbering-level `num` tab is normalized separately
+    // below; treating this direct form as a right tab makes a following
+    // run look like an overflowing aligned-tab continuation (WordOK.docx).
+    w::TabStopValues::Number => TabStopAlignment::Left,
+    w::TabStopValues::Clear | w::TabStopValues::Bar => return None,
+  };
+  Some(TabStop {
+    position_pt,
+    alignment,
+    leader: tab.leader.map(tab_leader).unwrap_or_default(),
+  })
+}
+
+fn merge_numbering_suffix_tabs(target: &mut Vec<TabStop>, values: &[TabStop], clears: &[f32]) {
+  // ECMA-376's custom stops are additive. Clear/replace inherited positions
+  // before inserting this group's own declarations; an own stop is not
+  // cancelled by a clear in the same group. Native also preserves authored
+  // group order when an imported ruler was not sorted by position.
+  target.retain(|stop| {
+    !clears.contains(&stop.position_pt)
+      && !values
+        .iter()
+        .any(|value| value.position_pt == stop.position_pt)
+  });
+  let mut index = 0;
+  for stop in values {
+    while target
+      .get(index)
+      .is_some_and(|old| old.position_pt < stop.position_pt)
+    {
+      index += 1;
+    }
+    target.insert(index, *stop);
+    index += 1;
+  }
+}
+
+fn apply_numbering_suffix_tabs(
+  target: &mut Vec<TabStop>,
+  tabs: &w::Tabs,
+  decimal_symbols: OfficeNumberSeparators,
+) {
+  let stops: Vec<_> = tabs
+    .tab_stop
+    .iter()
+    .filter_map(|tab| tab_stop_model(tab, decimal_symbols))
+    .collect();
+  let clears: Vec<_> = tabs
+    .tab_stop
+    .iter()
+    .filter(|tab| tab.val == w::TabStopValues::Clear)
+    .filter_map(|tab| signed_twips_measure_to_points(&tab.position))
+    .collect();
+  merge_numbering_suffix_tabs(target, &stops, &clears);
+}
+
 fn merge_tab_stop_values(target: &mut ParagraphFormat, values: &ParagraphFormat) {
+  target.toc_default_tab_leader = values.toc_default_tab_leader;
   for clear in &values.tab_stop_clear_positions_pt {
     target.tab_stops.retain(|stop| stop.position_pt != *clear);
     if !target.tab_stop_clear_positions_pt.contains(clear) {
@@ -8552,6 +9105,7 @@ struct ComplexFieldState {
   form_drop_down_value: Option<String>,
   form_text_input: bool,
   form_text_blank_style: Option<TextStyle>,
+  page_reference_separator_style: Option<Box<TextStyle>>,
   form_date_time_tokens: Option<Vec<String>>,
   field_locked: bool,
   in_result: bool,
@@ -8568,6 +9122,8 @@ struct ComplexFieldImportState {
   fields: Vec<ComplexFieldState>,
   current_paragraph_breaks: Vec<usize>,
   current_reference_events: Vec<ParagraphFieldEvent>,
+  current_separator_count: usize,
+  current_toc_separator_styles: Vec<(usize, Box<TextStyle>)>,
   next_field_id: u64,
   table_depth: usize,
   style_outline_level: Option<u8>,
@@ -8577,6 +9133,8 @@ impl ComplexFieldImportState {
   fn begin_paragraph(&mut self, table_depth: usize, style_outline_level: Option<u8>) {
     debug_assert!(self.current_paragraph_breaks.is_empty());
     debug_assert!(self.current_reference_events.is_empty());
+    debug_assert!(self.current_toc_separator_styles.is_empty());
+    self.current_separator_count = 0;
     self.table_depth = table_depth;
     self.style_outline_level = style_outline_level;
     for field in &mut self.fields {
@@ -8590,6 +9148,30 @@ impl ComplexFieldImportState {
     events: &mut Vec<ParagraphFieldEvent>,
     styles: &StylesCatalog,
   ) {
+    // The syntax collector and visible-run importer traverse the same source
+    // separators. Attach resolved TOC character context by its exact local
+    // separator ordinal, including nested fields and cross-paragraph codes.
+    // Only TOCs retain a font/style allocation. Unsupported source containers
+    // must not shift an unrelated separator's formatting.
+    if !self.current_toc_separator_styles.is_empty()
+      && events
+        .iter()
+        .filter(|event| matches!(event, ParagraphFieldEvent::Separate { .. }))
+        .count()
+        == self.current_separator_count
+    {
+      for (index, resolved) in self.current_toc_separator_styles.drain(..) {
+        if let Some(ParagraphFieldEvent::Separate { style }) = events
+          .iter_mut()
+          .filter(|event| matches!(event, ParagraphFieldEvent::Separate { .. }))
+          .nth(index)
+        {
+          *style = Some(resolved);
+        }
+      }
+    } else {
+      self.current_toc_separator_styles.clear();
+    }
     let mut suppress_break = None;
     if let Some(field) = self.fields.first_mut() {
       let instruction_name = field_instruction_name(&field.instr);
@@ -8636,7 +9218,10 @@ impl ComplexFieldImportState {
             // tdf129520), but those producer fragments are not visible when
             // there is no active mail-merge data source. Emit the placeholder
             // at that first paragraph and discard each later cached fragment
-            // while retaining the authored paragraph structure.
+            // together with the paragraph delimiters inside that result.
+            // Native print refresh gives1/3-paragraph caches identical
+            // following-story positions; locked controls retain their marks.
+            // Surrounding authored paragraph marks remain intact.
             if !field.address_block_placeholder_emitted {
               let mut style =
                 field_result_style(&field.result).unwrap_or_else(|| field.style.clone());
@@ -8655,6 +9240,7 @@ impl ComplexFieldImportState {
             }
             field.result.clear();
             field.result_paragraph_breaks.clear();
+            suppress_break = Some(ParagraphFieldEvent::SuppressParagraphBreak { deferred: false });
           }
           _ => {}
         }
@@ -8705,6 +9291,8 @@ impl ComplexFieldImportState {
       self.fields.clear();
       self.current_paragraph_breaks.clear();
       self.current_reference_events.clear();
+      self.current_toc_separator_styles.clear();
+      self.current_separator_count = 0;
       return;
     };
     flush_unclosed_complex_fields(&mut paragraph.inlines, self, styles);
@@ -8815,6 +9403,7 @@ fn push_run_or_complex_field(
           form_drop_down_value: form_drop_down_value(field_char),
           form_text_input: has_form_text_input(field_char),
           form_text_blank_style: blank_form_text_input(field_char).then(|| style.clone()),
+          page_reference_separator_style: None,
           form_date_time_tokens: form_date_time_tokens(field_char),
           field_locked: field_char
             .field_lock
@@ -8828,7 +9417,24 @@ fn push_run_or_complex_field(
       w::RunChoice::FieldChar(field_char)
         if field_char.field_char_type == w::FieldCharValues::Separate =>
       {
+        let separator_index = complex_fields.current_separator_count;
+        complex_fields.current_separator_count += 1;
         if let Some(field) = complex_fields.fields.last_mut() {
+          if field
+            .instr
+            .split_whitespace()
+            .next()
+            .is_some_and(|name| name.eq_ignore_ascii_case("TOC"))
+          {
+            complex_fields
+              .current_toc_separator_styles
+              .push((separator_index, Box::new(style.clone())));
+          }
+          if !field.field_locked
+            && field_instruction_name(&field.instr).as_deref() == Some("PAGEREF")
+          {
+            field.page_reference_separator_style = Some(Box::new(style.clone()));
+          }
           field.in_result = true;
           if field.form_text_blank_style.is_some() {
             // The separator's character style owns a blank text form field's
@@ -8929,6 +9535,7 @@ fn flush_complex_field(
   let Some(state) = complex_fields.fields.pop() else {
     return;
   };
+  let page_reference_separator_style = state.page_reference_separator_style;
   let result_paragraph_breaks = state.result_paragraph_breaks.clone();
   let mut deferred_paragraph_breaks = state.deferred_paragraph_breaks;
   let deferred_reference_paragraph_breaks = state.deferred_reference_paragraph_breaks;
@@ -8989,6 +9596,12 @@ fn flush_complex_field(
     // Unsupported equation grammar continues through the existing cache path.
     resolved.push(InlineItem::Overstrike(overstrike.portion));
     resolved.extend(overstrike.trailing.into_iter().map(InlineItem::Text));
+  } else if closed && let Some(value) = empty_barcode_field_error(&state.instr, styles) {
+    // Legacy BARCODE is a display field, like EQ. Word prints its missing-
+    // argument diagnostic independently of fldLock and print-update options.
+    let style = field_result_style(&state.result).unwrap_or(state.style);
+    let (text, style) = value.into_text_and_style(style, styles.locales.ui_language());
+    push_resolved_field_text(&mut resolved, text, style, state.hyperlink_url.as_deref());
   } else if closed && state.field_locked {
     // ECMA-376 Part 1 §17.16.18: fldLock on the begin character prevents
     // recalculation even when an application explicitly requests an update.
@@ -9179,8 +9792,17 @@ fn flush_complex_field(
   } else if closed && let Some(text) = refreshed_doc_property_field(&state.instr, styles) {
     let style = field_result_style(&state.result).unwrap_or(state.style);
     push_resolved_field_text(&mut resolved, text, style, state.hyperlink_url.as_deref());
-  } else if closed && let Some(text) = refreshed_doc_variable_field(&state.instr, styles) {
+  } else if closed && missing_doc_property_field(&state.instr, styles) {
     let style = field_result_style(&state.result).unwrap_or(state.style);
+    push_localized_missing_doc_property(
+      &mut resolved,
+      style,
+      state.hyperlink_url.as_deref(),
+      styles.locales.ui_language(),
+    );
+  } else if closed && let Some(value) = refreshed_scalar_field(&state.instr, styles) {
+    let style = field_result_style(&state.result).unwrap_or(state.style);
+    let (text, style) = value.into_text_and_style(style, styles.locales.ui_language());
     // A document-variable CR/LF is a paragraph boundary, not an ordinary
     // line-feed glyph. The source field may have already crossed paragraphs;
     // once Word refreshes it, discard that cached boundary and reconstruct
@@ -9277,17 +9899,19 @@ fn flush_complex_field(
         style_name,
         state.style,
         state.hyperlink_url.as_deref(),
-        styles.locales.ui_language(),
+        styles,
       );
     } else {
-      // Word's PAGE/NUMPAGES update takes its default character formatting
+      // Word's PAGE/NUMPAGES/PAGEREF update takes its default character formatting
       // from the first nonblank field-code character, not the begin marker,
       // separator or old result. CHARFORMAT has the same owner (§17.16.4.3.3).
       // MERGEFORMAT instead preserves a populated cache; without one it
       // falls back to that ordinary field-code format.
       let default_style = if matches!(
         &kind,
-        DynamicFieldKind::Page { .. } | DynamicFieldKind::NumPages { .. }
+        DynamicFieldKind::Page { .. }
+          | DynamicFieldKind::NumPages { .. }
+          | DynamicFieldKind::PageRef { .. }
       ) {
         state
           .instr
@@ -9449,11 +10073,23 @@ fn flush_complex_field(
     let result_start = resolved_insertion_index
       .map(|index| index.min(inlines.len()))
       .unwrap_or(inlines.len());
+    let page_reference_separator_style = page_reference_separator_style.filter(|_| {
+      closed
+        && matches!(resolved.as_slice(), [InlineItem::Text(run)]
+        if matches!(run.dynamic_field, Some(DynamicFieldKind::PageRef { .. })))
+    });
+    // Only a top-level result has a committed paragraph inline offset here.
+    // Nested field operands/results keep their existing formatting route.
     let resolved_len = resolved.len();
     if result_start == inlines.len() {
       inlines.extend(resolved);
     } else {
       inlines.splice(result_start..result_start, resolved);
+      shift_page_reference_style_offsets(
+        &mut complex_fields.current_reference_events,
+        result_start,
+        resolved_len,
+      );
       for offset in &mut complex_fields.current_paragraph_breaks {
         if *offset > result_start {
           *offset += resolved_len;
@@ -9465,6 +10101,14 @@ fn flush_complex_field(
         .into_iter()
         .map(|offset| result_start + offset),
     );
+    if let Some(style) = page_reference_separator_style {
+      complex_fields
+        .current_reference_events
+        .push(ParagraphFieldEvent::PageReferenceResultStyle {
+          inline_offset: result_start,
+          style,
+        });
+    }
     if refreshable_reference {
       let result_end = result_start + resolved_len;
       if let Some(bookmark_name) = reference_bookmark_name {
@@ -10061,26 +10705,52 @@ fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<S
   if field_name.eq_ignore_ascii_case("AUTHOR")
     || field_name.eq_ignore_ascii_case("LASTSAVEDBY")
     || field_name.eq_ignore_ascii_case("FILENAME")
+    || field_name.eq_ignore_ascii_case("TITLE")
   {
     // ECMA-376 Part 1 §17.16.5.4 and §17.16.5.31 read dc:creator and
     // cp:lastModifiedBy respectively, not the rendering host's user name.
     // §17.16.5.17 reads FILENAME from the current storage name. A stale
     // field cache or package title is not that name. With no supplied name,
-    // preserve the cache; unsupported switches (including the full-path \p)
-    // also remain cached rather than inventing a storage location.
-    let mut value = if field_name.eq_ignore_ascii_case("FILENAME") {
-      styles.source_file_name.clone()?
+    // preserve the cache. The full-path \p switch requires supplied storage
+    // context; neither the cached result nor the host's working directory is
+    // a substitute for the document's actual location.
+    // §17.16.5.66 reads TITLE from dc:title. Native refresh clears a stale
+    // result when that property is missing or empty; a field argument would
+    // set the property and remains cached until that behavior is supported.
+    let filename = field_name.eq_ignore_ascii_case("FILENAME");
+    let mut value = if filename {
+      let path = styles
+        .source_file_path
+        .as_deref()
+        .filter(|path| !path.is_empty());
+      if tokens[1..]
+        .iter()
+        .any(|token| token.eq_ignore_ascii_case(r"\p"))
+      {
+        path?.to_string()
+      } else {
+        path
+          .and_then(|path| path.rsplit(['\\', '/']).next())
+          .filter(|name| !name.is_empty())
+          .map(str::to_string)
+          .or_else(|| styles.source_file_name.clone())?
+      }
+    } else if field_name.eq_ignore_ascii_case("TITLE") {
+      styles.title.clone()
     } else if field_name.eq_ignore_ascii_case("AUTHOR") {
       styles.author.clone()?
     } else {
       styles.last_saved_by.clone()?
     };
-    let (switches, remainder) = tokens[1..].as_chunks::<2>();
-    for pair in switches {
-      if pair[0] != r"\*" {
+    let mut switches = tokens[1..].iter();
+    while let Some(switch) = switches.next() {
+      if filename && switch.eq_ignore_ascii_case(r"\p") {
+        continue;
+      }
+      if switch != r"\*" {
         return None;
       }
-      match pair[1].to_ascii_lowercase().as_str() {
+      match switches.next()?.to_ascii_lowercase().as_str() {
         "upper" => value = value.to_uppercase(),
         "lower" => value = value.to_lowercase(),
         "mergeformat" => {}
@@ -10089,7 +10759,7 @@ fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<S
         _ => return None,
       }
     }
-    return remainder.is_empty().then_some(value);
+    return Some(value);
   }
   if !tokens
     .first()
@@ -10102,7 +10772,7 @@ fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<S
     .custom_properties
     .iter()
     .find(|(name, _)| name.eq_ignore_ascii_case(property_name))
-    .map(|(_, value)| value.as_str())?;
+    .and_then(|(_, value)| value.as_deref())?;
 
   let date = value.get(..10).and_then(|date| {
     let mut parts = date.split('-');
@@ -10130,37 +10800,216 @@ fn refreshed_doc_property_field(instr: &str, styles: &StylesCatalog) -> Option<S
   }
 }
 
-fn refreshed_doc_variable_field(instr: &str, styles: &StylesCatalog) -> Option<String> {
-  // DOCVARIABLE values are stored in w:settings/w:docVars; LibreOffice
-  // likewise imports that table as user-field masters (tdf#150542), including
-  // the OOXML escaped line-break sequences used by Word. A found variable is
-  // refreshed only for the explicit field-update request, while an absent
-  // named variable is an unresolved field even without that request: Word
-  // does not expose its stale cached result (tdf#128076).
+fn missing_doc_property_field(instr: &str, styles: &StylesCatalog) -> bool {
+  if styles.import_settings.field_update_datetime.is_none()
+    || !instr
+      .split_ascii_whitespace()
+      .next()
+      .is_some_and(|name| name.eq_ignore_ascii_case("DOCPROPERTY"))
+  {
+    return false;
+  }
+  let tokens = field_instruction_tokens(instr);
+  let [_, name] = tokens.as_slice() else {
+    // Formatting switches have their own result semantics. Keep unsupported
+    // instructions cached, as for the ordinary core-property field path.
+    return false;
+  };
+  let name = name.trim();
+  if name.is_empty()
+    || styles
+      .custom_properties
+      .keys()
+      .any(|key| key.eq_ignore_ascii_case(name))
+  {
+    return false;
+  }
+  // ECMA-376 §17.16.5.14 lists the built-in categories. Word's native
+  // BuiltInDocumentProperties inventory also exposes the spaced names below.
+  // A built-in or an unimplemented custom value is not a missing property:
+  // preserve its cached result until its value semantics are supported.
+  ![
+    "Author",
+    "Bytes",
+    "Category",
+    "Characters",
+    "CharactersWithSpaces",
+    "Comments",
+    "Company",
+    "CreateTime",
+    "HyperlinkBase",
+    "Keywords",
+    "LastPrinted",
+    "LastSavedBy",
+    "LastSavedTime",
+    "Lines",
+    "Manager",
+    "NameOfApplication",
+    "ODMADocId",
+    "Pages",
+    "Paragraphs",
+    "RevisionNumber",
+    "Security",
+    "Subject",
+    "Template",
+    "Title",
+    "TotalEditingTime",
+    "Words",
+    "Last author",
+    "Revision number",
+    "Application name",
+    "Last print date",
+    "Creation date",
+    "Last save time",
+    "Total editing time",
+    "Number of pages",
+    "Number of words",
+    "Number of characters",
+    "Format",
+    "Number of bytes",
+    "Number of lines",
+    "Number of paragraphs",
+    "Number of slides",
+    "Number of notes",
+    "Number of hidden Slides",
+    "Number of multimedia clips",
+    "Hyperlink base",
+    "Number of characters (with spaces)",
+    "Content type",
+    "Content status",
+    "Language",
+    "Document version",
+  ]
+  .iter()
+  .any(|builtin| builtin.eq_ignore_ascii_case(name))
+}
+
+enum RefreshedScalarField {
+  Value(String),
+  Error(ScalarFieldError),
+}
+
+impl RefreshedScalarField {
+  fn error(message: ScalarFieldError, styles: &StylesCatalog) -> Option<Self> {
+    localized_scalar_field_error(message, styles.locales.ui_language())?;
+    Some(Self::Error(message))
+  }
+
+  fn into_text_and_style(
+    self,
+    mut style: TextStyle,
+    ui_language: Option<&str>,
+  ) -> (String, TextStyle) {
+    match self {
+      Self::Value(text) => (text, style),
+      Self::Error(error) => {
+        let message = FieldMessage::ScalarError(error);
+        apply_generated_field_message_style(&mut style, message, ui_language);
+        (localized_field_message(message, ui_language), style)
+      }
+    }
+  }
+}
+
+fn scalar_field_switches_supported(tokens: &[String], numeric: bool) -> bool {
+  let (pairs, remainder) = tokens.as_chunks::<2>();
+  let supported = pairs.iter().all(|pair| {
+    pair[0] == r"\*"
+      && (pair[1].eq_ignore_ascii_case("MERGEFORMAT")
+        || (numeric && field_number_format(pair).is_some()))
+  });
+  supported && remainder.is_empty()
+}
+
+fn empty_barcode_field_error(instr: &str, styles: &StylesCatalog) -> Option<RefreshedScalarField> {
   let tokens = field_instruction_tokens(instr);
   if !tokens
     .first()
-    .is_some_and(|name| name.eq_ignore_ascii_case("DOCVARIABLE"))
+    .is_some_and(|name| name.eq_ignore_ascii_case("BARCODE"))
+    || !scalar_field_switches_supported(&tokens[1..], false)
   {
     return None;
   }
-  if tokens.iter().any(|token| token.eq_ignore_ascii_case(r"\@")) {
-    // Word's DOCVARIABLE cache remains authoritative for a date-picture
-    // switch; the stored variable is a user string, not a DATE field. The
-    // cond-field-cached-value control persists the already formatted
-    // `Sunday` result for this exact combination.
+  RefreshedScalarField::error(ScalarFieldError::BarcodeArgument, styles)
+}
+
+fn refreshed_scalar_field(instr: &str, styles: &StylesCatalog) -> Option<RefreshedScalarField> {
+  // Printing reconstructs these values temporarily; querying Field.Result
+  // after export still exposes the old cache. Ordinary import keeps that cache.
+  styles.import_settings.field_update_datetime?;
+  let tokens = field_instruction_tokens(instr);
+  let name = tokens.first()?;
+  if name.eq_ignore_ascii_case("REVNUM") {
+    if !scalar_field_switches_supported(&tokens[1..], true) {
+      return None;
+    }
+    return Some(RefreshedScalarField::Value(format_field_number(
+      styles.revision_number?,
+      field_number_format(&tokens).unwrap_or(FieldNumberFormat::Decimal),
+    )));
+  }
+  let statistics_switches = if name.eq_ignore_ascii_case("NUMCHARS") {
+    Some(&tokens[1..])
+  } else if name.eq_ignore_ascii_case("INFO")
+    && tokens
+      .get(1)
+      .is_some_and(|token| token.eq_ignore_ascii_case("NumChars"))
+  {
+    Some(&tokens[2..])
+  } else {
+    None
+  };
+  if let Some(switches) = statistics_switches {
+    if !scalar_field_switches_supported(switches, true) {
+      return None;
+    }
+    return Some(RefreshedScalarField::Value(format_field_number(
+      styles.cached_character_count?,
+      field_number_format(switches).unwrap_or(FieldNumberFormat::Decimal),
+    )));
+  }
+  if !name.eq_ignore_ascii_case("DOCVARIABLE") && !name.eq_ignore_ascii_case("AUTOTEXT") {
     return None;
   }
-  let variable_name = tokens.get(1)?.trim();
-  let value = styles
+  if name.eq_ignore_ascii_case("DOCVARIABLE")
+    && tokens.iter().any(|token| token.eq_ignore_ascii_case(r"\@"))
+  {
+    // Keep the existing valid date-picture cache until its formatter is modeled.
+    return None;
+  }
+  let argument = tokens.get(1).filter(|token| !token.starts_with('\\'));
+  if name.eq_ignore_ascii_case("DOCVARIABLE")
+    && styles.document_variables.is_empty()
+    && argument.is_some_and(|name| !name.trim().is_empty())
+  {
+    // Word's empty Variables collection yields an empty named result, even
+    // for a cross-paragraph field with an ignored extra operand. Adding one
+    // unrelated variable instead produces the missing-name diagnostic. A
+    // missing argument is a separate error and must not take this path.
+    return Some(RefreshedScalarField::Value(String::new()));
+  }
+  let switches_start = if argument.is_some() { 2 } else { 1 };
+  if !scalar_field_switches_supported(&tokens[switches_start..], false) {
+    // Date-picture DOCVARIABLE values need date parsing. Preserve their valid
+    // formatted cache (cond-field-cached-value) until that formatter is available.
+    return None;
+  }
+  if name.eq_ignore_ascii_case("AUTOTEXT") {
+    // A document-supplied glossary may contain the entry. Its rich content
+    // needs a separate importer; do not replace an unhandled entry with an error.
+    return (!styles.has_glossary_document)
+      .then(|| RefreshedScalarField::error(ScalarFieldError::AutoTextEntry, styles))
+      .flatten();
+  }
+  let Some(variable_name) = argument.filter(|name| !name.trim().is_empty()) else {
+    return RefreshedScalarField::error(ScalarFieldError::DocumentVariableArgument, styles);
+  };
+  styles
     .document_variables
     .iter()
-    .find(|(name, _)| name.as_str() == variable_name || name.eq_ignore_ascii_case(variable_name))
-    .map(|(_, value)| value.clone());
-  if value.is_some() {
-    styles.import_settings.field_update_datetime?;
-  }
-  Some(value.unwrap_or_default())
+    .find(|(name, _)| name.eq_ignore_ascii_case(variable_name))
+    .map(|(_, value)| RefreshedScalarField::Value(value.clone()))
+    .or_else(|| RefreshedScalarField::error(ScalarFieldError::DocumentVariableValue, styles))
 }
 
 fn refreshed_if_field(instr: &str, styles: &StylesCatalog) -> Option<String> {
@@ -10591,10 +11440,12 @@ fn push_localized_missing_style_ref(
   style_name: &str,
   mut style: TextStyle,
   hyperlink_url: Option<&str>,
-  ui_language: Option<&str>,
+  styles: &StylesCatalog,
 ) {
+  let ui_language = styles.locales.ui_language();
   let message = FieldMessage::MissingStyle(style_name);
   apply_generated_field_message_style(&mut style, message, ui_language);
+  let mut style = styles.missing_style_ref_resource_style(style);
   style.wordprocessingml_field_group = true;
   inlines.push(InlineItem::Text(TextRun {
     text: localized_field_message(message, ui_language),
@@ -10606,6 +11457,22 @@ fn push_localized_missing_style_ref(
     style_ref_numbering_text: None,
     preserve_text_portion: false,
   }));
+}
+
+fn push_localized_missing_doc_property(
+  inlines: &mut Vec<InlineItem>,
+  mut style: TextStyle,
+  hyperlink_url: Option<&str>,
+  ui_language: Option<&str>,
+) {
+  let message = FieldMessage::UnknownDocumentProperty;
+  apply_generated_field_message_style(&mut style, message, ui_language);
+  push_resolved_field_text(
+    inlines,
+    localized_field_message(message, ui_language),
+    style,
+    hyperlink_url,
+  );
 }
 
 fn mark_wordprocessing_field_result(inlines: &mut [InlineItem]) {
@@ -11299,6 +12166,16 @@ fn push_simple_field(
     return;
   }
 
+  if let Some(value) = empty_barcode_field_error(&field.instruction, context.styles) {
+    let (_, result_style) = simple_field_result_text_and_style(field, base_style.clone(), context);
+    let (text, style) = value.into_text_and_style(
+      result_style.unwrap_or(base_style),
+      context.styles.locales.ui_language(),
+    );
+    push_resolved_field_text(inlines, text, style, None);
+    return;
+  }
+
   let field_locked = field
     .field_lock
     .is_some_and(ooxmlsdk::simple_type::OnOffValue::as_bool);
@@ -11341,11 +12218,11 @@ fn push_simple_field(
     let refreshed_date_time =
       refreshed_date_time_field(&field.instruction, &base_style, context.styles);
     let refreshed_doc_property = refreshed_doc_property_field(&field.instruction, context.styles);
-    let refreshed_doc_variable = refreshed_doc_variable_field(&field.instruction, context.styles);
+    let refreshed_scalar = refreshed_scalar_field(&field.instruction, context.styles);
     let dynamic_kind = dynamic_field_kind(&field.instruction);
     if refreshed_date_time.is_some()
       || refreshed_doc_property.is_some()
-      || refreshed_doc_variable.is_some()
+      || refreshed_scalar.is_some()
       || dynamic_kind.is_some()
     {
       let (result_text, result_style) =
@@ -11355,23 +12232,29 @@ fn push_simple_field(
         push_resolved_field_text(inlines, text, style, None);
       } else if let Some(text) = refreshed_doc_property {
         push_resolved_field_text(inlines, text, style, None);
-      } else if let Some(text) = refreshed_doc_variable {
+      } else if let Some(value) = refreshed_scalar {
+        let (text, style) = value.into_text_and_style(style, context.styles.locales.ui_language());
         push_resolved_field_text(inlines, text, style, None);
       } else if let Some(DynamicFieldKind::StyleRef { style_name, .. }) = dynamic_kind.as_ref()
         && context
           .styles
           .style_ref_name_requires_localized_error(style_name)
       {
-        push_localized_missing_style_ref(
-          inlines,
-          style_name,
-          style,
-          None,
-          context.styles.locales.ui_language(),
-        );
+        push_localized_missing_style_ref(inlines, style_name, style, None, context.styles);
       } else if let Some(kind) = dynamic_kind {
         push_dynamic_field(inlines, kind, style, None, result_text);
       }
+      return;
+    }
+    if missing_doc_property_field(&field.instruction, context.styles) {
+      let (_, result_style) =
+        simple_field_result_text_and_style(field, base_style.clone(), context);
+      push_localized_missing_doc_property(
+        inlines,
+        result_style.unwrap_or(base_style),
+        None,
+        context.styles.locales.ui_language(),
+      );
       return;
     }
   }
@@ -11762,7 +12645,28 @@ fn push_run_with_character_style_policy(
           None,
         );
       }
-      w::RunChoice::NoBreakHyphen => text.push('\u{2011}'),
+      w::RunChoice::NoBreakHyphen => {
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
+        // ECMA-376 §17.3.3.18 specifies the hyphen-minus glyph with no
+        // line-break opportunity. Keep its source type distinct from a
+        // literal U+2011, whose Unicode glyph and font fallback differ.
+        let mut control_style = style.clone();
+        control_style.wordprocessingml_no_break_hyphen = true;
+        text.push('\u{2011}');
+        flush_run_text(
+          inlines,
+          &mut text,
+          control_style,
+          hyperlink_url,
+          &style_ref_keys,
+        );
+      }
       w::RunChoice::SoftHyphen => text.push('\u{00ad}'),
       w::RunChoice::FootnoteReferenceMark | w::RunChoice::EndnoteReferenceMark => {
         flush_run_text(
@@ -11847,10 +12751,26 @@ fn push_run_with_character_style_policy(
           &style_ref_keys,
         );
         let drawing_start = inlines.len();
-        if let Some(image) = drawing::inline_image(drawing, styles, images, hyperlinks) {
+        if let Some(mut image) = drawing::inline_image(drawing, styles, images, hyperlinks) {
+          if matches!(image.placement, ImagePlacement::Inline) {
+            image.source_run_font_size_pt =
+              Some(crate::fonts::effective_font_size_pt(&style, None));
+          }
           inlines.push(InlineItem::Image(image));
         }
-        drawing::push_drawing_shapes(drawing, inlines, styles, images, hyperlinks);
+        let contour_owns_wrap =
+          drawing::push_drawing_shapes(drawing, inlines, styles, images, hyperlinks);
+        if contour_owns_wrap
+          && let Some(InlineItem::Image(image)) = inlines.get_mut(drawing_start)
+          && let ImagePlacement::Floating(placement) = &mut image.placement
+        {
+          // The accepted polygon proxy owns this picture's text wrapping.
+          // Keeping the paint host's rectangle as well erases concave/cut
+          // contour clearance (ECMA-376 §20.4.2.16/19; native Tight/Through
+          // and Square controls). Retain all paint geometry and z-order.
+          image.contour_owned_wrap = Some(placement.wrap);
+          placement.wrap = ImageWrapMode::None;
+        }
         drawing::push_drawing_textboxes(drawing, inlines, styles, images, hyperlinks);
         wrap_inline_wordprocessing_drawing_group(drawing, inlines, drawing_start);
         apply_inline_object_run_border(
@@ -12373,26 +13293,35 @@ fn push_sdt_run(
   if let Some((properties, value)) = sdt.sdt_properties.as_ref().and_then(|properties| {
     sdt_bound_replacement(context.custom_xml_bindings, properties).map(|value| (properties, value))
   }) {
-    let style =
-      if let Some(run_properties) = sdt_placeholder_replacement_run_properties(Some(properties)) {
-        properties::run_style(Some(run_properties), base_style, context.styles)
-      } else if !showing_placeholder && sdt_is_plain_text_control(properties) {
-        // ECMA-376 Part 1 §17.5.2.27 scopes sdtPr/rPr to replacement of
-        // placeholder text. For an already-materialized plain-text cache,
-        // update its text while retaining the cached run's formatting. Word's
-        // immutable ShapeOverlappingWithSdt output keeps the cached accent
-        // color, and Writer's sdt-data-binding-char-style test pins the same
-        // non-placeholder character-style behavior.
-        sdt_cached_run_style(content, base_style.clone(), context.styles).unwrap_or(base_style)
-      } else {
-        // A showing placeholder is only a temporary cache and must not leak its
-        // PlaceholderText style into the bound value. Date controls likewise
-        // synthesize formatted text from the binding rather than preserving the
-        // stale cached run (Writer's paired data-binding color/date tests).
-        base_style
-      };
+    let style = if matches!(value, SdtBoundReplacement::DefaultPlaceholder) {
+      // A newly materialized default placeholder uses the paragraph's
+      // formatting plus sdtPr/rPr, not the discarded cached run's style.
+      properties::run_style(
+        sdt_contents_run_properties(properties),
+        base_style,
+        context.styles,
+      )
+    } else if let Some(run_properties) =
+      sdt_placeholder_replacement_run_properties(Some(properties))
+    {
+      properties::run_style(Some(run_properties), base_style, context.styles)
+    } else if !showing_placeholder && sdt_is_plain_text_control(properties) {
+      // ECMA-376 Part 1 §17.5.2.27 scopes sdtPr/rPr to replacement of
+      // placeholder text. For an already-materialized plain-text cache,
+      // update its text while retaining the cached run's formatting. Word's
+      // immutable ShapeOverlappingWithSdt output keeps the cached accent
+      // color, and Writer's sdt-data-binding-char-style test pins the same
+      // non-placeholder character-style behavior.
+      sdt_cached_run_style(content, base_style.clone(), context.styles).unwrap_or(base_style)
+    } else {
+      // A showing placeholder is only a temporary cache and must not leak its
+      // PlaceholderText style into the bound value. Date controls likewise
+      // synthesize formatted text from the binding rather than preserving the
+      // stale cached run (Writer's paired data-binding color/date tests).
+      base_style
+    };
     inlines.push(InlineItem::Text(TextRun {
-      text: run_display_text(value, style.clone()),
+      text: run_display_text(value.into_text(), style.clone()),
       style,
       hyperlink_url: hyperlink_url.map(str::to_owned),
       dynamic_field: None,
@@ -12586,6 +13515,10 @@ fn sdt_placeholder_replacement_run_properties(
   if !sdt_showing_placeholder(properties) {
     return None;
   }
+  sdt_contents_run_properties(properties)
+}
+
+fn sdt_contents_run_properties(properties: &w::SdtProperties) -> Option<&w::RunProperties> {
   properties.sdt_properties_choice.iter().find_map(|choice| {
     let w::SdtPropertiesChoice::RunProperties(properties) = choice else {
       return None;
@@ -12639,7 +13572,7 @@ fn sdt_supports_bound_text(properties: &w::SdtProperties) -> bool {
       choice,
       w::SdtPropertiesChoice::SdtContentText(_) | w::SdtPropertiesChoice::SdtContentDate(_)
     )
-  })
+  }) || sdt_is_bound_rich_text_control(properties)
 }
 
 fn sdt_is_plain_text_control(properties: &w::SdtProperties) -> bool {
@@ -12647,30 +13580,69 @@ fn sdt_is_plain_text_control(properties: &w::SdtProperties) -> bool {
     .sdt_properties_choice
     .iter()
     .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentText(_)))
+    || sdt_is_bound_rich_text_control(properties)
+}
+
+fn sdt_is_bound_rich_text_control(properties: &w::SdtProperties) -> bool {
+  // [MS-OI29500] §2.1.193 overrides the rich-text binding prohibition:
+  // Word imports a mapped rich-text SDT as plain text. Native cell and
+  // inline controls expose Type=1 and the unformatted mapped string.
+  sdt_has_data_binding(properties)
+    && properties
+      .sdt_properties_choice
+      .iter()
+      .any(|choice| matches!(choice, w::SdtPropertiesChoice::SdtContentRichText))
+}
+
+enum SdtBoundReplacement {
+  Text(String),
+  DefaultPlaceholder,
+}
+
+impl SdtBoundReplacement {
+  fn into_text(self) -> String {
+    match self {
+      Self::Text(text) => text,
+      // ECMA-376 Part 1 §§17.5.2.9, 17.5.2.25 prescribe five spaces when
+      // the placeholder is absent or unresolved. Word materializes U+0020
+      // (observed through COM), despite the specification's NBSP wording.
+      Self::DefaultPlaceholder => "     ".to_owned(),
+    }
+  }
 }
 
 fn sdt_bound_replacement(
   custom_xml_bindings: &CustomXmlBindings,
   properties: &w::SdtProperties,
-) -> Option<String> {
+) -> Option<SdtBoundReplacement> {
   if !sdt_supports_bound_text(properties) {
     return None;
   }
   let value = custom_xml_bindings.value_for_sdt(properties)?;
-  if value.is_empty()
-    && sdt_has_data_binding(properties)
-    && let Some(name) = sdt_placeholder_doc_part(properties)
-    && let Some(body) = custom_xml_bindings.glossary_placeholder(name)
-    && let Some(text) = simple_glossary_placeholder_text(body)
-  {
-    // ECMA-376 Part 1 §17.5.2.25 requires an empty mapped XML element to
-    // display the named placeholder from a bbPlcHdr Glossary Document entry.
-    // Keep this distinct from the Word deviations in [MS-OI29500]
-    // §§2.1.195 and 2.1.199, which delay or suppress a placeholder selected
-    // only because run contents are empty.
-    return Some(text);
+  if value.is_empty() && sdt_has_data_binding(properties) {
+    if sdt_showing_placeholder(properties) {
+      // ECMA-376 §17.5.2.39 resumes the current placeholder on load. Native
+      // Word controls retain both its cached text and formatting even when
+      // the named glossary entry differs. This is not insertion of a bound
+      // value, so sdtPr/rPr must not be applied over the placeholder cache.
+      return None;
+    }
+    if let Some(body) = sdt_placeholder_doc_part(properties)
+      .and_then(|name| custom_xml_bindings.glossary_placeholder(name))
+    {
+      if let Some(text) = simple_glossary_placeholder_text(body) {
+        // A resolved glossary entry takes precedence over the default.
+        return Some(SdtBoundReplacement::Text(text));
+      }
+    } else {
+      // An empty mapped element materializes a placeholder immediately.
+      // A showingPlcHdr cache is already placeholder content; retain it.
+      // Do not extend this to empty, unmapped controls: [MS-OI29500]
+      // §§2.1.195 and 2.1.199 delay or suppress their placeholders.
+      return Some(SdtBoundReplacement::DefaultPlaceholder);
+    }
   }
-  sdt_bound_replacement_text(properties, value)
+  sdt_bound_replacement_text(properties, value).map(SdtBoundReplacement::Text)
 }
 
 fn sdt_has_data_binding(properties: &w::SdtProperties) -> bool {
@@ -13256,6 +14228,8 @@ fn inline_image_impl(
       )
       .filter(|_| properties.rotation_deg.abs() <= f32::EPSILON);
       Some(InlineImage {
+        contour_owned_wrap: None,
+        source_run_font_size_pt: None,
         data: image_data.data,
         content_type: image_data.content_type,
         blip_compression_state: properties.blip_compression_state,
@@ -13277,6 +14251,7 @@ fn inline_image_impl(
         line_box: InlineImageLineBox::CharacterLike,
         office_math_line_layout: None,
         office_math_display_layout: None,
+        office_math_metrics: None,
         crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -13325,6 +14300,8 @@ fn inline_image_impl(
         bottom_pt: effect_extent_bottom(anchor.effect_extent.as_ref()),
       };
       Some(InlineImage {
+        contour_owned_wrap: None,
+        source_run_font_size_pt: None,
         data: image_data.data,
         content_type: image_data.content_type,
         blip_compression_state: properties.blip_compression_state,
@@ -13346,6 +14323,7 @@ fn inline_image_impl(
         line_box: InlineImageLineBox::CharacterLike,
         office_math_line_layout: None,
         office_math_display_layout: None,
+        office_math_metrics: None,
         crop,
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
@@ -13859,8 +14837,8 @@ fn merge_textbox_frame_into_owning_shape(
   // wps:spPr and wps:txbx are children of the same wps:wsp. A textbox frame
   // without independent visual treatment is therefore content of the
   // preceding geometry, not a second layout object. Horizontal spAutoFit
-  // frames carry a synthetic fallback stroke and wrap mode, but those must
-  // not duplicate or replace the owning wps:spPr geometry.
+  // frames can carry a synthetic fallback stroke, but it must not duplicate
+  // or replace the owning wps:spPr geometry.
   if text_box_frame.fill_color.is_some()
     || text_box_frame.fill_image.is_some()
     || (text_box_frame.stroke.is_some() && !text_box_frame.text_box_auto_fit)
@@ -13906,6 +14884,7 @@ fn transfer_textbox_content(shape: &mut InlineShape, text_box_frame: &mut Inline
       .take();
   }
   shape.text_box_blocks = std::mem::take(&mut text_box_frame.text_box_blocks);
+  shape.text_box_link = text_box_frame.text_box_link;
   shape.text_inset_left_pt = text_box_frame.text_inset_left_pt;
   shape.text_inset_top_pt = text_box_frame.text_inset_top_pt;
   shape.text_inset_right_pt = text_box_frame.text_inset_right_pt;
@@ -13971,18 +14950,6 @@ struct DrawingShapeImportContext<'a> {
   hyperlinks: &'a HyperlinkCatalog,
   smartart_text_colors_by_model_id: Option<&'a HashMap<String, RgbColor>>,
   wordprocessing_canvas_has_background_paint: bool,
-}
-
-fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
-  match placement {
-    ImagePlacement::Floating(mut placement) => {
-      // content inside the owning draw shape (SwTextBoxHelper), so text flow
-      // must not be wrapped into the shape's textbox area.
-      placement.wrap = ImageWrapMode::TopBottom;
-      ImagePlacement::Floating(placement)
-    }
-    ImagePlacement::Inline => ImagePlacement::Inline,
-  }
 }
 
 fn wordprocessing_shape_textbox_uses_auto_fit(shape: &wps::WordprocessingShape) -> bool {
@@ -14727,10 +15694,7 @@ fn text_box_frame_from_wordprocessing_shape(
     .shape_style
     .as_ref()
     .and_then(|style| drawingml_font_reference_color(&style.font_reference, &styles.theme_colors))
-    .or_else(|| {
-      wordprocessing_shape_fill_color(shape, &styles.theme_colors)
-        .map(automatic_text_color_for_background)
-    });
+    .or_else(|| wordprocessing_shape_automatic_text_color(shape, &styles.theme_colors));
   if let Some(properties) = shape.text_body_properties.as_deref() {
     // ECMA-376 Part 1 §20.1.2.2.40 makes a:scene3d plus a:sp3d a
     // text-body property. LibreOffice imports the pair into the custom
@@ -15286,7 +16250,21 @@ fn wordprocessing_shape_textbox_frame(
   transform: DrawingMlGroupTransform,
   context: DrawingTextBoxImportContext<'_>,
 ) -> Option<InlineShape> {
-  let content = wordprocessing_shape_textbox_content(shape)?;
+  let empty_content = w::TextBoxContent::default();
+  let content = match shape.wordprocessing_shape_choice2.as_ref()? {
+    wps::WordprocessingShapeChoice2::TextBoxInfo2(textbox) => textbox.text_box_content.as_ref()?,
+    wps::WordprocessingShapeChoice2::LinkedTextBox(_) => &empty_content,
+  };
+  let text_box_link = match shape.wordprocessing_shape_choice2.as_ref()? {
+    wps::WordprocessingShapeChoice2::TextBoxInfo2(textbox) => TextBoxLink {
+      story_id: textbox.id.unwrap_or_default(),
+      sequence: 0,
+    },
+    wps::WordprocessingShapeChoice2::LinkedTextBox(textbox) => TextBoxLink {
+      story_id: textbox.id,
+      sequence: textbox.sequence,
+    },
+  };
   let shape_properties = shape
     .shape_properties
     .as_deref()
@@ -15360,11 +16338,9 @@ fn wordprocessing_shape_textbox_frame(
   let fill_color = wordart_fill_colors.first().copied();
   let additional_fill_colors = wordart_fill_colors.into_iter().skip(1).collect();
   let geometry = InlineShapeGeometry::Rectangle;
-  let placement = if auto_fit {
-    autofit_textbox_placement(placement)
-  } else {
-    placement
-  };
+  // bodyPr/spAutoFit controls the shape's size; wp:anchor owns how the body
+  // wraps around it. Native Word fit/fixed controls preserve wrapNone even
+  // when an unpainted textbox has no separate spPr geometry to merge into.
   let static3d = wordprocessing_shape_actual_static3d(shape, &properties, context.styles);
   let rotation_deg = if static3d.is_some() {
     // The static-3D renderer folds a:xfrm/@rot into the camera projection.
@@ -15406,8 +16382,12 @@ fn wordprocessing_shape_textbox_frame(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -15415,7 +16395,10 @@ fn wordprocessing_shape_textbox_frame(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d,
     wordprocessing_shape_host: true,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: Some(text_box_link),
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: wordprocessing_shape_outline_text_inset_pt(
       shape,
@@ -15639,13 +16622,13 @@ fn push_drawing_shapes_impl(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
-) {
+) -> bool {
   if drawing_is_hidden(drawing) {
-    return;
+    return false;
   }
 
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
-    return;
+    return false;
   };
   let top_level_picture = drawing_image_properties(graphic_data, &styles.theme_colors, None);
   let is_top_level_picture = top_level_picture.is_some();
@@ -15664,13 +16647,16 @@ fn push_drawing_shapes_impl(
     Some(w::DrawingChoice::Anchor(anchor)) => {
       ImagePlacement::Floating(floating_image_placement(anchor))
     }
-    None => return,
+    None => return false,
   };
 
   let has_authored_wrap_polygon = if let Some(w::DrawingChoice::Anchor(anchor)) =
     drawing.drawing_choice.as_ref()
-    && let Some(shape) = anchor_wrap_polygon_shape(anchor, placement, wrap_source_crop)
+    && let Some(mut shape) = anchor_wrap_polygon_shape(anchor, placement, wrap_source_crop)
   {
+    if let Some(picture) = top_level_picture.as_ref() {
+      rotate_picture_wrap_polygon(&mut shape, picture.rotation_deg, anchor);
+    }
     let usable = layout::has_authored_wrap_contour(&shape);
     inlines.push(InlineItem::Shape(shape));
     usable
@@ -15679,7 +16665,7 @@ fn push_drawing_shapes_impl(
   };
 
   if is_top_level_picture {
-    return;
+    return has_authored_wrap_polygon;
   }
   let shape_start = inlines.len();
 
@@ -15780,6 +16766,7 @@ fn push_drawing_shapes_impl(
     shape.wordprocessing_shape_hyperlink_description =
       drawing_shape_hyperlink_description(drawing, hyperlinks);
   }
+  has_authored_wrap_polygon
 }
 
 fn drawing_shape_properties(drawing: &w::Drawing) -> Option<&wp::DocProperties> {
@@ -15981,6 +16968,8 @@ fn wrap_locked_canvas_viewport(
       locked_canvas_viewport: Some(InlineLockedCanvasViewport {
         width_pt,
         height_pt,
+        content_offset_x_pt,
+        content_offset_y_pt,
       }),
       rotation_deg: 0.0,
       placement,
@@ -16230,12 +17219,12 @@ fn drawingml_generic_shape_shape(
   context: DrawingShapeImportContext<'_>,
 ) -> Option<InlineShape> {
   let properties = DrawingMlShapeProperties::Generic(shape_properties.clone());
-  let has_explicit_fill = properties.fill().is_some();
+  let has_explicit_fill = properties.has_explicit_fill();
   let explicit_fill_color =
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
   let fill_pattern =
     drawingml_shape_properties_pattern_fill(&properties, &context.styles.theme_colors);
-  let fill_override =
+  let mut fill_override =
     drawingml_shape_properties_common_fill(&properties, &context.styles.theme_colors).or_else(
       || {
         (!has_explicit_fill).then(|| {
@@ -16249,6 +17238,11 @@ fn drawingml_generic_shape_shape(
         })?
       },
     );
+  if transform.legacy_locked_canvas
+    && let Some(common::Fill::Gradient(gradient)) = &mut fill_override
+  {
+    gradient.interpolation = common::drawingml_gradient::office_art_interpolation(&gradient.stops);
+  }
   let fill_color = if drawingml_shape_properties_has_no_fill(&properties) {
     None
   } else {
@@ -16287,6 +17281,7 @@ fn drawingml_generic_shape_shape(
       context.styles,
       context.images,
       text_color,
+      transform.legacy_locked_canvas,
     )
   });
   if let Some(text_box) = &mut text_box {
@@ -16441,6 +17436,9 @@ fn drawingml_generic_shape_shape(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: transform.legacy_locked_canvas,
+    wordprocessing_text_warp_frame: None,
     text_warp: text_shape
       .and_then(|text_shape| {
         text_shape
@@ -16452,6 +17450,7 @@ fn drawingml_generic_shape_shape(
       .filter(|warp| warp.preset != a::TextShapeValues::TextNoShape)
       .cloned(),
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -16459,7 +17458,10 @@ fn drawingml_generic_shape_shape(
     effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
     static3d: properties.static3d(&context.styles.theme_colors),
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -16625,6 +17627,12 @@ fn wrap_inline_wordprocessing_drawing_group(
   // character-like object: its host advances and aligns once, while all
   // children retain their shared group coordinates.
   let mut host = chart_shape(width, height, 0.0, ImagePlacement::Inline, None);
+  host.wordprocessing_canvas_host = drawing_graphic_data(drawing).is_some_and(|data| {
+    data
+      .graphic_data_choice
+      .iter()
+      .any(|choice| matches!(choice, a::GraphicDataChoice::WordprocessingCanvas(_)))
+  });
   apply_drawing_effect_extent_to_shape(&mut host, drawing_effect_extent(drawing));
   host.canvas_children = Some(inlines.drain(drawing_start..).collect());
   inlines.push(InlineItem::Shape(host));
@@ -16746,8 +17754,12 @@ fn wordprocessing_canvas_background_shape(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -16755,7 +17767,10 @@ fn wordprocessing_canvas_background_shape(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -16814,6 +17829,12 @@ fn wordprocessing_group_shapes(
   )
   .map(|xfrm| transform.child(xfrm))
   .unwrap_or(transform);
+  let child_transform = DrawingMlGroupTransform {
+    wordprocessing_text_frame: (!transform.raw_coordinates && transform.affine == Affine::IDENTITY)
+      .then(|| wordprocessing_group_text_frame(&group.group_shape_properties))
+      .flatten(),
+    ..child_transform
+  };
   let child_context = DrawingShapeImportContext {
     effect_extent: DrawingEffectExtent::default(),
     ..context
@@ -16852,6 +17873,11 @@ fn wordprocessing_group_shape_shapes(
   )
   .map(|xfrm| transform.child(xfrm))
   .unwrap_or(transform);
+  let child_transform = DrawingMlGroupTransform {
+    // Even an identity/missing nested xfrm remains a distinct native owner.
+    wordprocessing_text_frame: None,
+    ..child_transform
+  };
   let child_context = DrawingShapeImportContext {
     effect_extent: DrawingEffectExtent::default(),
     ..context
@@ -17056,6 +18082,21 @@ fn wordprocessing_group_child_shape_items(
   {
     items.push(InlineItem::Shape(*frame));
   }
+  if let Some(frame) = transform.wordprocessing_text_frame {
+    for item in &mut items {
+      if let InlineItem::Shape(item) = item
+        && item.wordprocessing_shape_host
+        && !item.text_box_word_wrap
+        && item.static3d.is_none()
+        && item.text_warp.as_deref().is_some_and(|preset| {
+          common::drawingml_text_warp::paths(preset, 0.0, 0.0, 1.0, 1.0)
+            .is_some_and(|paths| paths.len() == 1)
+        })
+      {
+        item.wordprocessing_text_warp_frame = frame.shape_frame(shape).map(Box::new);
+      }
+    }
+  }
   items
 }
 
@@ -17071,7 +18112,7 @@ fn wordprocessing_shape_shape(
     .cloned()
     .unwrap_or_default();
   let properties = DrawingMlShapeProperties::Wordprocessing(shape_properties.clone());
-  let has_explicit_fill = properties.fill().is_some();
+  let has_explicit_fill = properties.has_explicit_fill();
   let explicit_fill_color =
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
   let fill_pattern =
@@ -17162,6 +18203,44 @@ fn wordprocessing_shape_shape(
       })
     });
   let static3d = wordprocessing_shape_actual_static3d(shape, &properties, context.styles);
+  let wordprocessing_shape_effect_pen = (!transform.legacy_locked_canvas
+    && static3d.is_none()
+    && matches!(effects.as_ref(), Some(common::DrawingEffectSource::List { source, .. })
+      if source.reflection.is_some() || source.glow.is_some()))
+  .then(|| {
+    let outline = wordprocessing_shape_actual_line_outline(shape, context.styles)?;
+    stroke_override.as_ref()?;
+    let rotation = properties
+      .transform2_d()
+      .and_then(|xfrm| xfrm.rotation)
+      .unwrap_or_default();
+    let local = Affine::scale_non_uniform(
+      if properties.flip_horizontal() {
+        -1.0
+      } else {
+        1.0
+      },
+      if properties.flip_vertical() {
+        -1.0
+      } else {
+        1.0
+      },
+    )
+    .then_rotate(sdk_units::drawingml_angle_to_degrees(rotation).to_radians());
+    Some(Box::new(common::DrawingMlDeviceStroke {
+      width_emu: outline
+        .width
+        .map(i64::from)
+        .unwrap_or(DRAWINGML_DEFAULT_LINE_WIDTH_EMU),
+      emu_to_points: drawingml_physical_pen_basis(transform.native_affine * local),
+      // Each fixed-output effect surface owns snapping independently of
+      // the layout/foreground quarter-turn policy (native width/angle controls).
+      snap: true,
+      realized_width_emu: None,
+    }))
+  })
+  .flatten();
+
   let rotation_deg = if static3d.is_some() {
     // The static-3D renderer owns both the camera revolution and the authored
     // a:xfrm rotation. Keep the stored shape rotation in source coordinates
@@ -17202,8 +18281,12 @@ fn wordprocessing_shape_shape(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -17211,7 +18294,10 @@ fn wordprocessing_shape_shape(
     effects,
     static3d,
     wordprocessing_shape_host: true,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: wordprocessing_shape_outline_text_inset_pt(
       shape,
@@ -17292,10 +18378,11 @@ fn drawing_diagram_shapes(
     .and_then(|id| context.images.diagram_drawings_by_relationship_id.get(&id))
   {
     return Some(drawingml_diagram_drawing_shapes(
-      drawing,
+      &drawing.drawing,
       placement,
       transform,
       DrawingShapeImportContext {
+        images: &drawing.images,
         smartart_text_colors_by_model_id: text_colors_by_model_id.as_ref(),
         ..context
       },
@@ -17310,6 +18397,20 @@ fn drawingml_diagram_drawing_shapes(
   transform: DrawingMlGroupTransform,
   context: DrawingShapeImportContext<'_>,
 ) -> Vec<InlineItem> {
+  // wp:inline owns one character-like frame for the whole persisted layout,
+  // just as for a diagram generated from its model. Child offsets belong to
+  // that frame; letting each child advance the paragraph breaks rows apart.
+  let inline_extent = matches!(placement, ImagePlacement::Inline)
+    .then_some(transform.fallback_size)
+    .flatten();
+  let child_context = DrawingShapeImportContext {
+    effect_extent: if inline_extent.is_some() {
+      DrawingEffectExtent::default()
+    } else {
+      context.effect_extent
+    },
+    ..context
+  };
   let child_transform = drawingml_group_transform_from_diagram_properties(
     &drawing.shape_tree.group_shape_properties,
     transform.raw_coordinates,
@@ -17325,17 +18426,22 @@ fn drawingml_diagram_drawing_shapes(
         choice,
         drawingml_group_child_placement(placement, transform.fallback_size),
         child_transform,
-        context,
+        child_context,
       )
     })
     .collect();
-  wrap_diagram_group_effects(
+  let children = wrap_diagram_group_effects(
     children,
     &drawing.shape_tree.group_shape_properties,
     child_transform.rotation_degrees(),
     placement,
-    context,
-  )
+    child_context,
+  );
+  if let Some((width, height)) = inline_extent {
+    diagram::wrap_in_host(children, width, height, placement, context.effect_extent)
+  } else {
+    children
+  }
 }
 
 fn drawingml_diagram_group_shapes(
@@ -17482,7 +18588,7 @@ fn drawingml_diagram_shape_shape(
   context: DrawingShapeImportContext<'_>,
 ) -> Option<InlineShape> {
   let properties = DrawingMlShapeProperties::Diagram((*shape.shape_properties).clone());
-  let has_explicit_fill = properties.fill().is_some();
+  let has_explicit_fill = properties.has_explicit_fill();
   let explicit_fill_color =
     drawingml_shape_properties_fill_color(&properties, &context.styles.theme_colors);
   let fill_pattern =
@@ -17515,7 +18621,7 @@ fn drawingml_diagram_shape_shape(
     })
   };
   let fill_image = drawingml_diagram_shape_image_fill(&shape.shape_properties, context.images);
-  let stroke_override = drawingml_actual_line_stroke(
+  let stroke_override = drawingml_actual_line_stroke_with_default_width(
     shape.shape_properties.outline.as_deref(),
     shape
       .shape_style
@@ -17524,6 +18630,7 @@ fn drawingml_diagram_shape_shape(
     &context.styles.theme_lines,
     &context.styles.theme_colors,
     properties.preset_geometry().map(|geometry| geometry.preset),
+    WORD_FIXED_OUTPUT_HAIRLINE_WIDTH_EMU as i32,
   );
   let stroke = stroke_override
     .as_ref()
@@ -17535,6 +18642,20 @@ fn drawingml_diagram_shape_shape(
   let smartart_text_color =
     drawingml_diagram_shape_text_color(shape, smartart_text_color, &context.styles.theme_colors);
   let mut text_box = drawingml_diagram_shape_text_box(shape, context.styles, smartart_text_color);
+  // SmartArt uses the same effect style matrix as other DrawingML shapes.
+  // A direct effect list (including an empty one) overrides the reference.
+  let effects = properties
+    .effects(&context.styles.theme_colors, Some(context.images))
+    .or_else(|| {
+      shape.shape_style.as_ref().and_then(|style| {
+        drawingml_effect_reference_effects(
+          &style.effect_reference,
+          &context.styles.theme_effects,
+          &context.styles.theme_colors,
+          Some(context.images),
+        )
+      })
+    });
   if fill_color.is_none()
     && fill_pattern.is_none()
     && fill_override.is_none()
@@ -17651,16 +18772,23 @@ fn drawingml_diagram_shape_shape(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
     text_fill: None,
-    effects: properties.effects(&context.styles.theme_colors, Some(context.images)),
+    effects,
     static3d: properties.static3d(&context.styles.theme_colors),
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: true,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -17720,8 +18848,15 @@ fn drawingml_gvml_text_body_frame(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   base_color: RgbColor,
+  legacy_locked_canvas: bool,
 ) -> Option<TextBoxFrameContent> {
   let text_static3d = drawingml_text_body_static3d(&text_body.body_properties, styles);
+  // The legacy canvas uses Calibri for an unavailable Latin face. Native
+  // missing-name, theme-major/minor, document-default and pitch/family
+  // controls all reproduce explicit Calibri pixels; installed faces remain
+  // authoritative. Keep substitution in the existing font registry/cache,
+  // separate from glyph linking and ordinary Word text-story substitution.
+  let missing_latin_fallback = legacy_locked_canvas.then(|| Arc::<str>::from("Calibri"));
   let list_style = text_body
     .list_style
     .as_deref()
@@ -17731,6 +18866,9 @@ fn drawingml_gvml_text_body_frame(
     .iter()
     .filter_map(|paragraph| {
       let mut paragraph_style = text_style_with_color(styles, base_color);
+      if let Some(family) = &missing_latin_fallback {
+        paragraph_style.fallback_font_family = Some(family.clone());
+      }
       // Word fixed output lowers generic GVML a:txSp text to glyph paths.
       // Unlike WPS w:txbxContent, this drawing-layer text is not exposed as
       // searchable PDF text; LibreOffice imports the same node as shape text.
@@ -18107,7 +19245,8 @@ fn drawingml_diagram_shape_text_box(
   let blocks = text_body
     .paragraph
     .iter()
-    .filter_map(|paragraph| {
+    .enumerate()
+    .filter_map(|(index, paragraph)| {
       let text = drawingml_paragraph_text(paragraph)?;
       let mut style = text_style_with_color(styles, color);
       let paragraph_level = paragraph
@@ -18155,6 +19294,15 @@ fn drawingml_diagram_shape_text_box(
       let alignment = paragraph_properties.and_then(|properties| properties.alignment);
       let mut block = simple_text_block(text, style);
       if let Block::Paragraph(target) = &mut block {
+        if let Some(properties) = paragraph_properties {
+          diagram::apply_paragraph_spacing(
+            &mut target.format,
+            properties,
+            target.base_style.font_size_pt,
+            index == 0,
+            index + 1 == text_body.paragraph.len(),
+          );
+        }
         if let Some(alignment) = alignment {
           target.format.alignment = match alignment {
             a::TextAlignmentTypeValues::Left => ParagraphAlignment::Left,
@@ -19507,6 +20655,7 @@ fn chart_space_shapes(
   {
     apply_chart_text_properties(&mut title_style, properties, styles);
   }
+  apply_word_chart_rich_title_defaults(&mut title_style, chart_space, styles.legacy_chart_defaults);
   if let Some(title) = chart_space.chart.title.as_deref() {
     apply_chart_rich_title_properties(&mut title_style, title, styles);
   }
@@ -19842,6 +20991,7 @@ fn chart_space_shapes(
     ui_language,
     format_locale: styles.locales.format_locale().map(str::to_owned),
     automatic_title,
+    title_overlay: word_chart_title_overlay(chart_space, styles.legacy_chart_defaults),
     title_style,
     label_style: legend_style,
     category_axis_title_style,
@@ -20281,6 +21431,7 @@ fn drawing_extended_chart_shapes(
     ui_language: styles.locales.ui_language().map(str::to_owned),
     format_locale: styles.locales.format_locale().map(str::to_owned),
     automatic_title: shared_chart::automatic_chart_title(styles.locales.ui_language()).to_string(),
+    title_overlay: false,
     title_style,
     label_style: label_style.clone(),
     category_axis_title_style,
@@ -20465,6 +21616,76 @@ fn apply_word_automatic_chart_title_theme_font(
       .theme_fonts
       .resolve_drawingml_typeface_for_language(typeface, Some(font_language)),
   );
+}
+
+fn word_chart_title_overlay(chart_space: &c::ChartSpace, legacy_defaults: bool) -> bool {
+  chart_space.chart.title.as_deref().is_some_and(|title| {
+    title
+      .overlay
+      .as_ref()
+      .and_then(|overlay| overlay.val)
+      .map_or(!legacy_defaults, |value| value.as_bool())
+  })
+}
+
+fn apply_word_chart_rich_title_defaults(
+  style: &mut TextStyle,
+  chart_space: &c::ChartSpace,
+  legacy_defaults: bool,
+) {
+  let Some(c::ChartTextChoice::RichText(rich)) = chart_space
+    .chart
+    .title
+    .as_deref()
+    .and_then(|title| title.chart_text.as_deref())
+    .and_then(|text| text.chart_text_choice.as_ref())
+  else {
+    return;
+  };
+  let Some(paragraph) = rich.paragraph.first() else {
+    return;
+  };
+  // Word's rich title has its own character defaults. A present defRPr,
+  // including an empty one, selects the chart's automatic title font: 10pt
+  // for legacy styles or 18pt for c14 styles and Office 2007 documents,
+  // otherwise 120% of an explicit chart-wide size. Without defRPr
+  // the rich run starts at 18pt instead. Native Font2/PDF controls distinguish
+  // these cases from title txPr, list defaults and changes to chart extent.
+  // Apply direct paragraph/run properties afterwards; axis titles keep their
+  // separate inheritance. LibreOffice's chart TextFormatter also applies the
+  // 120% chart-wide title scale, rather than treating it as a run override.
+  if paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.default_run_properties.as_deref())
+    .is_some()
+  {
+    // c14:style 102 and c:style 2 share a palette, but not their default
+    // title size. Preserve that distinction before chart_style_id normalizes
+    // the palette. Independent 102/118 and legacy 2/18 controls agree.
+    let default_size = if legacy_defaults
+      || matches!(
+        chart_space.chart_space_choice,
+        Some(c::ChartSpaceChoice::C14Style(_))
+      ) {
+      18.0
+    } else {
+      10.0
+    };
+    style.font_size_pt = chart_space
+      .text_properties
+      .as_deref()
+      .and_then(chart_text_properties_default_run_properties)
+      .and_then(|properties| properties.font_size)
+      .filter(|size| *size > 0)
+      .map_or(default_size, |size| size as f32 / 100.0 * 1.2);
+    style.kerning_minimum_size_pt.get_or_insert(12.0);
+  } else {
+    style.font_size_pt = 18.0;
+    // Font2's zero disables kerning; our threshold representation uses
+    // infinity for DrawingML kern=0, not a zero-size activation threshold.
+    style.kerning_minimum_size_pt.get_or_insert(f32::INFINITY);
+  }
 }
 
 fn apply_chart_rich_title_properties(
@@ -20824,8 +22045,12 @@ fn chart_shape(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -20833,7 +22058,10 @@ fn chart_shape(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -20873,12 +22101,103 @@ fn drawingml_physical_pen_basis(transform: Affine) -> [f64; 4] {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct WordprocessingGroupTextFrame {
+  child_to_emu: Affine,
+}
+
+fn wordprocessing_group_text_frame(
+  properties: &wpg::GroupShapeProperties,
+) -> Option<WordprocessingGroupTextFrame> {
+  let source = properties.transform_group.as_deref()?;
+  if source.rotation.unwrap_or_default().rem_euclid(21_600_000) != 0
+    || source.horizontal_flip.as_ref().is_some_and(|v| v.as_bool())
+    || source.vertical_flip.as_ref().is_some_and(|v| v.as_bool())
+    || source
+      .offset
+      .as_ref()
+      .is_some_and(|v| v.x.to_emu() != 0 || v.y.to_emu() != 0)
+  {
+    return None;
+  }
+  let extent = source.extents.as_ref()?;
+  let (width, height) = (extent.cx.to_emu(), extent.cy.to_emu());
+  // Missing child extents keep the existing source-coordinate default.
+  // An explicitly zero child axis has no observed frame-provider contract.
+  let (child_width, child_height) = source
+    .child_extents
+    .as_ref()
+    .map_or((width, height), |v| (v.cx.to_emu(), v.cy.to_emu()));
+  if width < 635 || height < 635 || child_width <= 0 || child_height <= 0 {
+    return None;
+  }
+  // Native WWLIB a21bf0/a21fe0 owns the parent WPG rectangle: signed EMU
+  // division by635 precedes the child's affine. a22be0 then rounds each
+  // mapped child edge separately. Keep this frame apart from shape painting.
+  let scale_x = (width / 635 * 635) as f64 / child_width as f64;
+  let scale_y = (height / 635 * 635) as f64 / child_height as f64;
+  let (offset_x, offset_y) = source
+    .child_offset
+    .as_ref()
+    .map_or((0, 0), |v| (v.x.to_emu(), v.y.to_emu()));
+  Some(WordprocessingGroupTextFrame {
+    child_to_emu: Affine::new([
+      scale_x,
+      0.0,
+      0.0,
+      scale_y,
+      -(offset_x as f64) * scale_x,
+      -(offset_y as f64) * scale_y,
+    ]),
+  })
+}
+
+impl WordprocessingGroupTextFrame {
+  fn shape_frame(self, shape: &wps::WordprocessingShape) -> Option<WordprocessingTextWarpFrame> {
+    let source = shape.shape_properties.as_deref()?.transform2_d.as_deref()?;
+    if source.rotation.unwrap_or_default().rem_euclid(21_600_000) != 0
+      || source.horizontal_flip.as_ref().is_some_and(|v| v.as_bool())
+      || source.vertical_flip.as_ref().is_some_and(|v| v.as_bool())
+    {
+      return None;
+    }
+    let offset = source.offset.as_ref()?;
+    let extent = source.extents.as_ref()?;
+    let (x, y, width, height) = (
+      offset.x.to_emu(),
+      offset.y.to_emu(),
+      extent.cx.to_emu(),
+      extent.cy.to_emu(),
+    );
+    if width <= 0 || height <= 0 {
+      return None;
+    }
+    let near = self.child_to_emu * kurbo::Point::new(x as f64, y as f64);
+    let far = self.child_to_emu
+      * kurbo::Point::new(x.checked_add(width)? as f64, y.checked_add(height)? as f64);
+    // Word's a234a8 child-rectangle route rounds the origin and extent
+    // independently before adding them (1700b8 -> 4bfe70). Rounding the
+    // transformed far edge instead loses one EMU at observed +/-1 EMU controls.
+    let [left, top, width, height] =
+      [near.x, near.y, far.x - near.x, far.y - near.y].map(|v| v.round() as i64);
+    Some(WordprocessingTextWarpFrame {
+      bounds_emu: [
+        left,
+        top,
+        left.checked_add(width)?,
+        top.checked_add(height)?,
+      ],
+    })
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct DrawingMlGroupTransform {
   affine: Affine,
   // Keep the pen's original-unit linear transform separate from f32 layout
   // geometry. Device-width half-pixel decisions consume this precision.
   native_affine: Affine,
   native_rotation_units: i32,
+  wordprocessing_text_frame: Option<WordprocessingGroupTextFrame>,
   raw_coordinates: bool,
   fallback_size: Option<(f32, f32)>,
   host_extent_controls_geometry: bool,
@@ -20899,6 +22218,7 @@ impl DrawingMlGroupTransform {
       affine: Affine::IDENTITY,
       native_affine: Affine::IDENTITY,
       native_rotation_units: 0,
+      wordprocessing_text_frame: None,
       raw_coordinates: false,
       fallback_size: None,
       host_extent_controls_geometry: false,
@@ -20962,7 +22282,7 @@ impl DrawingMlGroupTransform {
         if xfrm.flip_horizontal { -1.0 } else { 1.0 },
         if xfrm.flip_vertical { -1.0 } else { 1.0 },
       )
-      .then_rotate(f64::from(xfrm.rotation_deg.to_radians()))
+      .then_rotate(f64::from((xfrm.rotation_deg % 360.0).to_radians()))
       .then_translate((f64::from(center_x), f64::from(center_y)).into());
     let native_child = xfrm
       .native_linear
@@ -20977,6 +22297,9 @@ impl DrawingMlGroupTransform {
       affine: self.affine * orientation * child_coordinates,
       native_affine: self.native_affine * native_child,
       native_rotation_units,
+      // A nested group's provider/quantization order needs separate Native
+      // evidence. Do not inherit the outer frame as if it were another host.
+      wordprocessing_text_frame: None,
       raw_coordinates: true,
       fallback_size: None,
       host_extent_controls_geometry: false,
@@ -21056,7 +22379,10 @@ impl DrawingMlGroupTransform {
         if flip_horizontal { -1.0 } else { 1.0 },
         if flip_vertical { -1.0 } else { 1.0 },
       )
-      .then_rotate(f64::from(rotation_deg.to_radians()))
+      // Preserve the exact identity of an authored full turn before the
+      // Single-radian conversion. Otherwise360deg becomes a spurious
+      // 0.000010018deg after atan2 and selects a different text paint owner.
+      .then_rotate(f64::from((rotation_deg % 360.0).to_radians()))
       .then_translate(center.to_vec2());
     let transform = self.affine * local_orientation;
     let mapped_center = transform * center;
@@ -21243,6 +22569,31 @@ impl DrawingMlShapeProperties {
       Self::Wordprocessing(properties) => properties.outline.as_deref(),
       Self::Picture(properties) => properties.outline.as_deref(),
     }
+  }
+
+  fn has_explicit_fill(&self) -> bool {
+    // A bitmap is an explicit fill even though its paint is carried by
+    // InlineShapeImageFill rather than DrawingMlFillProperties. It must
+    // suppress the style's fillRef just like the other direct fill choices.
+    self.fill().is_some()
+      || match self {
+        Self::Diagram(properties) => matches!(
+          properties.shape_properties_choice2.as_ref(),
+          Some(dsp::ShapePropertiesChoice2::BlipFill(_))
+        ),
+        Self::Generic(properties) => matches!(
+          properties.shape_properties_choice2.as_ref(),
+          Some(a::ShapePropertiesChoice2::BlipFill(_))
+        ),
+        Self::Wordprocessing(properties) => matches!(
+          properties.shape_properties_choice2.as_ref(),
+          Some(wps::ShapePropertiesChoice2::BlipFill(_))
+        ),
+        Self::Picture(properties) => matches!(
+          properties.shape_properties_choice2.as_ref(),
+          Some(pic::ShapePropertiesChoice2::BlipFill(_))
+        ),
+      }
   }
 
   fn fill(&self) -> Option<DrawingMlFillProperties<'_>> {
@@ -21552,8 +22903,12 @@ fn anchor_wrap_polygon_shape(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -21561,7 +22916,10 @@ fn anchor_wrap_polygon_shape(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -21580,6 +22938,46 @@ fn anchor_wrap_polygon_shape(
     text_box_clip_vertical_overflow: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
+}
+
+fn rotate_picture_wrap_polygon(shape: &mut InlineShape, rotation_deg: f32, anchor: &wp::Anchor) {
+  let InlineShapeGeometry::Polyline { points, .. } = &mut shape.geometry else {
+    return;
+  };
+  // Picture contours share the picture's content origin and local rotation.
+  // Explicit offsets fix that origin directly. Alignment instead positions
+  // the outer effect frame, so the content starts inside its leading edges.
+  // Word also retains this frame for a forced in-cell line anchor. Native
+  // alignment/offset controls distinguish these from ordinary body offsets.
+  // Keep other drawing hosts on their independent origin contracts.
+  let uses_effect_frame = matches!(shape.placement, ImagePlacement::Floating(placement)
+    if placement.horizontal_alignment.is_some()
+      || placement.vertical_alignment.is_some()
+      || placement.layout_in_cell_forced);
+  (shape.offset_x_pt, shape.offset_y_pt) = if uses_effect_frame {
+    (
+      effect_extent_left(anchor.effect_extent.as_ref()),
+      effect_extent_top(anchor.effect_extent.as_ref()),
+    )
+  } else {
+    (0.0, 0.0)
+  };
+  let rotation_deg = rotation_deg.rem_euclid(360.0);
+  if rotation_deg <= f32::EPSILON {
+    return;
+  }
+  let center = (
+    f64::from(shape.width_pt) * 0.5,
+    f64::from(shape.height_pt) * 0.5,
+  );
+  let transform = Affine::translate((-center.0, -center.1))
+    .then_rotate(f64::from(rotation_deg).to_radians())
+    .then_translate(center.into());
+  for (x, y) in points {
+    let point = transform * kurbo::Point::new(f64::from(*x), f64::from(*y));
+    *x = point.x as f32;
+    *y = point.y as f32;
+  }
 }
 
 fn anchor_wrap_polygon_geometry(
@@ -21846,6 +23244,7 @@ fn drawingml_path_geometry_from_properties(
     }
     return Some(InlineShapeGeometry::Path {
       paths: common::drawingml_custom_geometry::paths(geometry, 0.0, 0.0, width_pt, height_pt)?,
+      preset: None,
       outline: properties
         .outline()
         .map(|outline| Box::new(outline.clone())),
@@ -21911,6 +23310,7 @@ fn drawingml_path_geometry_from_properties(
   })?;
   Some(InlineShapeGeometry::Path {
     paths,
+    preset: Some(preset.preset),
     outline: properties
       .outline()
       .map(|outline| Box::new(outline.clone())),
@@ -22063,8 +23463,12 @@ fn drawingml_picture_frame(
     placement,
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -22072,7 +23476,10 @@ fn drawingml_picture_frame(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -22142,6 +23549,8 @@ fn drawingml_picture_image(
     .and_then(|relationship_id| hyperlinks.target(relationship_id))
     .map(ToString::to_string);
   Some(InlineImage {
+    contour_owned_wrap: None,
+    source_run_font_size_pt: None,
     data: image_data.data,
     content_type: image_data.content_type,
     blip_compression_state: properties.blip_compression_state,
@@ -22172,6 +23581,7 @@ fn drawingml_picture_image(
     line_box: InlineImageLineBox::CharacterLike,
     office_math_line_layout: None,
     office_math_display_layout: None,
+    office_math_metrics: None,
     crop,
     rotation_deg: shape_properties.camera_adjusted_rotation_deg(mapped.rotation_deg),
     flip_horizontal: mapped.flip_horizontal,
@@ -22242,26 +23652,56 @@ fn drawingml_blip_shape_image_fill_with_theme(
   let relationship_id = image_properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &image_properties.effects);
+  let mode = drawingml_image_fill_mode(blip_fill);
+  // Word clips the source bitmap before mapping it into the independent
+  // stretch destination. Reuse picture import's pixel-interval rounding;
+  // empty srcRect and destination-only outsets retain the original bytes.
+  let source_crop = image_properties.crop;
+  let materialize_crop = matches!(mode, InlineShapeImageFillMode::DrawingMlStretch { .. })
+    && [
+      source_crop.left,
+      source_crop.top,
+      source_crop.right,
+      source_crop.bottom,
+    ]
+    .into_iter()
+    .any(|edge| edge > 0.0);
+  let (image_data, crop) =
+    materialize_source_rectangle_crop(image_data, source_crop, materialize_crop);
+  // Word's omitted rotWithShape stretch control has the same PDF image
+  // matrix and clip as explicit true. Keep tiled-fill import independent.
+  let rotate_with_shape = blip_fill.rotate_with_shape.as_ref().map_or(
+    matches!(mode, InlineShapeImageFillMode::DrawingMlStretch { .. }),
+    |value| value.as_bool(),
+  );
 
   Some(InlineShapeImageFill {
     data: image_data.data,
     content_type: image_data.content_type,
     blip_compression_state: image_properties.blip_compression_state,
-    crop: image_properties.crop,
+    crop,
     rotation_deg: image_properties.rotation_deg,
     flip_horizontal: image_properties.flip_horizontal,
     flip_vertical: image_properties.flip_vertical,
-    rotate_with_shape: blip_fill
-      .rotate_with_shape
-      .as_ref()
-      .is_some_and(|value| value.as_bool()),
-    mode: drawingml_image_fill_mode(blip_fill),
+    rotate_with_shape,
+    mode,
   })
 }
 
 fn drawingml_image_fill_mode(fill: &a::BlipFill) -> InlineShapeImageFillMode {
   match fill.blip_fill_choice.as_ref() {
-    Some(a::BlipFillChoice::Stretch(_)) => InlineShapeImageFillMode::Stretch,
+    Some(a::BlipFillChoice::Stretch(stretch)) => {
+      let rectangle = stretch.fill_rectangle.as_ref();
+      let edge = |value: Option<&DrawingmlPercentageValue>| {
+        value.and_then(drawingml_percent_to_ratio).unwrap_or(0.0)
+      };
+      InlineShapeImageFillMode::DrawingMlStretch {
+        left: edge(rectangle.and_then(|rect| rect.left.as_ref())),
+        top: edge(rectangle.and_then(|rect| rect.top.as_ref())),
+        right: edge(rectangle.and_then(|rect| rect.right.as_ref())),
+        bottom: edge(rectangle.and_then(|rect| rect.bottom.as_ref())),
+      }
+    }
     Some(a::BlipFillChoice::Tile(tile)) => InlineShapeImageFillMode::DrawingMlTile(tile.clone()),
     // Office treats an omitted bitmap mode on a shape fill as tiled.
     None => InlineShapeImageFillMode::DrawingMlTile(Box::default()),
@@ -22850,7 +24290,7 @@ fn drawingml_child_placement(
   }
 }
 
-fn wordprocessing_shape_fill_color(
+fn wordprocessing_shape_automatic_text_color(
   shape: &wps::WordprocessingShape,
   theme_colors: &ThemeColors,
 ) -> Option<RgbColor> {
@@ -22861,7 +24301,84 @@ fn wordprocessing_shape_fill_color(
       .cloned()
       .unwrap_or_default(),
   );
-  drawingml_shape_properties_fill_color(&properties, theme_colors)
+  let luma = match properties.fill()? {
+    DrawingMlFillProperties::Solid(fill) => resolve_drawingml_solid_fill(fill, theme_colors)
+      .filter(|color| color.opacity >= 1.0 - f32::EPSILON)
+      .map(|color| wordprocessing_shape_background_luma(color.color)),
+    DrawingMlFillProperties::Gradient(fill) => {
+      wordprocessing_linear_gradient_background_luma(fill, theme_colors)
+    }
+    DrawingMlFillProperties::NoFill | DrawingMlFillProperties::Pattern(_) => None,
+  };
+  luma
+    .map(wordprocessing_shape_text_color_for_luma)
+    .or_else(|| {
+      // Preserve the separate policy for translucent and non-linear brushes.
+      drawingml_shape_properties_fill_color(&properties, theme_colors)
+        .map(automatic_text_color_for_background)
+    })
+}
+
+fn wordprocessing_shape_background_luma(color: RgbColor) -> f64 {
+  f64::from(299 * u32::from(color.r) + 587 * u32::from(color.g) + 114 * u32::from(color.b))
+}
+
+fn wordprocessing_shape_text_color_for_luma(luma: f64) -> RgbColor {
+  // Word WPS controls use encoded RGB luma, not WCAG's linear-light contrast.
+  // The neutral transition is 60/256 on the normalized [0,1] range. Native
+  // gray59/60 and the separating RGB pairs at luma59.765/59.766 pin both the
+  // channel weighting and this normalization independently of a text anchor.
+  if luma * 256.0 < 60.0 * 255.0 * 1000.0 {
+    RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    }
+  } else {
+    RgbColor { r: 0, g: 0, b: 0 }
+  }
+}
+
+fn wordprocessing_linear_gradient_background_luma(
+  fill: &a::GradientFill,
+  theme_colors: &ThemeColors,
+) -> Option<f64> {
+  if !matches!(
+    fill.gradient_fill_choice.as_ref(),
+    Some(a::GradientFillChoice::LinearGradientFill(_))
+  ) {
+    return None;
+  }
+  let mut stops = fill
+    .gradient_stop_list
+    .as_ref()?
+    .gradient_stop
+    .iter()
+    .map(|stop| {
+      let color = resolved_docx_drawing_color(
+        Color::from_gradient_stop_choice(stop.gradient_stop_choice.as_ref()?)?,
+        theme_colors,
+      )?;
+      (color.opacity >= 1.0 - f32::EPSILON).then_some((
+        stop.position.as_ratio(),
+        wordprocessing_shape_background_luma(color.color),
+      ))
+    })
+    .collect::<Option<Vec<_>>>()?;
+  stops.sort_by(|left, right| left.0.total_cmp(&right.0));
+  let &(first_position, first_luma) = stops.first()?;
+  let &(last_position, last_luma) = stops.last()?;
+  // Integrate each linear interval, including constant extension to the
+  // brush endpoints. Native narrow center/edge controls distinguish this
+  // from the first stop, unweighted stop means and midpoint sampling.
+  Some(
+    first_position * first_luma
+      + stops
+        .windows(2)
+        .map(|pair| (pair[1].0 - pair[0].0) * (pair[0].1 + pair[1].1) * 0.5)
+        .sum::<f64>()
+      + (1.0 - last_position) * last_luma,
+  )
 }
 
 fn drawingml_shape_properties_fill_color(
@@ -22903,7 +24420,28 @@ fn drawingml_actual_line_stroke(
   theme_colors: &ThemeColors,
   preset: Option<a::ShapeTypeValues>,
 ) -> Option<common::Stroke<'static>> {
-  let actual = drawingml_actual_line_outline(direct, reference, theme_lines)?;
+  drawingml_actual_line_stroke_with_default_width(
+    direct,
+    reference,
+    theme_lines,
+    theme_colors,
+    preset,
+    DRAWINGML_DEFAULT_LINE_WIDTH_EMU as i32,
+  )
+}
+
+fn drawingml_actual_line_stroke_with_default_width(
+  direct: Option<&a::Outline>,
+  reference: Option<&a::LineReference>,
+  theme_lines: &ThemeLineStyles,
+  theme_colors: &ThemeColors,
+  preset: Option<a::ShapeTypeValues>,
+  default_width_emu: i32,
+) -> Option<common::Stroke<'static>> {
+  let mut actual = drawingml_actual_line_outline(direct, reference, theme_lines)?;
+  // Resolve direct/theme inheritance first. In SmartArt an omitted width
+  // uses the 0.75pt Office default; an explicit zero remains a device pen.
+  actual.width.get_or_insert(default_width_emu);
   let placeholder_color = reference
     .and_then(|reference| reference.line_reference_choice.as_ref())
     .and_then(Color::from_line_reference_choice);
@@ -23166,8 +24704,18 @@ fn vml_picture_choice_shape_types(choice: &w::PictureChoice) -> Vec<&v::Shapetyp
   }
 }
 
+fn vml_embedded_object_choice_shape_types(choice: &w::EmbeddedObjectChoice) -> Vec<&v::Shapetype> {
+  match choice {
+    w::EmbeddedObjectChoice::Shapetype(shape_type) => vec![shape_type],
+    w::EmbeddedObjectChoice::Group(group) => vml_group_shape_types(group),
+    w::EmbeddedObjectChoice::Shape(shape) => vml_shape_textbox_shape_types(shape),
+    _ => Vec::new(),
+  }
+}
+
 fn vml_paragraph_shape_types(paragraph: &w::Paragraph) -> Vec<&v::Shapetype> {
-  paragraph
+  let mut shape_types = Vec::new();
+  for choice in paragraph
     .paragraph_choice
     .iter()
     .filter_map(|choice| match choice {
@@ -23175,13 +24723,24 @@ fn vml_paragraph_shape_types(paragraph: &w::Paragraph) -> Vec<&v::Shapetype> {
       _ => None,
     })
     .flat_map(|run| &run.run_choice)
-    .filter_map(|choice| match choice {
-      w::RunChoice::Picture(picture) => Some(picture.as_ref()),
-      _ => None,
-    })
-    .flat_map(|picture| &picture.picture_choice)
-    .flat_map(vml_picture_choice_shape_types)
-    .collect()
+  {
+    match choice {
+      w::RunChoice::Picture(picture) => shape_types.extend(
+        picture
+          .picture_choice
+          .iter()
+          .flat_map(vml_picture_choice_shape_types),
+      ),
+      w::RunChoice::EmbeddedObject(object) => shape_types.extend(
+        object
+          .embedded_object_choice1
+          .iter()
+          .flat_map(vml_embedded_object_choice_shape_types),
+      ),
+      _ => {}
+    }
+  }
+  shape_types
 }
 
 fn vml_shape_textbox_shape_types(shape: &v::Shape) -> Vec<&v::Shapetype> {
@@ -23218,6 +24777,17 @@ fn vml_document_shape_types(body: &w::Body) -> Vec<v::Shapetype> {
   shape_types
 }
 
+fn retain_vml_paragraph_shape_types(paragraph: &w::Paragraph, images: &mut ImageCatalog) {
+  // Repeating stories have their own image/type catalog. A later picture
+  // can reference an earlier picture's definition, including another run
+  // in the same paragraph. Native shared/duplicated/explicit-fit controls
+  // produce identical paths. Keep definitions local to this story and do
+  // not pre-load declarations from later paragraphs or another header.
+  images
+    .vml_shape_types
+    .extend(vml_paragraph_shape_types(paragraph).into_iter().cloned());
+}
+
 fn vml_picture_shape_types<'a>(
   picture: &'a w::Picture,
   images: &'a ImageCatalog,
@@ -23229,6 +24799,22 @@ fn vml_picture_shape_types<'a>(
       .picture_choice
       .iter()
       .flat_map(vml_picture_choice_shape_types),
+  );
+  shape_types
+}
+
+fn vml_embedded_object_shape_types<'a>(
+  object: &'a w::EmbeddedObject,
+  images: &'a ImageCatalog,
+) -> Vec<&'a v::Shapetype> {
+  let mut shape_types = images.vml_shape_types.iter().collect::<Vec<_>>();
+  // VML type IDs are visible across objects, just as across pictures. Keep
+  // the current object's declarations last so local properties take priority.
+  shape_types.extend(
+    object
+      .embedded_object_choice1
+      .iter()
+      .flat_map(vml_embedded_object_choice_shape_types),
   );
   shape_types
 }
@@ -23577,6 +25163,7 @@ fn vml_special_shape(
   shape.geometry = InlineShapeGeometry::Path {
     paths: crate::xlsx::vml_shape_drawing_paths(&model, shape.width_pt, shape.height_pt)?,
     outline: None,
+    preset: None,
   };
   shape.fill_override = Some(Box::new(fill_override));
   shape.stroke_override = stroke_override.map(Box::new);
@@ -23736,6 +25323,7 @@ fn vml_round_rectangle_shape_with_style(
       shape.height_pt,
     )?,
     outline: None,
+    preset: Some(preset.preset),
   };
   shape.effects = round_rectangle
     .round_rectangle_choice
@@ -23983,10 +25571,15 @@ fn vml_shape_shape_with_style(
     // the containing block maps coordinates and does not clip the envelope
     // (VML specification, shape coordinate system). Native controls scaling
     // coordsize independently from the path distinguish this from resizing
-    // a preset to the nominal host. Ordinary recognized presets retain their
-    // established geometry; neither route paints a separate host outline.
-    inline.geometry = fontwork_coordinate_size
-      .as_ref()
+    // a preset to the nominal host. Legacy inflate-top (spt164) also consumes
+    // its authored open path at standard coordinates: native path/formula
+    // controls change the envelope independently of its preset and adjustment.
+    // Its cubic upper boundary is not DrawingML textInflateTop's quadratic.
+    // Other recognized presets retain their established normalization; neither
+    // route paints a separate host outline.
+    inline.geometry = (fontwork_coordinate_size.is_some()
+      || preset == a::TextShapeValues::TextInflateTop)
+      .then_some(())
       .and_then(|_| vml_fontwork_open_envelope(&inline.geometry))
       .unwrap_or(InlineShapeGeometry::Rectangle);
     inline.text_fill = inline.fill_override.clone();
@@ -24016,6 +25609,15 @@ fn vml_shape_shape_with_style(
     // A direct v:textpath overrides the same property on its referenced
     // v:shapetype. In particular, spt31 supplies fitpath on the shapetype
     // while the shape supplies the string and fitshape.
+    inline.vml_text_fit_shape = text_path
+      .fit_shape
+      .as_ref()
+      .or_else(|| {
+        shape_type
+          .and_then(vml_shapetype_text_path)
+          .and_then(|path| path.fit_shape.as_ref())
+      })
+      .is_some_and(|value| value.as_bool());
     inline.vml_text_fit_path = text_path
       .fit_path
       .as_ref()
@@ -24580,6 +26182,7 @@ fn vml_fontwork_open_envelope(geometry: &InlineShapeGeometry) -> Option<InlineSh
   (!boundaries.is_empty()).then_some(InlineShapeGeometry::Path {
     paths: boundaries,
     outline: None,
+    preset: None,
   })
 }
 
@@ -24651,11 +26254,12 @@ fn vml_fontwork_adjust_value_list(
   if preset != a::TextShapeValues::TextDeflateInflateDeflate {
     return None;
   }
-  let adjustment = shape
-    .adjustment
-    .as_deref()
-    .or_else(|| shape_type.and_then(|shape_type| shape_type.adjustment.as_deref()));
-  let value = vml_adjustment_values(adjustment)?.into_iter().next()??;
+  // Omitted entries inherit by index, just as the authored path formulas do.
+  // A partial list such as ",10800" must retain the shapetype's first guide.
+  let adjustment = vml_shape_adjustments(shape, shape_type);
+  let value = vml_adjustment_values(adjustment.as_deref())?
+    .into_iter()
+    .next()??;
   let height = vml_coordinate_pair(
     shape
       .coordinate_size
@@ -25120,6 +26724,7 @@ pub(crate) fn vml_path_geometry(
   Some(InlineShapeGeometry::Path {
     paths,
     outline: None,
+    preset: None,
   })
 }
 
@@ -25654,8 +27259,12 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     placement: style.placement(),
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -25663,7 +27272,10 @@ fn vml_polyline_shape(polyline: &v::PolyLine, images: &ImageCatalog) -> Option<I
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -25720,7 +27332,7 @@ fn vml_fill_image(
   Some(InlineShapeImageFill {
     data,
     content_type,
-    blip_compression_state: common::BlipCompressionState::Unspecified,
+    blip_compression_state: common::BlipCompressionState::NotApplicable,
     crop: ImageCrop::default(),
     rotation_deg: 0.0,
     flip_horizontal: false,
@@ -25839,9 +27451,10 @@ fn vml_inline_group_frame(group: &v::Group) -> Option<InlineShape> {
   frame.placement = ImagePlacement::Inline;
   frame.allow_outside_page = false;
   frame.vml_group_flow_frame = true;
-  frame.width_pt += VmlGroupTransform::from_group(group)
-    .map(|transform| transform.inline_leading_pt)
-    .unwrap_or(0.0);
+  if let Some(transform) = VmlGroupTransform::from_group(group) {
+    frame.width_pt += transform.inline_leading_pt;
+    frame.height_pt += transform.inline_top_pt;
+  }
   Some(frame)
 }
 
@@ -25916,8 +27529,12 @@ fn vml_shape_frame_with_style(
     placement: style.placement(),
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -25925,7 +27542,10 @@ fn vml_shape_frame_with_style(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -26007,8 +27627,12 @@ fn vml_textbox_frame(
     placement: style.placement(),
     chart: None,
     canvas_children: None,
+    wordprocessing_canvas_host: false,
+    legacy_locked_canvas: false,
+    wordprocessing_text_warp_frame: None,
     text_warp: None,
     vml_group_flow_frame: false,
+    vml_text_fit_shape: false,
     vml_text_fit_path: false,
     vml_text_trim: false,
     text_image_fill: None,
@@ -26016,7 +27640,10 @@ fn vml_textbox_frame(
     effects: None,
     static3d: None,
     wordprocessing_shape_host: false,
+    wordprocessing_diagram_host: false,
+    wordprocessing_shape_effect_pen: None,
     wordprocessing_shape_id: None,
+    text_box_link: None,
     wordprocessing_shape_hyperlink_description: None,
     wordprocessing_shape_outline_text_inset_pt: 0.0,
     wordprocessing_canvas_has_background_paint: false,
@@ -26493,15 +28120,7 @@ fn embedded_object_image(
       w::EmbeddedObjectChoice::OleObject(ole) => Some(ole.as_ref()),
       _ => None,
     });
-  let shape_types = object
-    .embedded_object_choice1
-    .iter()
-    .flat_map(|choice| match choice {
-      w::EmbeddedObjectChoice::Shapetype(shape_type) => vec![shape_type.as_ref()],
-      w::EmbeddedObjectChoice::Group(group) => vml_group_shape_types(group),
-      _ => Vec::new(),
-    })
-    .collect::<Vec<_>>();
+  let shape_types = vml_embedded_object_shape_types(object, images);
   let mut image = object
     .embedded_object_choice1
     .iter()
@@ -26519,7 +28138,7 @@ fn embedded_object_image(
       }
       _ => None,
     })?;
-  image.metafile_background_color = embedded_object_metafile_background_color(object);
+  image.metafile_background_color = embedded_object_metafile_background_color(object, &shape_types);
   image.semantic_metafile_font_family =
     object
       .embedded_object_choice2
@@ -26619,15 +28238,10 @@ fn embedded_legacy_excel_content_preview(native_ole: &o::OleObject) -> bool {
       .is_some_and(|prog_id| prog_id.eq_ignore_ascii_case("Excel.Sheet.8"))
 }
 
-fn embedded_object_metafile_background_color(object: &w::EmbeddedObject) -> Option<[u8; 3]> {
-  let shape_types = object
-    .embedded_object_choice1
-    .iter()
-    .filter_map(|choice| match choice {
-      w::EmbeddedObjectChoice::Shapetype(shape_type) => Some(shape_type.as_ref()),
-      _ => None,
-    })
-    .collect::<Vec<_>>();
+fn embedded_object_metafile_background_color(
+  object: &w::EmbeddedObject,
+  shape_types: &[&v::Shapetype],
+) -> Option<[u8; 3]> {
   let shape = object
     .embedded_object_choice1
     .iter()
@@ -26635,14 +28249,7 @@ fn embedded_object_metafile_background_color(object: &w::EmbeddedObject) -> Opti
       w::EmbeddedObjectChoice::Shape(shape) => Some(shape.as_ref()),
       _ => None,
     })?;
-  let shape_type = shape.r#type.as_deref().and_then(|reference| {
-    let id = reference.strip_prefix('#').unwrap_or(reference);
-    shape_types
-      .iter()
-      .copied()
-      .rev()
-      .find(|shape_type| shape_type.id.as_deref() == Some(id))
-  });
+  let shape_type = vml_shape_type_for_reference(shape, shape_types);
   let model = crate::xlsx::object_resources::vml_shape_model(shape, shape_type);
   match word_vml_shape_common_fill(&model, Affine::IDENTITY) {
     common::Fill::Solid(color) if color.a == u8::MAX => Some([color.r, color.g, color.b]),
@@ -27560,9 +29167,106 @@ fn attach_vml_textbox_owner(
     // painted object, including typed roundrects. Retain its wrap/z-order.
     transfer_textbox_content(owner, &mut frame);
     owner.word_text_frame = true;
+    if let Some(extent) = vml_textbox_relative_frame_outsets(owner) {
+      owner.effect_left_pt = extent.left_pt;
+      owner.effect_top_pt = extent.top_pt;
+      owner.effect_right_pt = extent.right_pt;
+      owner.effect_bottom_pt = extent.bottom_pt;
+    }
   } else {
     inlines.push(InlineItem::Shape(frame));
   }
+}
+
+fn vml_textbox_relative_frame_outsets(shape: &InlineShape) -> Option<DrawingEffectExtent> {
+  let ImagePlacement::Floating(placement) = shape.placement else {
+    return None;
+  };
+  if !placement
+    .relative_width_pct
+    .is_some_and(|percent| percent > 0.0)
+    && !placement
+      .relative_height_pct
+      .is_some_and(|percent| percent > 0.0)
+  {
+    return None;
+  }
+  if shape.rotation_deg != 0.0
+    || shape.flip_horizontal
+    || shape.flip_vertical
+    || shape.effects.is_some()
+    || shape.static3d.is_some()
+    || placement.alignment_extent.is_some()
+    || placement.group_child_offset_x_pt != 0.0
+    || placement.group_child_offset_y_pt != 0.0
+    || placement.horizontal_alignment.is_some()
+    || placement.vertical_alignment.is_some()
+    || placement.horizontal_offset_pct.is_some()
+    || placement.vertical_offset_pct.is_some()
+  {
+    return None;
+  }
+  let rectangular = match &shape.geometry {
+    InlineShapeGeometry::Rectangle => true,
+    InlineShapeGeometry::Path { paths, .. } => {
+      let [path] = paths.as_slice() else {
+        return None;
+      };
+      let [
+        common::PathCommand::MoveTo(a),
+        common::PathCommand::LineTo(b),
+        common::PathCommand::LineTo(c),
+        common::PathCommand::LineTo(d),
+        common::PathCommand::Close,
+      ] = path.commands.as_slice()
+      else {
+        return None;
+      };
+      ((a.y == b.y && b.x == c.x && c.y == d.y && d.x == a.x)
+        || (a.x == b.x && b.y == c.y && c.x == d.x && d.y == a.y))
+        && a.x.0.min(c.x.0) == 0.0
+        && a.y.0.min(c.y.0) == 0.0
+        && a.x.0.max(c.x.0) == shape.width_pt
+        && a.y.0.max(c.y.0) == shape.height_pt
+    }
+    _ => false,
+  };
+  if !rectangular {
+    return None;
+  }
+  let stroke = shape.stroke.map_or(0.0, |stroke| stroke.width_pt);
+  if stroke <= 0.0 && shape.fill_color.is_none() && shape.fill_override.is_none() {
+    return None;
+  }
+  // Word's legacy percentage size belongs to the complete device enclosure,
+  // before AutoSize replaces the text height. Native stroke/phase/percentage,
+  // fixed/growing and wrap controls establish the 96-DPI enclosure. The grid
+  // is in the authored anchor coordinate system: changing page margins moves
+  // the frame without changing its outsets. Unstroked geometry rounds to the
+  // device grid; a pen requires outward bounds including its half width.
+  let axis = |offset: f32, extent: f32| {
+    let start = f64::from(offset);
+    let end = start + f64::from(extent);
+    let grid = f64::from(units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH);
+    let (near, far) = if stroke > 0.0 {
+      let half_pen = f64::from(stroke) / 2.0;
+      (
+        ((start - half_pen) / grid).floor() * grid,
+        ((end + half_pen) / grid).ceil() * grid,
+      )
+    } else {
+      ((start / grid).round() * grid, (end / grid).round() * grid)
+    };
+    ((start - near).max(0.0) as f32, (far - end).max(0.0) as f32)
+  };
+  let (left_pt, right_pt) = axis(placement.horizontal_offset_pt, shape.width_pt);
+  let (top_pt, bottom_pt) = axis(placement.vertical_offset_pt, shape.height_pt);
+  Some(DrawingEffectExtent {
+    left_pt,
+    top_pt,
+    right_pt,
+    bottom_pt,
+  })
 }
 
 fn vml_style_is_hidden(style: Option<&str>) -> bool {
@@ -27850,27 +29554,31 @@ fn vml_image_data(
   }
   let image_data = image_data_with_effects(resource, &effects);
 
-  let (width_pt, height_pt) = if matches!(style.placement(), ImagePlacement::Inline)
+  let bitmap_size = if matches!(style.placement(), ImagePlacement::Inline)
     && style.rotation_deg == 0.0
     && !style.flip_horizontal
     && !style.flip_vertical
     && effects.is_empty()
     && vml_image_crop(data) == ImageCrop::default()
   {
-    vml_picture::inline_png_size(&resource.data, width_pt, height_pt)
-      .unwrap_or((width_pt, height_pt))
+    vml_picture::inline_bitmap_size(&resource.data, width_pt, height_pt)
   } else {
-    (width_pt, height_pt)
+    None
   };
+  let (width_pt, height_pt) = bitmap_size
+    .as_ref()
+    .map_or((width_pt, height_pt), |size| size.layout_pt);
 
   Some(InlineImage {
+    contour_owned_wrap: None,
+    source_run_font_size_pt: None,
     data: image_data.data,
     content_type: image_data.content_type,
-    blip_compression_state: common::BlipCompressionState::Unspecified,
+    blip_compression_state: common::BlipCompressionState::NotApplicable,
     picture_frame: None,
     run_border: None,
     picture_frame_clips_image: false,
-    picture_paint_size_pt: None,
+    picture_paint_size_pt: bitmap_size.and_then(|size| size.paint_pt),
     effects: None,
     static3d: None,
     width_pt,
@@ -27885,6 +29593,7 @@ fn vml_image_data(
     line_box: InlineImageLineBox::CharacterLike,
     office_math_line_layout: None,
     office_math_display_layout: None,
+    office_math_metrics: None,
     crop: vml_image_crop(data),
     rotation_deg: style.rotation_deg,
     flip_horizontal: style.flip_horizontal,
@@ -28001,6 +29710,7 @@ struct VmlImageStyle {
 struct VmlGroupTransform {
   affine: Affine,
   inline_leading_pt: f32,
+  inline_top_pt: f32,
   ignore_aligned_parent_offsets: bool,
   mapped_size_pt: Option<(f32, f32)>,
   coordinate_box: Option<(f32, f32, f32, f32)>,
@@ -28015,6 +29725,7 @@ impl VmlGroupTransform {
       affine: Affine::translate((-f64::from(origin_x), -f64::from(origin_y)))
         .then_scale_non_uniform(f64::from(scale_x), f64::from(scale_y)),
       inline_leading_pt: 0.0,
+      inline_top_pt: 0.0,
       ignore_aligned_parent_offsets: false,
       mapped_size_pt: None,
       coordinate_box: None,
@@ -28029,11 +29740,12 @@ impl VmlGroupTransform {
       Self::from_group_with_style_and_anchor(group, group.style.as_deref(), true)?;
     if !vml_group_has_explicit_floating_position(group.style.as_deref()) {
       let shape_types = vml_group_shape_types(group);
-      transform.inline_leading_pt = group
-        .group_choice
-        .iter()
-        .filter_map(|choice| vml_group_stroked_child_leading_pt(choice, transform, &shape_types))
-        .fold(0.0, f32::max);
+      for choice in &group.group_choice {
+        if let Some((left, top)) = vml_group_child_leading_pt(choice, transform, &shape_types) {
+          transform.inline_leading_pt = transform.inline_leading_pt.max(left);
+          transform.inline_top_pt = transform.inline_top_pt.max(top);
+        }
+      }
     }
     Some(transform)
   }
@@ -28344,6 +30056,11 @@ impl VmlGroupTransform {
               child_anchor_height,
             )
           }
+          + if inline_group {
+            self.inline_top_pt
+          } else {
+            0.0
+          }
       ),
     ];
     let horizontal_reference = if inline_group {
@@ -28566,13 +30283,22 @@ fn vml_vertical_alignment_style(alignment: VerticalImageAlignment) -> &'static s
   }
 }
 
-fn vml_group_stroked_child_leading_pt(
+fn vml_group_child_leading_pt(
   choice: &v::GroupChoice,
   transform: VmlGroupTransform,
   shape_types: &[&v::Shapetype],
-) -> Option<f32> {
+) -> Option<(f32, f32)> {
   if let v::GroupChoice::Shape(shape) = choice {
     return vml_group_custom_shape_leading_pt(shape, transform, shape_types);
+  }
+  if let v::GroupChoice::Rectangle(rectangle) = choice {
+    let style = transform.child_style(rectangle.style.as_deref())?;
+    let inline = vml_rectangle_shape_with_style(rectangle, Some(&style), &ImageCatalog::default())?;
+    if let Some(leading) =
+      vml_rectangular_group_child_leading_pt(&inline, vml_image_style(Some(&style)))
+    {
+      return Some(leading);
+    }
   }
   let (model, style) = match choice {
     v::GroupChoice::Arc(shape) => (
@@ -28620,22 +30346,22 @@ fn vml_group_stroked_child_leading_pt(
   })?;
   let style = transform.child_style(Some(style))?;
   let leading_x = vml_image_style(Some(&style)).horizontal_offset_pt;
-  (leading_x <= f32::EPSILON).then_some((-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
+  (leading_x <= f32::EPSILON).then_some((
+    (-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT,
+    0.0,
+  ))
 }
 
 fn vml_group_custom_shape_leading_pt(
   shape: &v::Shape,
   transform: VmlGroupTransform,
   shape_types: &[&v::Shapetype],
-) -> Option<f32> {
+) -> Option<(f32, f32)> {
   let authored_style = shape.style.as_deref()?;
   let transformed_style = transform.child_style(Some(authored_style))?;
   let child = vml_image_style(Some(&transformed_style));
   let shape_type = vml_shape_type_for_reference(shape, shape_types);
   let model = crate::xlsx::object_resources::vml_shape_model(shape, shape_type);
-  if !model.stroked {
-    return None;
-  }
 
   // SdrObjGroup::GetSnapRect() is the union of its children's snap
   // rectangles. In particular an SdrEdgeObj uses its resolved connector path,
@@ -28650,6 +30376,14 @@ fn vml_group_custom_shape_leading_pt(
     &ImageCatalog::default(),
     shape_types,
   );
+  if let Some(inline) = inline.as_ref()
+    && let Some(leading) = vml_rectangular_group_child_leading_pt(inline, child)
+  {
+    return Some(leading);
+  }
+  if !model.stroked {
+    return None;
+  }
   let path_min_x = inline
     .as_ref()
     .and_then(|inline| vml_inline_shape_stroked_path_min_x(inline, child));
@@ -28659,7 +30393,43 @@ fn vml_group_custom_shape_leading_pt(
     (None, Some(true)) => child.horizontal_offset_pt,
     (None, _) => return None,
   };
-  (leading_x <= f32::EPSILON).then_some((-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
+  (leading_x <= f32::EPSILON).then_some((
+    (-leading_x).max(0.0) + LO_VML_INLINE_GROUP_EDGE_BOUND_PT,
+    0.0,
+  ))
+}
+
+// Word's inline drawing frame uses screen-device bounds independently of the
+// authored child coordinates. Native rectangle controls enclose the stroked
+// near edge on the 96-DPI grid, with a minimum one-pixel pen for bounds only.
+// Unstroked rectangles instead round their near edge to that grid. Crossed
+// position/pen controls distinguish this from rounding each operand separately.
+// LO's SwAsCharAnchoredObjectPosition likewise separates snap and ink bounds,
+// but its device conversion is not the Word rule. Keep custom paths, rotations
+// and effects on their existing geometry owners.
+fn vml_rectangular_group_child_leading_pt(
+  shape: &InlineShape,
+  style: VmlImageStyle,
+) -> Option<(f32, f32)> {
+  if !matches!(shape.geometry, InlineShapeGeometry::Rectangle)
+    || shape.rotation_deg != 0.0
+    || shape.effects.is_some()
+  {
+    return None;
+  }
+  const DEVICE_STEP_PT: f32 = 72.0 / 96.0;
+  let leading = |offset: f32| {
+    let pixels = if let Some(stroke) = shape.stroke {
+      ((stroke.width_pt.max(DEVICE_STEP_PT) / 2.0 - offset) / DEVICE_STEP_PT).ceil()
+    } else {
+      (-offset / DEVICE_STEP_PT).round()
+    };
+    pixels.max(0.0) * DEVICE_STEP_PT
+  };
+  Some((
+    leading(style.horizontal_offset_pt),
+    leading(style.vertical_offset_pt),
+  ))
 }
 
 fn vml_inline_shape_stroked_path_min_x(shape: &InlineShape, style: VmlImageStyle) -> Option<f32> {
@@ -28968,7 +30738,6 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
       }
       "mso-position-horizontal-relative" => {
         output.horizontal_relative_to = vml_horizontal_reference(value);
-        output.absolute_position = true;
       }
       "mso-position-horizontal" => {
         output.horizontal_alignment = vml_horizontal_alignment(value);
@@ -28976,7 +30745,6 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
       }
       "mso-position-vertical-relative" => {
         output.vertical_relative_to = vml_vertical_reference(value);
-        output.absolute_position = true;
       }
       "mso-position-vertical" => {
         output.vertical_alignment = vml_vertical_alignment(value);
@@ -29004,6 +30772,9 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
     }
   }
 
+  // VML's default position is static (Word inline). The mso-position-*
+  // reference declarations select coordinates; they do not make an object
+  // floating. Word retains bnc780044_spacing's char/line picture in flow.
   // LibreOffice's VML importer initializes the object surround mode to
   // WrapTextMode_THROUGH and changes it only when a wrap type is authored
   // (oox/source/vml/vmlshape.cxx::lcl_setSurround). Word commonly omits the
@@ -29500,16 +31271,6 @@ fn drawing_blip_fill_image_properties(
   {
     properties.crop = crop;
     properties.source_rectangle_crop = true;
-  } else if let Some(crop) = blip_fill
-    .blip_fill_choice
-    .as_ref()
-    .and_then(|choice| match choice {
-      a::BlipFillChoice::Stretch(stretch) => stretch.fill_rectangle.as_ref(),
-      a::BlipFillChoice::Tile(_) => None,
-    })
-    .map(image_crop_from_fill_rectangle)
-  {
-    properties.crop = crop;
   }
 
   if let Some(blip) = blip_fill.blip.as_ref() {
@@ -29731,6 +31492,7 @@ struct StylesCatalog {
   automatic_escapement_fonts: automatic_escapement::Fonts,
   html_division_vertical_margins: HashMap<i64, (f32, f32)>,
   import_settings: ImportSettings,
+  legacy_chart_defaults: bool,
   display_math_alignment: Option<OfficeMathDisplayAlignment>,
   math_font_family: Option<Arc<str>>,
   math_break_binary: Option<ooxmlsdk::schemas::m::BreakBinaryOperatorValues>,
@@ -29758,10 +31520,19 @@ struct StylesCatalog {
   theme_lines: ThemeLineStyles,
   theme_effects: ThemeEffectStyles,
   font_substitutions: HashMap<String, FontSubstitution>,
-  custom_properties: HashMap<String, String>,
+  // Membership is distinct from mapper metadata: a bare w:font still names
+  // a declared face. None preserves the absence of a usable font-table part.
+  font_table_names: Option<HashSet<String>>,
+  // None retains the presence of a property whose value kind is not rendered.
+  custom_properties: HashMap<String, Option<String>>,
   source_file_name: Option<String>,
+  source_file_path: Option<String>,
+  title: String,
   author: Option<String>,
   last_saved_by: Option<String>,
+  revision_number: Option<usize>,
+  cached_character_count: Option<usize>,
+  has_glossary_document: bool,
   document_variables: HashMap<String, String>,
   has_bibliography: bool,
   has_explicitly_empty_bibliography: bool,
@@ -30138,6 +31909,7 @@ struct TableImportContext<'a> {
   table_style: &'a TableStyleModel,
   table_look: TableLookModel,
   row_count: usize,
+  first_row_header_count: usize,
   nested_table_level: usize,
   in_header_footer: bool,
 }
@@ -30148,7 +31920,9 @@ struct TableModelContext {
   in_header_footer: bool,
 }
 
-fn load_custom_document_properties(package: &WordprocessingDocument) -> HashMap<String, String> {
+fn load_custom_document_properties(
+  package: &WordprocessingDocument,
+) -> HashMap<String, Option<String>> {
   let Some(part) = package.custom_file_properties_part() else {
     return HashMap::new();
   };
@@ -30160,19 +31934,21 @@ fn load_custom_document_properties(package: &WordprocessingDocument) -> HashMap<
     .iter()
     .filter_map(|property| {
       let name = property.name.as_ref()?.clone();
-      let value = match property.custom_document_property_choice.as_ref()? {
-        op::CustomDocumentPropertyChoice::Vtlpstr(value)
-        | op::CustomDocumentPropertyChoice::Vtlpwstr(value)
-        | op::CustomDocumentPropertyChoice::VtbString(value)
-        | op::CustomDocumentPropertyChoice::VtDate(value)
-        | op::CustomDocumentPropertyChoice::VtFileTime(value) => value.clone(),
-        _ => return None,
+      let value = match property.custom_document_property_choice.as_ref() {
+        Some(
+          op::CustomDocumentPropertyChoice::Vtlpstr(value)
+          | op::CustomDocumentPropertyChoice::Vtlpwstr(value)
+          | op::CustomDocumentPropertyChoice::VtbString(value)
+          | op::CustomDocumentPropertyChoice::VtDate(value)
+          | op::CustomDocumentPropertyChoice::VtFileTime(value),
+        ) => Some(value),
+        _ => None,
       };
       // Word's custom-property exporter can retain NUL terminators as the
       // `_x0000_` escape. Writer's tdf147861_customField control documents
       // that these terminators are not part of the displayed DOCPROPERTY
       // value; strip only a trailing run and preserve authored interior text.
-      let value = value.trim_end_matches("_x0000_").to_string();
+      let value = value.map(|value| value.trim_end_matches("_x0000_").to_string());
       Some((name, value))
     })
     .collect()
@@ -30310,15 +32086,24 @@ impl StylesCatalog {
   ) -> Result<Self> {
     let theme = ThemeData::load(package, main, locales.default_document_resource_locale());
     let font_substitutions = load_font_substitutions(package, main);
+    let font_table_names = main
+      .font_table_part(package)
+      .and_then(|part| part.root_element(package).ok())
+      .map(declared_word_font_names);
     let html_division_vertical_margins = main
       .web_settings_part(package)
       .and_then(|part| part.root_element(package).ok())
       .map(html_division_vertical_margins)
       .unwrap_or_default();
     let custom_properties = load_custom_document_properties(package);
+    let legacy_chart_defaults = settings::legacy_chart_defaults(package);
     let core_properties = package
       .core_file_properties_part()
       .and_then(|part| part.root_element(package).ok());
+    let title = core_properties
+      .and_then(|properties| properties.title.as_ref())
+      .cloned()
+      .unwrap_or_default();
     let author = core_properties
       .and_then(|properties| properties.creator.as_ref())
       // Creator is an XML element, unlike the scalar LastModifiedBy alias.
@@ -30328,6 +32113,11 @@ impl StylesCatalog {
     let last_saved_by = core_properties
       .and_then(|properties| properties.last_modified_by.as_ref())
       .map(ToString::to_string);
+    let revision_number = core_properties
+      .and_then(|properties| properties.revision.as_ref())
+      .and_then(|revision| revision.trim().parse::<usize>().ok())
+      .filter(|revision| *revision <= i32::MAX as usize);
+    let has_glossary_document = main.glossary_document_part(package).is_some();
     let has_bibliography = has_word_bibliography_custom_xml(package, main);
     let has_explicitly_empty_bibliography = has_explicitly_empty_word_bibliography(package, main);
     let has_index_entries = main
@@ -30361,6 +32151,7 @@ impl StylesCatalog {
     let Some(styles_part) = main.style_definitions_part(package) else {
       let mut catalog = Self {
         import_settings,
+        legacy_chart_defaults,
         locales: locales.clone(),
         simplified_chinese_ui: locales.resource_locale().is_simplified_chinese(),
         doc_default_run: word_doc_default_run_seed(false, locales),
@@ -30371,9 +32162,13 @@ impl StylesCatalog {
         theme_effects: theme.effects,
         html_division_vertical_margins,
         font_substitutions,
+        font_table_names,
         custom_properties,
+        title,
         author,
         last_saved_by,
+        revision_number,
+        has_glossary_document,
         document_variables,
         has_bibliography,
         has_explicitly_empty_bibliography,
@@ -30395,6 +32190,8 @@ impl StylesCatalog {
         .wordprocessingml_legacy_escapement_rounding = import_settings.word97_escapement_rounding;
       catalog.doc_default_run.wordprocessingml_cjk_line_metrics =
         import_settings.wordprocessingml_cjk_line_metrics;
+      catalog.doc_default_run.wordprocessingml_no_leading =
+        import_settings.wordprocessingml_no_leading;
       catalog.doc_default_run.cjk_punctuation_compression_ratio = if cjk_punctuation_compression {
         1.0
       } else {
@@ -30410,6 +32207,12 @@ impl StylesCatalog {
           locales.default_document_resource_locale(),
         ));
       }
+      resolve_word_balance_reference_font(
+        &catalog.theme_fonts,
+        catalog.locales.default_document_language(),
+        catalog.font_table_names.as_ref(),
+        &mut catalog.doc_default_run,
+      );
       return Ok(catalog);
     };
     let styles = styles_part.root_element(package)?;
@@ -30429,6 +32232,7 @@ impl StylesCatalog {
       .is_some();
     let mut catalog = Self {
       import_settings,
+      legacy_chart_defaults,
       locales: locales.clone(),
       simplified_chinese_ui: locales.resource_locale().is_simplified_chinese(),
       has_styles_part: true,
@@ -30441,9 +32245,13 @@ impl StylesCatalog {
       theme_effects: theme.effects,
       html_division_vertical_margins,
       font_substitutions,
+      font_table_names,
       custom_properties,
+      title,
       author,
       last_saved_by,
+      revision_number,
+      has_glossary_document,
       document_variables,
       has_bibliography,
       has_explicitly_empty_bibliography,
@@ -30473,6 +32281,8 @@ impl StylesCatalog {
       .wordprocessingml_legacy_escapement_rounding = import_settings.word97_escapement_rounding;
     catalog.doc_default_run.wordprocessingml_cjk_line_metrics =
       import_settings.wordprocessingml_cjk_line_metrics;
+    catalog.doc_default_run.wordprocessingml_no_leading =
+      import_settings.wordprocessingml_no_leading;
     catalog.doc_default_run.cjk_punctuation_compression_ratio = if cjk_punctuation_compression {
       1.0
     } else {
@@ -30510,11 +32320,19 @@ impl StylesCatalog {
       );
     }
 
+    resolve_word_balance_reference_font(
+      &catalog.theme_fonts,
+      catalog.locales.default_document_language(),
+      catalog.font_table_names.as_ref(),
+      &mut catalog.doc_default_run,
+    );
+
     let explicit_style_ids = styles
       .style
       .iter()
       .filter_map(|style| style.style_id.as_deref())
       .collect::<HashSet<_>>();
+    let mut implicit_normal_style_id = None;
     for style in &styles.style {
       let Some((style_id, recovered_style_id)) = imported_style_definition_id(style) else {
         continue;
@@ -30527,6 +32345,22 @@ impl StylesCatalog {
         continue;
       }
       let style_type = imported_style_definition_type(style);
+      if implicit_normal_style_id.is_none()
+        && catalog.default_paragraph_style_id.is_none()
+        && matches!(style_type, w::StyleValues::Paragraph)
+        && !style.default.is_some_and(|value| value.as_bool())
+        && !style.custom_style.is_some_and(|value| value.as_bool())
+        && style
+          .style_name
+          .as_ref()
+          .is_some_and(|name| name.val.eq_ignore_ascii_case("Normal"))
+      {
+        // Word recognizes its built-in Normal by primary name, independently
+        // of the producer's styleId. Native absent/default=0/custom/name/ID
+        // controls distinguish this from an arbitrary nondefault style.
+        // Defer selection so any explicit default retains precedence.
+        implicit_normal_style_id = Some(style_id.to_string());
+      }
       if matches!(style_type, w::StyleValues::Paragraph)
         && style.default.is_some_and(|value| value.as_bool())
       {
@@ -30599,6 +32433,10 @@ impl StylesCatalog {
       } else {
         catalog.styles.insert(style_id.to_string(), entry);
       }
+    }
+
+    if catalog.default_paragraph_style_id.is_none() {
+      catalog.default_paragraph_style_id = implicit_normal_style_id;
     }
 
     if catalog.doc_default_run.font_family.is_none() {
@@ -30788,6 +32626,89 @@ impl StylesCatalog {
     style
   }
 
+  fn missing_style_ref_resource_style(&self, mut style: TextStyle) -> TextStyle {
+    let language = self
+      .locales
+      .ui_language()
+      .and_then(crate::localization::canonical_locale);
+    let simplified_chinese = OfficeStringCatalog::for_ui_language(self.locales.ui_language())
+      .resource_locale()
+      == OfficeResourceLocale::SimplifiedChinese;
+    if !simplified_chinese
+      && !language.is_some_and(|locale| matches!(locale.id.language.as_str(), "en" | "fr"))
+    {
+      return style;
+    }
+    // Native cache-font/size and Normal-font controls: en/fr undefined-style
+    // diagnostics use an 8pt bold resource run. The Latin family follows an
+    // available Normal face, otherwise the application's Calibri fallback;
+    // MERGEFORMAT does not preserve the old result's font for this error.
+    let normal = self.run_style_with_base(
+      None,
+      self.doc_default_run.clone(),
+      RunStyleOverrides::default(),
+    );
+    let family = if self
+      .automatic_escapement_fonts
+      .has_exact_ascii_face(&normal)
+    {
+      normal
+        .font_family
+        .clone()
+        .unwrap_or_else(|| Arc::from("Calibri"))
+    } else {
+      Arc::from("Calibri")
+    };
+    style.font_family = Some(family.clone());
+    style.high_ansi_font_family = Some(family);
+    style.fallback_font_family = None;
+    style.high_ansi_fallback_font_family = None;
+    style.font_family_class = None;
+    style.high_ansi_font_family_class = None;
+    style.font_charset = None;
+    style.high_ansi_font_charset = None;
+    style.font_pitch = None;
+    style.high_ansi_font_pitch = None;
+    if simplified_chinese {
+      // Word's missing-style resource uses Normal's faces, independently of
+      // the cached result and MERGEFORMAT. Native Normal/cache/theme controls
+      // distinguish an available Chinese face from Normal's Latin-only EA
+      // slot: the latter uses the document's minor theme for the resource's
+      // UI script. Bind the complete EA run, including curly punctuation,
+      // instead of allowing each missing Han glyph to fall back separately.
+      let family = normal
+        .east_asia_font_family
+        .as_ref()
+        .filter(|_| {
+          self
+            .automatic_escapement_fonts
+            .has_exact_east_asia_face_for_char(&normal, '错')
+        })
+        .cloned()
+        .or_else(|| {
+          self.theme_fonts.supplemental(
+            &self.theme_fonts.minor_supplemental,
+            self.locales.ui_language(),
+          )
+        })
+        .or_else(|| self.theme_fonts.minor_east_asia.clone())
+        .unwrap_or_else(|| {
+          office_default_font_family_for_resource_locale(OfficeResourceLocale::SimplifiedChinese)
+        });
+      style.east_asia_font_family = Some(family);
+      style.east_asia_fallback_font_family = None;
+      style.east_asia_font_family_class = None;
+      style.east_asia_font_charset = None;
+      style.east_asia_font_pitch = None;
+    } else {
+      style.font_size_pt = 8.0;
+      style.complex_font_size_pt = Some(8.0);
+    }
+    style.bold = true;
+    style.complex_bold = Some(true);
+    style
+  }
+
   fn missing_hyperlink_result_style(&self) -> TextStyle {
     let mut style = self.run_style_with_base(
       None,
@@ -30914,6 +32835,12 @@ impl StylesCatalog {
 
   fn apply_font_substitution(&self, style: &mut TextStyle) {
     apply_font_substitution_from_table(&self.font_substitutions, style);
+    resolve_word_balance_reference_font(
+      &self.theme_fonts,
+      self.locales.default_document_language(),
+      self.font_table_names.as_ref(),
+      style,
+    );
   }
 
   fn symbol_font_uses_byte_transport(&self, family: &str, code: u32, style: &TextStyle) -> bool {
@@ -30988,6 +32915,12 @@ impl StylesCatalog {
 
   fn apply_word_font_table_mappings(&self, style: &mut TextStyle, fonts: Option<&w::RunFonts>) {
     apply_word_font_table_mappings(&self.font_substitutions, style, fonts);
+    resolve_word_balance_reference_font(
+      &self.theme_fonts,
+      self.locales.default_document_language(),
+      self.font_table_names.as_ref(),
+      style,
+    );
   }
 
   fn style_ref_name_requires_localized_error(&self, style_name: &str) -> bool {
@@ -30996,22 +32929,96 @@ impl StylesCatalog {
         style_name,
         self.locales.ui_language(),
       );
-    if !localized_name || matches!(style_name.trim().as_bytes(), [b'1'..=b'9']) {
+    if (!localized_name && !self.has_styles_part)
+      || matches!(style_name.trim().as_bytes(), [b'1'..=b'9'])
+    {
       return false;
     }
     let target = normalized_style_ref_lookup_key(style_name);
+    // A loaded style part proves that an absent named style cannot acquire a
+    // page-dependent target. Generate its diagnostic before measuring lines,
+    // rather than replacing a short cache after the footer cell was laid out.
+    // A declared style with no text remains dynamic: that is another resource.
+    let character_target = target.strip_suffix("character").filter(|_| !localized_name);
     !self.styles.iter().any(|(style_id, entry)| {
-      entry.custom_style
-        && (normalized_style_ref_lookup_key(style_id) == target
+      if !entry.custom_style
+        && let Some(native) = entry.name.as_deref().and_then(|name| {
+          field_localization::native_builtin_style_ref_name(
+            name,
+            entry.style_type,
+            self.locales.ui_language(),
+          )
+        })
+      {
+        return field_localization::native_style_ref_name_matches(native.name, style_name)
+          // Keep the pre-existing linked-character aliases outside the
+          // established native builtin-name namespace.
+          || (matches!(entry.style_type, Some(w::StyleValues::Paragraph))
+            && character_target.is_some_and(|target| {
+              style_ref_lookup_key_matches(style_id, target)
+                || entry.name.as_deref().is_some_and(|name| {
+                  style_ref_lookup_key_matches(name, target)
+                })
+            }));
+      }
+      (!localized_name || entry.custom_style)
+        && (style_ref_lookup_key_matches(style_id, &target)
           || entry
             .name
             .as_deref()
-            .is_some_and(|name| normalized_style_ref_lookup_key(name) == target))
+            .is_some_and(|name| style_ref_lookup_key_matches(name, &target))
+          || (matches!(entry.style_type, Some(w::StyleValues::Paragraph))
+            && character_target.is_some_and(|target| {
+              style_ref_lookup_key_matches(style_id, target)
+                || entry
+                  .name
+                  .as_deref()
+                  .is_some_and(|name| style_ref_lookup_key_matches(name, target))
+            })))
     })
   }
 
   fn style_ref_keys(&self, style_id: &str) -> Vec<Arc<str>> {
     let mut keys = Vec::new();
+    if let Some(entry) = self.styles.get(style_id)
+      && !entry.custom_style
+      && let Some(name) = entry.name.as_deref()
+      && let Some(native) = field_localization::native_builtin_style_ref_name(
+        name,
+        entry.style_type,
+        self.locales.ui_language(),
+      )
+    {
+      keys.push(Arc::from(format!(
+        "{}{}",
+        field_localization::NATIVE_STYLE_REF_KEY_PREFIX,
+        native.name
+      )));
+      // TOC custom-style selection retains the source namespace. Keep it
+      // separate from STYLEREF's UI-localized builtin display names.
+      for source_name in [style_id, name] {
+        if !source_name.is_empty() {
+          push_unique_style_ref_key(
+            &mut keys,
+            &format!(
+              "{}{source_name}",
+              field_localization::SOURCE_STYLE_REF_KEY_PREFIX
+            ),
+          );
+        }
+      }
+      if let Some(level) = native.heading_level {
+        keys.push(Arc::from(format!(
+          "{}{level}",
+          field_localization::NUMERIC_HEADING_STYLE_REF_KEY_PREFIX
+        )));
+      }
+      if matches!(entry.style_type, Some(w::StyleValues::Paragraph)) {
+        push_unique_style_ref_key(&mut keys, &format!("{name} Character"));
+        push_unique_style_ref_key(&mut keys, &format!("{style_id}Character"));
+      }
+      return keys;
+    }
     push_unique_style_ref_key(&mut keys, style_id);
     if let Some(entry) = self.styles.get(style_id) {
       if let Some(name) = &entry.name {
@@ -31031,11 +33038,36 @@ impl StylesCatalog {
   }
 
   fn table_style(&self, style_id: Option<&str>) -> TableStyleModel {
+    if style_id.is_some_and(|id| id.eq_ignore_ascii_case("TableGrid") && !self.has_table_style(id))
+    {
+      // Word's import recovery uses the serialized default style's metrics
+      // for an unresolved TableGrid reference. Resolve padding and indent
+      // together: recovering only padding loses an inherited zero indent.
+      // Native Range.WordOpenXML replaces this missing reference with the
+      // default style; a serialized Grid without basedOn is independent.
+      let base = self.table_style(None);
+      return TableStyleModel {
+        cell_margins: base.cell_margins,
+        indent_left_pt: base.indent_left_pt,
+        ..TableStyleModel::default()
+      };
+    }
     let mut style = TableStyleModel::default();
     let style_id = style_id.or(self.default_table_style_id.as_deref());
     for entry in self.style_chain(style_id) {
       if matches!(entry.style_type, Some(w::StyleValues::Table)) {
         merge_table_style_model(&mut style, &entry.table_style);
+        if entry
+          .name
+          .as_deref()
+          .is_some_and(|name| name.eq_ignore_ascii_case("Normal Table"))
+        {
+          // Word canonicalizes the built-in Normal Table indent to zero,
+          // even when the serialized style supplies a positive tblInd.
+          // Native readback confirms this by reserved name, including a
+          // renamed styleId; derived styles can still override it normally.
+          style.indent_left_pt = Some(0.0);
+        }
       }
     }
     // Table styles are inherited base-to-derived, but their conditional
@@ -31223,6 +33255,74 @@ fn normalized_style_ref_lookup_key(name: &str) -> String {
     .collect()
 }
 
+fn style_ref_lookup_key_matches(name: &str, normalized: &str) -> bool {
+  name
+    .trim()
+    .chars()
+    .filter(|character| !character.is_whitespace() && !matches!(character, '-' | '_'))
+    .flat_map(char::to_lowercase)
+    .eq(normalized.chars())
+}
+
+fn declared_word_font_names(fonts: &w::Fonts) -> HashSet<String> {
+  fonts
+    .xml_children
+    .iter()
+    .filter_map(|choice| {
+      let w::FontsChoice::Font(font) = choice else {
+        return None;
+      };
+      let family = font.name.trim();
+      (!family.is_empty()).then(|| family.to_ascii_lowercase())
+    })
+    .collect()
+}
+
+fn resolve_word_balance_reference_font(
+  theme: &ThemeFonts,
+  document_language: Option<&str>,
+  declared_fonts: Option<&HashSet<String>>,
+  style: &mut TextStyle,
+) {
+  // Partial style records retain their source reference for inheritance.
+  // Resolve only an effective style with the compatibility behavior enabled.
+  if !style.wordprocessingml_balance_single_byte_double_byte_width {
+    return;
+  }
+  let mut reference_theme = style.wordprocessingml_balance_reference_theme;
+  if reference_theme.is_none() {
+    match style
+      .wordprocessingml_balance_reference_font_family
+      .as_deref()
+    {
+      Some(family)
+        if declared_fonts
+          .is_none_or(|fonts| fonts.contains(&family.trim().to_ascii_lowercase())) =>
+      {
+        return;
+      }
+      _ => reference_theme = Some(w::ThemeFontValues::MinorEastAsia),
+    }
+  }
+  let family = match reference_theme {
+    Some(w::ThemeFontValues::MajorEastAsia | w::ThemeFontValues::MinorEastAsia) => {
+      let token = if reference_theme == Some(w::ThemeFontValues::MajorEastAsia) {
+        "+mj-ea"
+      } else {
+        "+mn-ea"
+      };
+      let family = theme.resolve_drawingml_typeface_for_language(token, document_language);
+      (family.as_ref() != token).then_some(family)
+    }
+    _ => theme.resolve(reference_theme),
+  };
+  // Native declared/undeclared EA controls distinguish actual font-table
+  // membership from an rFonts spelling. Recovered theme references keep the
+  // source token, so later merges cannot reinterpret them as named records.
+  style.wordprocessingml_balance_reference_font_family = family;
+  style.wordprocessingml_balance_reference_theme = reference_theme;
+}
+
 fn load_font_substitutions(
   package: &WordprocessingDocument,
   main: &MainDocumentPart,
@@ -31233,6 +33333,10 @@ fn load_font_substitutions(
   let Ok(fonts) = font_table_part.root_element(package) else {
     return HashMap::new();
   };
+  // Most font-table records need no physical query. Reuse one local
+  // registry only for an initial system record or an incompatible outline
+  // declaration; do this during import, not for each text measurement.
+  let mut system_registry = None;
   fonts
     .xml_children
     .iter()
@@ -31240,9 +33344,46 @@ fn load_font_substitutions(
       let w::FontsChoice::Font(font) = choice else {
         return None;
       };
-      font_substitution_from_table_entry(font)
+      font_substitution_with_system_realization(font, |family| {
+        crate::fonts::font_table_named_true_type_font(
+          system_registry.get_or_insert_with(ooxmlsdk_fonts::FontRegistry::new),
+          family,
+        )
+      })
     })
     .collect()
+}
+
+fn font_substitution_with_system_realization(
+  font: &w::Font,
+  mut installed_true_type: impl FnMut(&str) -> bool,
+) -> Option<(String, FontSubstitution)> {
+  let (family, mut substitution) = font_substitution_from_table_entry(font)?;
+  let initial_latin_record = matches!(family.as_str(), "times new roman" | "arial");
+  let declared_non_true_type = font
+    .not_true_type
+    .as_ref()
+    .is_some_and(|value| value.val.is_none_or(|value| value.as_bool()));
+  if substitution.charset == Some(ooxmlsdk_fonts::FontCharset::ShiftJis)
+    && (initial_latin_record || declared_non_true_type)
+    && installed_true_type(font.name.as_str().trim())
+  {
+    substitution.charset = if initial_latin_record {
+      // [MS-OI29500] §17.8 records reuse of font metadata already loaded in
+      // the Word session. Fresh Word readbacks contain these two ANSI faces;
+      // unique/duplicate charset80 controls keep their initial ANSI records.
+      // Same-session 00 -> 80 / 80 -> 80 controls establish that ownership.
+      // Limit this normalization to the observed initial Latin records and
+      // an actual same-name installed face, not arbitrary installed fonts.
+      Some(ooxmlsdk_fonts::FontCharset::Ansi)
+    } else {
+      // Word's actual fontTable readback rebuilds an installed TrueType face
+      // declared as raster: charset80 becomes00. A missing or private embedded
+      // face does not prove that mismatch and keeps its existing metadata.
+      None
+    };
+  }
+  Some((family, substitution))
 }
 
 fn font_substitution_from_table_entry(font: &w::Font) -> Option<(String, FontSubstitution)> {
@@ -31563,6 +33704,7 @@ fn word_doc_default_run_seed(
   // Explicit default/style/run languages override this seed in the cascade.
   let mut style = TextStyle {
     language: Some(Arc::from("en-US")),
+    wordprocessingml_han_fallback: true,
     ..TextStyle::default()
   };
   if has_default_run_properties {
@@ -33734,6 +35876,17 @@ fn merge_style_values_with_font_selection(
       }
       target.east_asia_font_family = values.east_asia_font_family.clone();
     }
+    if values.wordprocessingml_balance_reference_theme.is_some()
+      || values
+        .wordprocessingml_balance_reference_font_family
+        .is_some()
+    {
+      target.wordprocessingml_balance_reference_font_family = values
+        .wordprocessingml_balance_reference_font_family
+        .clone();
+      target.wordprocessingml_balance_reference_theme =
+        values.wordprocessingml_balance_reference_theme;
+    }
     if values.complex_font_family.is_some() {
       if target.complex_font_family != values.complex_font_family {
         target.complex_fallback_font_family = None;
@@ -33903,6 +36056,9 @@ fn merge_style_values_with_font_selection(
   if !values.color_is_automatic || values.color != TextStyle::default().color {
     target.color = values.color;
     target.color_is_automatic = false;
+  }
+  if values.wordprocessing_emphasis_mark.is_some() {
+    target.wordprocessing_emphasis_mark = values.wordprocessing_emphasis_mark;
   }
   if values.word_run_border.is_some() {
     target.word_run_border = values.word_run_border;
@@ -34268,6 +36424,7 @@ impl NumberingCatalog {
     let level = level_override
       .and_then(|override_| override_.level.as_ref())
       .or(abstract_level)?;
+    format.numbering_level_index = Some(level_index);
     format.numbering_level_font_size_set =
       level
         .symbol_run_properties
@@ -34295,6 +36452,11 @@ impl NumberingCatalog {
       ..format_context
     };
     merge_numbering_format_values(format, &level.format_properties, format_context);
+    merge_numbering_suffix_tabs(
+      &mut format.list_label_suffix_tab_stops,
+      &level.format_properties.list_label_suffix_tab_stops,
+      &level.format_properties.tab_stop_clear_positions_pt,
+    );
     let start_override = level_override.and_then(|override_| override_.start);
     // [MS-OI29500] §2.1.292: Word ignores w:start when it is inside the
     // w:lvl child of a numbering-instance override. Only w:startOverride can
@@ -34456,6 +36618,23 @@ impl NumberingCatalog {
     let mut text = format_numbering_label_with_context(level, format_context);
     let suppressed_non_numerical_text =
       format_numbering_label_suppressing_non_numerical_with_context(level, format_context);
+    if matches!(
+      level.format,
+      w::NumberFormatValues::Hebrew1
+        | w::NumberFormatValues::Hebrew2
+        | w::NumberFormatValues::ArabicAlpha
+        | w::NumberFormatValues::ArabicAbjad
+    ) && text
+      .chars()
+      .any(|character| ('\u{590}'..='\u{7bf}').contains(&character))
+    {
+      // Word's generated alphabetic RTL numbering is a separate script
+      // portion: Native crossed-font/size/weight controls select cs/szCs
+      // for its letters, ascii/sz for the suffix, and bCs for both. This
+      // does not change the rFonts table for authored paragraph runs.
+      style.wordprocessingml_complex_numbering = true;
+      style.complex_script = Some(true);
+    }
     finalize_numbering_symbol_transport_style(
       &mut style,
       level.format,
@@ -34566,6 +36745,14 @@ fn numbering_level_model_with_theme(
     .as_deref()
     .and_then(|properties| properties.tabs.as_ref())
   {
+    // Keep this group's declaration order for the suffix's independent
+    // style/level/direct cascade. Ordinary text tabs retain their existing
+    // sorted ruler and clear behavior.
+    format_properties.list_label_suffix_tab_stops = tabs
+      .tab_stop
+      .iter()
+      .filter_map(|tab| tab_stop_model(tab, import_settings.decimal_tab_symbols))
+      .collect();
     for tab in &tabs.tab_stop {
       if tab.val != w::TabStopValues::Number {
         continue;
@@ -34774,6 +36961,8 @@ fn numbering_drawing_image(
     .get(properties.relationship_id.as_deref()?)?;
   let image_data = image_data_with_effects(resource, &properties.effects);
   Some(InlineImage {
+    contour_owned_wrap: None,
+    source_run_font_size_pt: None,
     data: image_data.data,
     content_type: image_data.content_type,
     blip_compression_state: properties.blip_compression_state,
@@ -34795,6 +36984,7 @@ fn numbering_drawing_image(
     line_box: InlineImageLineBox::CharacterLike,
     office_math_line_layout: None,
     office_math_display_layout: None,
+    office_math_metrics: None,
     crop: properties.crop,
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
@@ -36514,6 +38704,7 @@ run_properties_accessor!(run_properties_color, Color, w::Color);
 run_properties_accessor!(run_properties_shading, Shading, w::Shading);
 run_properties_accessor!(run_properties_border, Border, w::Border);
 run_properties_accessor!(run_properties_underline, Underline, w::Underline);
+run_properties_accessor!(run_properties_emphasis, Emphasis, w::Emphasis);
 run_properties_accessor!(run_properties_strike, Strike, w::Strike);
 run_properties_accessor!(run_properties_double_strike, DoubleStrike, w::DoubleStrike);
 run_properties_accessor!(run_properties_outline, Outline, w::Outline);
@@ -36661,7 +38852,23 @@ paragraph_mark_run_properties_accessor!(
   w::FitText
 );
 
+paragraph_mark_run_properties_accessor!(
+  paragraph_mark_run_properties_emphasis,
+  Emphasis,
+  w::Emphasis
+);
+
 impl<'a> RunProps<'a> {
+  fn emphasis(&self) -> Option<&'a w::Emphasis> {
+    match self {
+      Self::Direct(properties) => run_properties_emphasis(properties),
+      Self::Style(properties) => properties.emphasis.as_ref(),
+      Self::BaseStyle(properties) => properties.emphasis.as_ref(),
+      Self::Numbering(properties) => properties.emphasis.as_ref(),
+      Self::ParagraphMark(properties) => paragraph_mark_run_properties_emphasis(properties),
+    }
+  }
+
   fn run_fonts(&self) -> Option<&'a w::RunFonts> {
     match self {
       Self::Direct(properties) => run_properties_run_fonts(properties),
@@ -37706,6 +39913,188 @@ mod tests {
     TwipsMeasureValue::Twips(value as u64)
   }
 
+  #[test]
+  fn linked_textbox_import_retains_empty_successor_identity_and_geometry() {
+    let shape = wps::WordprocessingShape::from_bytes(br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1270000" cy="635000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></wps:spPr><wps:linkedTxbx id="27" seq="3"/><wps:bodyPr lIns="91440" tIns="91440" rIns="91440" bIns="91440"><a:noAutofit/></wps:bodyPr></wps:wsp>"#).unwrap();
+    let frame = wordprocessing_shape_textbox_frame(
+      &shape,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
+      },
+    )
+    .unwrap();
+    assert_eq!(
+      frame.text_box_link,
+      Some(TextBoxLink {
+        story_id: 27,
+        sequence: 3
+      })
+    );
+    assert!(frame.text_box_blocks.is_empty());
+    assert_eq!(frame.width_pt, 100.0);
+    assert_eq!(frame.height_pt, 50.0);
+    assert!((frame.text_inset_top_pt - 7.2).abs() < 0.001);
+  }
+
+  #[test]
+  fn zero_area_linked_textbox_uses_source_line_cursor_and_keeps_anchor_order() {
+    for spaces in [1, 3, 4] {
+      for reversed in [false, true] {
+        let mut story = merge_test_paragraph(&format!(
+          "{}{EXPLICIT_DEFAULT_WORD_TEXT_TAB}",
+          " ".repeat(spaces)
+        ));
+        story.base_style.font_family = Some("Noto Sans".into());
+        story.base_style.font_size_pt = 10.0;
+        story.format.wordprocessing_shape_story = true;
+        story.field_events = vec![ParagraphFieldEvent::Content];
+        if let InlineItem::Text(run) = &mut story.inlines[0] {
+          run.style = story.base_style.clone();
+        }
+        let image = InlineImage {
+          contour_owned_wrap: None,
+          source_run_font_size_pt: None,
+          data: Bytes::new(),
+          content_type: Some("image/png".into()),
+          blip_compression_state: common::BlipCompressionState::NotApplicable,
+          picture_frame: None,
+          run_border: None,
+          picture_frame_clips_image: false,
+          picture_paint_size_pt: None,
+          effects: None,
+          static3d: None,
+          width_pt: 63.35,
+          height_pt: 27.35,
+          inline_offset_x_pt: 0.0,
+          inline_offset_y_pt: 0.0,
+          effect_left_pt: 0.0,
+          effect_top_pt: 0.0,
+          effect_right_pt: 0.0,
+          effect_bottom_pt: 0.0,
+          inline_baseline_gap_pt: None,
+          line_box: InlineImageLineBox::CharacterLike,
+          office_math_line_layout: None,
+          office_math_display_layout: None,
+          office_math_metrics: None,
+          crop: ImageCrop::default(),
+          rotation_deg: 0.0,
+          flip_horizontal: false,
+          flip_vertical: false,
+          metafile_background_color: None,
+          alt_text: None,
+          hyperlink_url: None,
+          semantic_metafile_text: false,
+          metafile_semantic_text_includes_raster_backdrop: false,
+          signature_line: None,
+          semantic_metafile_font_family: None,
+          native_ole_equation: None,
+          metafile_native_size: false,
+          metafile_fixed_output_profile: common::MetafileFixedOutputProfile::Default,
+          placement: ImagePlacement::Inline,
+        };
+        story.inlines.push(InlineItem::Image(image));
+        let mut last = merge_test_paragraph(&EXPLICIT_DEFAULT_WORD_TEXT_TAB.to_string());
+        story.inlines.append(&mut last.inlines);
+        let mut head = chart_shape(29.6, 3.55, 0.0, ImagePlacement::Inline, None);
+        head.wordprocessing_shape_host = true;
+        head.word_text_frame = true;
+        head.text_box_link = Some(TextBoxLink {
+          story_id: 1,
+          sequence: 0,
+        });
+        head.text_inset_left_pt = 7.2;
+        head.text_inset_top_pt = 7.2;
+        head.text_inset_right_pt = 7.2;
+        head.text_inset_bottom_pt = 7.2;
+        head.text_box_blocks = vec![Block::paragraph(story)];
+        let mut next = head.clone();
+        next.text_box_link.as_mut().unwrap().sequence = 1;
+        next.width_pt = 103.3;
+        next.height_pt = 53.9;
+        next.text_box_blocks.clear();
+        let mut anchor = merge_test_paragraph("");
+        anchor.inlines = if reversed {
+          vec![InlineItem::Shape(next), InlineItem::Shape(head)]
+        } else {
+          vec![InlineItem::Shape(head), InlineItem::Shape(next)]
+        };
+        let mut blocks = vec![Block::paragraph(anchor)];
+        let original = blocks.clone();
+        linked_textboxes::advance_zero_area_heads(std::iter::once(blocks.as_mut_slice()), 36.0);
+        let Block::Paragraph(anchor) = &blocks[0] else {
+          panic!()
+        };
+        let head_index = usize::from(reversed);
+        let InlineItem::Shape(head) = &anchor.inlines[head_index] else {
+          panic!()
+        };
+        let InlineItem::Shape(next) = &anchor.inlines[1 - head_index] else {
+          panic!()
+        };
+        let Block::Paragraph(prefix) = &head.text_box_blocks[0] else {
+          panic!()
+        };
+        assert_eq!(
+          prefix
+            .inlines
+            .iter()
+            .filter_map(|inline| match inline {
+              InlineItem::Text(run) => Some(run.text.as_str()),
+              _ => None,
+            })
+            .collect::<String>(),
+          " ".repeat(spaces)
+        );
+        let Block::Paragraph(following) = &next.text_box_blocks[0] else {
+          panic!()
+        };
+        assert_eq!(
+          following
+            .inlines
+            .iter()
+            .filter(|inline| matches!(inline, InlineItem::Image(_)))
+            .count(),
+          1
+        );
+        assert_eq!(head.width_pt, 29.6);
+        assert_eq!(next.height_pt, 53.9);
+        for mode in ["gap", "unlinked", "positive"] {
+          let mut negative = original.clone();
+          let Block::Paragraph(p) = &mut negative[0] else {
+            panic!()
+          };
+          let InlineItem::Shape(shape) = &mut p.inlines[if mode == "positive" {
+            head_index
+          } else {
+            1 - head_index
+          }] else {
+            panic!()
+          };
+          match mode {
+            "gap" => shape.text_box_link.as_mut().unwrap().sequence = 2,
+            "unlinked" => shape.text_box_link.as_mut().unwrap().story_id = 99,
+            "positive" => shape.height_pt = 80.0,
+            _ => unreachable!(),
+          }
+          linked_textboxes::advance_zero_area_heads(std::iter::once(negative.as_mut_slice()), 36.0);
+          let Block::Paragraph(p) = &negative[0] else {
+            panic!()
+          };
+          let InlineItem::Shape(next) = &p.inlines[1 - head_index] else {
+            panic!()
+          };
+          assert!(next.text_box_blocks.is_empty(), "{mode}");
+        }
+      }
+    }
+  }
+
   fn merge_test_paragraph(text: &str) -> Paragraph {
     Paragraph {
       inlines: vec![InlineItem::Text(TextRun {
@@ -37837,6 +40226,31 @@ mod tests {
     let rows = [row(vec![Block::paragraph(first_true)])];
     assert!(transferred_table_page_break_before(&rows, 1));
     assert!(!transferred_table_page_break_before(&rows, 2));
+  }
+
+  #[test]
+  fn body_cover_page_metadata_distinguishes_objects_from_gallery_lists() {
+    for (kind, gallery, expected) in [
+      ("docPartObj", "Cover Pages", true),
+      ("docPartObj", "Page Numbers (Bottom of Page)", false),
+      ("docPartList", "Cover Pages", false),
+    ] {
+      let cover = format!(
+        r#"<w:sdt><w:sdtPr><w:{kind}><w:docPartGallery w:val="{gallery}"/><w:docPartUnique/></w:{kind}></w:sdtPr><w:sdtContent><w:p><w:r><w:t>Cover</w:t></w:r></w:p></w:sdtContent></w:sdt>"#
+      );
+      for content in [
+        cover.clone(),
+        format!("<w:p/>{cover}"),
+        format!("<w:sdt><w:sdtContent>{cover}</w:sdtContent></w:sdt>"),
+      ] {
+        let xml = format!(
+          r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{content}</w:body>"#
+        );
+        let body = w::Body::from_bytes(xml.as_bytes()).expect("cover-page control");
+        assert_eq!(body_has_cover_page(&body), expected, "{kind}, {gallery}");
+      }
+    }
+    assert!(!body_has_cover_page(&w::Body::default()));
   }
 
   #[test]
@@ -38714,6 +41128,120 @@ mod tests {
     }
   }
 
+  fn framepr_table_test_body(
+    cell_properties: &str,
+    following_properties: &str,
+    table_properties: &str,
+  ) -> String {
+    format!(
+      r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:p><w:r><w:t>s</w:t></w:r></w:p>
+      <w:p><w:pPr><w:framePr w:w="5103" w:h="1565" w:hRule="exact" w:hSpace="142" w:wrap="around" w:vAnchor="page" w:hAnchor="page" w:x="6345" w:y="2225"/></w:pPr><w:r><w:t>F</w:t></w:r></w:p>
+      <w:tbl><w:tblPr>{table_properties}<w:tblW w:w="0" w:type="auto"/><w:tblLayout w:type="fixed"/><w:tblBorders><w:top w:val="single" w:sz="6"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="5046"/></w:tblGrid>
+        <w:tr><w:tc><w:tcPr><w:tcW w:w="5046" w:type="dxa"/></w:tcPr><w:p><w:pPr>{cell_properties}</w:pPr><w:r><w:rPr><w:i/><w:sz w:val="16"/></w:rPr><w:t>G</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>
+      <w:p><w:pPr>{following_properties}</w:pPr><w:r><w:t>H</w:t></w:r><w:bookmarkStart w:id="0" w:name="_GoBack"/><w:bookmarkEnd w:id="0"/></w:p>
+      <w:tbl><w:tr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+      <w:p><w:r><w:t>E</w:t></w:r></w:p>
+    </w:body>"#
+    )
+  }
+
+  const FRAMEPR_TABLE_TEST_PROPERTIES: &str = r#"<w:framePr w:w="5103" w:h="1565" w:hRule="exact" w:hSpace="142" w:wrap="around" w:vAnchor="page" w:hAnchor="page" w:x="6345" w:y="2225"/>"#;
+
+  #[test]
+  fn framepr_table_shares_existing_frame_and_retains_table_content() {
+    let source = framepr_table_test_body(
+      FRAMEPR_TABLE_TEST_PROPERTIES,
+      FRAMEPR_TABLE_TEST_PROPERTIES,
+      "",
+    );
+    let sections = imported_body_sections(source.as_bytes());
+    let [
+      Block::Paragraph(_),
+      Block::Frame(frame),
+      Block::Table(_),
+      Block::Paragraph(_),
+    ] = sections[0].blocks.as_slice()
+    else {
+      panic!("F, framed table G and H must share one frame; the following table stays in the body");
+    };
+    let [
+      Block::Paragraph(_),
+      Block::Table(table),
+      Block::Paragraph(following),
+    ] = frame.blocks.as_slice()
+    else {
+      panic!("the frame must retain the table as a table between its paragraphs");
+    };
+    assert_eq!(table.column_widths_pt, [252.3]);
+    assert!(table.borders.is_some());
+    let [Block::Paragraph(cell)] = table.rows[0].cells[0].blocks.as_slice() else {
+      panic!("the redundant cell frame must not survive inside its parent story");
+    };
+    assert!(cell.format.frame.is_none());
+    let InlineItem::Text(run) = &cell.inlines[0] else {
+      panic!("G text")
+    };
+    assert_eq!(run.text, "G");
+    assert!(run.style.italic);
+    assert_eq!(run.style.font_size_pt, 8.0);
+    assert!(following.field_events.iter().any(|event| matches!(event,
+      ParagraphFieldEvent::BookmarkStart { id, name } if id == "0" && name == "_GoBack")));
+  }
+
+  #[test]
+  fn framepr_table_obeys_native_missing_and_shifted_frame_boundaries() {
+    let shifted = FRAMEPR_TABLE_TEST_PROPERTIES.replace("6345", "6346");
+    for (cell, following, contains_table, following_is_frame) in [
+      ("", FRAMEPR_TABLE_TEST_PROPERTIES, false, true),
+      (FRAMEPR_TABLE_TEST_PROPERTIES, "", true, false),
+      (FRAMEPR_TABLE_TEST_PROPERTIES, shifted.as_str(), true, true),
+    ] {
+      let source = framepr_table_test_body(cell, following, "");
+      let sections = imported_body_sections(source.as_bytes());
+      let Block::Frame(first) = &sections[0].blocks[1] else {
+        panic!("F frame")
+      };
+      assert_eq!(
+        first.blocks.iter().any(|b| matches!(b, Block::Table(_))),
+        contains_table
+      );
+      let next = if contains_table { 2 } else { 3 };
+      assert_eq!(
+        matches!(&sections[0].blocks[next], Block::Frame(_)),
+        following_is_frame
+      );
+      if !contains_table {
+        assert!(matches!(&sections[0].blocks[2], Block::Table(_)));
+      }
+    }
+  }
+
+  #[test]
+  fn framepr_table_preserves_unmatched_floating_and_pagebreak_owners() {
+    let shifted = FRAMEPR_TABLE_TEST_PROPERTIES.replace("6345", "6346");
+    let page_break = format!("<w:pageBreakBefore/>{FRAMEPR_TABLE_TEST_PROPERTIES}");
+    for (cell, properties) in [
+      (shifted.as_str(), ""),
+      (FRAMEPR_TABLE_TEST_PROPERTIES, "<w:tblpPr/>"),
+      (page_break.as_str(), ""),
+    ] {
+      let source = framepr_table_test_body(cell, "", properties);
+      let sections = imported_body_sections(source.as_bytes());
+      let [
+        Block::Paragraph(_),
+        Block::Frame(frame),
+        Block::Table(_),
+        ..,
+      ] = sections[0].blocks.as_slice()
+      else {
+        panic!("a distinct owner must remain a body table");
+      };
+      assert!(matches!(frame.blocks.as_slice(), [Block::Paragraph(_)]));
+    }
+  }
+
   #[test]
   fn adjacent_framepr_paragraphs_group_by_frame_attributes_not_paragraph_decoration() {
     let frame = ParagraphFrameProperties {
@@ -38779,6 +41307,48 @@ mod tests {
     assert!(first.format.borders.top.is_some());
     assert_ne!(first.format.shading, second.format.shading);
     assert!(third.format.borders.bottom.is_some());
+  }
+
+  #[test]
+  fn drop_cap_frames_preserve_runs_and_leave_following_text_unchanged() {
+    for location in ["drop", "margin"] {
+      let xml = format!(
+        r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:p><w:pPr><w:framePr w:dropCap="{location}" w:lines="3" w:wrap="around"/>
+            <w:spacing w:line="798" w:lineRule="exact"/></w:pPr>
+            <w:r><w:rPr><w:rFonts w:ascii="Liberation Serif"/><w:sz w:val="260"/>
+              <w:position w:val="-11"/></w:rPr><w:t>-</w:t></w:r></w:p>
+          <w:p><w:pPr><w:framePr w:dropCap="{location}" w:lines="3" w:wrap="around"/>
+            <w:spacing w:line="798" w:lineRule="exact"/></w:pPr>
+            <w:r><w:rPr><w:sz w:val="275"/></w:rPr><w:t>A</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Following body text</w:t></w:r></w:p>
+          <w:sectPr/>
+        </w:body>"#,
+      );
+      let sections = imported_body_sections_with_styles(xml.as_bytes(), &StylesCatalog::default());
+      let [
+        Block::Frame(first),
+        Block::Frame(second),
+        Block::Paragraph(body),
+      ] = sections[0].blocks.as_slice()
+      else {
+        panic!("drop-cap text retains independent frames before its anchor paragraph");
+      };
+      assert!(first.drop_cap && second.drop_cap);
+      let Block::Paragraph(cap) = &first.blocks[0] else {
+        panic!("drop-cap frame contents");
+      };
+      let InlineItem::Text(run) = &cap.inlines[0] else {
+        panic!("drop-cap text run");
+      };
+      assert_eq!(run.text, "-");
+      assert_eq!(run.style.font_size_pt, 130.0);
+      assert_eq!(run.style.baseline_shift_pt, -5.5);
+      assert_eq!(run.style.font_family.as_deref(), Some("Liberation Serif"));
+      assert_eq!(cap.format.line_height_rule, LineHeightRule::Exact);
+      assert_eq!(cap.format.line_height_pt, Some(39.9));
+      assert_eq!(inline_text(&body.inlines), "Following body text");
+    }
   }
 
   #[test]
@@ -39512,8 +42082,10 @@ mod tests {
     )
     .expect("embedded VML object");
 
+    let images = ImageCatalog::default();
+    let shape_types = vml_embedded_object_shape_types(&object, &images);
     assert_eq!(
-      embedded_object_metafile_background_color(&object),
+      embedded_object_metafile_background_color(&object, &shape_types),
       Some([255, 0, 0])
     );
   }
@@ -39865,6 +42437,32 @@ mod tests {
   }
 
   #[test]
+  fn vml_wordart_fitshape_inherits_with_explicit_instance_precedence() {
+    for inherited in ["", "fitshape=\"f\"", "fitshape=\"t\""] {
+      let xml = format!(
+        r##"<v:shapetype xmlns:v="urn:schemas-microsoft-com:vml"
+          id="_x0000_t136"><v:textpath on="t" {inherited}/></v:shapetype>"##
+      );
+      let shape_type = v::Shapetype::from_bytes(xml.as_bytes()).unwrap();
+      for (direct, expected) in [
+        ("", inherited == "fitshape=\"t\""),
+        ("fitshape=\"f\"", false),
+        ("fitshape=\"t\"", true),
+      ] {
+        let xml = format!(
+          r##"<v:shape xmlns:v="urn:schemas-microsoft-com:vml"
+            type="#_x0000_t136" style="width:300pt;height:120pt">
+            <v:textpath string="DRAFT" {direct}/></v:shape>"##
+        );
+        let shape = v::Shape::from_bytes(xml.as_bytes()).unwrap();
+        let shape = vml_shape_shape(&shape, &ImageCatalog::default(), &[&shape_type]).unwrap();
+        assert_eq!(shape.vml_text_fit_shape, expected);
+        assert!(!shape.vml_text_fit_path);
+      }
+    }
+  }
+
+  #[test]
   fn vml_wordart_fitpath_inherits_from_shapetype_and_accepts_shape_override() {
     let shape_type = v::Shapetype::from_bytes(
       br##"<v:shapetype xmlns:v="urn:schemas-microsoft-com:vml"
@@ -39921,6 +42519,34 @@ mod tests {
         (Some(expected.0), Some(expected.1))
       );
       assert!(shape.fill_image.is_none());
+    }
+  }
+
+  #[test]
+  fn vml_wordart_partial_adjustments_inherit_each_shape_type_parameter() {
+    let shape_type = v::Shapetype::from_bytes(
+      br#"<v:shapetype xmlns:v="urn:schemas-microsoft-com:vml"
+        id="_x0000_t167" coordsize="21600,21600" adj="6054"/>"#,
+    )
+    .unwrap();
+    for (authored, expected) in [
+      (None, 28_028),
+      (Some(",10800"), 28_028),
+      (Some("6054,10800"), 28_028),
+      (Some("0,10800"), 0),
+      (Some("10800,10800"), 50_000),
+    ] {
+      let shape = v::Shape {
+        adjustment: authored.map(str::to_owned),
+        ..Default::default()
+      };
+      let guides = vml_fontwork_adjust_value_list(
+        a::TextShapeValues::TextDeflateInflateDeflate,
+        &shape,
+        Some(&shape_type),
+      )
+      .unwrap();
+      assert_eq!(guides.shape_guide[0].formula, format!("val {expected}"));
     }
   }
 
@@ -40166,7 +42792,7 @@ mod tests {
   }
 
   #[test]
-  fn disabled_vml_document_pattern_falls_back_to_the_word_background_color() {
+  fn disabled_vml_document_pattern_disables_the_word_background_color() {
     for disabled in ["fill=\"f\"", ""] {
       let fill_on = if disabled.is_empty() { "on=\"f\"" } else { "" };
       let xml = format!(
@@ -40179,14 +42805,7 @@ mod tests {
       );
       let background = w::DocumentBackground::from_bytes(xml.as_bytes()).expect("background");
       assert!(document_background_pattern(&background, &office_vml_pattern_images()).is_none());
-      assert_eq!(
-        document_background_color(&background),
-        Some(RgbColor {
-          r: 0x11,
-          g: 0x22,
-          b: 0x33,
-        })
-      );
+      assert_eq!(document_background_color(&background), None);
     }
   }
 
@@ -41277,6 +43896,33 @@ mod tests {
   }
 
   #[test]
+  fn decimal_tab_stops_retain_type_symbols_and_inherited_clear_identity() {
+    let tabs = w::Tabs::from_bytes(
+      br#"<w:tabs xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tab w:val="clear" w:pos="709"/><w:tab w:val="decimal" w:pos="1884" w:leader="dot"/></w:tabs>"#,
+    ).unwrap();
+    let symbols = OfficeNumberSeparators {
+      decimal: ',',
+      grouping: '.',
+    };
+    let mut format = ParagraphFormat::default();
+    format.tab_stops.push(TabStop {
+      position_pt: 35.45,
+      alignment: TabStopAlignment::Left,
+      leader: TabLeader::None,
+    });
+    apply_tab_stops(&mut format, &tabs, symbols);
+    assert_eq!(
+      format.tab_stops,
+      [TabStop {
+        position_pt: 94.2,
+        alignment: TabStopAlignment::Decimal(symbols),
+        leader: TabLeader::Dot,
+      }]
+    );
+    assert_eq!(format.tab_stop_clear_positions_pt, [35.45]);
+  }
+
+  #[test]
   fn tab_stop_identity_preserves_neighboring_twips_through_overlays_and_clears() {
     let tabs = w::Tabs::from_bytes(
       br#"<w:tabs xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tab w:val="left" w:pos="720"/><w:tab w:val="left" w:pos="721"/><w:tab w:val="left" w:pos="722"/><w:tab w:val="left" w:pos="1440"/></w:tabs>"#,
@@ -41285,12 +43931,12 @@ mod tests {
       br#"<w:tabs xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tab w:val="right" w:pos="721" w:leader="dot"/><w:tab w:val="clear" w:pos="722"/></w:tabs>"#,
     ).unwrap();
     let mut parent = ParagraphFormat::default();
-    apply_tab_stops(&mut parent, &tabs);
+    apply_tab_stops(&mut parent, &tabs, Default::default());
     assert_eq!(parent.tab_stops.len(), 4);
     let mut direct = parent.clone();
-    apply_tab_stops(&mut direct, &overlay);
+    apply_tab_stops(&mut direct, &overlay, Default::default());
     let mut child = ParagraphFormat::default();
-    apply_tab_stops(&mut child, &overlay);
+    apply_tab_stops(&mut child, &overlay, Default::default());
     merge_tab_stop_values(&mut parent, &child);
     for format in [&parent, &direct] {
       assert_eq!(
@@ -41377,6 +44023,79 @@ mod tests {
     let (width, height) = parsed.size_pt.expect("transformed size");
     assert!((width - 112.95).abs() < 0.001);
     assert!((height - 35.25).abs() < 0.001);
+  }
+
+  #[test]
+  fn vml_relative_textbox_frame_retains_native_device_outsets() {
+    // Native fixed/growing frames, three percentages, three wrap modes,
+    // two reference origins and independent subpixel anchor phases. These
+    // rows give the observed left/top outsets and total vertical enclosure.
+    for (pen, phase, left, top, vertical) in [
+      (0.0, 0.0, 0.3, 0.0, 0.0),
+      (0.0, 0.2, 0.0, 0.1, 0.1),
+      (0.0, 0.4, 0.0, 0.3, 0.5),
+      (0.0, 0.6, 0.15, 0.0, 0.0),
+      (0.75, 0.0, 1.05, 0.65, 1.25),
+      (0.75, 0.2, 0.5, 0.85, 1.25),
+      (0.75, 0.4, 0.7, 1.05, 2.0),
+      (0.75, 0.6, 0.9, 0.5, 1.25),
+      (3.0, 0.0, 1.8, 2.15, 4.25),
+      (3.0, 0.2, 2.0, 1.6, 3.5),
+      (3.0, 0.4, 2.2, 1.8, 3.5),
+      (3.0, 0.6, 1.65, 2.0, 3.5),
+    ] {
+      for custom_path in [false, true] {
+        let element = if custom_path { "shape" } else { "rect" };
+        let path = if custom_path {
+          "path='m,l,21600r21600,l21600,xe'"
+        } else {
+          ""
+        };
+        let xml = format!(
+          "<v:{element} xmlns:v='urn:schemas-microsoft-com:vml' {path} style='position:absolute;margin-left:{}pt;margin-top:{}pt;width:252.6pt;height:248.5pt;mso-height-percent:200;mso-height-relative:margin' stroked='{}' strokeweight='{pen}pt'/>",
+          118.05 + phase,
+          7.4 + phase,
+          if pen > 0.0 { "t" } else { "f" },
+        );
+        let mut shape = if custom_path {
+          let source = v::Shape::from_bytes(xml.as_bytes()).unwrap();
+          vml_shape_shape_with_style(
+            &source,
+            source.style.as_deref(),
+            &ImageCatalog::default(),
+            &[],
+          )
+          .unwrap()
+        } else {
+          let source = v::Rectangle::from_bytes(xml.as_bytes()).unwrap();
+          vml_rectangle_shape(&source, &ImageCatalog::default()).unwrap()
+        };
+        let extent = vml_textbox_relative_frame_outsets(&shape).unwrap();
+        assert!((extent.left_pt - left).abs() < 0.0001);
+        assert!((extent.top_pt - top).abs() < 0.0001);
+        assert!((extent.top_pt + extent.bottom_pt - vertical).abs() < 0.0001);
+        if phase == 0.0 {
+          // Independent width-only and both-axis 20% controls: the native
+          // painted widths are 93.3, 91.95 and 89.7pt in a 468pt column.
+          let native_width = if pen == 0.0 {
+            93.3
+          } else if pen == 0.75 {
+            91.95
+          } else {
+            89.7
+          };
+          assert!((93.6 - extent.left_pt - extent.right_pt - native_width).abs() < 0.0001);
+        }
+        shape.rotation_deg = 10.0;
+        assert!(vml_textbox_relative_frame_outsets(&shape).is_none());
+        shape.rotation_deg = 0.0;
+        let ImagePlacement::Floating(placement) = &mut shape.placement else {
+          panic!("floating frame")
+        };
+        placement.relative_height_pct = None;
+        assert!(vml_textbox_relative_frame_outsets(&shape).is_none());
+      }
+    }
   }
 
   #[test]
@@ -41949,6 +44668,39 @@ mod tests {
   }
 
   #[test]
+  fn vml_repeating_story_retains_shared_picture_types_without_cross_story_leakage() {
+    let paragraph = w::Paragraph::from_bytes(
+      br##"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:v="urn:schemas-microsoft-com:vml">
+        <w:r><w:pict><v:shapetype id="_x0000_t136">
+          <v:textpath on="t" fitshape="t"/></v:shapetype>
+          <v:shape type="#_x0000_t136" style="width:300pt;height:120pt">
+            <v:textpath string="DRAFT"/></v:shape></w:pict></w:r>
+        <w:r><w:pict><v:shape type="#_x0000_t136" style="width:300pt;height:120pt">
+          <v:textpath string="Hgyp"/></v:shape></w:pict></w:r>
+      </w:p>"##,
+    )
+    .unwrap();
+    let mut story = ImageCatalog::default();
+    retain_vml_paragraph_shape_types(&paragraph, &mut story);
+    let later = w::Picture::from_bytes(
+      br##"<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:v="urn:schemas-microsoft-com:vml"><v:shape type="#_x0000_t136"
+          style="width:300pt;height:120pt"><v:textpath string="Hgyp"/>
+        </v:shape></w:pict>"##,
+    )
+    .unwrap();
+    for (catalog, fitted) in [(&story, true), (&ImageCatalog::default(), false)] {
+      let mut inlines = Vec::new();
+      push_pict_shapes_impl(&later, &mut inlines, catalog);
+      let [InlineItem::Shape(shape)] = inlines.as_slice() else {
+        panic!("one later WordArt shape");
+      };
+      assert_eq!(shape.vml_text_fit_shape, fitted);
+    }
+  }
+
+  #[test]
   fn vml_shape_type_declared_in_an_earlier_picture_resolves_later_shapes() {
     let body = w::Body::from_bytes(
       br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -41982,6 +44734,55 @@ mod tests {
     let resolved = vml_shape_type_for_reference(shape, &shape_types)
       .expect("shape type declared in another picture");
     assert_eq!(resolved.id.as_deref(), Some("diamond"));
+  }
+
+  #[test]
+  fn embedded_object_inherits_story_shape_type_and_keeps_explicit_fill_overrides() {
+    let body = w::Body::from_bytes(
+      br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:v="urn:schemas-microsoft-com:vml">
+        <w:p><w:r><w:object><v:shapetype id="olePicture" filled="f" stroked="f"/>
+        </w:object></w:r></w:p>
+      </w:body>"#,
+    )
+    .unwrap();
+    let mut images = ImageCatalog {
+      vml_shape_types: vml_document_shape_types(&body),
+      ..Default::default()
+    };
+    assert_eq!(images.vml_shape_types.len(), 1);
+    images.by_relationship_id.insert(
+      "preview".into(),
+      package::ImageResource {
+        data: vec![1, 2, 3].into(),
+        content_type: Some("image/x-emf".into()),
+      },
+    );
+    for (local_type, shape_fill, expected) in [
+      ("", "", None),
+      ("", "filled='f'", None),
+      ("", "filled='t' fillcolor='#3366CC'", Some([51, 102, 204])),
+      (
+        "<v:shapetype id='olePicture' filled='t' fillcolor='#FFFFFF'/>",
+        "",
+        Some([255, 255, 255]),
+      ),
+    ] {
+      let xml = format!(
+        r##"<w:object
+        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:v="urn:schemas-microsoft-com:vml"
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        {local_type}<v:shape type="#olePicture" style="width:120pt;height:48pt" {shape_fill}>
+          <v:imagedata r:id="preview"/>
+        </v:shape>
+      </w:object>"##
+      );
+      let object = w::EmbeddedObject::from_bytes(xml.as_bytes()).unwrap();
+      let image = embedded_object_image(&object, &images, None).unwrap();
+      assert_eq!(image.metafile_background_color, expected);
+      assert_eq!((image.width_pt, image.height_pt), (120.0, 48.0));
+    }
   }
 
   #[test]
@@ -42451,9 +45252,89 @@ mod tests {
       (VmlGroupTransform::from_group(&edge)
         .expect("edge group transform")
         .inline_leading_pt
-        - LO_VML_INLINE_GROUP_EDGE_BOUND_PT)
+        - 0.75)
         .abs()
         < 0.001
+    );
+  }
+
+  #[test]
+  fn inline_vml_rectangular_group_retains_native_outline_bounds() {
+    // Actual native controls: line-width thresholds and both sides of the
+    // nearest-pixel origin boundary, including an unstroked negative child.
+    for (stroke, top, expected) in [
+      (Some(0.0), 0.0, 0.75),
+      (Some(0.25), 0.0, 0.75),
+      (Some(0.25), -0.4, 1.5),
+      (Some(0.25), 0.2, 0.75),
+      (Some(1.5), -0.2, 1.5),
+      (Some(1.5), 0.4, 0.75),
+      (Some(2.0), -0.4, 1.5),
+      (Some(1.5), 0.0, 0.75),
+      (Some(1.51), 0.0, 1.5),
+      (Some(3.0), 0.0, 1.5),
+      (Some(3.01), 0.0, 2.25),
+      (Some(0.75), -0.4, 1.5),
+      (Some(0.75), -0.35, 0.75),
+      (Some(0.75), 0.35, 0.75),
+      (Some(0.75), 0.4, 0.0),
+      (None, -10.0, 9.75),
+      (None, 0.0, 0.0),
+    ] {
+      for element in ["shape", "rect"] {
+        let pen = stroke.map_or_else(
+          || "stroked='f'".to_string(),
+          |width| format!("strokeweight='{width}pt'"),
+        );
+        let xml = format!(
+          "<v:group xmlns:v='urn:schemas-microsoft-com:vml' style='width:100pt;height:50pt' coordorigin='0,0' coordsize='2000,1000'><v:{element} style='position:absolute;left:110;top:{};width:400;height:200' {pen}/></v:group>",
+          top * 20.0
+        );
+        let group = v::Group::from_bytes(xml.as_bytes()).unwrap();
+        let transform = VmlGroupTransform::from_group(&group).unwrap();
+        assert_eq!(transform.inline_leading_pt, 0.0);
+        assert_eq!(transform.inline_top_pt, expected, "{xml}");
+        let frame = vml_inline_group_frame(&group).unwrap();
+        assert_eq!(frame.height_pt, 50.0 + expected);
+        let style = transform
+          .child_anchor_style(
+            group.style.as_deref(),
+            Some(&format!(
+              "position:absolute;left:110;top:{};width:400;height:200",
+              top * 20.0
+            )),
+          )
+          .unwrap();
+        assert!((vml_image_style(Some(&style)).vertical_offset_pt - top - expected).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
+  fn inline_vml_group_children_share_the_outer_outline_frame() {
+    let xml = br#"<v:group xmlns:v="urn:schemas-microsoft-com:vml"
+      style="width:100pt;height:50pt" coordorigin="0,0" coordsize="2000,1000">
+      <v:shape style="position:absolute;left:110;top:0;width:400;height:200"/>
+      <v:rect style="position:absolute;left:0;top:-100;width:100;height:100" strokeweight="4pt"/>
+    </v:group>"#;
+    let mut group = v::Group::from_bytes(xml).unwrap();
+    let transform = VmlGroupTransform::from_group(&group).unwrap();
+    assert_eq!(transform.inline_leading_pt, 2.25);
+    assert_eq!(transform.inline_top_pt, 7.5);
+    let first = transform
+      .child_anchor_style(
+        group.style.as_deref(),
+        Some("position:absolute;left:110;top:0;width:400;height:200"),
+      )
+      .unwrap();
+    let first = vml_image_style(Some(&first));
+    assert_eq!(first.horizontal_offset_pt, 7.75);
+    assert_eq!(first.vertical_offset_pt, 7.5);
+    group.style = Some("position:absolute;left:0;top:0;width:100pt;height:50pt".into());
+    let floating = VmlGroupTransform::from_group(&group).unwrap();
+    assert_eq!(
+      (floating.inline_leading_pt, floating.inline_top_pt),
+      (0.0, 0.0)
     );
   }
 
@@ -43287,6 +46168,53 @@ mod tests {
   }
 
   #[test]
+  fn mapped_rich_text_sdt_uses_plain_bound_text_and_cached_insertion_format() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let bindings = CustomXmlBindings::from_test_xml(
+      Some(CORE_PROPERTIES_ID),
+      r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title>2024-06-07T00:00:00Z</dc:title></cp:coreProperties>"#,
+    );
+    for bound in [false, true] {
+      let binding = if bound {
+        format!(
+          r#"<w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/>"#
+        )
+      } else {
+        String::new()
+      };
+      let paragraph = w::Paragraph::from_bytes(format!(
+        r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtPr>{binding}<w:richText/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:sz w:val="28"/></w:rPr><w:t>cached</w:t></w:r></w:sdtContent></w:sdt></w:p>"#,
+      ).as_bytes()).expect("rich-text control");
+      let mut form_widget_ids = FormWidgetIdAllocator::default();
+      let inlines = paragraph_inlines(
+        &paragraph,
+        TextStyle::default(),
+        &StylesCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &bindings,
+        &mut form_widget_ids,
+      );
+      assert_eq!(
+        inline_text(&inlines),
+        if bound {
+          "2024-06-07T00:00:00Z"
+        } else {
+          "cached"
+        }
+      );
+      let run = inlines
+        .iter()
+        .find_map(|inline| match inline {
+          InlineItem::Text(run) => Some(run),
+          _ => None,
+        })
+        .expect("control text");
+      assert_eq!(run.style.font_size_pt, 14.0);
+    }
+  }
+
+  #[test]
   fn inline_placeholder_and_date_bindings_discard_cached_run_formatting() {
     const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
     let bindings = CustomXmlBindings::from_test_xml(
@@ -43872,6 +46800,60 @@ mod tests {
   }
 
   #[test]
+  fn numbering_suffix_tabs_merge_level_and_direct_sources_additively() {
+    let tabs = |content: &str| {
+      w::Tabs::from_bytes(format!(r#"<w:tabs xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{content}</w:tabs>"#).as_bytes()).unwrap()
+    };
+    let symbols = ImportSettings::default().decimal_tab_symbols;
+    let mut ruler = Vec::new();
+    apply_numbering_suffix_tabs(
+      &mut ruler,
+      &tabs(r#"<w:tab w:val="left" w:pos="1440"/>"#),
+      symbols,
+    );
+    apply_numbering_suffix_tabs(
+      &mut ruler,
+      &tabs(r#"<w:tab w:val="num" w:pos="1728"/>"#),
+      symbols,
+    );
+    assert_eq!(
+      ruler
+        .iter()
+        .map(|stop| stop.position_pt)
+        .collect::<Vec<_>>(),
+      vec![72.0, 86.4]
+    );
+    apply_numbering_suffix_tabs(
+      &mut ruler,
+      &tabs(r#"<w:tab w:val="clear" w:pos="1440"/>"#),
+      symbols,
+    );
+    assert_eq!(ruler.len(), 1);
+    assert_eq!(ruler[0].position_pt, 86.4);
+    // Clear removes an inherited stop; the group's own declaration remains.
+    apply_numbering_suffix_tabs(
+      &mut ruler,
+      &tabs(r#"<w:tab w:val="num" w:pos="1728"/><w:tab w:val="clear" w:pos="1728"/>"#),
+      symbols,
+    );
+    assert_eq!(ruler.len(), 1);
+    assert_eq!(ruler[0].position_pt, 86.4);
+    ruler.clear();
+    apply_numbering_suffix_tabs(
+      &mut ruler,
+      &tabs(r#"<w:tab w:val="num" w:pos="1728"/><w:tab w:val="left" w:pos="1440"/>"#),
+      symbols,
+    );
+    assert_eq!(
+      ruler
+        .iter()
+        .map(|stop| stop.position_pt)
+        .collect::<Vec<_>>(),
+      vec![86.4, 72.0]
+    );
+  }
+
+  #[test]
   fn empty_numbering_text_tabs_to_the_level_left_indent() {
     let level = w::Level::from_bytes(
       br#"<w:lvl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val=""/><w:pPr><w:ind w:left="1432" w:hanging="1432"/></w:pPr></w:lvl>"#,
@@ -43922,9 +46904,11 @@ mod tests {
     )
     .expect("picture bullet numbering level");
     let image = InlineImage {
+      contour_owned_wrap: None,
+      source_run_font_size_pt: None,
       data: Bytes::new(),
       content_type: Some("image/gif".into()),
-      blip_compression_state: common::BlipCompressionState::Unspecified,
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
       picture_frame: None,
       run_border: None,
       picture_frame_clips_image: false,
@@ -43943,6 +46927,7 @@ mod tests {
       line_box: InlineImageLineBox::CharacterLike,
       office_math_line_layout: None,
       office_math_display_layout: None,
+      office_math_metrics: None,
       crop: ImageCrop::default(),
       rotation_deg: 0.0,
       flip_horizontal: false,
@@ -44537,6 +47522,288 @@ mod tests {
   }
 
   #[test]
+  fn loaded_style_namespace_distinguishes_undefined_and_unpopulated_targets() {
+    let styles = StylesCatalog {
+      has_styles_part: true,
+      styles: HashMap::from([(
+        "DemoStyle".to_string(),
+        StyleEntry {
+          custom_style: true,
+          style_type: Some(w::StyleValues::Paragraph),
+          name: Some("Declared Name".to_string()),
+          ..StyleEntry::default()
+        },
+      )]),
+      ..StylesCatalog::default()
+    };
+    for name in [
+      "DemoStyle",
+      "declared-name",
+      "DEMO_STYLE",
+      "Declared Name Character",
+    ] {
+      assert!(
+        !styles.style_ref_name_requires_localized_error(name),
+        "{name}"
+      );
+    }
+    for name in ["Missing 7", "Überschrift 1", "Heading 1"] {
+      assert!(
+        styles.style_ref_name_requires_localized_error(name),
+        "{name}"
+      );
+    }
+    assert!(!styles.style_ref_name_requires_localized_error("1"));
+    assert!(!StylesCatalog::default().style_ref_name_requires_localized_error("Missing 7"));
+  }
+
+  #[test]
+  fn simplified_chinese_missing_style_resource_follows_normal_and_theme_fonts() {
+    // Actual Word controls vary Normal, the cached field and both theme
+    // collections independently. Only Normal's available face or the minor
+    // theme's Han face owns the generated error; cache fonts do not survive.
+    for theme in ["SimSun", "DengXian"] {
+      for (normal_ea, expected) in [
+        ("Calibri", theme),
+        ("Arial", theme),
+        ("DengXian", "DengXian"),
+        ("KaiTi", "KaiTi"),
+      ] {
+        for cached in ["Calibri", "Courier New"] {
+          let styles = StylesCatalog {
+            locales: OfficeLocaleContext::new(Some("zh-CN"), None, Some("en-US")),
+            doc_default_run: TextStyle {
+              font_family: Some(Arc::from("Calibri")),
+              east_asia_font_family: Some(Arc::from(normal_ea)),
+              ..TextStyle::default()
+            },
+            theme_fonts: ThemeFonts {
+              minor_supplemental: vec![(Arc::from("Hans"), Arc::from(theme))],
+              major_supplemental: vec![(Arc::from("Hans"), Arc::from("MS Mincho"))],
+              ..ThemeFonts::default()
+            },
+            ..StylesCatalog::default()
+          };
+          let mut inlines = Vec::new();
+          push_localized_missing_style_ref(
+            &mut inlines,
+            "Centered Heading",
+            TextStyle {
+              font_family: Some(Arc::from(cached)),
+              east_asia_font_family: Some(Arc::from("MS Mincho")),
+              font_size_pt: 11.0,
+              ..TextStyle::default()
+            },
+            None,
+            &styles,
+          );
+          let [InlineItem::Text(run)] = inlines.as_slice() else {
+            panic!("one generated resource");
+          };
+          assert_eq!(run.style.font_family.as_deref(), Some("Calibri"));
+          assert_eq!(
+            run.style.east_asia_font_family.as_deref(),
+            Some(expected),
+            "{theme}/{normal_ea}/{cached}"
+          );
+          assert_eq!(run.style.font_size_pt, 11.0);
+          assert!(run.style.bold);
+          assert_eq!(
+            run.style.wordprocessingml_font_hint,
+            Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia)
+          );
+          assert!(run.dynamic_field.is_none());
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn undefined_styleref_is_measured_as_its_resource_and_locked_caches_stay_authored() {
+    for complex in [false, true] {
+      for locked in [false, true] {
+        let lock = if locked { "1" } else { "0" };
+        let result = r#"<w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:sz w:val="28"/></w:rPr><w:t>CACHE KEEP</w:t></w:r>"#;
+        let field = if complex {
+          format!(
+            r#"<w:r><w:fldChar w:fldCharType="begin" w:fldLock="{lock}"/></w:r><w:r><w:instrText> STYLEREF "Überschrift 1" \* MERGEFORMAT </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>{result}<w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+          )
+        } else {
+          format!(
+            r#"<w:fldSimple w:instr=" STYLEREF &quot;Überschrift 1&quot; \* MERGEFORMAT " w:fldLock="{lock}">{result}</w:fldSimple>"#
+          )
+        };
+        let xml = format!(
+          r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{field}</w:p>"#
+        );
+        let p = w::Paragraph::from_bytes(xml.as_bytes()).expect("source field");
+        let styles = StylesCatalog {
+          has_styles_part: true,
+          locales: OfficeLocaleContext::new(Some("fr-CA"), Some("zh-CN"), Some("zh-CN")),
+          doc_default_run: TextStyle {
+            font_family: Some(Arc::from("OOXMLSDKDefinitelyMissingFont74331")),
+            ..TextStyle::default()
+          },
+          ..StylesCatalog::default()
+        };
+        let mut ids = FormWidgetIdAllocator::default();
+        let inlines = paragraph_inlines(
+          &p,
+          TextStyle::default(),
+          &styles,
+          &ImageCatalog::default(),
+          &HyperlinkCatalog::default(),
+          &CustomXmlBindings::default(),
+          &mut ids,
+        );
+        let [InlineItem::Text(text)] = inlines.as_slice() else {
+          panic!("one result")
+        };
+        assert!(text.dynamic_field.is_none());
+        if locked {
+          assert_eq!(text.text, "CACHE KEEP");
+          assert_eq!(text.style.font_family.as_deref(), Some("Courier New"));
+          assert_eq!(text.style.font_size_pt, 14.0);
+        } else {
+          assert_eq!(
+            text.text,
+            "Erreur! Utilisez l'onglet Accueil pour appliquer Überschrift 1 au texte que vous souhaitez faire apparaître ici."
+          );
+          assert_eq!(text.style.font_family.as_deref(), Some("Calibri"));
+          assert_eq!(text.style.high_ansi_font_family.as_deref(), Some("Calibri"));
+          assert_eq!(text.style.font_size_pt, 8.0);
+          assert!(text.style.bold);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn native_builtin_styleref_namespace_preserves_numeric_custom_and_unknown_routes() {
+    for (canonical, german, style_type) in (1..=9)
+      .map(|level| {
+        (
+          format!("heading {level}"),
+          format!("Überschrift {level}"),
+          w::StyleValues::Paragraph,
+        )
+      })
+      .chain([
+        (
+          "Subtitle".to_string(),
+          "Untertitel".to_string(),
+          w::StyleValues::Paragraph,
+        ),
+        (
+          "Intense Emphasis".to_string(),
+          "Intensive Hervorhebung".to_string(),
+          w::StyleValues::Character,
+        ),
+      ])
+    {
+      for language in ["de-DE", "en-US"] {
+        let mut styles = StylesCatalog {
+          has_styles_part: true,
+          locales: OfficeLocaleContext::new(Some(language), Some("zh-CN"), Some("zh-CN")),
+          styles: HashMap::from([(
+            "OpaqueSourceId".to_string(),
+            StyleEntry {
+              name: Some(canonical.clone()),
+              style_type: Some(style_type),
+              ..StyleEntry::default()
+            },
+          )]),
+          ..StylesCatalog::default()
+        };
+        let (native, foreign) = if language == "de-DE" {
+          (&german, &canonical)
+        } else {
+          (&canonical, &german)
+        };
+        assert!(!styles.style_ref_name_requires_localized_error(native));
+        assert!(styles.style_ref_name_requires_localized_error(foreign));
+        assert!(styles.style_ref_name_requires_localized_error("OpaqueSourceId"));
+        assert!(!styles.style_ref_name_requires_localized_error("1"));
+        if canonical == "Intense Emphasis" {
+          assert!(styles.style_ref_name_requires_localized_error("IntensiveHervorhebung"));
+          assert!(styles.style_ref_name_requires_localized_error("IntenseEmphasis"));
+        }
+        if style_type == w::StyleValues::Paragraph {
+          assert!(!styles.style_ref_name_requires_localized_error("OpaqueSourceIdCharacter"));
+        }
+        styles
+          .styles
+          .get_mut("OpaqueSourceId")
+          .unwrap()
+          .custom_style = true;
+        assert!(!styles.style_ref_name_requires_localized_error("OpaqueSourceId"));
+        assert!(!styles.style_ref_name_requires_localized_error(&canonical));
+        assert!(styles.style_ref_name_requires_localized_error(&german));
+        styles.styles.get_mut("OpaqueSourceId").unwrap().name = Some(german.clone());
+        assert!(!styles.style_ref_name_requires_localized_error(&german));
+      }
+    }
+    let styles = StylesCatalog {
+      has_styles_part: true,
+      locales: OfficeLocaleContext::new(Some("fr-CA"), Some("zh-CN"), Some("zh-CN")),
+      styles: HashMap::from([(
+        "OpaqueSourceId".to_string(),
+        StyleEntry {
+          name: Some("heading 1".to_string()),
+          style_type: Some(w::StyleValues::Paragraph),
+          ..StyleEntry::default()
+        },
+      )]),
+      ..StylesCatalog::default()
+    };
+    assert!(!styles.style_ref_name_requires_localized_error("OpaqueSourceId"));
+    assert!(!styles.style_ref_name_requires_localized_error("heading 1"));
+    assert!(
+      styles
+        .style_ref_keys("OpaqueSourceId")
+        .iter()
+        .any(|key| key.as_ref() == "OpaqueSourceId")
+    );
+  }
+
+  #[test]
+  fn german_named_styleref_remains_dynamic_before_line_measurement() {
+    let paragraph = w::Paragraph::from_bytes(
+      r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldSimple w:instr=" STYLEREF &quot;Überschrift 1&quot; \* MERGEFORMAT "><w:r><w:t>CACHE</w:t></w:r></w:fldSimple></w:p>"#.as_bytes(),
+    ).expect("localized field");
+    let styles = StylesCatalog {
+      has_styles_part: true,
+      locales: OfficeLocaleContext::new(Some("de-DE"), Some("zh-CN"), Some("zh-CN")),
+      styles: HashMap::from([(
+        "berschrift1".to_string(),
+        StyleEntry {
+          name: Some("heading 1".to_string()),
+          style_type: Some(w::StyleValues::Paragraph),
+          ..StyleEntry::default()
+        },
+      )]),
+      ..StylesCatalog::default()
+    };
+    let mut ids = FormWidgetIdAllocator::default();
+    let inlines = paragraph_inlines(
+      &paragraph,
+      TextStyle::default(),
+      &styles,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut ids,
+    );
+    let [InlineItem::Text(text)] = inlines.as_slice() else {
+      panic!("one dynamic field")
+    };
+    assert_eq!(text.text, "CACHE");
+    assert!(
+      matches!(&text.dynamic_field, Some(DynamicFieldKind::StyleRef { style_name, .. }) if style_name.as_ref() == "Überschrift 1")
+    );
+  }
+
+  #[test]
   fn style_ref_keys_mark_only_authored_custom_style_names() {
     let mut styles = StylesCatalog {
       simplified_chinese_ui: true,
@@ -44588,6 +47855,56 @@ mod tests {
     assert!(!styles.style_ref_name_requires_localized_error("foobar"));
     styles.styles.get_mut("Heading1").unwrap().custom_style = true;
     assert!(!styles.style_ref_name_requires_localized_error("Heading 1"));
+  }
+
+  #[test]
+  fn style_ref_implicit_default_matches_explicit_paragraph_style() {
+    let styles = StylesCatalog {
+      default_paragraph_style_id: Some("BodyDefault".to_string()),
+      styles: HashMap::from([
+        (
+          "BodyDefault".to_string(),
+          StyleEntry {
+            name: Some("Normal".to_string()),
+            style_type: Some(w::StyleValues::Paragraph),
+            ..Default::default()
+          },
+        ),
+        (
+          "Other".to_string(),
+          StyleEntry {
+            name: Some("Other".to_string()),
+            custom_style: true,
+            style_type: Some(w::StyleValues::Paragraph),
+            ..Default::default()
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+    for style_id in [None, Some("BodyDefault"), Some("Other")] {
+      let properties = style_id
+        .map(|id| format!(r#"<w:pPr><w:pStyle w:val="{id}"/></w:pPr>"#))
+        .unwrap_or_default();
+      let paragraph = w::Paragraph::from_bytes(format!(r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{properties}<w:r><w:t>PRECEDING NORMAL TEXT</w:t></w:r></w:p>"#).as_bytes()).unwrap();
+      let model = paragraph_model(
+        &paragraph,
+        &styles,
+        &mut NumberingCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &CustomXmlBindings::default(),
+        &mut FormWidgetIdAllocator::default(),
+      );
+      assert_eq!(
+        model.style_ref_keys,
+        styles.style_ref_keys(style_id.unwrap_or("BodyDefault"))
+      );
+      assert_eq!(
+        model.style_ref_text.as_deref(),
+        Some("PRECEDING NORMAL TEXT")
+      );
+    }
   }
 
   #[test]
@@ -44867,6 +48184,160 @@ mod tests {
       (w::ThemeFontValues::MinorBidi, "Arial"),
     ] {
       assert_eq!(english.resolve(Some(token)).as_deref(), Some(expected));
+    }
+  }
+
+  #[test]
+  fn word_font_table_initial_latin_records_reuse_loaded_ansi_charset() {
+    use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
+    for (name, class, expected_class) in [
+      ("Times New Roman", "roman", FontFamilyClass::Serif),
+      ("tImEs NeW rOmAn", "roman", FontFamilyClass::Serif),
+      ("Arial", "swiss", FontFamilyClass::SansSerif),
+    ] {
+      let xml = format!(
+        r#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="{name}"><w:altName w:val="Retained Alternate"/><w:charset w:val="80"/><w:family w:val="{class}"/><w:pitch w:val="variable"/></w:font>"#
+      );
+      let font = w::Font::from_bytes(xml.as_bytes()).unwrap();
+      let mut queries = 0;
+      let (_, value) = font_substitution_with_system_realization(&font, |requested| {
+        assert_eq!(requested, name);
+        queries += 1;
+        true
+      })
+      .unwrap();
+      assert_eq!(value.charset, Some(FontCharset::Ansi));
+      assert_eq!(value.family_class, Some(expected_class));
+      assert_eq!(value.pitch, Some(FontPitch::Variable));
+      assert_eq!(
+        value.alternate_family.as_deref(),
+        Some("Retained Alternate")
+      );
+      assert_eq!(queries, 1);
+    }
+  }
+
+  #[test]
+  fn word_font_table_initial_records_require_a_same_name_installed_face() {
+    for name in ["Times New Roman", "Arial"] {
+      for embedded in ["", r#"<w:embedRegular r:id="private-font"/>"#] {
+        let xml = format!(
+          r#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" w:name="{name}"><w:charset w:val="80"/>{embedded}</w:font>"#
+        );
+        let font = w::Font::from_bytes(xml.as_bytes()).unwrap();
+        let mut queries = 0;
+        let (_, value) = font_substitution_with_system_realization(&font, |_| {
+          queries += 1;
+          false
+        })
+        .unwrap();
+        assert_eq!(value.charset, Some(ooxmlsdk_fonts::FontCharset::ShiftJis));
+        assert_eq!(queries, 1);
+      }
+    }
+  }
+
+  #[test]
+  fn word_font_table_initial_records_preserve_other_faces_and_charsets() {
+    for (name, charset) in [
+      ("Liberation Serif", "80"),
+      ("Calibri", "80"),
+      ("MS PMincho", "80"),
+      ("OOXMLSDK Missing Initial Record", "80"),
+      ("Times New Roman", "00"),
+      ("Times New Roman", "86"),
+      ("Arial", "02"),
+      ("Arial", "88"),
+    ] {
+      let xml = format!(
+        r#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="{name}"><w:charset w:val="{charset}"/></w:font>"#
+      );
+      let font = w::Font::from_bytes(xml.as_bytes()).unwrap();
+      let expected = word_font_table_charset(font.font_char_set.as_ref());
+      let (_, value) = font_substitution_with_system_realization(&font, |_| {
+        panic!("unrelated font records need no new physical query")
+      })
+      .unwrap();
+      assert_eq!(value.charset, expected, "{name}/{charset}");
+    }
+  }
+
+  #[test]
+  fn word_font_table_outline_realization_normalizes_only_proven_raster_kind_mismatch() {
+    use ooxmlsdk_fonts::FontCharset;
+    for (record, physical_true_type, expected, queries) in [
+      (r#"<w:charset w:val="80"/><w:notTrueType/>"#, true, None, 1),
+      (
+        r#"<w:charset w:val="80"/><w:notTrueType w:val="true"/>"#,
+        true,
+        None,
+        1,
+      ),
+      (
+        r#"<w:charset w:val="80"/><w:notTrueType w:val="true"/>"#,
+        false,
+        Some(FontCharset::ShiftJis),
+        1,
+      ),
+      (
+        r#"<w:charset w:val="80"/><w:notTrueType w:val="false"/>"#,
+        true,
+        Some(FontCharset::ShiftJis),
+        0,
+      ),
+      (
+        r#"<w:charset w:val="80"/>"#,
+        true,
+        Some(FontCharset::ShiftJis),
+        0,
+      ),
+      (
+        r#"<w:charset w:val="00"/><w:notTrueType/>"#,
+        true,
+        Some(FontCharset::Ansi),
+        0,
+      ),
+      (r#"<w:charset w:val="01"/><w:notTrueType/>"#, true, None, 0),
+    ] {
+      let xml = format!(
+        r#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="Liberation Serif"><w:altName w:val="Times New Roman"/>{record}</w:font>"#
+      );
+      let font = w::Font::from_bytes(xml.as_bytes()).unwrap();
+      let mut actual_queries = 0;
+      let (_, value) = font_substitution_with_system_realization(&font, |family| {
+        assert_eq!(family, "Liberation Serif");
+        actual_queries += 1;
+        physical_true_type
+      })
+      .unwrap();
+      assert_eq!(
+        value.charset, expected,
+        "{record}, physical={physical_true_type}"
+      );
+      assert_eq!(actual_queries, queries);
+    }
+  }
+
+  #[test]
+  fn word_font_table_outline_realization_retains_panose_and_signature_controls() {
+    for extra in [
+      r#"<w:panose1 w:val="02020603050405020304"/>"#,
+      r#"<w:panose1 w:val="020F0502020204030204"/>"#,
+      r#"<w:sig w:usb0="00000000" w:usb1="00000000" w:usb2="00000000" w:usb3="00000000" w:csb0="00020000" w:csb1="00000000"/>"#,
+    ] {
+      let (before, after) = if extra.contains("panose1") {
+        (extra, "")
+      } else {
+        ("", extra)
+      };
+      let xml = format!(
+        r#"<w:font xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:name="Liberation Serif">{before}<w:charset w:val="80"/><w:family w:val="roman"/><w:pitch w:val="variable"/>{after}</w:font>"#
+      );
+      let font = w::Font::from_bytes(xml.as_bytes()).unwrap();
+      let (_, value) =
+        font_substitution_with_system_realization(&font, |_| panic!("no outline conflict"))
+          .unwrap();
+      assert_eq!(value.charset, Some(ooxmlsdk_fonts::FontCharset::ShiftJis));
     }
   }
 
@@ -45297,6 +48768,7 @@ mod tests {
     assert_eq!(authored.complex_font_size_pt, Some(10.0));
     assert_eq!(authored.language.as_deref(), Some("en-US"));
     assert_eq!(authored.east_asia_language, None);
+    assert!(authored.wordprocessingml_han_fallback);
 
     let omitted = word_doc_default_run_seed(false, &locales);
     assert_eq!(omitted.font_size_pt, 11.0);
@@ -45304,6 +48776,10 @@ mod tests {
     assert_eq!(omitted.language.as_deref(), Some("en-US"));
     assert_eq!(omitted.east_asia_language.as_deref(), Some("zh-CN"));
     assert_eq!(omitted.bidi_language.as_deref(), Some("ar-SA"));
+    assert!(omitted.wordprocessingml_han_fallback);
+    assert!(
+      properties::run_style(None, omitted, &StylesCatalog::default()).wordprocessingml_han_fallback
+    );
   }
 
   #[test]
@@ -45790,6 +49266,243 @@ mod tests {
   }
 
   #[test]
+  fn word_balance_reference_preserves_native_source_levels() {
+    let catalog = StylesCatalog {
+      locales: OfficeLocaleContext::new(Some("en-US"), Some("zh-CN"), Some("zh-CN")),
+      theme_fonts: ThemeFonts {
+        minor_supplemental: vec![(Arc::from("Hans"), Arc::from("宋体"))],
+        ..Default::default()
+      },
+      font_table_names: Some(HashSet::from([
+        "times new roman".into(),
+        "microsoft yahei".into(),
+      ])),
+      ..Default::default()
+    };
+    let defaults = w::RunPropertiesBaseStyle {
+      run_fonts: Some(w::RunFonts {
+        ascii: Some("Times New Roman".into()),
+        east_asia: Some("Times New Roman".into()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut base = TextStyle {
+      wordprocessingml_balance_single_byte_double_byte_width: true,
+      ..Default::default()
+    };
+    properties::merge_doc_default_run_style(
+      &mut base,
+      Some(&defaults),
+      &catalog.theme_fonts,
+      &catalog.theme_colors,
+    );
+    catalog.apply_font_substitution(&mut base);
+    assert_eq!(base.font_family.as_deref(), Some("Times New Roman"));
+    assert_eq!(
+      base.east_asia_font_family.as_deref(),
+      Some("Times New Roman")
+    );
+    assert_eq!(
+      base
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("宋体")
+    );
+
+    // A CS-only declaration cannot erase the inherited reference.
+    let cs_only = w::RunPropertiesBaseStyle {
+      run_fonts: Some(w::RunFonts {
+        complex_script: Some("Tahoma".into()),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut partial = TextStyle::default();
+    properties::merge_run_style(
+      &mut partial,
+      Some(RunProps::BaseStyle(&cs_only)),
+      &catalog.theme_fonts,
+      &catalog.theme_colors,
+    );
+    let mut inherited = base.clone();
+    merge_style_values(&mut inherited, &partial);
+    catalog.apply_font_substitution(&mut inherited);
+    assert_eq!(
+      inherited.wordprocessingml_balance_reference_font_family,
+      base.wordprocessingml_balance_reference_font_family
+    );
+
+    // Normal/direct TNR replaces the reference despite equal painted EA names.
+    properties::merge_run_style(
+      &mut partial,
+      Some(RunProps::BaseStyle(&defaults)),
+      &catalog.theme_fonts,
+      &catalog.theme_colors,
+    );
+    assert!(!partial.wordprocessingml_balance_single_byte_double_byte_width);
+    let mut explicit = base.clone();
+    merge_style_values(&mut explicit, &partial);
+    catalog.apply_font_substitution(&mut explicit);
+    assert_eq!(
+      explicit
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("Times New Roman")
+    );
+    assert_eq!(explicit.wordprocessingml_balance_reference_theme, None);
+    let mut ignored = base.clone();
+    merge_style_values_with_font_selection(&mut ignored, &partial, false);
+    assert_eq!(
+      ignored.wordprocessingml_balance_reference_font_family,
+      base.wordprocessingml_balance_reference_font_family
+    );
+
+    let mut yahei_defaults = defaults;
+    yahei_defaults.run_fonts.as_mut().unwrap().east_asia = Some("Microsoft YaHei".into());
+    let mut yahei = base.clone();
+    properties::merge_doc_default_run_style(
+      &mut yahei,
+      Some(&yahei_defaults),
+      &catalog.theme_fonts,
+      &catalog.theme_colors,
+    );
+    catalog.apply_font_substitution(&mut yahei);
+    assert_eq!(
+      yahei
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("Microsoft YaHei")
+    );
+    assert_eq!(yahei.font_family.as_deref(), Some("Times New Roman"));
+  }
+
+  #[test]
+  fn word_balance_reference_keeps_explicit_theme_without_paint_slot_resolution() {
+    let theme = ThemeFonts {
+      major_supplemental: vec![(Arc::from("Jpan"), Arc::from("MS Mincho"))],
+      minor_supplemental: vec![(Arc::from("Jpan"), Arc::from("MS Gothic"))],
+      ..Default::default()
+    };
+    assert_eq!(theme.resolve(Some(w::ThemeFontValues::MajorEastAsia)), None);
+    let props = w::RunPropertiesBaseStyle {
+      run_fonts: Some(w::RunFonts {
+        east_asia_theme: Some(w::ThemeFontValues::MajorEastAsia),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let mut partial = TextStyle::default();
+    properties::merge_run_style(
+      &mut partial,
+      Some(RunProps::BaseStyle(&props)),
+      &theme,
+      &ThemeColors::default(),
+    );
+    assert_eq!(
+      partial.wordprocessingml_balance_reference_theme,
+      Some(w::ThemeFontValues::MajorEastAsia)
+    );
+    // Ordinary paint fallback remains independent from the reference source.
+    assert_eq!(
+      partial.east_asia_font_family.as_deref(),
+      Some("Times New Roman")
+    );
+    let mut effective = TextStyle {
+      wordprocessingml_balance_single_byte_double_byte_width: true,
+      ..Default::default()
+    };
+    merge_style_values(&mut effective, &partial);
+    resolve_word_balance_reference_font(&theme, Some("ja-JP"), None, &mut effective);
+    assert_eq!(
+      effective
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("MS Mincho")
+    );
+    assert_eq!(
+      effective.east_asia_font_family.as_deref(),
+      Some("Times New Roman")
+    );
+
+    let source_only = TextStyle {
+      wordprocessingml_balance_reference_theme: Some(w::ThemeFontValues::MinorEastAsia),
+      ..Default::default()
+    };
+    let mut excluded = effective.clone();
+    merge_style_values_with_font_selection(&mut excluded, &source_only, false);
+    assert_eq!(
+      excluded.wordprocessingml_balance_reference_theme,
+      Some(w::ThemeFontValues::MajorEastAsia)
+    );
+    merge_style_values(&mut effective, &source_only);
+    resolve_word_balance_reference_font(&theme, Some("ja-JP"), None, &mut effective);
+    assert_eq!(
+      effective
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("MS Gothic")
+    );
+  }
+
+  #[test]
+  fn word_balance_reference_uses_complete_font_membership_and_theme_locale() {
+    let fonts = w::Fonts::from_bytes(br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="Times New Roman"/><w:font w:name="Microsoft YaHei"/></w:fonts>"#).unwrap();
+    let names = declared_word_font_names(&fonts);
+    assert_eq!(names.len(), 2);
+    let theme = ThemeFonts {
+      minor_supplemental: vec![
+        (Arc::from("Hans"), Arc::from("宋体")),
+        (Arc::from("Jpan"), Arc::from("MS Mincho")),
+      ],
+      ..Default::default()
+    };
+    let make_style = || TextStyle {
+      font_family: Some(Arc::from("Times New Roman")),
+      east_asia_font_family: Some(Arc::from("Microsoft YaHei")),
+      wordprocessingml_balance_reference_font_family: Some(Arc::from("Microsoft YaHei")),
+      wordprocessingml_balance_single_byte_double_byte_width: true,
+      ..Default::default()
+    };
+    let mut declared = make_style();
+    resolve_word_balance_reference_font(&theme, Some("zh-CN"), Some(&names), &mut declared);
+    assert_eq!(
+      declared
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("Microsoft YaHei")
+    );
+    let missing = HashSet::from(["times new roman".to_owned()]);
+    for (language, expected) in [("zh-CN", "宋体"), ("ja-JP", "MS Mincho")] {
+      let mut undeclared = make_style();
+      resolve_word_balance_reference_font(&theme, Some(language), Some(&missing), &mut undeclared);
+      assert_eq!(
+        undeclared
+          .wordprocessingml_balance_reference_font_family
+          .as_deref(),
+        Some(expected)
+      );
+      assert_eq!(
+        undeclared.east_asia_font_family.as_deref(),
+        Some("Microsoft YaHei")
+      );
+    }
+    let mut absent = make_style();
+    resolve_word_balance_reference_font(&theme, Some("zh-CN"), None, &mut absent);
+    assert_eq!(
+      absent
+        .wordprocessingml_balance_reference_font_family
+        .as_deref(),
+      Some("Microsoft YaHei")
+    );
+    let mut disabled = make_style();
+    disabled.wordprocessingml_balance_single_byte_double_byte_width = false;
+    let before = disabled.clone();
+    resolve_word_balance_reference_font(&theme, Some("zh-CN"), Some(&missing), &mut disabled);
+    assert_eq!(disabled, before);
+  }
+
+  #[test]
   fn word_theme_font_language_selects_supplemental_east_asian_face() {
     let fonts = ThemeFonts {
       major_ascii: Some(Arc::from("Cambria")),
@@ -45980,6 +49693,253 @@ mod tests {
     assert!((shape.shape.text_inset_top_pt - 12.725).abs() < 0.001);
     assert!((shape.shape.text_inset_right_pt - 16.325).abs() < 0.001);
     assert!((shape.shape.text_inset_bottom_pt - 12.725).abs() < 0.001);
+  }
+
+  #[test]
+  fn word_chart_defaults_follow_source_application_version() {
+    use ooxmlsdk::parts::style_definitions_part::StyleDefinitionsPart;
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    // Actual Word exports: changing only app.xml changes both default size
+    // and IncludeInLayout. Neither paragraph compatibility nor chart type
+    // selects this mode. Explicit overlay values override either default.
+    for (application, version, legacy) in [
+      (None, None, false),
+      (Some("Microsoft Office Word"), None, false),
+      (None, Some("12.0000"), false),
+      (Some("Microsoft Office Word"), Some("0.0000"), true),
+      (Some("Microsoft Office Word"), Some("9.0000"), true),
+      (Some("Microsoft Office Word"), Some("11.0000"), true),
+      (Some("Microsoft Office Word"), Some("12.0000"), true),
+      (Some("Microsoft Office Word"), Some("12.9999"), true),
+      (Some("Microsoft Office Word"), Some("13.0000"), false),
+      (Some("Microsoft Office Word"), Some("14.0000"), false),
+      (Some("Microsoft Office Word"), Some("16.0000"), false),
+      (Some("Microsoft Macintosh Word"), Some("12.0000"), true),
+      (Some("Microsoft Excel"), Some("12.0000"), true),
+      (Some("Microsoft PowerPoint"), Some("12.0000"), true),
+      (Some("Microsoft Macintosh Excel"), Some("12.0000"), true),
+      (
+        Some("Microsoft Macintosh PowerPoint"),
+        Some("12.0000"),
+        true,
+      ),
+      (Some("LibreOffice"), Some("12.0000"), false),
+      (Some("microsoft office word"), Some("12.0000"), false),
+      (Some("Microsoft Custom"), Some("12.0000"), false),
+      (Some("Microsoft Office Word 2007"), Some("12.0000"), false),
+      (Some("Microsoft Word"), Some("12.0000"), false),
+      (Some("Microsoft Office Excel"), Some("12.0000"), false),
+    ] {
+      for has_styles in [false, true] {
+        let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+        let main = package.add_main_document_part().unwrap();
+        main.set_data(&mut package, br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#.to_vec()).unwrap();
+        if application.is_some() || version.is_some() {
+          let application = application.map_or(String::new(), |name| {
+            format!("<Application>{name}</Application>")
+          });
+          let version = version.map_or(String::new(), |value| {
+            format!("<AppVersion>{value}</AppVersion>")
+          });
+          package.add_extended_file_properties_part().unwrap().set_data(&mut package, format!(r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">{application}{version}</Properties>"#).into_bytes()).unwrap();
+        }
+        if has_styles {
+          main.add_new_part_auto_id::<_, StyleDefinitionsPart>(&mut package).unwrap().set_data(&mut package, br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.to_vec()).unwrap();
+        }
+        let styles = StylesCatalog::load(
+          &package,
+          &main,
+          ImportSettings::default(),
+          &OfficeLocaleContext::default(),
+        )
+        .unwrap();
+        assert_eq!(
+          styles.legacy_chart_defaults, legacy,
+          "{application:?} {version:?}"
+        );
+        for (overlay, expected_overlay) in [
+          ("", !legacy),
+          ("<c:overlay/>", !legacy),
+          ("<c:overlay val=\"0\"/>", false),
+          ("<c:overlay val=\"1\"/>", true),
+        ] {
+          let xml = format!(
+            r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:p><a:pPr><a:defRPr/></a:pPr><a:r><a:t>Sales</a:t></a:r></a:p></c:rich></c:tx>{overlay}</c:title><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>"#
+          );
+          let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+          let shapes = chart_space_shapes(
+            &source,
+            None,
+            432.0,
+            252.0,
+            ImagePlacement::Inline,
+            DrawingEffectExtent::default(),
+            &styles,
+          )
+          .unwrap();
+          let chart = shapes[0].chart.as_ref().unwrap();
+          assert_eq!(chart.title_overlay, expected_overlay);
+          assert_eq!(
+            chart.title_style.font_size_pt,
+            if legacy { 18.0 } else { 10.0 }
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_chart_rich_title_defaults_follow_native_property_ownership() {
+    let tx = |size| {
+      format!(
+        r#"<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="{size}"/></a:pPr></a:p></c:txPr>"#
+      )
+    };
+    // Actual Word Font2 sizes from independent defRPr/run/title/global
+    // controls. The exported PDF confirms the same nominal sizes after
+    // normal device-grid realization; frame dimensions do not scale them.
+    for (paragraph, run, global_size, title_size, expected_size, expected_kern) in [
+      ("<a:pPr><a:defRPr/></a:pPr>", "", None, None, 10.0, 12.0),
+      ("<a:pPr/>", "", None, None, 18.0, 0.0),
+      ("", "", None, Some(1200), 18.0, 0.0),
+      ("", "", Some(1200), None, 18.0, 0.0),
+      (
+        "<a:pPr><a:defRPr b=\"0\"/></a:pPr>",
+        "",
+        None,
+        None,
+        10.0,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr lang=\"en-US\"/></a:pPr>",
+        "",
+        None,
+        None,
+        10.0,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr/></a:pPr>",
+        "",
+        None,
+        Some(1200),
+        10.0,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr/></a:pPr>",
+        "",
+        Some(1200),
+        Some(2000),
+        14.4,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr sz=\"1400\"/></a:pPr>",
+        "",
+        None,
+        Some(1200),
+        14.0,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr sz=\"1400\"/></a:pPr>",
+        "",
+        Some(1200),
+        None,
+        14.0,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr/></a:pPr>",
+        "sz=\"1800\"",
+        None,
+        None,
+        18.0,
+        12.0,
+      ),
+      (
+        "<a:pPr><a:defRPr kern=\"0\"/></a:pPr>",
+        "",
+        None,
+        None,
+        10.0,
+        0.0,
+      ),
+    ] {
+      let global = global_size.map(tx).unwrap_or_default();
+      let title = title_size.map(tx).unwrap_or_default();
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p>{paragraph}<a:r><a:rPr {run} b="1"><a:latin typeface="Cambria"/></a:rPr><a:t>Sales</a:t></a:r></a:p></c:rich></c:tx>{title}</c:title>
+          <c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:ptCount val="1"/><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart></c:plotArea></c:chart>{global}</c:chartSpace>"#
+      );
+      for (style_xml, modern) in [
+        ("", false),
+        (r#"<c:style val="18"/>"#, false),
+        (
+          r#"<c14:style xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart" val="102"/>"#,
+          true,
+        ),
+        (
+          r#"<c14:style xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart" val="118"/>"#,
+          true,
+        ),
+      ] {
+        let xml = xml.replacen("<c:chart>", &format!("{style_xml}<c:chart>"), 1);
+        let chart_space = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+        let expected_size = if modern && expected_size == 10.0 {
+          18.0
+        } else {
+          expected_size
+        };
+        for (width, height, legacy_chart_defaults) in [
+          (235.0, 181.0, false),
+          (432.0, 252.0, false),
+          (235.0, 181.0, true),
+          (432.0, 252.0, true),
+        ] {
+          let expected_size = if legacy_chart_defaults && expected_size == 10.0 {
+            18.0
+          } else {
+            expected_size
+          };
+          let shapes = chart_space_shapes(
+            &chart_space,
+            None,
+            width,
+            height,
+            ImagePlacement::Inline,
+            DrawingEffectExtent::default(),
+            &StylesCatalog {
+              legacy_chart_defaults,
+              ..StylesCatalog::default()
+            },
+          )
+          .expect("imported chart");
+          let chart = shapes[0].chart.as_ref().expect("chart payload");
+          let style = &chart.title_style;
+          assert!(
+            (style.font_size_pt - expected_size).abs() < 0.000_01,
+            "{xml}"
+          );
+          let expected_kern = if expected_kern == 0.0 {
+            f32::INFINITY
+          } else {
+            expected_kern
+          };
+          assert_eq!(style.kerning_minimum_size_pt, Some(expected_kern), "{xml}");
+          assert_eq!(style.font_family.as_deref(), Some("Cambria"));
+          assert!(style.bold);
+          assert_eq!(
+            chart.label_style.font_size_pt,
+            global_size.map_or(10.0, |size| size as f32 / 100.0)
+          );
+        }
+      }
+    }
   }
 
   #[test]
@@ -46327,6 +50287,41 @@ mod tests {
   }
 
   #[test]
+  fn word_single_path_group_frame_retains_native_integer_source_edges() {
+    let group: wpg::GroupShapeProperties = r#"<wpg:grpSpPr xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:xfrm><a:off x="0" y="0"/><a:ext cx="1733040" cy="1123200"/><a:chOff x="0" y="0"/><a:chExt cx="1733040" cy="1123200"/></a:xfrm></wpg:grpSpPr>"#.parse().unwrap();
+    let transform = wordprocessing_group_text_frame(&group).unwrap();
+    // Actual WWLIB a22cea child-rectangle captures, with unchanged text.
+    for (width, expected_right) in [
+      (1_330_200, 1_543_929),
+      (1_332_229, 1_545_958),
+      (1_332_231, 1_545_960),
+    ] {
+      let shape: wps::WordprocessingShape = format!(r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="213840" y="254160"/><a:ext cx="{width}" cy="147240"/></a:xfrm></wps:spPr></wps:wsp>"#).parse().unwrap();
+      assert_eq!(
+        transform.shape_frame(&shape).unwrap().bounds_emu,
+        [213_825, 254_042, expected_right, 401_214]
+      );
+    }
+    let mut group_transform = DrawingMlGroupTransform::identity();
+    group_transform.wordprocessing_text_frame = Some(transform);
+    // Nested-host realization has not been observed. Retain the established
+    // route instead of guessing an extra quantization at every group level.
+    assert!(
+      group_transform
+        .child(DrawingMlGroupXfrm::default())
+        .wordprocessing_text_frame
+        .is_none()
+    );
+    let mut invalid = group.clone();
+    invalid.transform_group.as_mut().unwrap().rotation = Some(60_000);
+    assert!(wordprocessing_group_text_frame(&invalid).is_none());
+    let zero: wpg::GroupShapeProperties = r#"<wpg:grpSpPr xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:xfrm><a:ext cx="0" cy="1123200"/></a:xfrm></wpg:grpSpPr>"#.parse().unwrap();
+    assert!(wordprocessing_group_text_frame(&zero).is_none());
+    let zero_child: wpg::GroupShapeProperties = r#"<wpg:grpSpPr xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:xfrm><a:ext cx="1733040" cy="1123200"/><a:chExt cx="0" cy="1123200"/></a:xfrm></wpg:grpSpPr>"#.parse().unwrap();
+    assert!(wordprocessing_group_text_frame(&zero_child).is_none());
+  }
+
+  #[test]
   fn wordprocessing_twip_hosts_truncate_emu_remainders() {
     for value_emu in [724_535, 724_536, 724_852, 724_853, 724_992, 725_169] {
       assert_eq!(wordprocessing_twip_host_emu_to_points(value_emu), 57.05);
@@ -46336,6 +50331,31 @@ mod tests {
     assert_eq!(wordprocessing_twip_host_emu_to_points(1_677_725), 132.1);
     assert_eq!(wordprocessing_twip_host_emu_to_points(1_882_747), 148.2);
     assert_eq!(wordprocessing_twip_host_emu_to_points(-104_609), -8.2);
+  }
+
+  #[test]
+  fn drawingml_full_turn_preserves_shape_and_group_identity() {
+    for angle in [0.0, 360.0, 720.0, -360.0] {
+      let mapped = DrawingMlGroupTransform::identity()
+        .map_rect((10.0, 20.0, 120.0, 80.0), (angle, false, false));
+      assert_eq!(mapped.rotation_deg, 0.0);
+      assert_eq!(
+        (mapped.x_pt, mapped.y_pt, mapped.width_pt, mapped.height_pt),
+        (10.0, 20.0, 120.0, 80.0)
+      );
+      let grouped = DrawingMlGroupTransform::identity().child(DrawingMlGroupXfrm {
+        rotation_deg: angle,
+        width_pt: 120.0,
+        height_pt: 80.0,
+        child_width: 120.0,
+        child_height: 80.0,
+        ..Default::default()
+      });
+      assert_eq!(grouped.affine, Affine::IDENTITY);
+    }
+    let smallest_authored_angle = DrawingMlGroupTransform::identity()
+      .map_rect((0.0, 0.0, 120.0, 80.0), (1.0 / 60_000.0, false, false));
+    assert!(smallest_authored_angle.rotation_deg > f32::EPSILON);
   }
 
   #[test]
@@ -46751,6 +50771,59 @@ mod tests {
   }
 
   #[test]
+  fn locked_canvas_missing_latin_face_keeps_its_native_substitution_after_run_cascade() {
+    let text_body = a::TextBody::from_bytes(
+      br#"<a:txBody xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:bodyPr/>
+        <a:lstStyle><a:lvl1pPr><a:defRPr>
+          <a:latin typeface="OOXMLSDK Missing Canvas Font"/>
+        </a:defRPr></a:lvl1pPr></a:lstStyle>
+        <a:p>
+          <a:r><a:rPr sz="1600"/><a:t>Inherited</a:t></a:r>
+          <a:r><a:rPr sz="1800"><a:latin typeface="Arial"/></a:rPr><a:t>Installed</a:t></a:r>
+        </a:p>
+      </a:txBody>"#,
+    )
+    .unwrap();
+    let mut styles = StylesCatalog::default();
+    styles.doc_default_run.font_family = Some(Arc::from("Cambria"));
+    styles.theme_fonts.minor_ascii = Some(Arc::from("Tahoma"));
+    for legacy in [false, true] {
+      let frame = drawingml_gvml_text_body_frame(
+        &text_body,
+        &styles,
+        &ImageCatalog::default(),
+        RgbColor { r: 0, g: 0, b: 0 },
+        legacy,
+      )
+      .unwrap();
+      let [Block::Paragraph(paragraph)] = frame.blocks.as_slice() else {
+        panic!("one paragraph")
+      };
+      let [InlineItem::Text(inherited), InlineItem::Text(installed)] = paragraph.inlines.as_slice()
+      else {
+        panic!("two runs")
+      };
+      assert_eq!(
+        inherited.style.font_family.as_deref(),
+        Some("OOXMLSDK Missing Canvas Font")
+      );
+      assert_eq!(installed.style.font_family.as_deref(), Some("Arial"));
+      for style in [&paragraph.base_style, &inherited.style, &installed.style] {
+        assert_eq!(
+          style.fallback_font_family.as_deref(),
+          legacy.then_some("Calibri")
+        );
+      }
+    }
+    assert_eq!(
+      styles.doc_default_run.font_family.as_deref(),
+      Some("Cambria")
+    );
+    assert!(styles.doc_default_run.fallback_font_family.is_none());
+  }
+
+  #[test]
   fn gvml_text_inherits_list_kerning_and_applies_direct_overrides() {
     let text_body = a::TextBody::from_bytes(
       br#"<a:txBody xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -46768,6 +50841,7 @@ mod tests {
       &StylesCatalog::default(),
       &ImageCatalog::default(),
       RgbColor { r: 0, g: 0, b: 0 },
+      false,
     )
     .expect("GVML text frame");
     let [
@@ -46791,6 +50865,153 @@ mod tests {
     assert_eq!(inherited.style.kerning_minimum_size_pt, Some(12.0));
     assert_eq!(threshold.style.kerning_minimum_size_pt, Some(66.01));
     assert_eq!(disabled.style.kerning_minimum_size_pt, Some(f32::INFINITY));
+  }
+
+  #[test]
+  fn wordprocessing_shape_auto_color_uses_encoded_luma_on_the_native_boundary() {
+    for (rgb, white) in [
+      ([0, 0, 255], true),
+      ([128, 0, 0], true),
+      ([0, 128, 0], false),
+      ([59, 59, 59], true),
+      ([60, 60, 60], false),
+      ([84, 13, 237], true),
+      ([7, 53, 233], false),
+      ([147, 101, 69], false),
+    ] {
+      let [r, g, b] = rgb;
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:cNvSpPr/>
+          <wps:spPr><a:solidFill><a:srgbClr val="{r:02X}{g:02X}{b:02X}"/></a:solidFill></wps:spPr>
+          <wps:bodyPr/></wps:wsp>"#,
+      );
+      let shape = wps::WordprocessingShape::from_bytes(xml.as_bytes()).unwrap();
+      let value = if white { 255 } else { 0 };
+      assert_eq!(
+        wordprocessing_shape_automatic_text_color(&shape, &ThemeColors::default()),
+        Some(RgbColor {
+          r: value,
+          g: value,
+          b: value
+        }),
+        "{rgb:?}",
+      );
+    }
+  }
+
+  #[test]
+  fn wordprocessing_shape_gradient_auto_color_integrates_positioned_stops() {
+    for (stops, white) in [
+      (vec![(0, "000000"), (100_000, "101010")], true),
+      (vec![(0, "101010"), (100_000, "000000")], true),
+      (
+        vec![(0, "000000"), (99_000, "000000"), (100_000, "FFFFFF")],
+        true,
+      ),
+      (
+        vec![(0, "FFFFFF"), (1_000, "000000"), (100_000, "000000")],
+        true,
+      ),
+      (
+        vec![(0, "FFFFFF"), (99_000, "FFFFFF"), (100_000, "000000")],
+        false,
+      ),
+      (
+        vec![
+          (0, "000000"),
+          (49_000, "000000"),
+          (50_000, "FFFFFF"),
+          (51_000, "000000"),
+          (100_000, "000000"),
+        ],
+        true,
+      ),
+      (
+        vec![
+          (0, "FFFFFF"),
+          (49_000, "FFFFFF"),
+          (50_000, "000000"),
+          (51_000, "FFFFFF"),
+          (100_000, "FFFFFF"),
+        ],
+        false,
+      ),
+      (
+        vec![(0, "000000"), (50_000, "FFFFFF"), (100_000, "000000")],
+        false,
+      ),
+      (
+        vec![(0, "FFFFFF"), (50_000, "000000"), (100_000, "FFFFFF")],
+        false,
+      ),
+      (vec![(0, "936545"), (100_000, "936545")], false),
+    ] {
+      let stops = stops
+        .iter()
+        .map(|(position, color)| {
+          format!(r#"<a:gs pos="{position}"><a:srgbClr val="{color}"/></a:gs>"#,)
+        })
+        .collect::<String>();
+      let xml = format!(
+        r#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:gsLst>{stops}</a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>"#,
+      );
+      let fill = a::GradientFill::from_bytes(xml.as_bytes()).unwrap();
+      let luma =
+        wordprocessing_linear_gradient_background_luma(&fill, &ThemeColors::default()).unwrap();
+      let value = if white { 255 } else { 0 };
+      assert_eq!(
+        wordprocessing_shape_text_color_for_luma(luma),
+        RgbColor {
+          r: value,
+          g: value,
+          b: value
+        }
+      );
+    }
+  }
+
+  #[test]
+  fn wordprocessing_shape_auto_color_keeps_explicit_story_colors() {
+    for (authored, expected) in [("auto", 0), ("000000", 0), ("FFFFFF", 255)] {
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr/>
+          <wps:spPr><a:solidFill><a:srgbClr val="936545"/></a:solidFill></wps:spPr>
+          <wps:txbx><w:txbxContent><w:p><w:r><w:rPr><w:color w:val="{authored}"/></w:rPr>
+          <w:t>COLOR</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp>"#,
+      );
+      let shape = wps::WordprocessingShape::from_bytes(xml.as_bytes()).unwrap();
+      let Some(wps::WordprocessingShapeChoice2::TextBoxInfo2(info)) =
+        &shape.wordprocessing_shape_choice2
+      else {
+        panic!("textbox story")
+      };
+      let frame = text_box_frame_from_wordprocessing_shape(
+        &shape,
+        info.text_box_content.as_ref().unwrap(),
+        &StylesCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        false,
+      );
+      let [Block::Paragraph(paragraph)] = frame.blocks.as_slice() else {
+        panic!("one paragraph")
+      };
+      let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+        panic!("one run")
+      };
+      assert_eq!(
+        run.style.color,
+        RgbColor {
+          r: expected,
+          g: expected,
+          b: expected
+        }
+      );
+    }
   }
 
   #[test]
@@ -47265,6 +51486,64 @@ mod tests {
   }
 
   #[test]
+  fn wps_effect_pen_preserves_authored_width_and_basis_without_changing_foreground() {
+    let reflection = r#"<a:effectLst><a:reflection blurRad="6350" sy="-100000"/></a:effectLst>"#;
+    let glow =
+      r#"<a:effectLst><a:glow rad="63500"><a:srgbClr val="FF0000"/></a:glow></a:effectLst>"#;
+    for (effect, legacy, expected_pen) in [
+      (reflection, false, true),
+      (glow, false, true),
+      ("", false, false),
+      (reflection, true, false),
+      (glow, true, false),
+    ] {
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:cNvSpPr/><wps:spPr><a:xfrm rot="1969697"><a:off x="0" y="0"/><a:ext cx="1054100" cy="736600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="57151"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill><a:prstDash val="dash"/></a:ln>{effect}</wps:spPr><wps:bodyPr/></wps:wsp>"#
+      );
+      let source = wps::WordprocessingShape::from_bytes(xml.as_bytes()).unwrap();
+      let styles = StylesCatalog::default();
+      let images = ImageCatalog::default();
+      let hyperlinks = HyperlinkCatalog::default();
+      let mut transform = DrawingMlGroupTransform::identity();
+      transform.legacy_locked_canvas = legacy;
+      let shape = wordprocessing_shape_shape(
+        &source,
+        ImagePlacement::Inline,
+        transform,
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
+        },
+      )
+      .unwrap();
+      assert_eq!(
+        shape.wordprocessing_shape_effect_pen.is_some(),
+        expected_pen
+      );
+      if let Some(pen) = &shape.wordprocessing_shape_effect_pen {
+        assert_eq!(pen.width_emu, 57_151);
+        let radians = (1_969_697_f64 / 60_000.0).to_radians();
+        assert!((pen.emu_to_points[0] - radians.cos() / 12_700.0).abs() < 1.0e-18);
+        assert!((pen.emu_to_points[1] - radians.sin() / 12_700.0).abs() < 1.0e-18);
+        assert!(pen.snap);
+        assert_eq!(pen.realized_width_emu, None);
+      }
+      assert!(
+        shape
+          .stroke_override
+          .as_ref()
+          .unwrap()
+          .drawingml_device
+          .is_none()
+      );
+    }
+  }
+
+  #[test]
   fn wps_inline_shape_and_textbox_share_one_layout_object() {
     let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="0D2C40"/></a:solidFill></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp>"#;
     let source = wps::WordprocessingShape::from_bytes(xml.as_bytes()).expect("WPS shape");
@@ -47383,6 +51662,50 @@ mod tests {
             8.0 + 4.0 * factor
           ]
         );
+      }
+    }
+  }
+
+  #[test]
+  fn unpainted_wps_autofit_preserves_authored_anchor_wrap() {
+    for fit in [false, true] {
+      let xml = format!(
+        r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <wps:cNvSpPr txBox="1"/><wps:spPr>
+            <a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="1828800"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
+            <a:ln><a:noFill/></a:ln>
+          </wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>BOX</w:t></w:r></w:p></w:txbxContent></wps:txbx>
+          <wps:bodyPr wrap="none"><a:{fit}/></wps:bodyPr></wps:wsp>"#,
+        fit = if fit { "spAutoFit" } else { "noAutofit" },
+      );
+      let source = wps::WordprocessingShape::from_bytes(xml.as_bytes()).unwrap();
+      for wrap in [
+        ImageWrapMode::None,
+        ImageWrapMode::TopBottom,
+        ImageWrapMode::Square,
+      ] {
+        let mut floating = floating_wordprocessing_shape_placement(&wp::Anchor::default());
+        floating.wrap = wrap;
+        let placement = ImagePlacement::Floating(floating);
+        let shape = wordprocessing_shape_textbox_frame(
+          &source,
+          placement,
+          DrawingMlGroupTransform::identity(),
+          DrawingTextBoxImportContext {
+            styles: &StylesCatalog::default(),
+            images: &ImageCatalog::default(),
+            hyperlinks: &HyperlinkCatalog::default(),
+            inside_wordprocessing_group: false,
+            wordprocessing_canvas_has_background_paint: false,
+          },
+        )
+        .unwrap();
+        assert_eq!(shape.placement, placement, "fit={fit}, wrap={wrap:?}");
+        assert_eq!(shape.text_box_resizes_to_fit, fit);
+        assert!(shape.fill_color.is_none() && shape.stroke.is_none());
       }
     }
   }
@@ -47691,7 +52014,7 @@ mod tests {
         ..Default::default()
       })
     );
-    let InlineShapeGeometry::Path { paths, outline } = shape.geometry else {
+    let InlineShapeGeometry::Path { paths, outline, .. } = shape.geometry else {
       panic!("degenerate straight connector must remain a styled path");
     };
     assert!(outline.is_some(), "the authored arrow end must be retained");
@@ -48037,6 +52360,46 @@ mod tests {
   }
 
   #[test]
+  fn no_break_hyphen_control_preserves_source_type_and_literal_unicode() {
+    let run = w::Run::from_bytes(
+      br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>A</w:t><w:noBreakHyphen/><w:t>B&#x2011;C</w:t><w:noBreakHyphen/><w:t>D</w:t></w:r>"#,
+    ).unwrap();
+    let mut inlines = Vec::new();
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle {
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      },
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      Some("https://example.com/"),
+    );
+    assert_eq!(inline_text(&inlines), "A\u{2011}B\u{2011}C\u{2011}D");
+    assert_eq!(inlines.len(), 5);
+    for (inline, (text, control)) in inlines.iter().zip([
+      ("A", false),
+      ("\u{2011}", true),
+      ("B\u{2011}C", false),
+      ("\u{2011}", true),
+      ("D", false),
+    ]) {
+      let InlineItem::Text(run) = inline else {
+        panic!("text portion")
+      };
+      assert_eq!(run.text, text);
+      assert_eq!(run.style.wordprocessingml_no_break_hyphen, control);
+      assert_eq!(run.hyperlink_url.as_deref(), Some("https://example.com/"));
+      assert_eq!(
+        crate::model::common_text_style(run.style.clone()).wordprocessingml_no_break_hyphen,
+        control
+      );
+    }
+  }
+
+  #[test]
   fn symbol_runs_preserve_declared_symbol_font_transport_codes() {
     let mut inlines = Vec::new();
     let styles = StylesCatalog {
@@ -48209,11 +52572,154 @@ mod tests {
     assert_eq!(inline_text(&inlines), "Test text box");
   }
 
+  #[test]
+  fn floating_picture_contour_owns_wrapping_without_a_second_image_rectangle() {
+    for mode in ["wrapTight", "wrapThrough", "wrapSquare"] {
+      for side in ["bothSides", "left", "right", "largest"] {
+        for valid_polygon in [false, true] {
+          let polygon = if mode == "wrapSquare" {
+            "".to_string()
+          } else {
+            let vertices = if valid_polygon {
+              r#"<wp:start x="0" y="0"/><wp:lineTo x="0" y="21600"/><wp:lineTo x="21600" y="21600"/><wp:lineTo x="21600" y="2000"/><wp:lineTo x="4000" y="0"/>"#
+            } else {
+              r#"<wp:start x="0" y="0"/><wp:lineTo x="0" y="0"/>"#
+            };
+            format!(r#"<wp:wrapPolygon edited="0">{vertices}</wp:wrapPolygon>"#)
+          };
+          let xml = format!(
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:drawing><wp:anchor behindDoc="1" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>990600</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>609600</wp:posOffset></wp:positionV><wp:extent cx="2540000" cy="1270000"/><wp:{mode} wrapText="{side}">{polygon}</wp:{mode}><wp:docPr id="1" name="Picture" descr="Keep visible painting"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Picture"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip/></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2540000" cy="1270000"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>"#
+          );
+          let run = w::Run::from_bytes(xml.as_bytes()).unwrap();
+          let mut inlines = Vec::new();
+          push_run(
+            &run,
+            &mut inlines,
+            TextStyle::default(),
+            &StylesCatalog::default(),
+            &ImageCatalog::default(),
+            &HyperlinkCatalog::default(),
+            None,
+          );
+          let Some(InlineItem::Image(image)) = inlines.first() else {
+            panic!("picture paint host")
+          };
+          let ImagePlacement::Floating(placement) = image.placement else {
+            panic!("floating picture")
+          };
+          let accepted = mode != "wrapSquare" && valid_polygon && side != "largest";
+          assert_eq!(
+            placement.wrap == ImageWrapMode::None,
+            accepted,
+            "{mode}/{side}/{valid_polygon}"
+          );
+          let source_wrap = match mode {
+            "wrapTight" => ImageWrapMode::Tight,
+            "wrapThrough" => ImageWrapMode::Through,
+            _ => ImageWrapMode::Square,
+          };
+          assert_eq!(image.contour_owned_wrap, accepted.then_some(source_wrap));
+          assert_eq!(inlines.iter().filter(|inline| matches!(inline, InlineItem::Shape(shape) if layout::has_authored_wrap_contour(shape))).count(), usize::from(accepted));
+          assert_eq!((image.width_pt, image.height_pt), (200.0, 100.0));
+          assert_eq!(
+            (placement.horizontal_offset_pt, placement.vertical_offset_pt),
+            (78.0, 48.0)
+          );
+          assert_eq!(
+            (placement.margin_left_pt, placement.margin_right_pt),
+            (9.0, 9.0)
+          );
+          assert!(placement.behind_text);
+          assert_eq!(image.alt_text.as_deref(), Some("Keep visible painting"));
+        }
+      }
+    }
+  }
+
   fn wrap_polygon_effect_origin_fixture(reference: &str, left_emu: i64) -> wp::Anchor {
     let xml = format!(
       r#"<wp:anchor xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" behindDoc="1" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="{reference}"><wp:posOffset>990600</wp:posOffset></wp:positionH><wp:positionV relativeFrom="paragraph"><wp:posOffset>609600</wp:posOffset></wp:positionV><wp:extent cx="2540000" cy="1270000"/><wp:effectExtent l="{left_emu}" t="63500" r="12700" b="0"/><wp:wrapTight wrapText="bothSides"><wp:wrapPolygon edited="0"><wp:start x="0" y="0"/><wp:lineTo x="21600" y="0"/><wp:lineTo x="21600" y="21600"/><wp:lineTo x="0" y="21600"/></wp:wrapPolygon></wp:wrapTight><wp:docPr id="1" name="contour origin"/><a:graphic><a:graphicData uri="urn:unused"/></a:graphic></wp:anchor>"#
     );
     wp::Anchor::from_bytes(xml.as_bytes()).expect("authored contour anchor")
+  }
+
+  #[test]
+  fn picture_wrap_polygon_import_retains_rotation_and_content_origin() {
+    for (degrees, expected) in [
+      (0, [(0.0, 0.0), (200.0, 0.0), (200.0, 100.0), (0.0, 100.0)]),
+      (
+        90,
+        [(150.0, -50.0), (150.0, 150.0), (50.0, 150.0), (50.0, -50.0)],
+      ),
+      (
+        270,
+        [(50.0, 150.0), (50.0, -50.0), (150.0, -50.0), (150.0, 150.0)],
+      ),
+    ] {
+      for reference in ["column", "page"] {
+        for effect in [0, 63_500] {
+          for (align_h, align_v, forced_cell) in [
+            (false, false, false),
+            (true, false, false),
+            (false, true, false),
+            (true, true, false),
+            (false, false, true),
+          ] {
+            let horizontal = if align_h {
+              "<wp:align>left</wp:align>"
+            } else {
+              "<wp:posOffset>990600</wp:posOffset>"
+            };
+            let vertical = if align_v {
+              "<wp:align>top</wp:align>"
+            } else {
+              "<wp:posOffset>609600</wp:posOffset>"
+            };
+            let vertical_reference = if forced_cell { "line" } else { "paragraph" };
+            let layout_in_cell = u8::from(!forced_cell);
+            let rotation = degrees * 60_000;
+            let xml = format!(
+              r#"<w:drawing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><wp:anchor behindDoc="1" distT="0" distB="0" distL="0" distR="0" simplePos="0" locked="0" layoutInCell="{layout_in_cell}" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="{reference}">{horizontal}</wp:positionH><wp:positionV relativeFrom="{vertical_reference}">{vertical}</wp:positionV><wp:extent cx="2540000" cy="1270000"/><wp:effectExtent l="{effect}" t="{effect}" r="{effect}" b="{effect}"/><wp:wrapThrough wrapText="bothSides"><wp:wrapPolygon edited="0"><wp:start x="0" y="0"/><wp:lineTo x="21600" y="0"/><wp:lineTo x="21600" y="21600"/><wp:lineTo x="0" y="21600"/></wp:wrapPolygon></wp:wrapThrough><wp:docPr id="1" name="Picture"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="Picture"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip/></pic:blipFill><pic:spPr><a:xfrm rot="{rotation}"><a:off x="0" y="0"/><a:ext cx="2540000" cy="1270000"/></a:xfrm></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing>"#
+            );
+            let drawing = w::Drawing::from_bytes(xml.as_bytes()).unwrap();
+            let mut inlines = Vec::new();
+            assert!(push_drawing_shapes_impl(
+              &drawing,
+              &mut inlines,
+              &StylesCatalog::default(),
+              &ImageCatalog::default(),
+              &HyperlinkCatalog::default(),
+            ));
+            let [InlineItem::Shape(shape)] = inlines.as_slice() else {
+              panic!("expected sole imported contour");
+            };
+            let expected_origin = if align_h || align_v || forced_cell {
+              effect as f32 / 12_700.0
+            } else {
+              0.0
+            };
+            assert_eq!(
+              (shape.offset_x_pt, shape.offset_y_pt),
+              (expected_origin, expected_origin)
+            );
+            assert_eq!(
+              shape.rotation_deg, 0.0,
+              "rotation is baked into the contour once"
+            );
+            let InlineShapeGeometry::Polyline { points, closed } = &shape.geometry else {
+              panic!("expected authored polygon");
+            };
+            assert!(*closed);
+            assert_eq!(points.len(), 5);
+            assert_eq!(points.first(), points.last());
+            for ((x, y), (expected_x, expected_y)) in points.iter().zip(expected) {
+              assert!((x - expected_x).abs() < 0.000_01);
+              assert!((y - expected_y).abs() < 0.000_01);
+            }
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -48465,6 +52971,36 @@ mod tests {
           );
         }
       }
+    }
+  }
+
+  #[test]
+  fn gutter_settings_preserve_boolean_values_and_authored_margins() {
+    use ooxmlsdk::parts::document_settings_part::DocumentSettingsPart;
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    for (setting, expected) in [
+      (None, false),
+      (Some(""), true),
+      (Some(" w:val=\"false\""), false),
+      (Some(" w:val=\"true\""), true),
+    ] {
+      let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+      let main = package.add_main_document_part().unwrap();
+      let settings = main
+        .add_new_part_auto_id::<_, DocumentSettingsPart>(&mut package)
+        .unwrap();
+      let flags = setting.map_or_else(String::new, |setting| {
+        format!("<w:gutterAtTop{setting}/><w:printTwoOnOne{setting}/>")
+      });
+      settings.set_data(&mut package, format!(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{flags}</w:settings>"#).into_bytes()).unwrap();
+      main.set_data(&mut package, br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:sectPr><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="720"/></w:sectPr></w:body></w:document>"#.to_vec()).unwrap();
+      let document = extract(&package, &LayoutOptions::default()).unwrap();
+      assert_eq!(document.page.gutter_at_top, expected);
+      assert_eq!(document.page.print_two_on_one, expected);
+      assert_eq!(document.page.margin_top_pt, 72.0);
+      assert_eq!(document.page.gutter_pt, 36.0);
+      assert_eq!(document.page.header_distance_pt, 36.0);
     }
   }
 
@@ -48743,6 +53279,66 @@ mod tests {
   }
 
   #[test]
+  fn unresolved_table_grid_preserves_default_indent_and_normal_table_normalization() {
+    // Native default/custom/renamed/basedOn controls and Range.WordOpenXML
+    // distinguish the reserved Normal Table name from its arbitrary styleId.
+    for name in ["Normal Table", "Custom"] {
+      for indent in [None, Some(0.0), Some(5.75)] {
+        for is_default in [false, true] {
+          let mut styles = StylesCatalog {
+            default_table_style_id: is_default.then(|| "Alias".to_string()),
+            ..StylesCatalog::default()
+          };
+          styles.styles.insert(
+            "Alias".to_string(),
+            StyleEntry {
+              name: Some(name.to_string()),
+              style_type: Some(w::StyleValues::Table),
+              table_style: TableStyleModel {
+                indent_left_pt: indent,
+                ..TableStyleModel::default()
+              },
+              ..StyleEntry::default()
+            },
+          );
+          let expected = if name == "Normal Table" {
+            Some(0.0)
+          } else {
+            indent
+          };
+          assert_eq!(
+            styles.table_style(Some("TableGrid")).indent_left_pt,
+            if is_default { expected } else { None }
+          );
+          styles.styles.insert(
+            "TableGrid".to_string(),
+            StyleEntry {
+              style_type: Some(w::StyleValues::Table),
+              ..StyleEntry::default()
+            },
+          );
+          assert_eq!(styles.table_style(Some("TableGrid")).indent_left_pt, None);
+          styles.styles.get_mut("TableGrid").unwrap().based_on = Some("Alias".to_string());
+          assert_eq!(
+            styles.table_style(Some("TableGrid")).indent_left_pt,
+            expected
+          );
+          styles
+            .styles
+            .get_mut("TableGrid")
+            .unwrap()
+            .table_style
+            .indent_left_pt = Some(12.0);
+          assert_eq!(
+            styles.table_style(Some("TableGrid")).indent_left_pt,
+            Some(12.0)
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn serialized_table_styles_without_margin_properties_start_at_zero() {
     let mut styles = StylesCatalog {
       has_styles_part: true,
@@ -48880,6 +53476,80 @@ mod tests {
     assert!(!should_align_leading_cell_content(top_level, 15, true));
     assert!(should_align_leading_cell_content(top_level, 15, false));
     assert!(!should_align_leading_cell_content(nested, 12, true));
+  }
+
+  #[test]
+  fn legacy_table_indentation_distinguishes_omitted_from_direct_and_inherited_zero() {
+    use ooxmlsdk::parts::{
+      document_settings_part::DocumentSettingsPart, style_definitions_part::StyleDefinitionsPart,
+    };
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    // Native Rows.LeftIndent observations: missing indent uses cell padding
+    // in inline compat 12/14, but zero in compat 15 and floating controls.
+    // Explicit and inherited zero both override that legacy default.
+    for mode in [None, Some(12), Some(14), Some(15)] {
+      for (direct, inherited) in [
+        (None, None),
+        (Some(0), None),
+        (Some(115), None),
+        (None, Some(0)),
+        (None, Some(115)),
+        (Some(0), Some(115)),
+      ] {
+        for margin in [115, 240] {
+          for floating in [false, true] {
+            let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+            let main = package.add_main_document_part().unwrap();
+            let styles = main
+              .add_new_part_auto_id::<_, StyleDefinitionsPart>(&mut package)
+              .unwrap();
+            let settings = main
+              .add_new_part_auto_id::<_, DocumentSettingsPart>(&mut package)
+              .unwrap();
+            let indent_xml = |value: Option<i32>| {
+              value.map_or_else(String::new, |value| {
+                format!(r#"<w:tblInd w:w="{value}" w:type="dxa"/>"#)
+              })
+            };
+            let inherited_xml = indent_xml(inherited);
+            styles.set_data(&mut package, format!(r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:style w:type="table" w:styleId="Base"><w:tblPr>{inherited_xml}</w:tblPr></w:style>
+              <w:style w:type="table" w:styleId="Grid"><w:basedOn w:val="Base"/></w:style></w:styles>"#).into_bytes()).unwrap();
+            let compatibility = mode.map_or_else(String::new, |mode| {
+              format!(r#"<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="{mode}"/>"#)
+            });
+            settings.set_data(&mut package, format!(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat>{compatibility}</w:compat></w:settings>"#).into_bytes()).unwrap();
+            let direct_xml = indent_xml(direct);
+            let placement = if floating {
+              r#"<w:tblpPr w:horzAnchor="margin" w:vertAnchor="text" w:tblpX="0" w:tblpY="0"/>"#
+            } else {
+              ""
+            };
+            main.set_data(&mut package, format!(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+              <w:tbl><w:tblPr><w:tblStyle w:val="Grid"/>{placement}<w:tblW w:w="5000" w:type="pct"/>{direct_xml}</w:tblPr>
+              <w:tblGrid><w:gridCol w:w="2380"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcMar><w:left w:w="{margin}" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:r><w:t>Visible</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/></w:body></w:document>"#).into_bytes()).unwrap();
+            let document = extract(&package, &LayoutOptions::default()).unwrap();
+            let Block::Table(table) = &document.sections[0].blocks[0] else {
+              panic!("table import")
+            };
+            let legacy = mode.unwrap_or(12) < 15;
+            let expected =
+              direct
+                .or(inherited)
+                .unwrap_or(if legacy && !floating { margin } else { 0 });
+            assert_eq!(
+              table.indent_left_pt,
+              expected as f32 / 20.0,
+              "mode={mode:?}, direct={direct:?}, inherited={inherited:?}, margin={margin}, floating={floating}"
+            );
+            assert_eq!(table.align_leading_cell_content, legacy);
+            assert_eq!(table.placement.is_some(), floating);
+            assert_eq!(table.preferred_width_pct, Some(1.0));
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -49462,6 +54132,7 @@ mod tests {
     let first_row = table_cell_style_for(
       &style,
       TableCellStyleContext {
+        first_row_group_size: 0,
         look: TableLookModel::default(),
         row_index: 0,
         row_count: 2,
@@ -49473,6 +54144,7 @@ mod tests {
     let body_row = table_cell_style_for(
       &style,
       TableCellStyleContext {
+        first_row_group_size: 0,
         look: TableLookModel::default(),
         row_index: 1,
         row_count: 2,
@@ -49549,6 +54221,7 @@ mod tests {
     let cell_style = table_cell_style_for(
       &style,
       TableCellStyleContext {
+        first_row_group_size: 0,
         look: TableLookModel {
           last_row: true,
           last_column: true,
@@ -49595,6 +54268,7 @@ mod tests {
     let top_right = table_cell_style_for(
       &table_style,
       TableCellStyleContext {
+        first_row_group_size: 0,
         look,
         row_index: 0,
         row_count: 2,
@@ -49606,6 +54280,7 @@ mod tests {
     let body_right = table_cell_style_for(
       &table_style,
       TableCellStyleContext {
+        first_row_group_size: 0,
         look,
         row_index: 1,
         row_count: 2,
@@ -49652,6 +54327,7 @@ mod tests {
       ..Default::default()
     };
     let context = TableCellStyleContext {
+      first_row_group_size: 0,
       look: TableLookModel {
         first_column: true,
         vertical_banding: true,
@@ -49860,6 +54536,7 @@ mod tests {
       left: Some(border(1.5)),
     };
     let context = |row_index| TableCellStyleContext {
+      first_row_group_size: 0,
       look: TableLookModel::default(),
       row_index,
       row_count: 3,
@@ -49909,6 +54586,137 @@ mod tests {
     );
     assert_eq!(no_inside.top, None);
     assert_eq!(no_inside.bottom, None);
+  }
+
+  #[test]
+  fn multirow_header_borders_keep_outer_edges_and_direct_cell_ownership() {
+    let border = BorderStyle {
+      width_pt: 2.25,
+      ..Default::default()
+    };
+    let region = CellBordersModel {
+      top: Some(border),
+      bottom: Some(border),
+      ..Default::default()
+    };
+    let context = |row_index, first_row_group_size| TableCellStyleContext {
+      look: TableLookModel::default(),
+      row_index,
+      row_count: 5,
+      cell_index: 0,
+      cell_count: 4,
+      explicit_first_row: true,
+      first_row_group_size,
+    };
+    for condition in [
+      w::TableStyleOverrideValues::FirstRow,
+      w::TableStyleOverrideValues::NorthWestCell,
+      w::TableStyleOverrideValues::NorthEastCell,
+    ] {
+      let edges = (0..3)
+        .map(|i| multirow_header_cell_borders_for_region(region, None, condition, context(i, 3)))
+        .collect::<Vec<_>>();
+      assert_eq!(edges[0].top, Some(border));
+      assert_eq!(edges[0].bottom, None);
+      assert_eq!(edges[1].top, None);
+      assert_eq!(edges[1].bottom, None);
+      assert_eq!(edges[2].top, None);
+      assert_eq!(edges[2].bottom, Some(border));
+      assert_eq!(
+        multirow_header_cell_borders_for_region(region, None, condition, context(1, 0)),
+        region
+      );
+      assert_eq!(
+        multirow_header_cell_borders_for_region(region, None, condition, context(3, 3)),
+        region
+      );
+      let direct = w::TableCellBorders {
+        top_border: Some(w::TopBorder {
+          val: w::BorderValues::Single,
+          size: Some(24),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let own = direct_cell_borders_model(edges[1], &direct);
+      assert_eq!(own.top.unwrap().width_pt, 3.0);
+      assert_eq!(own.bottom, None);
+    }
+  }
+
+  #[test]
+  fn multirow_header_import_uses_leading_headers_without_cnf_and_keeps_direct_borders() {
+    let border = BorderStyle {
+      width_pt: 2.25,
+      ..Default::default()
+    };
+    let fill = ShadingPaint::Solid(RgbColor {
+      r: 68,
+      g: 114,
+      b: 196,
+    });
+    for differentiate in [false, true] {
+      for all_headers in [false, true] {
+        let mut styles = StylesCatalog::default();
+        styles.import_settings.differentiate_multirow_table_headers = differentiate;
+        styles.styles.insert(
+          "Header".into(),
+          StyleEntry {
+            style_type: Some(w::StyleValues::Table),
+            table_style: TableStyleModel {
+              conditional: vec![(
+                w::TableStyleOverrideValues::FirstRow,
+                TableCellStyle {
+                  shading: Some(fill),
+                  borders: CellBordersModel {
+                    top: Some(border),
+                    bottom: Some(border),
+                    ..Default::default()
+                  },
+                  ..Default::default()
+                },
+              )],
+              ..Default::default()
+            },
+            ..Default::default()
+          },
+        );
+        let last_header = if all_headers {
+          "<w:trPr><w:tblHeader/></w:trPr>"
+        } else {
+          ""
+        };
+        let xml = format!(
+          r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:tbl><w:tblPr><w:tblStyle w:val="Header"/><w:tblLook w:firstRow="1" w:firstColumn="0"/></w:tblPr>
+          <w:tblGrid><w:gridCol w:w="3000"/></w:tblGrid>
+          <w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc></w:tr>
+          <w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcBorders><w:top w:val="single" w:sz="24"/></w:tcBorders></w:tcPr><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc></w:tr>
+          <w:tr>{last_header}<w:tc><w:p><w:r><w:t>C</w:t></w:r></w:p></w:tc></w:tr>
+          </w:tbl><w:p/><w:sectPr/></w:body>"#
+        );
+        let sections = imported_body_sections_with_styles(xml.as_bytes(), &styles);
+        let Block::Table(table) = &sections[0].blocks[0] else {
+          panic!("owned table source")
+        };
+        assert_eq!(table.rows[0].cells[0].shading, Some(fill));
+        assert_eq!(
+          table.rows[1].cells[0].shading,
+          (!all_headers).then_some(fill)
+        );
+        assert_eq!(table.rows[2].cells[0].shading, None);
+        assert_eq!(table.rows[0].cells[0].borders.top, Some(border));
+        assert_eq!(
+          table.rows[0].cells[0].borders.bottom,
+          if differentiate && !all_headers {
+            None
+          } else {
+            Some(border)
+          }
+        );
+        assert_eq!(table.rows[1].cells[0].borders.top.unwrap().width_pt, 3.0);
+      }
+    }
   }
 
   #[test]
@@ -50226,6 +55034,7 @@ mod tests {
     let first_cell = table_cell_style_for(
       &style,
       TableCellStyleContext {
+        first_row_group_size: 0,
         look: TableLookModel::default(),
         row_index: 0,
         row_count: 2,
@@ -51135,6 +55944,7 @@ mod tests {
       table_style: &TableStyleModel::default(),
       table_look: TableLookModel::default(),
       row_count: 1,
+      first_row_header_count: 0,
       nested_table_level: 1,
       in_header_footer: false,
     };
@@ -51237,14 +56047,139 @@ mod tests {
   }
 
   #[test]
+  fn missing_doc_property_distinguishes_absence_from_unimplemented_values() {
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    for complex in [false, true] {
+      for locked in [false, true] {
+        for (name, custom_value, refreshed) in [
+          ("Onderwerp", None, "エラー! プロパティ名に誤りがあります。"),
+          ("Onderwerp", Some("<vt:lpwstr/>"), ""),
+          (
+            "oNdErWeRp",
+            Some("<vt:lpwstr>Native Found</vt:lpwstr>"),
+            "Native Found",
+          ),
+          ("Onderwerp", Some("<vt:i4>42</vt:i4>"), "CACHED"),
+          ("Onderwerp", Some("<vt:bool>true</vt:bool>"), "CACHED"),
+          ("Subject", None, "CACHED"),
+          ("Number of pages", None, "CACHED"),
+        ] {
+          for refresh in [false, true] {
+            let lock = if locked { r#" w:fldLock="1""# } else { "" };
+            let field = if complex {
+              format!(
+                r#"<w:r><w:fldChar w:fldCharType="begin"{lock}/></w:r><w:r><w:instrText> DOCPROPERTY "{name}" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>CACHED</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+              )
+            } else {
+              format!(
+                r#"<w:fldSimple w:instr="DOCPROPERTY &quot;{name}&quot;"{lock}><w:r><w:t>CACHED</w:t></w:r></w:fldSimple>"#
+              )
+            };
+            let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+            let main = package.add_main_document_part().unwrap();
+            main.set_data(&mut package, format!(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>PREFIX|</w:t></w:r>{field}<w:r><w:t>|SUFFIX</w:t></w:r></w:p></w:body></w:document>"#).into_bytes()).unwrap();
+            if let Some(value) = custom_value {
+              let custom = package.add_custom_file_properties_part().unwrap();
+              custom.set_data(&mut package, format!(r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{{D5CDD505-2E9C-101B-9397-08002B2CF9AE}}" pid="2" name="Onderwerp">{value}</property></Properties>"#).into_bytes()).unwrap();
+              let values = load_custom_document_properties(&package);
+              assert!(values.contains_key("Onderwerp"));
+              if value.contains("<vt:i4>") || value.contains("<vt:bool>") {
+                assert_eq!(values.get("Onderwerp"), Some(&None));
+              }
+            }
+            let options = LayoutOptions {
+              ui_language: Some("ja-JP".to_string()),
+              field_update_datetime: refresh.then_some(FieldUpdateDateTime {
+                year: 2026,
+                month: 10,
+                day: 20,
+                hour: 0,
+                minute: 0,
+                second: 0,
+              }),
+              ..Default::default()
+            };
+            let document = extract(&package, &options).unwrap();
+            let Block::Paragraph(paragraph) = &document.sections[0].blocks[0] else {
+              panic!("field paragraph")
+            };
+            let expected = if refresh && !locked {
+              refreshed
+            } else {
+              "CACHED"
+            };
+            let text: String = paragraph
+              .inlines
+              .iter()
+              .filter_map(|inline| match inline {
+                InlineItem::Text(run) => Some(run.text.as_str()),
+                _ => None,
+              })
+              .collect();
+            assert_eq!(
+              text,
+              format!("PREFIX|{expected}|SUFFIX"),
+              "complex={complex} locked={locked} name={name} value={custom_value:?} refresh={refresh}"
+            );
+            let diagnostic = paragraph.inlines.iter().find_map(|inline| match inline {
+              InlineItem::Text(run) if run.text == "エラー! プロパティ名に誤りがあります。" => {
+                Some(run)
+              }
+              _ => None,
+            });
+            assert_eq!(diagnostic.is_some(), expected.starts_with("エラー!"));
+            if let Some(run) = diagnostic {
+              assert!(run.style.bold);
+              assert_eq!(
+                run.style.east_asia_font_family.as_deref(),
+                Some("MS Mincho")
+              );
+            }
+          }
+        }
+      }
+    }
+    let styles = StylesCatalog {
+      import_settings: ImportSettings {
+        field_update_datetime: Some(FieldUpdateDateTime {
+          year: 2026,
+          month: 10,
+          day: 20,
+          hour: 0,
+          minute: 0,
+          second: 0,
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    for instruction in [
+      "DOCPROPERTY",
+      "DOCPROPERTY \"\"",
+      "DOCPROPERTY Missing \\* CHARFORMAT",
+      "QUOTE DOCPROPERTY",
+      "TITLE",
+    ] {
+      assert!(
+        !missing_doc_property_field(instruction, &styles),
+        "{instruction}"
+      );
+    }
+    assert!(missing_doc_property_field("docproperty Missing", &styles));
+  }
+
+  #[test]
   fn core_property_fields_use_property_text_only_when_refresh_is_requested() {
     let mut styles = StylesCatalog {
+      title: "Native Alpha Title".to_string(),
       author: Some("Lorenzo Chavez".to_string()),
       last_saved_by: Some("Charles Brown".to_string()),
       ..Default::default()
     };
     assert_eq!(refreshed_doc_property_field("LASTSAVEDBY", &styles), None);
     assert_eq!(refreshed_doc_property_field("AUTHOR", &styles), None);
+    assert_eq!(refreshed_doc_property_field("TITLE", &styles), None);
     styles.import_settings.field_update_datetime = Some(FieldUpdateDateTime {
       year: 2026,
       month: 9,
@@ -51262,6 +56197,10 @@ mod tests {
       (r"author \* MERGEFORMAT", "Lorenzo Chavez"),
       (r"AUTHOR \* Upper", "LORENZO CHAVEZ"),
       (r"AUTHOR \* Lower", "lorenzo chavez"),
+      ("TITLE", "Native Alpha Title"),
+      (r"title \* MERGEFORMAT", "Native Alpha Title"),
+      (r"TITLE \* Upper", "NATIVE ALPHA TITLE"),
+      (r"TITLE \* Lower", "native alpha title"),
     ] {
       assert_eq!(
         refreshed_doc_property_field(instruction, &styles).as_deref(),
@@ -51276,6 +56215,9 @@ mod tests {
       // AUTHOR with an argument also changes the document property. Keep
       // its cache until that stateful field behavior is implemented.
       r#"AUTHOR "Another Author""#,
+      r"TITLE \*",
+      r"TITLE \* CHARFORMAT",
+      r#"TITLE "Another Title""#,
     ] {
       assert_eq!(refreshed_doc_property_field(instruction, &styles), None);
     }
@@ -51283,6 +56225,77 @@ mod tests {
     assert_eq!(refreshed_doc_property_field("LASTSAVEDBY", &styles), None);
     styles.author = None;
     assert_eq!(refreshed_doc_property_field("AUTHOR", &styles), None);
+    styles.title.clear();
+    assert_eq!(
+      refreshed_doc_property_field("TITLE", &styles).as_deref(),
+      Some("")
+    );
+  }
+
+  #[test]
+  fn title_field_refresh_reads_core_text_and_respects_cache_and_lock() {
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    // Cover both field representations and the missing/empty/nonempty core
+    // property states. An absent title is a valid empty value, not a reason
+    // to retain a stale field result. Locked or unrefreshed fields keep it.
+    for complex in [false, true] {
+      for locked in [false, true] {
+        for title in [None, Some(""), Some("Alpha &amp; Beta")] {
+          for refresh in [false, true] {
+            let lock = if locked { r#" w:fldLock="1""# } else { "" };
+            let field = if complex {
+              format!(
+                r#"<w:r><w:fldChar w:fldCharType="begin"{lock}/></w:r><w:r><w:instrText> TITLE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>CACHED</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+              )
+            } else {
+              format!(
+                r#"<w:fldSimple w:instr="TITLE"{lock}><w:r><w:rPr><w:i/></w:rPr><w:t>CACHED</w:t></w:r></w:fldSimple>"#
+              )
+            };
+            let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+            let main = package.add_main_document_part().unwrap();
+            main.set_data(&mut package, format!(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>{field}</w:p></w:body></w:document>"#).into_bytes()).unwrap();
+            if let Some(title) = title {
+              let core = package.add_core_file_properties_part().unwrap();
+              core.set_data(&mut package, format!(r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{title}</dc:title></cp:coreProperties>"#).into_bytes()).unwrap();
+            }
+            let options = LayoutOptions {
+              field_update_datetime: refresh.then_some(FieldUpdateDateTime {
+                year: 2026,
+                month: 10,
+                day: 20,
+                hour: 0,
+                minute: 0,
+                second: 0,
+              }),
+              ..Default::default()
+            };
+            let document = extract(&package, &options).unwrap();
+            let Block::Paragraph(paragraph) = &document.sections[0].blocks[0] else {
+              panic!("field paragraph")
+            };
+            let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+              panic!("one field result")
+            };
+            let expected = if refresh && !locked {
+              if title.is_some_and(|title| !title.is_empty()) {
+                "Alpha & Beta"
+              } else {
+                ""
+              }
+            } else {
+              "CACHED"
+            };
+            assert_eq!(
+              run.text, expected,
+              "complex={complex} locked={locked} title={title:?} refresh={refresh}"
+            );
+            assert!(run.style.italic);
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -51385,6 +56398,119 @@ mod tests {
   }
 
   #[test]
+  fn filename_field_uses_storage_context_and_formats_path_switches() {
+    for (path, name) in [
+      (r"C:\Folder A\MiXeD-字段.docx", "MiXeD-字段.docx"),
+      (r"\\Server\Share\MiXeD.docx", "MiXeD.docx"),
+      ("/documents/Folder A/MiXeD.docx", "MiXeD.docx"),
+    ] {
+      let styles = StylesCatalog {
+        source_file_name: Some("other-name.docx".to_string()),
+        source_file_path: Some(path.to_string()),
+        import_settings: ImportSettings {
+          field_update_datetime: Some(FieldUpdateDateTime {
+            year: 2026,
+            month: 9,
+            day: 11,
+            hour: 18,
+            minute: 3,
+            second: 2,
+          }),
+          ..Default::default()
+        },
+        ..Default::default()
+      };
+      for (instruction, expected) in [
+        ("FILENAME", name.to_string()),
+        (r"FILENAME \p", path.to_string()),
+        (r"FILENAME \p \* Upper", path.to_uppercase()),
+        (r"FILENAME \* Lower \p", path.to_lowercase()),
+        (r"FILENAME \p \* MERGEFORMAT", path.to_string()),
+        (r"FILENAME \p \p", path.to_string()),
+        (r"filename \P", path.to_string()),
+      ] {
+        assert_eq!(
+          refreshed_doc_property_field(instruction, &styles).as_deref(),
+          Some(expected.as_str()),
+          "{instruction}: {path}"
+        );
+      }
+      for instruction in [
+        r"FILENAME \p \*",
+        r"FILENAME \p \* CHARFORMAT",
+        r"FILENAME \p extra",
+        r"AUTHOR \p",
+      ] {
+        assert_eq!(refreshed_doc_property_field(instruction, &styles), None);
+      }
+    }
+  }
+
+  #[test]
+  fn filename_field_path_refresh_respects_lock_and_explicit_refresh() {
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    let path = r"C:\Storage\MiXeD-Path.docx";
+    for complex in [false, true] {
+      for locked in [false, true] {
+        for refresh in [false, true] {
+          for supplied_path in [None, Some(path)] {
+            for (instruction, path_switch) in [("FILENAME", false), (r"FILENAME \p", true)] {
+              let lock = if locked { r#" w:fldLock="1""# } else { "" };
+              let field = if complex {
+                format!(
+                  r#"<w:r><w:fldChar w:fldCharType="begin"{lock}/></w:r><w:r><w:instrText> {instruction} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>CACHED</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+                )
+              } else {
+                format!(
+                  r#"<w:fldSimple w:instr="{instruction}"{lock}><w:r><w:rPr><w:i/></w:rPr><w:t>CACHED</w:t></w:r></w:fldSimple>"#
+                )
+              };
+              let mut package =
+                WordprocessingDocument::create(WordprocessingDocumentType::Document);
+              let main = package.add_main_document_part().unwrap();
+              main.set_data(&mut package, format!(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>{field}</w:p></w:body></w:document>"#).into_bytes()).unwrap();
+              let options = LayoutOptions {
+                source_file_name: Some("other-name.docx".to_string()),
+                source_file_path: supplied_path.map(str::to_string),
+                field_update_datetime: refresh.then_some(FieldUpdateDateTime {
+                  year: 2026,
+                  month: 9,
+                  day: 11,
+                  hour: 18,
+                  minute: 3,
+                  second: 2,
+                }),
+                ..Default::default()
+              };
+              let document = extract(&package, &options).unwrap();
+              let Block::Paragraph(paragraph) = &document.sections[0].blocks[0] else {
+                panic!("field paragraph")
+              };
+              let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+                panic!("one field result")
+              };
+              let expected = if refresh && !locked {
+                if path_switch {
+                  supplied_path.unwrap_or("CACHED")
+                } else if supplied_path.is_some() {
+                  "MiXeD-Path.docx"
+                } else {
+                  "other-name.docx"
+                }
+              } else {
+                "CACHED"
+              };
+              assert_eq!(run.text, expected);
+              assert!(run.style.italic);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn simple_if_field_refresh_is_opt_in_and_compares_quoted_operands() {
     let styles = StylesCatalog {
       import_settings: ImportSettings {
@@ -51416,6 +56542,307 @@ mod tests {
       ),
       None
     );
+  }
+
+  fn imported_scalar_field_control(
+    instruction: &str,
+    complex: bool,
+    locked: bool,
+    refresh: bool,
+    ui_language: &str,
+    cache: &str,
+  ) -> TextRun {
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    let instruction = instruction.replace('&', "&amp;").replace('"', "&quot;");
+    let lock = if locked { r#" w:fldLock="1""# } else { "" };
+    let result = format!("<w:r><w:t>{cache}</w:t></w:r>");
+    let field = if complex {
+      format!(
+        r#"<w:r><w:fldChar w:fldCharType="begin"{lock}/></w:r><w:r><w:instrText>{instruction}</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>{result}<w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+      )
+    } else {
+      format!(r#"<w:fldSimple w:instr="{instruction}"{lock}>{result}</w:fldSimple>"#)
+    };
+    let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+    let main = package.add_main_document_part().unwrap();
+    main.set_data(&mut package, format!(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>{field}</w:p></w:body></w:document>"#).into_bytes()).unwrap();
+    main.add_new_part_auto_id::<_, ooxmlsdk::parts::document_settings_part::DocumentSettingsPart>(&mut package).unwrap().set_data(&mut package,
+      br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docVars><w:docVar w:name="Present" w:val="VARIABLE PRESENT"/><w:docVar w:name="MonthStart" w:val="1/1/2017"/></w:docVars></w:settings>"#.to_vec()).unwrap();
+    package.add_core_file_properties_part().unwrap().set_data(&mut package,
+      br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:revision>7</cp:revision></cp:coreProperties>"#.to_vec()).unwrap();
+    let options = LayoutOptions {
+      ui_language: Some(ui_language.to_string()),
+      field_update_datetime: refresh.then_some(FieldUpdateDateTime {
+        year: 2026,
+        month: 10,
+        day: 23,
+        hour: 0,
+        minute: 0,
+        second: 0,
+      }),
+      ..Default::default()
+    };
+    let document = extract(&package, &options).unwrap();
+    let Block::Paragraph(paragraph) = &document.sections[0].blocks[0] else {
+      panic!("scalar field paragraph")
+    };
+    let [InlineItem::Text(run)] = paragraph.inlines.as_slice() else {
+      panic!("one scalar field result: {:?}", paragraph.inlines)
+    };
+    run.clone()
+  }
+
+  #[test]
+  fn scalar_field_print_updates_follow_native_lock_and_refresh_matrix() {
+    // Actual Word print controls: ordinary value fields honor both gates;
+    // legacy BARCODE is a display field and ignores those recalculation gates.
+    for complex in [false, true] {
+      for locked in [false, true] {
+        for refresh in [false, true] {
+          for (instruction, expected, diagnostic, display_field) in [
+            (
+              "DOCVARIABLE",
+              "Error! Document Variable not defined.",
+              true,
+              false,
+            ),
+            (
+              r"DOCVARIABLE \* MERGEFORMAT",
+              "Error! Document Variable not defined.",
+              true,
+              false,
+            ),
+            (
+              r#"DOCVARIABLE """#,
+              "Error! Document Variable not defined.",
+              true,
+              false,
+            ),
+            (
+              "DOCVARIABLE Missing",
+              "Error! No document variable supplied.",
+              true,
+              false,
+            ),
+            ("DOCVARIABLE Present", "VARIABLE PRESENT", false, false),
+            (
+              r#"AUTOTEXT "Accent Bar 3""#,
+              "Error! AutoText entry not defined.",
+              true,
+              false,
+            ),
+            ("BARCODE", "Error!", true, true),
+            (r"BARCODE \* MERGEFORMAT", "Error!", true, true),
+            ("REVNUM", "7", false, false),
+            (r"REVNUM \* ROMAN", "VII", false, false),
+          ] {
+            let run = imported_scalar_field_control(
+              instruction,
+              complex,
+              locked,
+              refresh,
+              "en-US",
+              "CACHED",
+            );
+            let updated = display_field || (refresh && !locked);
+            assert_eq!(
+              run.text,
+              if updated { expected } else { "CACHED" },
+              "{instruction}: complex={complex} locked={locked} refresh={refresh}"
+            );
+            assert_eq!(run.style.bold, updated && diagnostic, "{instruction}");
+            assert_eq!(
+              run.style.wordprocessingml_generated_field_diagnostic,
+              updated && diagnostic
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn scalar_field_diagnostics_use_observed_application_resources() {
+    for (ui, values) in [
+      (
+        "de-DE",
+        [
+          "Fehler! Dokumentvariable nicht definiert.",
+          "Fehler! Keine Dokumentvariable verfügbar.",
+          "Fehler! AutoText-Eintrag nicht definiert.",
+          "Fehler!",
+        ],
+      ),
+      (
+        "zh-CN",
+        [
+          "错误!未定义文档变量。",
+          "错误!未提供文档变量。",
+          "错误!未定义“自动图文集”词条。",
+          "错误!",
+        ],
+      ),
+    ] {
+      for complex in [false, true] {
+        for (instruction, expected) in [
+          "DOCVARIABLE",
+          "DOCVARIABLE Missing",
+          "AUTOTEXT Missing",
+          "BARCODE",
+        ]
+        .into_iter()
+        .zip(values)
+        {
+          let run = imported_scalar_field_control(instruction, complex, false, true, ui, "CACHED");
+          assert_eq!(run.text, expected);
+          assert!(run.style.bold);
+          if ui == "zh-CN" {
+            assert_eq!(run.style.east_asia_font_family.as_deref(), Some("SimSun"));
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn numchars_print_update_counts_its_cache_and_respects_lock() {
+    for complex in [false, true] {
+      for locked in [false, true] {
+        for refresh in [false, true] {
+          for (instruction, expected) in [
+            ("NUMCHARS", "6"),
+            (r"NUMCHARS \* ROMAN", "VI"),
+            (r"INFO NumChars \* MERGEFORMAT", "6"),
+          ] {
+            let run = imported_scalar_field_control(
+              instruction,
+              complex,
+              locked,
+              refresh,
+              "en-US",
+              "CACHED",
+            );
+            assert_eq!(
+              run.text,
+              if refresh && !locked {
+                expected
+              } else {
+                "CACHED"
+              }
+            );
+            assert!(!run.style.bold);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn scalar_field_unsupported_values_and_resources_keep_their_cache() {
+    for complex in [false, true] {
+      for instruction in [
+        r"DOCVARIABLE MonthStart \@ dddd",
+        r"DOCVARIABLE Present \* CHARFORMAT",
+        r"REVNUM \* Ordinal",
+        "BARCODE 12345",
+      ] {
+        assert_eq!(
+          imported_scalar_field_control(instruction, complex, false, true, "en-US", "Sunday").text,
+          "Sunday"
+        );
+      }
+      for instruction in ["DOCVARIABLE Missing", "AUTOTEXT Missing", "BARCODE"] {
+        assert_eq!(
+          imported_scalar_field_control(instruction, complex, false, true, "fr-FR", "CACHED").text,
+          "CACHED"
+        );
+      }
+    }
+    let styles = StylesCatalog {
+      has_glossary_document: true,
+      import_settings: ImportSettings {
+        field_update_datetime: Some(FieldUpdateDateTime {
+          year: 2026,
+          month: 10,
+          day: 23,
+          hour: 0,
+          minute: 0,
+          second: 0,
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    assert!(refreshed_scalar_field("AUTOTEXT SuppliedEntry", &styles).is_none());
+  }
+
+  #[test]
+  fn scalar_field_empty_variables_collection_blanks_named_result_only_on_update() {
+    use ooxmlsdk::parts::document_settings_part::DocumentSettingsPart;
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+    for complex in [false, true] {
+      for cross in [false, true] {
+        if cross && !complex {
+          continue;
+        }
+        for empty_table in [false, true] {
+          for locked in [false, true] {
+            for refresh in [false, true] {
+              for ui in ["en-US", "ko-KR"] {
+                for suffix in ["", r" \* MERGEFORMAT", r" *\MERGEFORMAT"] {
+                  let instruction = format!("DOCVARIABLE Missing{suffix}");
+                  let lock = if locked { r#" w:fldLock="1""# } else { "" };
+                  let field = if complex {
+                    let boundary = if cross { "</w:p><w:p>" } else { "" };
+                    format!(
+                      r#"<w:r><w:fldChar w:fldCharType="begin"{lock}/></w:r><w:r><w:instrText>{instruction}</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>Test</w:t></w:r>{boundary}<w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+                    )
+                  } else {
+                    format!(
+                      r#"<w:fldSimple w:instr="{instruction}"{lock}><w:r><w:t>Test</w:t></w:r></w:fldSimple>"#
+                    )
+                  };
+                  let mut package =
+                    WordprocessingDocument::create(WordprocessingDocumentType::Document);
+                  let main = package.add_main_document_part().unwrap();
+                  main.set_data(&mut package,format!(r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>{field}</w:p></w:body></w:document>"#).into_bytes()).unwrap();
+                  if empty_table {
+                    main.add_new_part_auto_id::<_, DocumentSettingsPart>(&mut package).unwrap().set_data(&mut package,br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docVars/></w:settings>"#.to_vec()).unwrap();
+                  }
+                  let options = LayoutOptions {
+                    ui_language: Some(ui.to_string()),
+                    field_update_datetime: refresh.then_some(FieldUpdateDateTime {
+                      year: 2026,
+                      month: 10,
+                      day: 23,
+                      hour: 0,
+                      minute: 0,
+                      second: 0,
+                    }),
+                    ..Default::default()
+                  };
+                  let document = extract(&package, &options).unwrap();
+                  let actual = document.sections[0]
+                    .blocks
+                    .iter()
+                    .filter_map(|block| match block {
+                      Block::Paragraph(p) => Some(inline_text(&p.inlines)),
+                      _ => None,
+                    })
+                    .collect::<String>();
+                  assert_eq!(
+                    actual,
+                    if refresh && !locked { "" } else { "Test" },
+                    "complex={complex} cross={cross} empty={empty_table} locked={locked} refresh={refresh} ui={ui} suffix={suffix}"
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -52568,8 +57995,37 @@ mod tests {
   }
 
   #[test]
+  fn numbering_indent_tab_compatibility_reaches_imported_paragraphs() {
+    let paragraph = w::Paragraph::from_bytes(
+      br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>Body</w:t></w:r></w:p>"#,
+    ).unwrap();
+    for ignore_indent in [false, true] {
+      let styles = StylesCatalog {
+        import_settings: ImportSettings {
+          do_not_use_indent_as_numbering_tab_stop: ignore_indent,
+          ..Default::default()
+        },
+        ..Default::default()
+      };
+      let model = paragraph_model(
+        &paragraph,
+        &styles,
+        &mut NumberingCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &CustomXmlBindings::default(),
+        &mut FormWidgetIdAllocator::default(),
+      );
+      assert_eq!(
+        model.format.list_label_ignores_indent_tab_stop,
+        ignore_indent
+      );
+    }
+  }
+
+  #[test]
   fn complex_page_fields_use_code_format_unless_mergeformat_has_a_cache() {
-    for field_name in ["PAGE", "NUMPAGES"] {
+    for field_name in ["PAGE", "NUMPAGES", "PAGEREF _Target"] {
       for (switch, cached, expected_family, expected_size) in [
         ("", true, "Times New Roman", 10.0),
         ("\\* CHARFORMAT", true, "Times New Roman", 10.0),
@@ -52809,7 +58265,7 @@ mod tests {
             ..Default::default()
           };
           let mut numbering = NumberingCatalog::default();
-          let sections = body_sections(
+          let mut sections = body_sections(
             &body,
             BodySectionEnv {
               styles: &styles,
@@ -52824,7 +58280,16 @@ mod tests {
             },
           );
           assert_eq!(sections.len(), 1);
-          let result = story_paragraph_texts(&sections[0].blocks).concat();
+          // As in extract(), refresh field results before consuming the
+          // imported field-owned paragraph delimiters.
+          normalize_complex_field_paragraph_breaks(&mut sections[0].blocks);
+          let paragraphs = story_paragraph_texts(&sections[0].blocks);
+          assert_eq!(
+            paragraphs.len(),
+            if multiline && locked { 2 } else { 1 },
+            "Native print refresh replaces field-owned paragraph marks; {language}, multiline={multiline}, locked={locked}"
+          );
+          let result = paragraphs.concat();
           let expected = if locked {
             "cached firstcached second"
           } else {
@@ -53537,7 +59002,9 @@ mod tests {
     .with_test_placeholder("TitlePlaceholder", placeholder);
 
     assert_eq!(
-      sdt_bound_replacement(&bindings, &properties).as_deref(),
+      sdt_bound_replacement(&bindings, &properties)
+        .map(SdtBoundReplacement::into_text)
+        .as_deref(),
       Some("[Type the document title]")
     );
 
@@ -53545,7 +59012,166 @@ mod tests {
       br#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:placeholder><w:docPart w:val="TitlePlaceholder"/></w:placeholder><w:showingPlcHdr/><w:text/></w:sdtPr>"#,
     )
     .expect("showing-placeholder content control without a data binding");
-    assert_eq!(sdt_bound_replacement(&bindings, &showing_only), None);
+    assert!(sdt_bound_replacement(&bindings, &showing_only).is_none());
+  }
+
+  #[test]
+  fn showing_named_placeholder_preserves_cached_text_and_formatting() {
+    let styles = StylesCatalog::default();
+    for cached_bold in [false, true] {
+      for glossary_bold in [false, true] {
+        let placeholder = w::DocPartBody::from_bytes(
+          format!(r#"<w:docPartBody xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:rPr><w:b w:val="{}"/></w:rPr><w:t>GLOSSARY</w:t></w:r></w:p></w:docPartBody>"#, u8::from(glossary_bold)).as_bytes(),
+        ).expect("named placeholder");
+        let bindings = CustomXmlBindings::from_test_xml(None, "<unrelated/>")
+          .with_test_placeholder("AddressPlaceholder", placeholder);
+        let paragraph = w::Paragraph::from_bytes(
+          format!(r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sdt><w:sdtPr><w:rPr><w:b/></w:rPr><w:placeholder><w:docPart w:val="AddressPlaceholder"/></w:placeholder><w:showingPlcHdr/><w:dataBinding w:prefixMappings="xmlns:p='http://schemas.microsoft.com/office/2006/coverPageProps'" w:xpath="/p:CoverPageProperties[1]/p:CompanyAddress[1]" w:storeItemID="{{55AF091B-3C7A-41E3-B477-F2FDAA23CFDA}}"/><w:text/></w:sdtPr><w:sdtContent><w:r><w:rPr><w:b w:val="{}"/></w:rPr><w:t>CACHED</w:t></w:r></w:sdtContent></w:sdt></w:p>"#, u8::from(cached_bold)).as_bytes(),
+        ).expect("showing data-bound placeholder");
+        let inlines = paragraph_inlines(
+          &paragraph,
+          TextStyle::default(),
+          &styles,
+          &ImageCatalog::default(),
+          &HyperlinkCatalog::default(),
+          &bindings,
+          &mut FormWidgetIdAllocator::default(),
+        );
+        assert_eq!(inline_text(&inlines), "CACHED");
+        let run = inlines
+          .iter()
+          .find_map(|inline| match inline {
+            InlineItem::Text(run) if !run.text.is_empty() => Some(run),
+            _ => None,
+          })
+          .expect("preserved cached placeholder");
+        assert_eq!(run.style.bold, cached_bold);
+      }
+    }
+  }
+
+  #[test]
+  fn empty_data_binding_materializes_default_placeholder_with_insertion_formatting() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let bindings = CustomXmlBindings::from_test_xml(
+      Some(CORE_PROPERTIES_ID),
+      r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc"><dc:title/></cp:coreProperties>"#,
+    );
+    let styles = StylesCatalog::default();
+    for block in [false, true] {
+      for cached_size in [22, 44] {
+        for (format, expected_size) in [("", 11.0), (r#"<w:rPr><w:sz w:val="32"/></w:rPr>"#, 16.0)]
+        {
+          for placeholder in [
+            "",
+            r#"<w:placeholder><w:docPart w:val="Missing"/></w:placeholder>"#,
+            r#"<w:showingPlcHdr w:val="false"/>"#,
+          ] {
+            let cache = format!(
+              r#"<w:r><w:rPr><w:sz w:val="{cached_size}"/></w:rPr><w:t>first</w:t></w:r><w:r><w:rPr><w:sz w:val="{cached_size}"/></w:rPr><w:t>second</w:t></w:r>"#
+            );
+            let cache = if block {
+              format!("<w:p>{cache}</w:p>")
+            } else {
+              cache
+            };
+            let sdt = format!(
+              r#"<w:sdt><w:sdtPr>{format}{placeholder}<w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr><w:sdtContent>{cache}</w:sdtContent></w:sdt>"#
+            );
+            let mut form_widget_ids = FormWidgetIdAllocator::default();
+            let inlines = if block {
+              let sdt = w::SdtBlock::from_bytes(
+                sdt.replace("<w:sdt>", r#"<w:sdt xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#).as_bytes(),
+              ).expect("block content control");
+              let mut numbering = NumberingCatalog::default();
+              let mut complex_fields = ComplexFieldImportState::default();
+              let mut blocks = sdt_block_blocks(
+                &sdt,
+                &styles,
+                &mut numbering,
+                &ImageCatalog::default(),
+                &HyperlinkCatalog::default(),
+                BlockContentControls {
+                  custom_xml_bindings: &bindings,
+                  form_widget_ids: &mut form_widget_ids,
+                  complex_fields: &mut complex_fields,
+                  table_depth: 0,
+                  in_header_footer: false,
+                },
+              );
+              assert_eq!(blocks.len(), 1);
+              let Block::Paragraph(paragraph) = blocks.remove(0) else {
+                panic!("controlled paragraph")
+              };
+              paragraph.inlines
+            } else {
+              let paragraph = w::Paragraph::from_bytes(
+                format!(r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{sdt}<w:r><w:t>after</w:t></w:r></w:p>"#).as_bytes(),
+              ).expect("inline content control");
+              paragraph_inlines(
+                &paragraph,
+                TextStyle::default(),
+                &styles,
+                &ImageCatalog::default(),
+                &HyperlinkCatalog::default(),
+                &bindings,
+                &mut form_widget_ids,
+              )
+            };
+            assert_eq!(
+              inline_text(&inlines),
+              if block { "     " } else { "     after" }
+            );
+            let run = inlines
+              .iter()
+              .find_map(|inline| match inline {
+                InlineItem::Text(run) if !run.text.is_empty() => Some(run),
+                _ => None,
+              })
+              .expect("default placeholder run between content boundary markers");
+            assert_eq!(run.text, "     ");
+            assert_eq!(run.style.font_size_pt, expected_size);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn default_sdt_placeholder_requires_an_empty_resolved_binding_and_no_placeholder_cache() {
+    const CORE_PROPERTIES_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+    let properties = w::SdtProperties::from_bytes(
+      format!(r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:dataBinding w:xpath="/cp:coreProperties[1]/dc:title[1]" w:storeItemID="{CORE_PROPERTIES_ID}"/><w:text/></w:sdtPr>"#).as_bytes(),
+    ).expect("mapped text control");
+    for (content, expected) in [
+      ("<dc:title/>", Some("     ")),
+      ("<dc:title> </dc:title>", Some(" ")),
+      ("<dc:title>&#160;</dc:title>", Some("\u{a0}")),
+      ("<dc:title>value</dc:title>", Some("value")),
+      ("<dc:subject/>", None),
+    ] {
+      let bindings = CustomXmlBindings::from_test_xml(
+        Some(CORE_PROPERTIES_ID),
+        &format!(
+          r#"<cp:coreProperties xmlns:cp="urn:core" xmlns:dc="urn:dc">{content}</cp:coreProperties>"#
+        ),
+      );
+      assert_eq!(
+        sdt_bound_replacement(&bindings, &properties)
+          .map(SdtBoundReplacement::into_text)
+          .as_deref(),
+        expected
+      );
+      let mut showing = properties.clone();
+      showing
+        .sdt_properties_choice
+        .push(w::SdtPropertiesChoice::ShowingPlaceholder(
+          w::ShowingPlaceholder::default(),
+        ));
+      if content == "<dc:title/>" {
+        assert!(sdt_bound_replacement(&bindings, &showing).is_none());
+      }
+    }
   }
 
   #[test]
@@ -54537,6 +60163,38 @@ mod tests {
   }
 
   #[test]
+  fn vml_coordinate_references_preserve_inline_picture_flow() {
+    let mut catalog = ImageCatalog::default();
+    catalog.by_relationship_id.insert(
+      "rId1".into(),
+      package::ImageResource {
+        data: vec![1, 2, 3].into(),
+        content_type: Some("image/png".into()),
+      },
+    );
+    for references in [
+      "mso-position-horizontal-relative:char",
+      "mso-position-vertical-relative:line",
+      "mso-position-horizontal-relative:char;mso-position-vertical-relative:line",
+    ] {
+      for position in ["", "position:static;", "position:absolute;"] {
+        let xml = format!(
+          r##"<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><v:shape type="#_x0000_t75" style="{position}width:58.32pt;height:58.32pt;{references}"><v:imagedata r:id="rId1"/></v:shape></w:pict>"##
+        );
+        let picture = w::Picture::from_bytes(xml.as_bytes()).unwrap();
+        let image = pict_image_impl(&picture, &catalog, None).expect("VML picture");
+        assert_eq!(
+          matches!(image.placement, ImagePlacement::Inline),
+          position != "position:absolute;",
+          "{position}{references}",
+        );
+        assert_eq!(image.width_pt, 58.32);
+        assert_eq!(image.height_pt, 58.32);
+      }
+    }
+  }
+
+  #[test]
   fn vml_absolute_style_maps_to_floating_placement() {
     let style = vml_image_style(Some(
       "position:absolute;margin-left:12pt;margin-top:18pt;z-index:-2;\
@@ -54563,6 +60221,90 @@ mod tests {
     assert!((placement.horizontal_offset_pt - 12.0).abs() < 0.001);
     assert!((placement.vertical_offset_pt - 18.0).abs() < 0.001);
     assert!((placement.margin_left_pt - 9.0).abs() < 0.001);
+  }
+
+  #[test]
+  fn vml_wordart_inflate_top_preserves_standard_coordinate_path_and_formulas() {
+    // Native spt164 controls separately vary the adjustment, upper path and
+    // first formula. All change the painted envelope; the type number does
+    // not replace this authored path with DrawingML's quadratic preset.
+    for (adjustment, first_formula, endpoint, control) in [
+      (",10800", "val #0", 31.916_666, -10.638_889),
+      ("0,10800", "val #0", 0.0, 0.0),
+      // VML formulas have integer results: prod 10000 1 3 yields3333.
+      ("10000,10800", "val #0", 46.296_295, -15.430_555),
+      ("6894,10800", "val 0", 0.0, -10.638_889),
+    ] {
+      let definition = v::Shapetype::from_bytes(
+        format!(
+          r#"<v:shapetype xmlns:v="urn:schemas-microsoft-com:vml"
+            xmlns:o="urn:schemas-microsoft-com:office:office" id="_x0000_t164"
+            o:spt="164" coordsize="21600,21600" adj="6894"
+            path="m0@0c7200@2,14400@2,21600@0m,21600r21600,e">
+            <v:formulas><v:f eqn="{first_formula}"/><v:f eqn="prod #0 1 3"/>
+              <v:f eqn="sum 0 0 @1"/></v:formulas>
+            <v:path textpathok="t"/><v:textpath on="t" fitshape="t"/>
+          </v:shapetype>"#,
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let shape = v::Shape::from_bytes(
+        format!(
+          r##"<v:shape xmlns:v="urn:schemas-microsoft-com:vml" id="art"
+            type="#_x0000_t164" style="width:216pt;height:100pt" adj="{adjustment}">
+            <v:textpath string="Upper&#10;Middle&#10;Lower" fitpath="t" trim="t"/>
+          </v:shape>"##,
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let imported = vml_shape_shape(&shape, &ImageCatalog::default(), &[&definition]).unwrap();
+      let InlineShapeGeometry::Path { paths, .. } = imported.geometry else {
+        panic!("legacy inflate-top retains its authored envelope");
+      };
+      assert_eq!(paths.len(), 2);
+      let [
+        common::PathCommand::MoveTo(start),
+        common::PathCommand::CubicTo {
+          control1: c1,
+          control2: c2,
+          end,
+        },
+      ] = paths[0].commands.as_slice()
+      else {
+        panic!("legacy cubic upper boundary");
+      };
+      assert!((start.y.0 - endpoint).abs() < 0.0001);
+      assert!((end.y.0 - endpoint).abs() < 0.0001);
+      assert!(
+        (c1.y.0 - control).abs() < 0.0001,
+        "{adjustment}/{first_formula}: {c1:?}"
+      );
+      assert!(
+        (c2.y.0 - control).abs() < 0.0001,
+        "{adjustment}/{first_formula}: {c2:?}"
+      );
+      assert_eq!(
+        [start.x.0, c1.x.0, c2.x.0, end.x.0],
+        [0.0, 72.0, 144.0, 216.0]
+      );
+      let [
+        common::PathCommand::MoveTo(start),
+        common::PathCommand::LineTo(end),
+      ] = paths[1].commands.as_slice()
+      else {
+        panic!("horizontal lower boundary");
+      };
+      assert_eq!(
+        [start.x.0, start.y.0, end.x.0, end.y.0],
+        [0.0, 100.0, 216.0, 100.0]
+      );
+      assert_eq!(
+        imported.text_warp.as_deref().map(|warp| warp.preset),
+        Some(a::TextShapeValues::TextInflateTop)
+      );
+    }
   }
 
   #[test]
@@ -54829,6 +60571,7 @@ mod tests {
       assert_eq!(before.text, "Before");
       assert_eq!(after.text, "After");
       assert_eq!((host.width_pt, host.height_pt), (80.0, 40.0));
+      assert!(host.wordprocessing_canvas_host);
       assert_eq!(
         (
           host.effect_left_pt,
@@ -54849,6 +60592,7 @@ mod tests {
           panic!("one textbox owner")
         };
         assert_eq!((child.offset_x_pt, child.offset_y_pt), (1.0, 2.0));
+        assert!(!child.wordprocessing_canvas_host);
         assert_eq!((child.effect_left_pt, child.effect_top_pt), (0.0, 0.0));
         let [Block::Paragraph(text)] = child.text_box_blocks.as_slice() else {
           panic!("textbox must remain attached to its shape")
@@ -55446,6 +61190,8 @@ mod tests {
       Some(InlineLockedCanvasViewport {
         width_pt: 150.0,
         height_pt: 50.0,
+        content_offset_x_pt: 1.5,
+        content_offset_y_pt: 0.75,
       })
     );
     assert_eq!(picture.inline_frame_size_pt, Some((0.0, 0.0)));
@@ -56148,6 +61894,125 @@ mod tests {
   }
 
   #[test]
+  fn unmarked_builtin_normal_supplies_paragraph_defaults_by_name() {
+    use ooxmlsdk::parts::style_definitions_part::StyleDefinitionsPart;
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    // Native Word controls distinguish built-in names from style IDs and
+    // custom styles. An explicit paragraph default wins in either order.
+    for (attributes, name, explicit_default, expected_id) in [
+      (
+        r#"w:type="paragraph" w:styleId="style0""#,
+        "Normal",
+        None,
+        Some("style0"),
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0" w:default="1""#,
+        "Normal",
+        None,
+        Some("style0"),
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0" w:default="0""#,
+        "Normal",
+        None,
+        Some("style0"),
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0""#,
+        "PlainCustom",
+        None,
+        None,
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="Normal""#,
+        "Normal",
+        None,
+        Some("Normal"),
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0" w:customStyle="1""#,
+        "Normal",
+        None,
+        None,
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0""#,
+        "normal",
+        None,
+        Some("style0"),
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="Normal""#,
+        "PlainCustom",
+        None,
+        None,
+      ),
+      (
+        r#"w:type="character" w:styleId="style0""#,
+        "Normal",
+        None,
+        None,
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0""#,
+        "Normal",
+        Some(false),
+        Some("DefaultOther"),
+      ),
+      (
+        r#"w:type="paragraph" w:styleId="style0""#,
+        "Normal",
+        Some(true),
+        Some("DefaultOther"),
+      ),
+    ] {
+      let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+      let main = package.add_main_document_part().unwrap();
+      let styles = main
+        .add_new_part_auto_id::<_, StyleDefinitionsPart>(&mut package)
+        .unwrap();
+      let normal = format!(
+        r#"<w:style {attributes}><w:name w:val="{name}"/><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:style>"#
+      );
+      let other = r#"<w:style w:type="paragraph" w:styleId="DefaultOther" w:default="1" w:customStyle="1"><w:name w:val="DefaultOther"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="36"/></w:rPr></w:style>"#;
+      let definitions = match explicit_default {
+        Some(true) => format!("{other}{normal}"),
+        Some(false) => format!("{normal}{other}"),
+        None => normal,
+      };
+      styles.set_data(&mut package, format!(
+        r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:pPrDefault></w:docDefaults>{definitions}</w:styles>"#
+      ).into_bytes()).unwrap();
+      main.set_data(&mut package, br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Text</w:t></w:r></w:p></w:body></w:document>"#.to_vec()).unwrap();
+
+      let catalog = StylesCatalog::load(
+        &package,
+        &main,
+        ImportSettings::default(),
+        &OfficeLocaleContext::new(Some("zh-CN"), None, None),
+      )
+      .unwrap();
+      assert_eq!(catalog.default_paragraph_style_id.as_deref(), expected_id);
+      let document = extract(&package, &LayoutOptions::default()).unwrap();
+      let Block::Paragraph(paragraph) = &document.sections[0].blocks[0] else {
+        panic!("unstyled body paragraph")
+      };
+      let InlineItem::Text(run) = &paragraph.inlines[0] else {
+        panic!("unstyled body text")
+      };
+      let (family, size) = match expected_id {
+        Some("DefaultOther") => ("Arial", 18.0),
+        Some(_) => ("Times New Roman", 12.0),
+        None => ("Calibri", 11.0),
+      };
+      assert_eq!(run.style.font_family.as_deref(), Some(family));
+      assert_eq!(run.style.font_size_pt, size);
+    }
+  }
+
+  #[test]
   fn omitted_style_identity_uses_its_name_and_default_paragraph_type() {
     let source = w::Style::from_bytes(
       br#"<w:style xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -56735,6 +62600,70 @@ mod tests {
   }
 
   #[test]
+  fn word_emphasis_preserves_all_types_and_explicit_none_inheritance() {
+    for (name, value) in [
+      ("none", w::EmphasisMarkValues::None),
+      ("dot", w::EmphasisMarkValues::Dot),
+      ("comma", w::EmphasisMarkValues::Comma),
+      ("circle", w::EmphasisMarkValues::Circle),
+      ("underDot", w::EmphasisMarkValues::UnderDot),
+    ] {
+      let xml = format!(
+        r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:em w:val="{name}"/></w:rPr>"#
+      );
+      let direct = w::RunProperties::from_bytes(xml.as_bytes()).unwrap();
+      let paragraph_mark = w::ParagraphMarkRunProperties::from_bytes(xml.as_bytes()).unwrap();
+      let based = w::RunPropertiesBaseStyle {
+        emphasis: Some(w::Emphasis { val: value }),
+        ..Default::default()
+      };
+      let styled = w::StyleRunProperties {
+        emphasis: Some(w::Emphasis { val: value }),
+        ..Default::default()
+      };
+      let numbered = w::NumberingSymbolRunProperties {
+        emphasis: Some(w::Emphasis { val: value }),
+        ..Default::default()
+      };
+      for props in [
+        RunProps::Direct(&direct),
+        RunProps::ParagraphMark(&paragraph_mark),
+        RunProps::BaseStyle(&based),
+        RunProps::Style(&styled),
+        RunProps::Numbering(&numbered),
+      ] {
+        let mut style = TextStyle::default();
+        properties::merge_run_style(
+          &mut style,
+          Some(props),
+          &ThemeFonts::default(),
+          &ThemeColors::default(),
+        );
+        assert_eq!(style.wordprocessing_emphasis_mark, Some(value));
+        let mut inherited = TextStyle {
+          wordprocessing_emphasis_mark: Some(w::EmphasisMarkValues::Circle),
+          ..Default::default()
+        };
+        merge_style_values(&mut inherited, &style);
+        assert_eq!(inherited.wordprocessing_emphasis_mark, Some(value));
+        merge_style_values(&mut inherited, &TextStyle::default());
+        assert_eq!(inherited.wordprocessing_emphasis_mark, Some(value));
+        let none = w::RunProperties::from_bytes(br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:em w:val="none"/></w:rPr>"#).unwrap();
+        properties::merge_run_style(
+          &mut inherited,
+          Some(RunProps::Direct(&none)),
+          &ThemeFonts::default(),
+          &ThemeColors::default(),
+        );
+        assert_eq!(
+          inherited.wordprocessing_emphasis_mark,
+          Some(w::EmphasisMarkValues::None)
+        );
+      }
+    }
+  }
+
+  #[test]
   fn run_style_imports_the_wordprocessingml_ligature_categories() {
     let properties = w::RunPropertiesBaseStyle {
       ligatures: Some(w14::Ligatures {
@@ -56915,6 +62844,99 @@ mod tests {
   }
 
   #[test]
+  fn body_sections_in_block_containers_retain_main_story_ownership() {
+    // Word fixed-output controls preserve both the section start and the
+    // inherited header for body, SDT, nested SDT and custom XML variants.
+    // Compare the complete imported sections so field events, bookmarks,
+    // paragraph formatting and empty-carrier policy keep the same owner too.
+    for kind in ["nextPage", "continuous", "oddPage"] {
+      for carrier_text in ["", "Closing paragraph"] {
+        let content = format!(
+          r#"<w:bookmarkStart w:id="7" w:name="AcrossSection"/>
+          <w:p><w:r><w:t>First section</w:t></w:r></w:p>
+          <w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rHeader"/>
+          <w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr>
+          <w:r><w:t>{carrier_text}</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Second section</w:t></w:r></w:p>
+          <w:bookmarkEnd w:id="7"/>"#
+        );
+        let body = |inside: &str| {
+          format!(
+            r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          {inside}<w:sectPr><w:type w:val="{kind}"/><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body>"#
+          )
+        };
+        let direct = imported_body_sections(body(&content).as_bytes());
+        assert_eq!(direct.len(), 2);
+        assert_eq!(direct[0].page.width_pt, 612.0);
+        for (open, close) in [
+          ("<w:sdt><w:sdtContent>", "</w:sdtContent></w:sdt>"),
+          ("<w:customXml w:element=\"chapter\">", "</w:customXml>"),
+          (
+            "<w:sdt><w:sdtContent><w:sdt><w:sdtContent>",
+            "</w:sdtContent></w:sdt></w:sdtContent></w:sdt>",
+          ),
+          (
+            "<w:customXml w:element=\"chapter\"><w:sdt><w:sdtContent>",
+            "</w:sdtContent></w:sdt></w:customXml>",
+          ),
+        ] {
+          let wrapped = imported_body_sections(body(&format!("{open}{content}{close}")).as_bytes());
+          assert_eq!(
+            format!("{wrapped:?}"),
+            format!("{direct:?}"),
+            "{open}, {kind}, {carrier_text}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn body_sections_in_block_containers_preserve_field_end_on_discarded_carrier() {
+    let content = r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText> TOC \o "1-3" </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>Cached entry</w:t></w:r></w:p>
+      <w:p><w:pPr><w:sectPr/></w:pPr>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#;
+    let body = |inside: &str| {
+      format!(
+        r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      {inside}<w:p><w:r><w:t>After TOC</w:t></w:r></w:p><w:sectPr/></w:body>"#
+      )
+    };
+    let direct = imported_body_sections(body(content).as_bytes());
+    let wrapped = imported_body_sections(
+      body(&format!(
+        "<w:sdt><w:sdtContent>{content}</w:sdtContent></w:sdt>"
+      ))
+      .as_bytes(),
+    );
+    assert_eq!(wrapped.len(), 2);
+    assert_eq!(wrapped[0].blocks.len(), 1);
+    assert_eq!(format!("{wrapped:?}"), format!("{direct:?}"));
+  }
+
+  #[test]
+  fn body_sections_do_not_adopt_table_cell_section_properties() {
+    let xml = br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:sdt><w:sdtContent><w:tbl><w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid>
+      <w:tr><w:tc><w:sdt><w:sdtContent><w:p><w:pPr><w:sectPr>
+      <w:pgSz w:w="2000" w:h="4000"/></w:sectPr></w:pPr>
+      <w:r><w:t>Cell</w:t></w:r></w:p></w:sdtContent></w:sdt></w:tc></w:tr>
+      </w:tbl></w:sdtContent></w:sdt>
+      <w:p><w:r><w:t>Body</w:t></w:r></w:p>
+      <w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body>"#;
+    let sections = imported_body_sections(xml);
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].page.width_pt, 612.0);
+    assert_eq!(sections[0].blocks.len(), 2);
+    assert!(matches!(sections[0].blocks[0], Block::Table(_)));
+  }
+
+  #[test]
   fn body_sections_split_paragraph_and_body_section_properties() {
     let body = w::Body {
       body_choice: vec![
@@ -57020,6 +63042,58 @@ mod tests {
 
   fn imported_body_sections(xml: &[u8]) -> Vec<ImportedSection> {
     imported_body_sections_with_styles(xml, &StylesCatalog::default())
+  }
+
+  #[test]
+  fn deleted_section_delimiters_use_the_following_section_and_preserve_visible_text() {
+    // Native nextPage/continuous controls keep two COM Sections, but final
+    // PDF joins the sections and, for a visible carrier, Boundary + After.
+    for kind in ["nextPage", "continuous"] {
+      for deleted in [false, true] {
+        for visible in [false, true] {
+          let revision = if deleted {
+            r#"<w:rPr><w:del w:id="1" w:author="Test"/></w:rPr>"#
+          } else {
+            ""
+          };
+          let text = if visible { "Boundary" } else { "" };
+          let xml = format!(
+            r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:p><w:r><w:t>Before</w:t></w:r></w:p>
+            <w:p><w:pPr>{revision}<w:sectPr><w:type w:val="{kind}"/><w:pgSz w:w="10000" w:h="15840"/></w:sectPr></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>After</w:t></w:r></w:p>
+            <w:sectPr><w:type w:val="{kind}"/><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>
+          </w:body>"#
+          );
+          let sections = imported_body_sections(xml.as_bytes());
+          assert_eq!(sections.len(), if deleted { 1 } else { 2 });
+          assert_eq!(
+            sections[0].page.width_pt,
+            if deleted { 612.0 } else { 500.0 }
+          );
+          let paragraphs = sections
+            .iter()
+            .flat_map(|section| &section.blocks)
+            .filter_map(|block| match block {
+              Block::Paragraph(paragraph) => Some(inline_text(&paragraph.inlines)),
+              _ => None,
+            })
+            .filter(|text| !text.is_empty())
+            .collect::<Vec<_>>();
+          let expected = if visible && deleted {
+            vec!["Before", "BoundaryAfter"]
+          } else if visible {
+            vec!["Before", "Boundary", "After"]
+          } else {
+            vec!["Before", "After"]
+          };
+          assert_eq!(
+            paragraphs, expected,
+            "kind={kind}, deleted={deleted}, visible={visible}"
+          );
+        }
+      }
+    }
   }
 
   #[test]
@@ -57307,6 +63381,116 @@ mod tests {
   }
 
   #[test]
+  fn opening_section_authored_mark_has_no_incoming_page_boundary() {
+    for own_start in [
+      "",
+      r#"<w:type w:val="nextPage"/>"#,
+      r#"<w:type w:val="continuous"/>"#,
+    ] {
+      for following_start in ["continuous", "nextPage"] {
+        for properties in [
+          r#"<w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:rPr><w:sz w:val="16"/></w:rPr>"#,
+          r#"<w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:rPr><w:sz w:val="48"/></w:rPr>"#,
+          r#"<w:spacing w:after="0" w:line="240" w:lineRule="auto"/>"#,
+        ] {
+          let xml = format!(
+            r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:p><w:pPr>{properties}<w:sectPr>{own_start}</w:sectPr></w:pPr></w:p>
+              <w:p><w:r><w:t>following</w:t></w:r></w:p>
+              <w:sectPr><w:type w:val="{following_start}"/></w:sectPr>
+            </w:body>"#
+          );
+          let sections = imported_body_sections(xml.as_bytes());
+          assert_eq!(sections.len(), 2);
+          let [Block::Paragraph(mark)] = sections[0].blocks.as_slice() else {
+            panic!("opening authored mark lost: {own_start}, {following_start}, {properties}");
+          };
+          assert!(mark.inlines.is_empty());
+          assert!(mark.format.line_height_set);
+          assert!(sections[0].discarded_carrier_spacing_after_pt.is_none());
+          assert_eq!(
+            sections[0].break_kind,
+            if own_start.contains("continuous") {
+              SectionBreakKind::Continuous
+            } else {
+              SectionBreakKind::NextPage
+            }
+          );
+          assert_eq!(
+            sections[1].break_kind,
+            if following_start == "continuous" {
+              SectionBreakKind::Continuous
+            } else {
+              SectionBreakKind::NextPage
+            }
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn opening_section_authored_mark_after_text_remains_metadata() {
+    for own_start in [
+      "",
+      r#"<w:type w:val="nextPage"/>"#,
+      r#"<w:type w:val="continuous"/>"#,
+    ] {
+      for mark_size in [16, 48] {
+        let xml = format!(
+          r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:p><w:r><w:t>prefix</w:t></w:r></w:p>
+            <w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/>
+              <w:rPr><w:sz w:val="{mark_size}"/></w:rPr><w:sectPr>{own_start}</w:sectPr>
+            </w:pPr></w:p>
+            <w:p><w:r><w:t>following</w:t></w:r></w:p>
+            <w:sectPr><w:type w:val="continuous"/></w:sectPr>
+          </w:body>"#
+        );
+        let sections = imported_body_sections(xml.as_bytes());
+        let [Block::Paragraph(prefix)] = sections[0].blocks.as_slice() else {
+          panic!("a preceding text paragraph still owns the closing mark");
+        };
+        assert_eq!(inline_text(&prefix.inlines), "prefix");
+        assert_eq!(sections[0].discarded_carrier_spacing_after_pt, Some(0.0));
+      }
+    }
+  }
+
+  #[test]
+  fn opening_section_style_sized_mark_reuses_the_sole_mark_rule() {
+    let styles = large_normal_styles_catalog();
+    for own_start in [
+      "",
+      r#"<w:type w:val="nextPage"/>"#,
+      r#"<w:type w:val="continuous"/>"#,
+    ] {
+      for preceding in ["", "<w:p><w:r><w:t>prefix</w:t></w:r></w:p>"] {
+        let xml = format!(
+          r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            {preceding}<w:p><w:pPr><w:sectPr>{own_start}</w:sectPr></w:pPr></w:p>
+            <w:p><w:r><w:t>following</w:t></w:r></w:p>
+            <w:sectPr><w:type w:val="continuous"/></w:sectPr>
+          </w:body>"#
+        );
+        let sections = imported_body_sections_with_styles(xml.as_bytes(), &styles);
+        let [Block::Paragraph(first)] = sections[0].blocks.as_slice() else {
+          panic!("sole/preceded style-sized mark ownership changed");
+        };
+        assert_eq!(first.base_style.font_size_pt, 48.0);
+        assert_eq!(
+          inline_text(&first.inlines),
+          if preceding.is_empty() { "" } else { "prefix" }
+        );
+        assert_eq!(
+          sections[0].discarded_carrier_spacing_after_pt.is_none(),
+          preceding.is_empty()
+        );
+      }
+    }
+  }
+
+  #[test]
   fn directly_formatted_sole_continuous_section_keeps_its_paragraph_mark() {
     for properties in [
       r#"<w:rPr><w:sz w:val="6"/></w:rPr>"#,
@@ -57425,7 +63609,7 @@ mod tests {
         fixed_html_paragraph_auto_spacing: false,
       },
     );
-    refresh_tables_of_contents(
+    let _ = refresh_tables_of_contents(
       &mut sections,
       &styles,
       false,
@@ -57435,6 +63619,127 @@ mod tests {
     assert_eq!(sections.len(), 1);
     normalize_complex_field_paragraph_breaks(&mut sections[0].blocks);
     std::mem::take(&mut sections[0].blocks)
+  }
+
+  #[test]
+  fn pageref_missing_result_uses_its_separator_only() {
+    for (valid, locked, switch, expected_size, expected_family) in [
+      (false, false, "", 20.0, "Arial"),
+      (false, false, "\\* CHARFORMAT", 20.0, "Arial"),
+      (false, false, "\\* MERGEFORMAT", 20.0, "Arial"),
+      (true, false, "", 8.0, "Times New Roman"),
+      (true, false, "\\* CHARFORMAT", 8.0, "Times New Roman"),
+      (true, false, "\\* MERGEFORMAT", 6.0, "Courier New"),
+      (false, true, "", 6.0, "Courier New"),
+    ] {
+      let target = if valid {
+        r#"<w:bookmarkStart w:id="1" w:name="Target"/><w:bookmarkEnd w:id="1"/>"#
+      } else {
+        ""
+      };
+      let lock = if locked { r#"w:fldLock="1""# } else { "" };
+      let xml = format!(
+        r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p>{target}
+        <w:r><w:t>before</w:t></w:r>
+        <w:r><w:rPr><w:rFonts w:ascii="Calibri"/><w:sz w:val="28"/></w:rPr><w:fldChar w:fldCharType="begin" {lock}/></w:r>
+        <w:r><w:rPr><w:rFonts w:ascii="Times New Roman"/><w:sz w:val="16"/></w:rPr><w:instrText> PAGEREF Target {switch} </w:instrText></w:r>
+        <w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="40"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:rPr><w:rFonts w:ascii="Courier New"/><w:sz w:val="12"/></w:rPr><w:t>0</w:t></w:r>
+        <w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t>after</w:t></w:r>
+        </w:p></w:body>"#
+      );
+      let blocks = imported_fixed_output_reference_story(xml.as_bytes());
+      let [Block::Paragraph(paragraph)] = blocks.as_slice() else {
+        panic!()
+      };
+      let runs: Vec<_> = paragraph
+        .inlines
+        .iter()
+        .filter_map(|item| match item {
+          InlineItem::Text(run) => Some(run),
+          _ => None,
+        })
+        .collect();
+      assert_eq!(runs.len(), 3);
+      assert_eq!(runs[0].text, "before");
+      assert_eq!(runs[2].text, "after");
+      assert_eq!(
+        runs[1].style.font_size_pt, expected_size,
+        "valid={valid}, locked={locked}, switch={switch}"
+      );
+      assert_eq!(runs[1].style.font_family.as_deref(), Some(expected_family));
+      assert_eq!(runs[1].text.starts_with("Error!"), !valid && !locked);
+      assert!(
+        !paragraph
+          .field_events
+          .iter()
+          .any(|event| matches!(event, ParagraphFieldEvent::PageReferenceResultStyle { .. }))
+      );
+    }
+  }
+
+  #[test]
+  fn pageref_separator_styles_follow_adjacent_and_joined_results() {
+    for joined in [false, true] {
+      let boundary = if joined {
+        r#"</w:p><w:p><w:r><w:t>prefix</w:t></w:r>"#
+      } else {
+        ""
+      };
+      let paragraph_mark = if joined {
+        r#"<w:pPr><w:rPr><w:vanish/></w:rPr></w:pPr>"#
+      } else {
+        ""
+      };
+      let field = |size| {
+        format!(
+          r#"<w:r><w:fldChar w:fldCharType="begin"/></w:r>
+        <w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:instrText> PAGEREF Missing </w:instrText></w:r>
+        <w:r><w:rPr><w:sz w:val="{size}"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r>
+        <w:r><w:t>0</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+        )
+      };
+      let xml = format!(
+        r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p>{paragraph_mark}{}{boundary}{}<w:r><w:t>suffix</w:t></w:r></w:p></w:body>"#,
+        field(40),
+        field(52)
+      );
+      let blocks = imported_fixed_output_reference_story(xml.as_bytes());
+      let [Block::Paragraph(paragraph)] = blocks.as_slice() else {
+        panic!()
+      };
+      let sizes: Vec<_> = paragraph
+        .inlines
+        .iter()
+        .filter_map(|inline| match inline {
+          InlineItem::Text(run) if run.text.starts_with("Error!") => Some(run.style.font_size_pt),
+          _ => None,
+        })
+        .collect();
+      assert_eq!(sizes, vec![20.0, 26.0]);
+    }
+  }
+
+  #[test]
+  fn pageref_separator_style_survives_code_crossing_paragraphs() {
+    let blocks = imported_fixed_output_reference_story(br#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGEREF Missing </w:instrText></w:r></w:p>
+      <w:p><w:r><w:rPr><w:sz w:val="40"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>0</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>
+      </w:body>"#);
+    let runs: Vec<_> = blocks
+      .iter()
+      .filter_map(|block| match block {
+        Block::Paragraph(p) => Some(p),
+        _ => None,
+      })
+      .flat_map(|p| p.inlines.iter())
+      .filter_map(|inline| match inline {
+        InlineItem::Text(run) if run.text.starts_with("Error!") => Some(run),
+        _ => None,
+      })
+      .collect();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].style.font_size_pt, 20.0);
   }
 
   fn story_paragraph_texts(blocks: &[Block]) -> Vec<String> {
@@ -57958,6 +64263,17 @@ mod tests {
   }
 
   #[test]
+  fn next_column_section_with_different_page_size_starts_a_new_page() {
+    let previous = section_with_columns(w::SectionMarkValues::NextPage, 2);
+    let mut current = section_with_columns(w::SectionMarkValues::NextColumn, 2);
+    current.page_size = section(12240, 16840, w::PageOrientationValues::Portrait, None).page_size;
+    assert_eq!(
+      normalized_section_break(Some(&current), Some(&previous)),
+      SectionBreakKind::NextPage
+    );
+  }
+
+  #[test]
   fn next_column_section_uses_explicit_column_list_count() {
     let previous = explicit_columns_section(w::SectionMarkValues::NextPage);
     let current = explicit_columns_section(w::SectionMarkValues::NextColumn);
@@ -58091,6 +64407,98 @@ mod tests {
     );
 
     assert!(matches!(inlines.as_slice(), [InlineItem::PageBreak]));
+  }
+
+  #[test]
+  fn ignored_cell_page_break_removes_only_its_field_boundary() {
+    let paragraph = r#"<w:p><w:pPr><w:pageBreakBefore/></w:pPr>
+      <w:bookmarkStart w:id="7" w:name="Boundary"/>
+      <w:r><w:t>before</w:t><w:br w:type="page"/><w:t>after</w:t></w:r>
+      <w:bookmarkEnd w:id="7"/></w:p>"#;
+    let xml = format!(
+      r#"<w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      {paragraph}
+      <w:tbl><w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid><w:tr><w:tc>
+        {paragraph}
+        <w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r>
+          <w:r><w:instrText> DATE </w:instrText></w:r>
+          <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+          <w:r><w:t>cached date</w:t></w:r>
+          <w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>
+        <w:tbl><w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid><w:tr><w:tc>{paragraph}</w:tc></w:tr></w:tbl>
+      </w:tc></w:tr></w:tbl><w:p/><w:sectPr/>
+    </w:body>"#
+    );
+    let sections = imported_body_sections(xml.as_bytes());
+    let [Block::Paragraph(body), Block::Table(table), ..] = sections[0].blocks.as_slice() else {
+      panic!("body paragraph and table");
+    };
+    assert!(
+      body
+        .inlines
+        .iter()
+        .any(|item| matches!(item, InlineItem::PageBreak))
+    );
+    assert!(
+      body
+        .field_events
+        .iter()
+        .any(|event| matches!(event, ParagraphFieldEvent::PageBreak))
+    );
+    let [
+      Block::Paragraph(cell),
+      Block::Paragraph(field),
+      Block::Table(nested),
+      ..,
+    ] = table.rows[0].cells[0].blocks.as_slice()
+    else {
+      panic!("ordinary cell text, real field, and nested table");
+    };
+    let Block::Paragraph(nested_cell) = &nested.rows[0].cells[0].blocks[0] else {
+      panic!("nested cell paragraph");
+    };
+    let expected_events = body
+      .field_events
+      .iter()
+      .filter(|event| !matches!(event, ParagraphFieldEvent::PageBreak))
+      .cloned()
+      .collect::<Vec<_>>();
+    for cell in [cell, nested_cell] {
+      assert_eq!(inline_text(&cell.inlines), "beforeafter");
+      assert!(
+        !cell
+          .inlines
+          .iter()
+          .any(|item| matches!(item, InlineItem::PageBreak))
+      );
+      assert_eq!(
+        cell.field_events, expected_events,
+        "bookmark and visible-content order survives"
+      );
+      assert!(
+        cell.format.page_break_before,
+        "paragraph break-before is a different owner"
+      );
+    }
+    assert!(
+      field
+        .field_events
+        .iter()
+        .any(|event| matches!(event, ParagraphFieldEvent::Begin { .. }))
+    );
+    assert!(field.field_events.iter().any(|event| matches!(event, ParagraphFieldEvent::Instruction(instruction) if instruction.trim() == "DATE")));
+    assert!(
+      field
+        .field_events
+        .iter()
+        .any(|event| matches!(event, ParagraphFieldEvent::Separate { .. }))
+    );
+    assert!(
+      field
+        .field_events
+        .iter()
+        .any(|event| matches!(event, ParagraphFieldEvent::End))
+    );
   }
 
   #[test]
@@ -59276,6 +65684,182 @@ mod tests {
   }
 
   #[test]
+  fn drawingml_bitmap_fill_suppresses_style_fill_reference() {
+    let xml = br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm>
+        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        <a:blipFill><a:blip r:embed="picture"/><a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill>
+        <a:ln><a:noFill/></a:ln>
+      </wps:spPr><wps:style><a:lnRef idx="0"><a:srgbClr val="000000"/></a:lnRef>
+        <a:fillRef idx="1"><a:srgbClr val="F07F09"/></a:fillRef>
+        <a:effectRef idx="0"><a:srgbClr val="000000"/></a:effectRef>
+        <a:fontRef idx="minor"><a:srgbClr val="000000"/></a:fontRef>
+      </wps:style><wps:bodyPr/></wps:wsp>"#;
+    let mut source = wps::WordprocessingShape::from_bytes(xml).expect("bitmap shape");
+    let styles = StylesCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let mut images = ImageCatalog::default();
+    images.by_relationship_id.insert(
+      "picture".into(),
+      package::ImageResource {
+        data: Bytes::from_static(b"unmodified-bitmap"),
+        content_type: Some("image/jpeg".into()),
+      },
+    );
+    for bitmap in [true, false] {
+      if !bitmap {
+        source
+          .shape_properties
+          .as_mut()
+          .unwrap()
+          .shape_properties_choice2 = None;
+      }
+      let shape = wordprocessing_shape_shape(
+        &source,
+        ImagePlacement::Inline,
+        DrawingMlGroupTransform::identity(),
+        DrawingShapeImportContext {
+          effect_extent: DrawingEffectExtent::default(),
+          styles: &styles,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: false,
+        },
+      )
+      .expect("painted shape");
+      assert_eq!(shape.fill_image.is_some(), bitmap);
+      if bitmap {
+        assert!(shape.fill_color.is_none());
+        assert!(shape.fill_override.is_none());
+        assert_eq!(
+          shape.fill_image.unwrap().data.as_ref(),
+          b"unmodified-bitmap"
+        );
+      } else {
+        assert_eq!(
+          shape.fill_color,
+          Some(RgbColor {
+            r: 240,
+            g: 127,
+            b: 9
+          })
+        );
+      }
+    }
+    for (prefix, namespace) in [
+      ("a", "http://schemas.openxmlformats.org/drawingml/2006/main"),
+      (
+        "dsp",
+        "http://schemas.microsoft.com/office/drawing/2008/diagram",
+      ),
+      (
+        "pic",
+        "http://schemas.openxmlformats.org/drawingml/2006/picture",
+      ),
+    ] {
+      let drawing_namespace = if prefix == "a" {
+        ""
+      } else {
+        r#"xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main""#
+      };
+      let xml = format!(
+        r#"<{prefix}:spPr xmlns:{prefix}="{namespace}" {drawing_namespace}><a:blipFill><a:blip/></a:blipFill></{prefix}:spPr>"#
+      );
+      let properties = match prefix {
+        "a" => {
+          DrawingMlShapeProperties::Generic(a::ShapeProperties::from_bytes(xml.as_bytes()).unwrap())
+        }
+        "dsp" => DrawingMlShapeProperties::Diagram(
+          dsp::ShapeProperties::from_bytes(xml.as_bytes()).unwrap(),
+        ),
+        _ => DrawingMlShapeProperties::Picture(
+          pic::ShapeProperties::from_bytes(xml.as_bytes()).unwrap(),
+        ),
+      };
+      assert!(properties.has_explicit_fill());
+      assert!(properties.fill().is_none());
+    }
+  }
+
+  #[test]
+  fn drawingml_stretch_keeps_source_crop_and_destination_independent() {
+    let pixels = (0_u8..64).flat_map(|v| [v, v, v]).collect::<Vec<_>>();
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(&pixels, 8, 8, image::ColorType::Rgb8.into())
+      .unwrap();
+    let original = Bytes::from(png);
+    let mut images = ImageCatalog::default();
+    images.by_relationship_id.insert(
+      "picture".into(),
+      package::ImageResource {
+        data: original.clone(),
+        content_type: Some("image/png".into()),
+      },
+    );
+    for source in ["", "<a:srcRect/>", r#"<a:srcRect t="25000"/>"#] {
+      for (destination, expected_top) in
+        [("", 0.0), (r#"t="-100000""#, -1.0), (r#"t="25000""#, 0.25)]
+      {
+        let xml = format!(
+          r#"<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blip r:embed="picture"/>{source}<a:stretch><a:fillRect {destination}/></a:stretch></a:blipFill>"#
+        );
+        let fill = a::BlipFill::from_bytes(xml.as_bytes()).unwrap();
+        let imported = drawingml_blip_shape_image_fill(&fill, &images).unwrap();
+        let InlineShapeImageFillMode::DrawingMlStretch {
+          left,
+          top,
+          right,
+          bottom,
+        } = imported.mode
+        else {
+          panic!("expected independent stretch rectangle");
+        };
+        assert_eq!((left, top, right, bottom), (0.0, expected_top, 0.0, 0.0));
+        assert_eq!(imported.crop, ImageCrop::default());
+        if source.contains("25000") {
+          let image = image::load_from_memory(&imported.data).unwrap().to_rgb8();
+          assert_eq!(image.dimensions(), (8, 6));
+          assert_eq!(image.as_raw(), &pixels[8 * 2 * 3..]);
+        } else {
+          assert_eq!(imported.data, original);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn drawingml_stretch_defaults_to_rotation_with_shape() {
+    let mut images = ImageCatalog::default();
+    images.by_relationship_id.insert(
+      "picture".into(),
+      package::ImageResource {
+        data: Bytes::from_static(b"bitmap"),
+        content_type: Some("image/jpeg".into()),
+      },
+    );
+    for (attribute, expected) in [
+      ("", true),
+      (r#"rotWithShape="1""#, true),
+      (r#"rotWithShape="0""#, false),
+    ] {
+      let xml = format!(
+        r#"<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" {attribute}><a:blip r:embed="picture"/><a:stretch><a:fillRect t="-100000"/></a:stretch></a:blipFill>"#
+      );
+      let fill = a::BlipFill::from_bytes(xml.as_bytes()).unwrap();
+      assert_eq!(
+        drawingml_blip_shape_image_fill(&fill, &images)
+          .unwrap()
+          .rotate_with_shape,
+        expected
+      );
+    }
+  }
+
+  #[test]
   fn drawingml_shape_tile_fill_is_not_flattened_to_stretch() {
     let fill = a::BlipFill::from_bytes(
       br#"<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:blip/><a:tile sx="75000" sy="50000" flip="xy" algn="br"/></a:blipFill>"#,
@@ -59403,6 +65987,50 @@ mod tests {
     assert_eq!(top.height.map(|value| value.to_emu()), Some(0));
     assert_eq!(bottom.width.map(|value| value.to_emu()), Some(0));
     assert_eq!(bottom.height.map(|value| value.to_emu()), Some(7));
+  }
+
+  #[test]
+  fn word_2010_text_camera_ignores_preset_without_losing_the_light_rig() {
+    // MS-DOCX product behavior51 and Native72 source-derived controls:
+    // W14 camera presets are ignored, while the authored lighting survives.
+    // The independent WPS a:scene3d tests retain perspective cameras.
+    for camera in ["orthographicFront", "obliqueTopRight", "perspectiveFront"] {
+      let xml = format!(
+        r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:scene3d><w14:camera w14:prst="{camera}"/><w14:lightRig w14:rig="twoPt" w14:dir="b"><w14:rot w14:lat="60000" w14:lon="120000" w14:rev="180000"/></w14:lightRig></w14:scene3d></w:rPr>"#,
+      );
+      let properties = w::StyleRunProperties::from_bytes(xml.as_bytes()).unwrap();
+      let mut style = TextStyle::default();
+      properties::merge_run_style(
+        &mut style,
+        Some(RunProps::Style(&properties)),
+        &ThemeFonts::default(),
+        &ThemeColors::default(),
+      );
+      let resolved = common::drawingml_3d::resolve_static_3d_style(
+        style.drawingml_text_static3d.as_ref(),
+        style.wordprocessing_text_3d_parts.as_ref(),
+      )
+      .unwrap();
+      assert_eq!(
+        resolved.scene.camera.preset,
+        a::PresetCameraValues::OrthographicFront
+      );
+      assert_eq!(resolved.scene.light_rig.rig, a::LightRigValues::TwoPoints);
+      assert_eq!(
+        resolved.scene.light_rig.direction,
+        a::LightRigDirectionValues::Bottom
+      );
+      assert_eq!(
+        resolved
+          .scene
+          .light_rig
+          .rotation
+          .as_ref()
+          .unwrap()
+          .revolution,
+        180_000
+      );
+    }
   }
 
   #[test]

@@ -29,27 +29,75 @@ pub(super) fn overstrike(
     OverstrikeAlignment::Center
   };
   let arguments = rest.strip_prefix('(')?.trim_end().strip_suffix(')')?;
-  // Compound EQ expressions have their own operators and recursive layout.
-  // Preserve their cached result until that grammar is supported. Likewise,
-  // do not reinterpret escaped punctuation or locale-specific separators as
-  // literal text. The supported operands are complete, plain styled strings.
-  if arguments.contains(['(', ')', '\\', ';', '\r', '\n']) {
+  // Keep unsupported separators and escapes on the cached-result path.
+  // Parenthesized \s operands are parsed below, independently of authored
+  // instruction-run boundaries.
+  if arguments.contains([';', '\r', '\n']) {
     return None;
   }
   let arguments_start = instruction.len() - rest.len() + 1;
-  let mut start = arguments_start;
+  let mut depth = 0usize;
+  let mut start = 0;
+  let mut ranges = Vec::new();
+  for (index, character) in arguments.char_indices() {
+    match character {
+      '(' => depth += 1,
+      ')' => depth = depth.checked_sub(1)?,
+      ',' if depth == 0 => {
+        ranges.push(start..index);
+        start = index + 1;
+      }
+      _ => {}
+    }
+  }
+  if depth != 0 {
+    return None;
+  }
+  ranges.push(start..arguments.len());
   let mut operands = Vec::new();
-  for argument in arguments.split(',') {
-    let end = start + argument.len();
-    let runs = styled_runs(
+  for range in ranges {
+    let argument = &arguments[range.clone()];
+    let mut operand_start = arguments_start + range.start;
+    let mut shift = 0.0;
+    let literal = if argument.trim_start().starts_with('\\') {
+      let rest = super::strip_ascii_case_prefix(argument.trim_start(), r"\s")?.trim_start();
+      let (rest, direction) = if let Some(rest) = super::strip_ascii_case_prefix(rest, r"\up") {
+        (rest, 1.0)
+      } else {
+        (super::strip_ascii_case_prefix(rest, r"\do")?, -1.0)
+      };
+      let opening = rest.find('(')?;
+      let points = rest[..opening].trim();
+      // ECMA-376 Part4 §14.10.4.6: \s\up/\do displaces its single
+      // argument by an integral point distance (default 2). Native controls
+      // retain the authored size, including explicit operand font sizes;
+      // this is distinct from w:vertAlign automatic font reduction.
+      shift = direction
+        * if points.is_empty() {
+          2.0
+        } else {
+          points.parse::<i32>().ok()? as f32
+        };
+      let literal = rest[opening + 1..].trim_end().strip_suffix(')')?;
+      operand_start += argument.len() - rest.len() + opening + 1;
+      literal
+    } else {
+      argument
+    };
+    if literal.contains(['(', ')', '\\', ',']) {
+      return None;
+    }
+    let mut runs = styled_runs(
       instruction,
-      start..end,
+      operand_start..operand_start + literal.len(),
       instruction_styles,
       fallback_style,
       hyperlink_url,
     )?;
+    for run in &mut runs {
+      run.style.baseline_shift_pt += shift;
+    }
     operands.push(runs);
-    start = end + 1;
   }
   let trailing_start = arguments_start + arguments.len() + 1;
   let trailing = styled_runs(
@@ -160,6 +208,59 @@ mod tests {
   }
 
   #[test]
+  fn overstrike_script_operands_keep_native_sizes_and_point_offsets() {
+    for size in [6.0, 10.5, 14.0, 18.0] {
+      for points in [0, 2, 7, 14] {
+        let instruction = format!(" EQ \\o(ABCD,\\s\\up{points}(催化剂),\\s\\do{points}(△)) ");
+        let base = TextStyle {
+          font_size_pt: size,
+          ..Default::default()
+        };
+        let upper_start = instruction.find('催').unwrap();
+        let upper_end = upper_start + "催化剂".len();
+        let upper = TextStyle {
+          font_size_pt: 18.0,
+          baseline_shift_pt: 1.5,
+          ..base.clone()
+        };
+        let styles = instruction
+          .char_indices()
+          .map(|(index, _)| {
+            (
+              index,
+              if (upper_start..upper_end).contains(&index) {
+                upper.clone()
+              } else {
+                base.clone()
+              },
+            )
+          })
+          .collect::<Vec<_>>();
+        let field = overstrike(&instruction, &styles, &base, Some("#target")).unwrap();
+        assert_eq!(field.portion.operands.len(), 3);
+        for (index, text, font_size, shift) in [
+          (0, "ABCD", size, 0.0),
+          (1, "催化剂", 18.0, points as f32 + 1.5),
+          (2, "△", size, -(points as f32)),
+        ] {
+          let runs = &field.portion.operands[index];
+          assert_eq!(runs.len(), 1);
+          assert_eq!(runs[0].text, text);
+          assert_eq!(runs[0].style.font_size_pt, font_size);
+          assert_eq!(runs[0].style.baseline_shift_pt, shift);
+          assert_eq!(runs[0].hyperlink_url.as_deref(), Some("#target"));
+        }
+        assert_eq!(field.trailing[0].text, " ");
+      }
+    }
+    for instruction in [r"EQ \o(AB,\s\up(C))", r"EQ \o(AB, \S \UP 2(C))"] {
+      let field = overstrike(instruction, &[], &TextStyle::default(), None).unwrap();
+      assert_eq!(field.portion.operands[1][0].text, "C");
+      assert_eq!(field.portion.operands[1][0].style.baseline_shift_pt, 2.0);
+    }
+  }
+
+  #[test]
   fn overstrike_preserves_spaces_after_the_expression() {
     // Native 12/16pt controls distinguish spaces inside the instruction from
     // a separate following text run; each contributes its own full advance.
@@ -195,7 +296,10 @@ mod tests {
     }
     for instruction in [
       r"EQ \o\ad(A,B)",
-      r"EQ \o(\s\up3(A),B)",
+      r"EQ \o(\s\ai3(A),B)",
+      r"EQ \o(\s\up3(A,B),C)",
+      r"EQ \o(\s\up3(A),\f(B,C))",
+      r"EQ \o(\s\up1.5(A),B)",
       r"EQ \o(A;B)",
       r"EQ \o(A,B",
       r"EQ \o()",

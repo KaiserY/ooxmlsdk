@@ -218,6 +218,10 @@ pub struct PdfOptions {
   /// Input file name used by spreadsheet formulas such as CELL("filename").
   pub source_file_name: Option<String>,
 
+  /// Complete storage path used to refresh Word's FILENAME \\p field.
+  /// This is rendering context; the converter does not open this path.
+  pub source_file_path: Option<String>,
+
   /// BCP 47 user-interface language for generated document labels.
   pub ui_language: Option<String>,
 
@@ -271,6 +275,7 @@ impl Default for PdfOptions {
       bitmap_missing_fonts: true,
       jpeg_quality: None,
       source_file_name: None,
+      source_file_path: None,
       ui_language: None,
       format_locale: None,
       default_document_language: None,
@@ -344,6 +349,7 @@ impl PdfOptions {
   pub fn layout_options(&self) -> ooxmlsdk_layout::options::LayoutOptions {
     ooxmlsdk_layout::options::LayoutOptions {
       source_file_name: self.source_file_name.clone(),
+      source_file_path: self.source_file_path.clone(),
       ui_language: self.ui_language.clone(),
       format_locale: self.format_locale.clone(),
       default_document_language: self.default_document_language.clone(),

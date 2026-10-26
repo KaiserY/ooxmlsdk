@@ -160,6 +160,9 @@ fn resolve_path_gradient_tile(
 }
 
 pub fn resolved_stops(gradient: &GradientFill<'static>) -> Vec<GradientStop<'static>> {
+  if gradient.interpolation == GradientInterpolation::OfficeArtPerChannelGamma {
+    return office_art_resolved_stops(&gradient.stops);
+  }
   if !matches!(
     gradient.interpolation,
     GradientInterpolation::PowerPointGammaSigma | GradientInterpolation::SigmaSrgb
@@ -194,6 +197,62 @@ pub fn resolved_stops(gradient: &GradientFill<'static>) -> Vec<GradientStop<'sta
   }
   stops.push(gradient.stops.last().expect("two gradient stops").clone());
   stops
+}
+
+/// Office Open Specifications' two-color and mirrored three-color rules.
+/// Word's legacy locked canvas uses this policy; other export owners select
+/// their interpolation independently.
+pub(crate) fn office_art_interpolation(stops: &[GradientStop<'_>]) -> GradientInterpolation {
+  let full_range = stops.first().is_some_and(|stop| stop.position == 0.0)
+    && stops.last().is_some_and(|stop| stop.position == 1.0);
+  let symmetric_three = stops.len() == 3
+    && stops[0].color == stops[2].color
+    && stops[1].position > 0.0
+    && stops[1].position < 1.0;
+  if full_range && (stops.len() == 2 || symmetric_three) {
+    GradientInterpolation::OfficeArtPerChannelGamma
+  } else {
+    GradientInterpolation::LinearSrgb
+  }
+}
+
+fn office_art_resolved_stops(stops: &[GradientStop<'static>]) -> Vec<GradientStop<'static>> {
+  // Microsoft Open Specifications, Mike Bowen, 2025-04-17:
+  // https://learn.microsoft.com/en-us/answers/questions/2248059/
+  // Apply the directional power to the channel's interpolation ratio, not
+  // to the absolute endpoint colors. Fixed subdivisions avoid per-pixel pow
+  // calls and share the same resolved colors with vector and raster output.
+  if stops.len() < 2 {
+    return stops.to_vec();
+  }
+  const STEPS: usize = 32;
+  let mut resolved = Vec::with_capacity((stops.len() - 1) * STEPS + 1);
+  for pair in stops.windows(2) {
+    let (start, end) = (&pair[0], &pair[1]);
+    for step in 0..STEPS {
+      let t = step as f32 / STEPS as f32;
+      let darker = t.powf(1.875);
+      let lighter = 1.0 - (1.0 - t).powf(1.875);
+      let channel = |a: u8, b: u8| {
+        let ratio = if b > a { lighter } else { darker };
+        (f32::from(a) + (f32::from(b) - f32::from(a)) * ratio)
+          .round()
+          .clamp(0.0, 255.0) as u8
+      };
+      resolved.push(GradientStop {
+        position: start.position + (end.position - start.position) * t,
+        color: Color {
+          r: channel(start.color.r, end.color.r),
+          g: channel(start.color.g, end.color.g),
+          b: channel(start.color.b, end.color.b),
+          a: linear_color(start.color, end.color, t).a,
+        },
+        scheme: None,
+      });
+    }
+  }
+  resolved.push(stops.last().expect("two gradient stops").clone());
+  resolved
 }
 
 pub(crate) fn sample(stops: &[GradientStop<'static>], position: f32) -> Color {
@@ -396,7 +455,7 @@ fn linear_color(start: Color, end: Color, blend: f32) -> Color {
   }
 }
 
-fn gamma_correct_color(start: Color, end: Color, blend: f32) -> Color {
+pub(crate) fn gamma_correct_color(start: Color, end: Color, blend: f32) -> Color {
   let channel = |start: u8, end: u8| {
     let start = (f32::from(start) / 255.0).powf(2.2);
     let end = (f32::from(end) / 255.0).powf(2.2);
@@ -417,6 +476,65 @@ fn gamma_correct_color(start: Color, end: Color, blend: f32) -> Color {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn office_art_gradient_uses_directional_channel_ratios_and_authored_boundaries() {
+    let rgb = |r, g, b| Color { r, g, b, a: 255 };
+    let stop = |position, color| GradientStop {
+      position,
+      color,
+      scheme: None,
+    };
+    let white = rgb(255, 255, 255);
+    let gray = rgb(221, 221, 221);
+    let dark = rgb(64, 64, 64);
+    let mut stops = vec![stop(0.0, white), stop(1.0, gray)];
+    assert_eq!(
+      office_art_interpolation(&stops),
+      GradientInterpolation::OfficeArtPerChannelGamma
+    );
+    let resolved = office_art_resolved_stops(&stops);
+    // Native plain OfficeArt ramps, independent of geometry/text/effects:
+    // white-to-gray midpoint is about 246, not the GDI+ brush's 239.
+    assert_eq!(resolved[16].color, rgb(246, 246, 246));
+    stops[0].color = rgb(128, 64, 32);
+    stops[1].color = rgb(32, 160, 224);
+    assert_eq!(
+      office_art_resolved_stops(&stops)[16].color,
+      rgb(102, 134, 172)
+    );
+    stops[0].color.a = 128;
+    stops[1].color.a = 0;
+    assert_eq!(
+      office_art_interpolation(&stops),
+      GradientInterpolation::OfficeArtPerChannelGamma
+    );
+    assert_eq!(office_art_resolved_stops(&stops)[16].color.a, 64);
+    for (first, last) in [(0.0, 0.99999), (0.01, 1.0), (0.2, 0.8)] {
+      stops[0].position = first;
+      stops[1].position = last;
+      assert_eq!(
+        office_art_interpolation(&stops),
+        GradientInterpolation::LinearSrgb
+      );
+    }
+    for middle in [0.25, 0.5, 0.75] {
+      let mut mirrored = vec![stop(0.0, white), stop(middle, dark), stop(1.0, white)];
+      assert_eq!(
+        office_art_interpolation(&mirrored),
+        GradientInterpolation::OfficeArtPerChannelGamma
+      );
+      let resolved = office_art_resolved_stops(&mirrored);
+      assert_eq!(resolved[32].position, middle);
+      assert_eq!(resolved[32].color, dark);
+      assert_eq!(resolved[16].color, resolved[48].color);
+      mirrored[2].color = gray;
+      assert_eq!(
+        office_art_interpolation(&mirrored),
+        GradientInterpolation::LinearSrgb
+      );
+    }
+  }
 
   #[test]
   fn present_relative_rect_uses_schema_defaults_before_tile_mapping() {

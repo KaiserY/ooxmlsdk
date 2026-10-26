@@ -655,7 +655,7 @@ fn write_page_document(
         internal_links: &internal_links,
         page_links: &mut page_links,
         requires_codepoint_mappings: conformance.requires_codepoint_mappings(),
-        forbids_private_use_mappings: conformance.forbids_private_use_mappings(),
+        requires_actual_text_for_private_use: conformance.requires_actual_text_for_private_use(),
         page_width_pt: width_pt,
         page_height_pt: height_pt,
         group_bounds: [0.0, 0.0, width_pt, height_pt],
@@ -1239,7 +1239,7 @@ struct PreparedPageWriter<'a> {
   internal_links: &'a InternalLinkTargets,
   page_links: &'a mut DirectPageLinks,
   requires_codepoint_mappings: bool,
-  forbids_private_use_mappings: bool,
+  requires_actual_text_for_private_use: bool,
   page_width_pt: f32,
   page_height_pt: f32,
   group_bounds: [f32; 4],
@@ -1386,7 +1386,7 @@ fn write_isolated_prepared_group(
       internal_links: writer.internal_links,
       page_links: &mut *writer.page_links,
       requires_codepoint_mappings: writer.requires_codepoint_mappings,
-      forbids_private_use_mappings: writer.forbids_private_use_mappings,
+      requires_actual_text_for_private_use: writer.requires_actual_text_for_private_use,
       page_width_pt: writer.page_width_pt,
       page_height_pt: writer.page_height_pt,
       group_bounds: writer.group_bounds,
@@ -1693,7 +1693,7 @@ fn write_prepared_office_math_svg(
   let fonts = &mut *writer.fonts;
   let refs = &mut *writer.refs;
   let requires_codepoint_mappings = writer.requires_codepoint_mappings;
-  let forbids_private_use_mappings = writer.forbids_private_use_mappings;
+  let requires_actual_text_for_private_use = writer.requires_actual_text_for_private_use;
   write_transformed_image_content(
     content,
     image,
@@ -1717,7 +1717,7 @@ fn write_prepared_office_math_svg(
           fonts,
           refs,
           requires_codepoint_mappings,
-          forbids_private_use_mappings,
+          requires_actual_text_for_private_use,
         },
       )
     },
@@ -1734,6 +1734,76 @@ fn write_prepared_metafile(
   }
 
   let render_options = super::metafile::render_options_for_image(image, writer.options);
+  if matches!(
+    writer.options.images.optimization_policy,
+    crate::PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+  ) && let Some(picture) =
+    ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_picture_with_options(
+      &image.data,
+      render_options,
+    )
+  {
+    let bitmap = &picture.bitmap;
+    let mut source = image.clone();
+    source.data = Cow::Borrowed(&bitmap.data);
+    source.content_type = Some(Cow::Borrowed(bitmap.content_type));
+    let Some((display_width, display_height)) =
+      expanded_image_display_size(image.width_pt, image.height_pt, image.crop)
+    else {
+      return Ok(());
+    };
+    // Keep the EMF+ source image, then apply the ordinary Word picture codec
+    // and resolution policy once. The metafile canvas is not a source bitmap.
+    let prepared = writer.image_policy.raster_direct(
+      &source.data,
+      source.content_type.as_deref(),
+      writer.options,
+      None,
+      (display_width * bitmap.width, display_height * bitmap.height),
+      image.blip_compression_state,
+    )?;
+    let registered = writer.images.register(prepared, || writer.refs.alloc())?;
+    writer
+      .resources
+      .register_image(&registered.name, registered.id);
+    // Native Word's EMF+ Half sampling shifts the source window by half a
+    // pixel. For an unmodified full-source picture its far edge is clipped
+    // to the source bounds. None/HighSpeed retain the full extent. Preserve
+    // the destination origin; this sampling state does not move the host.
+    let sample_fraction = |pixels: u32| {
+      if picture.half_pixel_offset {
+        (pixels as f32 - 0.5) / pixels as f32
+      } else {
+        1.0
+      }
+    };
+    return write_transformed_image_content(
+      content,
+      image,
+      image.width_pt,
+      image.height_pt,
+      image.crop,
+      |content, width, height, local_transform| {
+        let draw_width = width * bitmap.width * sample_fraction(picture.source_size[0]);
+        let draw_height = height * bitmap.height * sample_fraction(picture.source_size[1]);
+        content
+          .transform(local_transform)
+          .rect(0.0, 0.0, width, height)
+          .clip_nonzero()
+          .end_path()
+          .transform([
+            draw_width,
+            0.0,
+            0.0,
+            -draw_height,
+            width * bitmap.x,
+            height * bitmap.y + draw_height,
+          ])
+          .x_object(Name(&registered.name));
+        Ok(())
+      },
+    );
+  }
   if image.metafile_fixed_output_profile == common::MetafileFixedOutputProfile::WordVmlEmfPicture
     && let Ok(Some(drawing)) =
       ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_drawing_with_options(
@@ -1758,6 +1828,30 @@ fn write_prepared_metafile(
   let image = painted_image.as_ref().unwrap_or(image);
   let (paint_width_pt, paint_height_pt) =
     super::metafile::native_paint_size(image).unwrap_or((image.width_pt, image.height_pt));
+  if matches!(
+    writer.options.images.optimization_policy,
+    crate::PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+  ) && let Some(bitmap) =
+    ooxmlsdk_layout::render::emf_wmf::extract_metafile_full_bitmap_with_options(
+      &image.data,
+      render_options,
+    )
+  {
+    // Word retains the source DIB as an ordinary picture. A generated GDI
+    // surface would resample it and force the lossless preview codec, losing
+    // both its original dimensions and the host's photographic JPEG profile.
+    let mut source = image.clone();
+    source.data = Cow::Borrowed(&bitmap.data);
+    source.content_type = Some(Cow::Borrowed(bitmap.content_type));
+    return write_prepared_raster_image(
+      content,
+      &source,
+      writer,
+      None,
+      paint_width_pt,
+      paint_height_pt,
+    );
+  }
   write_prepared_raster_image(
     content,
     image,
@@ -2970,7 +3064,7 @@ fn write_prepared_font_run_as_text(
         glyphs: &glyphs[segment_start..segment.end],
         actual_text,
         requires_codepoint_mappings: writer.requires_codepoint_mappings,
-        forbids_private_use_mappings: writer.forbids_private_use_mappings,
+        requires_actual_text_for_private_use: writer.requires_actual_text_for_private_use,
         x_pt,
       },
       &glyph_context,
@@ -3891,7 +3985,7 @@ struct PositionedGlyphSegment<'glyphs, 'text> {
   glyphs: &'glyphs [super::paint::PaintGlyph],
   actual_text: Option<&'text str>,
   requires_codepoint_mappings: bool,
-  forbids_private_use_mappings: bool,
+  requires_actual_text_for_private_use: bool,
   x_pt: f32,
 }
 
@@ -3906,7 +4000,7 @@ fn write_positioned_glyph_segment(
     glyphs,
     actual_text,
     requires_codepoint_mappings,
-    forbids_private_use_mappings,
+    requires_actual_text_for_private_use,
     x_pt,
   } = segment;
   if let Some(actual_text) = actual_text {
@@ -3917,7 +4011,8 @@ fn write_positioned_glyph_segment(
       ensure_glyph_semantic_mapping_supported(
         &semantic,
         requires_codepoint_mappings,
-        forbids_private_use_mappings,
+        requires_actual_text_for_private_use,
+        true,
       )?;
       let registered = fonts.register_glyph(
         context.handle,
@@ -3941,14 +4036,17 @@ fn write_positioned_glyph_segment(
   let mut total_advance_em = 0.0;
   for glyph in glyphs {
     let semantic = glyph_semantic_text(context.source, glyph)?;
+    let private_use_actual_text =
+      private_use_requires_actual_text(&semantic, requires_actual_text_for_private_use);
     ensure_glyph_semantic_mapping_supported(
       &semantic,
       requires_codepoint_mappings,
-      forbids_private_use_mappings,
+      requires_actual_text_for_private_use,
+      private_use_actual_text,
     )?;
     let registered = fonts.register_glyph(context.handle, glyph.glyph_id, Some(&semantic))?;
     let prepared = PreparedGlyph { glyph, registered };
-    if registered.semantic_conflict {
+    if registered.semantic_conflict || private_use_actual_text {
       let advance = write_registered_glyph_segment(
         content,
         &compatible,
@@ -4066,7 +4164,8 @@ fn without_nonprinting_control_glyphs<'a>(
 pub(super) fn ensure_glyph_semantic_mapping_supported(
   semantic: &str,
   requires_codepoint_mappings: bool,
-  forbids_private_use_mappings: bool,
+  requires_actual_text_for_private_use: bool,
+  actual_text_present: bool,
 ) -> Result<()> {
   if requires_codepoint_mappings
     && (semantic.is_empty()
@@ -4076,10 +4175,16 @@ pub(super) fn ensure_glyph_semantic_mapping_supported(
   {
     return unsupported("invalid glyph semantics in a Unicode-mapped PDF profile");
   }
-  if forbids_private_use_mappings && semantic.chars().any(super::paint::is_unicode_private_use) {
+  if !actual_text_present
+    && private_use_requires_actual_text(semantic, requires_actual_text_for_private_use)
+  {
     return unsupported("private-use glyph semantics in PDF/A-3a");
   }
   Ok(())
+}
+
+pub(super) fn private_use_requires_actual_text(semantic: &str, required: bool) -> bool {
+  required && semantic.chars().any(super::paint::is_unicode_private_use)
 }
 
 #[derive(Clone, Copy)]
@@ -6193,7 +6298,7 @@ mod tests {
       flip_vertical: false,
       content_type: "image/png".into(),
       bytes: bytes.into(),
-      blip_compression_state: common::BlipCompressionState::Unspecified,
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -6232,7 +6337,7 @@ mod tests {
       flip_vertical: false,
       data: Cow::Borrowed(&[]),
       content_type: Some(Cow::Borrowed("image/x-emf")),
-      blip_compression_state: common::BlipCompressionState::Unspecified,
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
       metafile_monochrome_dib_palette_override: None,
       metafile_background_color: None,
       metafile_external_header: None,
@@ -8364,6 +8469,7 @@ mod tests {
           end: point(172.0, 122.0),
         },
       ]],
+      word_envelope: false,
       follow_path: None,
       vml_fit_path: None,
       vml_trim_band: None,
@@ -10177,22 +10283,109 @@ mod tests {
   }
 
   #[test]
+  fn direct_writer_pdfa3a_covers_private_use_mappings_with_actual_text() {
+    let creation_date = crate::PdfDateTime {
+      year: 2026,
+      month: Some(10),
+      day: Some(20),
+      hour: Some(0),
+      minute: Some(0),
+      second: Some(0),
+      utc_offset_hour: Some(0),
+      utc_offset_minute: Some(0),
+    };
+    for source in ["A\u{e225}B\u{e226}\u{e225}C", "A\u{f0000}B\u{100001}C"] {
+      for semantic_only in [false, true] {
+        let document = text_document(
+          source,
+          common::TextStyle {
+            font_family: Some("Calibri".into()),
+            font_size: Pt(12.0),
+            color: color(0, 0, 0, u8::MAX),
+            semantic_only,
+            ..Default::default()
+          },
+        );
+        let mut options = uncompressed_options();
+        options.standards = vec![PdfStandard::PdfA3a, PdfStandard::PdfUa1];
+        options.default_document_language = Some("en-US".to_string());
+        options.metadata.title = Some("Private-use text".to_string());
+        options.metadata.creation_date = Some(creation_date);
+        let pdf = render(&document, &options).unwrap();
+        let serialized = String::from_utf8_lossy(&pdf);
+        let mut covered = String::new();
+        for property in serialized.split("/ActualText<").skip(1) {
+          let end = property.find('>').unwrap();
+          let hex = &property[..end];
+          assert!(property[end + 1..].starts_with(">>BDC"));
+          assert_eq!(hex.len() % 4, 0);
+          let utf16 = (0..hex.len())
+            .step_by(4)
+            .map(|i| u16::from_str_radix(&hex[i..i + 4], 16).unwrap())
+            .collect::<Vec<_>>();
+          assert_eq!(utf16[0], 0xfeff);
+          covered.extend(
+            String::from_utf16(&utf16[1..])
+              .unwrap()
+              .chars()
+              .filter(|&ch| super::super::paint::is_unicode_private_use(ch)),
+          );
+        }
+        let expected: String = source
+          .chars()
+          .filter(|&ch| super::super::paint::is_unicode_private_use(ch))
+          .collect();
+        assert_eq!(covered, expected, "semantic_only={semantic_only}");
+      }
+    }
+
+    // A first, unambiguous PUA mapping needs no added wrapper in profiles
+    // without the levelA requirement. Existing CID-conflict policy is separate.
+    let document = text_document(
+      "A\u{e225}B",
+      common::TextStyle {
+        font_family: Some("Calibri".into()),
+        font_size: Pt(12.0),
+        ..Default::default()
+      },
+    );
+    for standard in [PdfStandard::Pdf14, PdfStandard::PdfA3u, PdfStandard::PdfUa1] {
+      let mut options = uncompressed_options();
+      options.standards = vec![standard];
+      options.default_document_language = Some("en-US".to_string());
+      options.metadata.title = Some("Private-use text".to_string());
+      options.metadata.creation_date = Some(creation_date);
+      let pdf = render(&document, &options).unwrap();
+      assert!(!String::from_utf8_lossy(&pdf).contains("/ActualText"));
+    }
+  }
+
+  #[test]
   fn direct_writer_applies_profile_semantic_rules_after_legacy_symbol_remapping() {
-    assert!(ensure_glyph_semantic_mapping_supported("\u{2022}", true, true).is_ok());
+    assert!(ensure_glyph_semantic_mapping_supported("\u{2022}", true, true, false).is_ok());
     let webdings =
       super::super::paint::symbol_font_semantic_text("\u{f045}\u{f04a}\u{f049}", Some("Webdings"));
-    assert!(ensure_glyph_semantic_mapping_supported(&webdings, true, true).is_ok());
-    assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", false, false).is_ok());
-    assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", true, false).is_ok());
+    assert!(ensure_glyph_semantic_mapping_supported(&webdings, true, true, false).is_ok());
+    assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", false, false, false).is_ok());
+    assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", true, false, false).is_ok());
     assert!(matches!(
-      ensure_glyph_semantic_mapping_supported("\u{f0b7}", true, true),
+      ensure_glyph_semantic_mapping_supported("\u{f0b7}", true, true, false),
       Err(PdfError::DirectWriterUnsupported {
         feature: "private-use glyph semantics in PDF/A-3a"
       })
     ));
-    assert!(ensure_glyph_semantic_mapping_supported("\0", false, false).is_ok());
+    assert!(ensure_glyph_semantic_mapping_supported("\u{f0b7}", true, true, true).is_ok());
+    for semantic in ["", "\0", "\u{feff}", "\u{fffe}"] {
+      assert!(matches!(
+        ensure_glyph_semantic_mapping_supported(semantic, true, true, true),
+        Err(PdfError::DirectWriterUnsupported {
+          feature: "invalid glyph semantics in a Unicode-mapped PDF profile"
+        })
+      ));
+    }
+    assert!(ensure_glyph_semantic_mapping_supported("\0", false, false, false).is_ok());
     assert!(matches!(
-      ensure_glyph_semantic_mapping_supported("\0", true, false),
+      ensure_glyph_semantic_mapping_supported("\0", true, false, false),
       Err(PdfError::DirectWriterUnsupported {
         feature: "invalid glyph semantics in a Unicode-mapped PDF profile"
       })
@@ -10203,11 +10396,11 @@ mod tests {
   fn direct_writer_legacy_symbol_selectors_keep_unknown_private_use_rejected() {
     for (family, source) in [("Wingdings", "\u{f0e8}"), ("Symbol", "\u{f0de}")] {
       let semantic = super::super::paint::symbol_font_semantic_text(source, Some(family));
-      assert!(ensure_glyph_semantic_mapping_supported(&semantic, true, true).is_ok());
+      assert!(ensure_glyph_semantic_mapping_supported(&semantic, true, true, false).is_ok());
       for (family, source) in [("Calibri", source), (family, "\u{e225}")] {
         let unsupported = super::super::paint::symbol_font_semantic_text(source, Some(family));
         assert!(matches!(
-          ensure_glyph_semantic_mapping_supported(&unsupported, true, true),
+          ensure_glyph_semantic_mapping_supported(&unsupported, true, true, false),
           Err(PdfError::DirectWriterUnsupported {
             feature: "private-use glyph semantics in PDF/A-3a"
           })
@@ -10218,7 +10411,7 @@ mod tests {
       super::super::paint::symbol_font_semantic_text("\u{f0e8}\u{e225}", Some("Wingdings"));
     assert_eq!(mixed, "\u{1f87a}\u{e225}");
     assert!(matches!(
-      ensure_glyph_semantic_mapping_supported(&mixed, true, true),
+      ensure_glyph_semantic_mapping_supported(&mixed, true, true, false),
       Err(PdfError::DirectWriterUnsupported {
         feature: "private-use glyph semantics in PDF/A-3a"
       })
@@ -11863,7 +12056,7 @@ mod tests {
         x: Pt(3.0),
         y: Pt(5.0),
       },
-      blip_compression_state: common::BlipCompressionState::Unspecified,
+      blip_compression_state: common::BlipCompressionState::NotApplicable,
     };
     let mut document = blank_document(&[(120.0, 192.0), (120.0, 288.0)]);
     for page in &mut document.pages {

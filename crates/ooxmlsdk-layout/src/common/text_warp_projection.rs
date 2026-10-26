@@ -5,9 +5,11 @@ use kurbo::{BezPath, CubicBez, ParamCurve, ParamCurveArclen, PathEl, PathSeg, Po
 use super::{PathCommand, Point as LayoutPoint, Pt, TextWarp};
 
 mod follow_path;
+mod word_envelope;
 pub use follow_path::{
   TextFollowPathFontCell, TextFollowPathSampler, text_follow_path_glyph_transform,
 };
+pub use word_envelope::append_word_envelope_outline;
 
 const TEXT_WARP_ARCLEN_ACCURACY_PT: f64 = 0.0001;
 
@@ -379,6 +381,7 @@ mod tests {
           end: point(100.0, 50.0),
         },
       ]],
+      word_envelope: false,
       follow_path: None,
       vml_fit_path: None,
       vml_trim_band: None,

@@ -212,7 +212,7 @@ fn format_pages<'a>(
   let first_top = flow.body_content_bottom_pt - available;
   let left = flow.setup.margin_left_pt;
   let width = flow.setup.width_pt - left - flow.setup.margin_right_pt;
-  let mut note_flow = note_story_flow(FlowContext {
+  let mut note_flow = footnote_story_flow(FlowContext {
     content_left_pt: left,
     content_width: width,
     content_bottom: flow.body_content_bottom_pt,
@@ -387,7 +387,7 @@ fn format_separator(
   } else {
     layout_note_story_blocks(
       &document.footnote_separator_stories.separator,
-      flow,
+      footnote_story_flow(flow),
       current,
       pages,
       metrics,
@@ -508,6 +508,8 @@ pub(super) mod tests {
 
   pub(in crate::docx::layout) fn document() -> DocxDocument {
     DocxDocument {
+      num_pages_excludes_cover: false,
+      toc_print_cache: None,
       page: PageSetup {
         width_pt: 360.0,
         height_pt: 300.0,

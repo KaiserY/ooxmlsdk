@@ -1,4 +1,5 @@
-use ooxmlsdk::common::SdkError;
+use ooxmlsdk::common::{SdkError, XmlNamespace};
+use ooxmlsdk::namespaces::XmlKnownNamespace;
 use ooxmlsdk::parts::image_part::ImagePart;
 use ooxmlsdk::parts::visio_comments_part::VisioCommentsPart;
 use ooxmlsdk::parts::visio_document::VisioDocument as VisioPackage;
@@ -41,6 +42,7 @@ pub fn add_page(
       None => document.add_new_part_auto_id::<_, VisioPagesPart>(package)?,
     };
   let mut pages = read_xml::<Pages>(package, &pages_part)?;
+  ensure_namespaces(&mut pages.xmlns);
   let before = related_ids::<_, VisioPagePart>(&pages_part, package, PAGE);
   let page_part = pages_part.add_new_part_auto_id::<_, VisioPagePart>(package)?;
   let rel_id = related_ids::<_, VisioPagePart>(&pages_part, package, PAGE)
@@ -61,7 +63,9 @@ pub fn add_page(
     ..Default::default()
   });
   pages_part.set_data(package, pages.to_xml()?.into_bytes())?;
-  page_part.set_data(package, PageContents::default().to_xml()?.into_bytes())?;
+  let mut contents = PageContents::default();
+  ensure_namespaces(&mut contents.xmlns);
+  page_part.set_data(package, contents.to_xml()?.into_bytes())?;
   Ok(page_id)
 }
 
@@ -78,6 +82,7 @@ pub fn add_master(
       None => document.add_new_part_auto_id::<_, VisioMastersPart>(package)?,
     };
   let mut masters = read_xml::<Masters>(package, &masters_part)?;
+  ensure_namespaces(&mut masters.xmlns);
   let before = related_ids::<_, VisioMasterPart>(&masters_part, package, MASTER);
   let master_part = masters_part.add_new_part_auto_id::<_, VisioMasterPart>(package)?;
   let rel_id = related_ids::<_, VisioMasterPart>(&masters_part, package, MASTER)
@@ -92,7 +97,9 @@ pub fn add_master(
     ..Default::default()
   });
   masters_part.set_data(package, masters.to_xml()?.into_bytes())?;
-  master_part.set_data(package, MasterContents::default().to_xml()?.into_bytes())?;
+  let mut contents = MasterContents::default();
+  ensure_namespaces(&mut contents.xmlns);
+  master_part.set_data(package, contents.to_xml()?.into_bytes())?;
   Ok(master_id)
 }
 
@@ -135,7 +142,9 @@ pub fn add_color(package: &mut VisioPackage, index: u32, rgb: &str) -> Result<()
 
 pub(crate) fn read_drawing(package: &VisioPackage) -> Result<Drawing, SdkError> {
   let part = package.visio_document_part()?;
-  read_xml(package, &part)
+  let mut drawing = read_xml::<Drawing>(package, &part)?;
+  ensure_namespaces(&mut drawing.xmlns);
+  Ok(drawing)
 }
 
 pub(crate) fn write_drawing(package: &mut VisioPackage, drawing: &Drawing) -> Result<(), SdkError> {
@@ -323,12 +332,22 @@ pub fn add_comment(package: &mut VisioPackage, comment: CommentRecord) -> Result
 
 fn read_comments(package: &VisioPackage) -> Result<Comments, SdkError> {
   let document = package.visio_document_part()?;
-  let Some(part) =
-    document.child_part_by_relationship_type::<_, VisioCommentsPart>(package, COMMENTS)
-  else {
-    return Ok(Comments::default());
-  };
-  read_xml(package, &part)
+  let mut comments =
+    match document.child_part_by_relationship_type::<_, VisioCommentsPart>(package, COMMENTS) {
+      Some(part) => read_xml::<Comments>(package, &part)?,
+      None => Comments::default(),
+    };
+  ensure_namespaces(&mut comments.xmlns);
+  Ok(comments)
+}
+
+pub(crate) fn ensure_namespaces(namespaces: &mut Vec<XmlNamespace>) {
+  for namespace in [XmlKnownNamespace::Visio, XmlKnownNamespace::R] {
+    let namespace = XmlNamespace::known(namespace);
+    if !namespaces.contains(&namespace) {
+      namespaces.push(namespace);
+    }
+  }
 }
 
 fn write_comments(package: &mut VisioPackage, comments: &Comments) -> Result<(), SdkError> {

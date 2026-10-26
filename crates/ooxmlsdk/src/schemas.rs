@@ -118,6 +118,7 @@ pub mod schemas_microsoft_com_office_spreadsheetml_2025_external_code_service2;
 pub mod schemas_microsoft_com_office_spreadsheetml_2025_pivot_data_source;
 pub mod schemas_microsoft_com_office_tasks_2019_documenttasks;
 pub mod schemas_microsoft_com_office_thememl_2012_main;
+pub mod schemas_microsoft_com_office_visio_2012_main;
 pub mod schemas_microsoft_com_office_webextensions_taskpanes_2010_11;
 pub mod schemas_microsoft_com_office_webextensions_webextension_2010_11;
 pub mod schemas_microsoft_com_office_word;
@@ -481,6 +482,9 @@ pub mod t {
 }
 pub mod thm15 {
   pub use super::schemas_microsoft_com_office_thememl_2012_main::*;
+}
+pub mod visio {
+  pub use super::schemas_microsoft_com_office_visio_2012_main::*;
 }
 pub mod wetp {
   pub use super::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::*;

@@ -600,6 +600,10 @@
     "Namespace": "DocumentFormat.OpenXml.Vml"
   },
   {
+    "Prefix": "visio",
+    "Namespace": "DocumentFormat.OpenXml.Visio"
+  },
+  {
     "Prefix": "o",
     "Namespace": "DocumentFormat.OpenXml.Vml.Office"
   },

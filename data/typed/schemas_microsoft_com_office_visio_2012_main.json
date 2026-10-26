@@ -1,0 +1,47 @@
+[
+  {
+    "Name": "visio:VisioDocument_Type/visio:VisioDocument",
+    "ClassName": "VisioDocument",
+    "PartClassName": "VisioDocumentPart"
+  },
+  {
+    "Name": "visio:Masters_Type/visio:Masters",
+    "ClassName": "Masters",
+    "PartClassName": "VisioMastersPart"
+  },
+  {
+    "Name": "visio:MasterContents_Type/visio:MasterContents",
+    "ClassName": "MasterContents",
+    "PartClassName": "VisioMasterPart"
+  },
+  {
+    "Name": "visio:Pages_Type/visio:Pages",
+    "ClassName": "Pages",
+    "PartClassName": "VisioPagesPart"
+  },
+  {
+    "Name": "visio:PageContents_Type/visio:PageContents",
+    "ClassName": "PageContents",
+    "PartClassName": "VisioPagePart"
+  },
+  {
+    "Name": "visio:Comments_Type/visio:Comments",
+    "ClassName": "Comments",
+    "PartClassName": "VisioCommentsPart"
+  },
+  {
+    "Name": "visio:DataConnections_Type/visio:DataConnections",
+    "ClassName": "DataConnections",
+    "PartClassName": "VisioConnectionsPart"
+  },
+  {
+    "Name": "visio:DataRecordSets_Type/visio:DataRecordSets",
+    "ClassName": "DataRecordSets",
+    "PartClassName": "VisioRecordsetsPart"
+  },
+  {
+    "Name": "visio:Extensions_Type/visio:Extensions",
+    "ClassName": "Extensions",
+    "PartClassName": "VisioExtensionsPart"
+  }
+]

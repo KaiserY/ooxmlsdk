@@ -1,0 +1,19 @@
+{
+  "Root": "visio:Pages_Type",
+  "Name": "VisioPagesPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.pages+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/pages",
+  "Target": "pages",
+  "RootElement": "Pages",
+  "Paths": {
+    "General": "visio/pages"
+  },
+  "Children": [
+    {
+      "MaxOccursGreatThanOne": true,
+      "ApiName": "VisioPageParts",
+      "Name": "VisioPagePart"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "Root": "visio:Masters_Type",
+  "Name": "VisioMastersPart",
+  "Base": "OpenXmlPart",
+  "ContentType": "application/vnd.ms-visio.masters+xml",
+  "RelationshipType": "http://schemas.microsoft.com/visio/2010/relationships/masters",
+  "Target": "masters",
+  "RootElement": "Masters",
+  "Paths": {
+    "General": "visio/masters"
+  },
+  "Children": [
+    {
+      "MaxOccursGreatThanOne": true,
+      "ApiName": "VisioMasterParts",
+      "Name": "VisioMasterPart"
+    }
+  ]
+}

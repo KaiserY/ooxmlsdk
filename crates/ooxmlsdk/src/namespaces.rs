@@ -292,6 +292,8 @@ pub enum XmlKnownNamespace {
   Tsle,
   #[sdk("v", "urn:schemas-microsoft-com:vml")]
   V,
+  #[sdk("visio", "http://schemas.microsoft.com/office/visio/2012/main")]
+  Visio,
   #[sdk(
     "vt",
     "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
@@ -948,6 +950,9 @@ pub(crate) fn minimum_version_by_uri(uri: &[u8]) -> Option<crate::sdk::FileForma
       Some(crate::sdk::FileFormatVersion::Office2013)
     }
     b"urn:schemas-microsoft-com:vml" => Some(crate::sdk::FileFormatVersion::Office2007),
+    b"http://schemas.microsoft.com/office/visio/2012/main" => {
+      Some(crate::sdk::FileFormatVersion::Office2007)
+    }
     b"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" => {
       Some(crate::sdk::FileFormatVersion::Office2007)
     }

@@ -4,7 +4,6 @@
 // -----------------------------------------------------------------------------
 //
 
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:DataConnections")]
 pub struct DataConnections {
@@ -15,7 +14,6 @@ pub struct DataConnections {
   #[sdk(child(qname = "visio:DataConnection"))]
   pub data_connection: Vec<DataConnection>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:DataRecordSets")]
 pub struct DataRecordSets {
@@ -30,7 +28,6 @@ pub struct DataRecordSets {
   #[sdk(child(qname = "visio:DataRecordSet"))]
   pub data_record_set: Vec<DataRecordSet>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:Extensions")]
 pub struct Extensions {
@@ -45,7 +42,6 @@ pub struct Extensions {
   #[sdk(child(qname = "visio:SectionDef"))]
   pub section_def: Vec<SectionDef>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:MasterContents")]
 pub struct MasterContents {
@@ -57,7 +53,6 @@ pub struct MasterContents {
   #[sdk(child(qname = "visio:Connects"))]
   pub connects: Option<Connects>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:Masters")]
 pub struct Masters {
@@ -69,7 +64,6 @@ pub struct Masters {
   #[sdk(child(qname = "visio:MasterShortcut"))]
   pub master_shortcut: Vec<MasterShortcut>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:PageContents")]
 pub struct PageContents {
@@ -81,7 +75,6 @@ pub struct PageContents {
   #[sdk(child(qname = "visio:Connects"))]
   pub connects: Option<Connects>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:Pages")]
 pub struct Pages {
@@ -90,7 +83,6 @@ pub struct Pages {
   #[sdk(child(qname = "visio:Page"))]
   pub page: Vec<Page>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:SolutionXML")]
 pub struct SolutionXml {
@@ -100,7 +92,6 @@ pub struct SolutionXml {
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<[u8]>>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Solutions")]
 pub struct Solutions {
@@ -109,7 +100,6 @@ pub struct Solutions {
   #[sdk(child(qname = "visio:Solution"))]
   pub solution: Vec<Solution>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Validation")]
 pub struct Validation {
@@ -124,7 +114,6 @@ pub struct Validation {
   #[sdk(child(qname = "visio:Issues"))]
   pub issues: Option<Issues>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:VisioDocument")]
 pub struct VisioDocument {
@@ -178,7 +167,6 @@ pub struct VisioDocument {
   #[sdk(any)]
   pub unknown_xml: Vec<std::boxed::Box<[u8]>>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Windows")]
 pub struct Windows {
@@ -191,7 +179,6 @@ pub struct Windows {
   #[sdk(child(qname = "visio:Window"))]
   pub window: Vec<Window>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Cell")]
 pub struct Cell {
@@ -209,7 +196,6 @@ pub struct Cell {
   #[sdk(child(qname = "visio:RefBy"))]
   pub ref_by: Vec<RefBy>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ActionTagRow {
@@ -223,7 +209,6 @@ pub struct ActionTagRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ActionsRow {
@@ -239,7 +224,6 @@ pub struct ActionsRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct AnnotationRow {
@@ -251,7 +235,6 @@ pub struct AnnotationRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:AuthorEntry")]
 pub struct AuthorEntry {
@@ -268,7 +251,6 @@ pub struct AuthorEntry {
   #[sdk(attr(qname = ":ResolutionID"))]
   pub resolution_id: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RefBy")]
 pub struct RefBy {
@@ -277,7 +259,6 @@ pub struct RefBy {
   #[sdk(attr(qname = ":ID"))]
   pub id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct CharacterRow {
@@ -289,7 +270,6 @@ pub struct CharacterRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:ColorEntry")]
 pub struct ColorEntry {
@@ -298,7 +278,6 @@ pub struct ColorEntry {
   #[sdk(attr(qname = ":RGB"))]
   pub rgb: crate::simple_type::StringValue,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:CommentEntry")]
 pub struct CommentEntry {
@@ -321,7 +300,6 @@ pub struct CommentEntry {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:AuthorList")]
 pub struct AuthorList {
@@ -329,7 +307,6 @@ pub struct AuthorList {
   #[sdk(child(qname = "visio:AuthorEntry"))]
   pub author_entry: Vec<AuthorEntry>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:CommentList")]
 pub struct CommentList {
@@ -337,7 +314,6 @@ pub struct CommentList {
   #[sdk(child(qname = "visio:CommentEntry"))]
   pub comment_entry: Vec<CommentEntry>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ConnectionAbcdRow {
@@ -353,7 +329,6 @@ pub struct ConnectionAbcdRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ConnectionRow {
@@ -369,7 +344,6 @@ pub struct ConnectionRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Connect")]
 pub struct Connect {
@@ -386,7 +360,6 @@ pub struct Connect {
   #[sdk(attr(qname = ":ToPart"))]
   pub to_part: Option<crate::simple_type::Int32Value>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ControlRow {
@@ -402,7 +375,6 @@ pub struct ControlRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:CustomProp")]
 pub struct CustomProp {
@@ -413,7 +385,6 @@ pub struct CustomProp {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DataColumn")]
 pub struct DataColumn {
@@ -446,7 +417,6 @@ pub struct DataColumn {
   #[sdk(attr(qname = ":Hyperlink"))]
   pub hyperlink: Option<crate::simple_type::BooleanValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DataConnection")]
 pub struct DataConnection {
@@ -465,7 +435,6 @@ pub struct DataConnection {
   #[sdk(attr(qname = ":AlwaysUseConnectionFile"))]
   pub always_use_connection_file: Option<crate::simple_type::BooleanValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Rel")]
 pub struct Rel {
@@ -473,7 +442,6 @@ pub struct Rel {
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DataColumns")]
 pub struct DataColumns {
@@ -485,7 +453,6 @@ pub struct DataColumns {
   #[sdk(child(qname = "visio:DataColumn"))]
   pub data_column: Vec<DataColumn>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:PrimaryKey")]
 pub struct PrimaryKey {
@@ -495,7 +462,6 @@ pub struct PrimaryKey {
   #[sdk(child(qname = "visio:RowKeyValue"))]
   pub row_key_value: Vec<RowKeyValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RowMap")]
 pub struct RowMap {
@@ -506,7 +472,6 @@ pub struct RowMap {
   #[sdk(attr(qname = ":ShapeID"))]
   pub shape_id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RefreshConflict")]
 pub struct RefreshConflict {
@@ -517,7 +482,6 @@ pub struct RefreshConflict {
   #[sdk(attr(qname = ":PageID"))]
   pub page_id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:AutoLinkComparison")]
 pub struct AutoLinkComparison {
@@ -528,7 +492,6 @@ pub struct AutoLinkComparison {
   #[sdk(attr(qname = ":ContextTypeLabel"))]
   pub context_type_label: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DataRecordSet")]
 pub struct DataRecordSet {
@@ -580,38 +543,24 @@ pub struct DataRecordSet {
   #[sdk(child(qname = "visio:AutoLinkComparison"))]
   pub auto_link_comparison: Vec<AutoLinkComparison>,
 }
-///
 pub type Title = crate::simple_type::StringValue;
-///
 pub type Subject = crate::simple_type::StringValue;
-///
 pub type Creator = crate::simple_type::StringValue;
-///
 pub type Manager = crate::simple_type::StringValue;
-///
 pub type Company = crate::simple_type::StringValue;
-///
 pub type Category = crate::simple_type::StringValue;
-///
 pub type Keywords = crate::simple_type::StringValue;
-///
 pub type Desc = crate::simple_type::StringValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:HyperlinkBase")]
 pub struct HyperlinkBase {
   #[sdk(attr(qname = ":href"))]
   pub href: crate::simple_type::StringValue,
 }
-///
 pub type AlternateNames = crate::simple_type::StringValue;
-///
 pub type Template = crate::simple_type::StringValue;
-///
 pub type BuildNumberCreated = crate::simple_type::Int32Value;
-///
 pub type BuildNumberEdited = crate::simple_type::Int32Value;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:PreviewPicture")]
 pub struct PreviewPicture {
@@ -620,7 +569,6 @@ pub struct PreviewPicture {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::Base64BinaryValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:CustomProps")]
 pub struct CustomProps {
@@ -628,21 +576,13 @@ pub struct CustomProps {
   #[sdk(child(qname = "visio:CustomProp"))]
   pub custom_prop: Vec<CustomProp>,
 }
-///
 pub type TimeCreated = crate::simple_type::DateTimeValue;
-///
 pub type TimeSaved = crate::simple_type::DateTimeValue;
-///
 pub type TimeEdited = crate::simple_type::DateTimeValue;
-///
 pub type TimePrinted = crate::simple_type::DateTimeValue;
-///
 pub type GlueSettings = crate::simple_type::Int32Value;
-///
 pub type SnapSettings = crate::simple_type::Int32Value;
-///
 pub type SnapExtensions = crate::simple_type::Int32Value;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:SnapAngles")]
 pub struct SnapAngles {
@@ -650,23 +590,14 @@ pub struct SnapAngles {
   #[sdk(text_child(qname = "visio:SnapAngle"))]
   pub snap_angle: Vec<SnapAngle>,
 }
-///
 pub type DynamicGridEnabled = crate::simple_type::BooleanValue;
-///
 pub type ProtectStyles = crate::simple_type::BooleanValue;
-///
 pub type ProtectShapes = crate::simple_type::BooleanValue;
-///
 pub type ProtectMasters = crate::simple_type::BooleanValue;
-///
 pub type ProtectBkgnds = crate::simple_type::BooleanValue;
-///
 pub type CustomMenusFile = crate::simple_type::StringValue;
-///
 pub type CustomToolbarsFile = crate::simple_type::StringValue;
-///
 pub type AttachedToolbars = crate::simple_type::Base64BinaryValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:EventItem")]
 pub struct EventItem {
@@ -683,7 +614,6 @@ pub struct EventItem {
   #[sdk(attr(qname = ":TargetArgs"))]
   pub target_args: crate::simple_type::StringValue,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:CellDef")]
 pub struct CellDef {
@@ -698,14 +628,12 @@ pub struct CellDef {
   #[sdk(attr(qname = ":S"))]
   pub s: Option<crate::simple_type::ByteValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:FunctionDef")]
 pub struct FunctionDef {
   #[sdk(attr(qname = ":N"))]
   pub n: crate::simple_type::StringValue,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:SectionDef")]
 pub struct SectionDef {
@@ -722,7 +650,6 @@ pub struct SectionDef {
   #[sdk(child(qname = "visio:RowDef"))]
   pub row_def: Option<RowDef>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:FaceName")]
 pub struct FaceName {
@@ -739,7 +666,6 @@ pub struct FaceName {
   #[sdk(attr(qname = ":Flags"))]
   pub flags: Option<crate::simple_type::UInt32Value>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct FieldRow {
@@ -751,7 +677,6 @@ pub struct FieldRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct FillGradientRow {
@@ -763,7 +688,6 @@ pub struct FillGradientRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct GeometryRow {
@@ -777,7 +701,6 @@ pub struct GeometryRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:HeaderMargin")]
 pub struct HeaderMargin {
@@ -786,7 +709,6 @@ pub struct HeaderMargin {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::DoubleValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:FooterMargin")]
 pub struct FooterMargin {
@@ -795,19 +717,12 @@ pub struct FooterMargin {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::DoubleValue>,
 }
-///
 pub type HeaderLeft = crate::simple_type::StringValue;
-///
 pub type HeaderCenter = crate::simple_type::StringValue;
-///
 pub type HeaderRight = crate::simple_type::StringValue;
-///
 pub type FooterLeft = crate::simple_type::StringValue;
-///
 pub type FooterCenter = crate::simple_type::StringValue;
-///
 pub type FooterRight = crate::simple_type::StringValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:HeaderFooterFont")]
 pub struct HeaderFooterFont {
@@ -840,7 +755,6 @@ pub struct HeaderFooterFont {
   #[sdk(attr(qname = ":FaceName"))]
   pub face_name: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct HyperlinkRow {
@@ -854,7 +768,6 @@ pub struct HyperlinkRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:IssueTarget")]
 pub struct IssueTarget {
@@ -863,7 +776,6 @@ pub struct IssueTarget {
   #[sdk(attr(qname = ":ShapeID"))]
   pub shape_id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RuleInfo")]
 pub struct RuleInfo {
@@ -872,7 +784,6 @@ pub struct RuleInfo {
   #[sdk(attr(qname = ":RuleID"))]
   pub rule_id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Issue")]
 pub struct Issue {
@@ -887,7 +798,6 @@ pub struct Issue {
   #[sdk(child(qname = "visio:RuleInfo"))]
   pub rule_info: Option<RuleInfo>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct LayerRow {
@@ -899,7 +809,6 @@ pub struct LayerRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct LineGradientRow {
@@ -911,7 +820,6 @@ pub struct LineGradientRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Shapes")]
 pub struct Shapes {
@@ -919,7 +827,6 @@ pub struct Shapes {
   #[sdk(child(qname = "visio:Shape"))]
   pub shape: Vec<Shape>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Connects")]
 pub struct Connects {
@@ -927,9 +834,7 @@ pub struct Connects {
   #[sdk(child(qname = "visio:Connect"))]
   pub connect: Vec<Connect>,
 }
-///
 pub type Icon = crate::simple_type::Base64BinaryValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:PageSheet")]
 pub struct PageSheet {
@@ -955,7 +860,6 @@ pub struct PageSheet {
     )]
   pub page_sheet_choice: Vec<PageSheetChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Master")]
 pub struct Master {
@@ -998,7 +902,6 @@ pub struct Master {
     )]
   pub master_choice: Vec<MasterChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:MasterShortcut")]
 pub struct MasterShortcut {
@@ -1030,7 +933,6 @@ pub struct MasterShortcut {
   #[sdk(text_child(qname = "visio:Icon"))]
   pub icon: Icon,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Page")]
 pub struct Page {
@@ -1066,7 +968,6 @@ pub struct Page {
     )]
   pub page_choice: Vec<PageChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ParagraphRow {
@@ -1078,7 +979,6 @@ pub struct ParagraphRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RowKeyValue")]
 pub struct RowKeyValue {
@@ -1087,7 +987,6 @@ pub struct RowKeyValue {
   #[sdk(attr(qname = ":Value"))]
   pub value: crate::simple_type::StringValue,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct PropertyRow {
@@ -1101,21 +1000,18 @@ pub struct PropertyRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:PublishedPage")]
 pub struct PublishedPage {
   #[sdk(attr(qname = ":ID"))]
   pub id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RefreshableData")]
 pub struct RefreshableData {
   #[sdk(attr(qname = ":ID"))]
   pub id: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ReviewerRow {
@@ -1127,14 +1023,12 @@ pub struct ReviewerRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RuleSetFlags")]
 pub struct RuleSetFlags {
   #[sdk(attr(qname = ":Hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Rule")]
 pub struct Rule {
@@ -1157,7 +1051,6 @@ pub struct Rule {
   #[sdk(text_child(qname = "visio:RuleTest"))]
   pub rule_test: Option<RuleTest>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RuleSet")]
 pub struct RuleSet {
@@ -1178,11 +1071,8 @@ pub struct RuleSet {
   #[sdk(child(qname = "visio:Rule"))]
   pub rule: Vec<Rule>,
 }
-///
 pub type RuleFilter = crate::simple_type::StringValue;
-///
 pub type RuleTest = crate::simple_type::StringValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct ScratchRow {
@@ -1194,7 +1084,6 @@ pub struct ScratchRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RowDef")]
 pub struct RowDef {
@@ -1202,7 +1091,6 @@ pub struct RowDef {
   #[sdk(child(qname = "visio:CellDef"))]
   pub cell_def: Vec<CellDef>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Text")]
 pub struct Text {
@@ -1217,13 +1105,9 @@ pub struct Text {
     )]
   pub text_choice: Vec<TextChoice>,
 }
-///
 pub type Data1 = crate::simple_type::StringValue;
-///
 pub type Data2 = crate::simple_type::StringValue;
-///
 pub type Data3 = crate::simple_type::StringValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:ForeignData")]
 pub struct ForeignData {
@@ -1251,7 +1135,6 @@ pub struct ForeignData {
   #[sdk(child(qname = "visio:Rel"))]
   pub rel: Rel,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct RowUnion {
@@ -1273,7 +1156,6 @@ pub struct RowUnion {
     )]
   pub row_union_choice: Vec<RowUnionChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Section")]
 pub struct Section {
@@ -1291,7 +1173,6 @@ pub struct Section {
     )]
   pub section_choice: Vec<SectionChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Shape")]
 pub struct Shape {
@@ -1340,9 +1221,7 @@ pub struct Shape {
   #[sdk(child(qname = "visio:Shapes"))]
   pub shapes: Option<Shapes>,
 }
-///
 pub type SnapAngle = crate::simple_type::DoubleValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Solution")]
 pub struct Solution {
@@ -1352,7 +1231,6 @@ pub struct Solution {
   #[sdk(child(qname = "visio:Rel"))]
   pub rel: Rel,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:StyleSheet")]
 pub struct StyleSheet {
@@ -1386,7 +1264,6 @@ pub struct StyleSheet {
     )]
   pub style_sheet_choice: Vec<StyleSheetChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Tab")]
 pub struct Tab {
@@ -1396,7 +1273,6 @@ pub struct Tab {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: Vec<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct TabsRow {
@@ -1408,28 +1284,24 @@ pub struct TabsRow {
   #[sdk(child(qname = "visio:Tab"))]
   pub tab: Vec<Tab>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:cp")]
 pub struct Cp {
   #[sdk(attr(qname = ":IX"))]
   pub ix: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:pp")]
 pub struct Pp {
   #[sdk(attr(qname = ":IX"))]
   pub ix: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:tp")]
 pub struct Tp {
   #[sdk(attr(qname = ":IX"))]
   pub ix: crate::simple_type::UInt32Value,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:fld")]
 pub struct Fld {
@@ -1438,7 +1310,6 @@ pub struct Fld {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Row")]
 pub struct UserRow {
@@ -1452,7 +1323,6 @@ pub struct UserRow {
   #[sdk(child(qname = "visio:Cell"))]
   pub cell: std::boxed::Box<Cell>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:ValidationProperties")]
 pub struct ValidationProperties {
@@ -1461,7 +1331,6 @@ pub struct ValidationProperties {
   #[sdk(attr(qname = ":ShowIgnored"))]
   pub show_ignored: crate::simple_type::BooleanValue,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:RuleSets")]
 pub struct RuleSets {
@@ -1469,7 +1338,6 @@ pub struct RuleSets {
   #[sdk(child(qname = "visio:RuleSet"))]
   pub rule_set: Vec<RuleSet>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Issues")]
 pub struct Issues {
@@ -1477,7 +1345,6 @@ pub struct Issues {
   #[sdk(child(qname = "visio:Issue"))]
   pub issue: Vec<Issue>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DocumentProperties")]
 pub struct DocumentProperties {
@@ -1506,7 +1373,6 @@ pub struct DocumentProperties {
     )]
   pub document_properties_choice: Vec<DocumentPropertiesChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DocumentSettings")]
 pub struct DocumentSettings {
@@ -1538,7 +1404,6 @@ pub struct DocumentSettings {
     )]
   pub document_settings_choice: Vec<DocumentSettingsChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Colors")]
 pub struct Colors {
@@ -1546,7 +1411,6 @@ pub struct Colors {
   #[sdk(child(qname = "visio:ColorEntry"))]
   pub color_entry: Vec<ColorEntry>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:FaceNames")]
 pub struct FaceNames {
@@ -1554,7 +1418,6 @@ pub struct FaceNames {
   #[sdk(child(qname = "visio:FaceName"))]
   pub face_name: Vec<FaceName>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:StyleSheets")]
 pub struct StyleSheets {
@@ -1562,7 +1425,6 @@ pub struct StyleSheets {
   #[sdk(child(qname = "visio:StyleSheet"))]
   pub style_sheet: Vec<StyleSheet>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DocumentSheet")]
 pub struct DocumentSheet {
@@ -1596,7 +1458,6 @@ pub struct DocumentSheet {
     )]
   pub document_sheet_choice: Vec<DocumentSheetChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:EventList")]
 pub struct EventList {
@@ -1604,7 +1465,6 @@ pub struct EventList {
   #[sdk(child(qname = "visio:EventItem"))]
   pub event_item: Vec<EventItem>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:HeaderFooter")]
 pub struct HeaderFooter {
@@ -1625,7 +1485,6 @@ pub struct HeaderFooter {
     )]
   pub header_footer_choice: Vec<HeaderFooterChoice>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:DataTransferInfo")]
 pub struct DataTransferInfo {
@@ -1644,7 +1503,6 @@ pub struct DataTransferInfo {
   #[sdk(attr(qname = ":TransferTime"))]
   pub transfer_time: Option<crate::simple_type::UInt32Value>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:PublishSettings")]
 pub struct PublishSettings {
@@ -1655,7 +1513,6 @@ pub struct PublishSettings {
   #[sdk(child(qname = "visio:RefreshableData"))]
   pub refreshable_data: Vec<RefreshableData>,
 }
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(xml_header, qname = "visio:Comments")]
 pub struct Comments {
@@ -1669,23 +1526,14 @@ pub struct Comments {
   #[sdk(child(qname = "visio:CommentList"))]
   pub comment_list: Option<CommentList>,
 }
-///
 pub type StencilGroup = crate::simple_type::Int32Value;
-///
 pub type StencilGroupPos = crate::simple_type::Int32Value;
-///
 pub type ShowRulers = crate::simple_type::BooleanValue;
-///
 pub type ShowGrid = crate::simple_type::BooleanValue;
-///
 pub type ShowPageBreaks = crate::simple_type::BooleanValue;
-///
 pub type ShowGuides = crate::simple_type::BooleanValue;
-///
 pub type ShowConnectionPoints = crate::simple_type::BooleanValue;
-///
 pub type TabSplitterPos = crate::simple_type::DoubleValue;
-///
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "visio:Window")]
 pub struct Window {

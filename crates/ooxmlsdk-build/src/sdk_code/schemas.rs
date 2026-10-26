@@ -1808,7 +1808,12 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     } else {
       quote! {}
     };
-    let summary_doc = format!(" {}", type_decl.docs);
+    let summary_doc = if type_decl.docs.trim().is_empty() {
+      quote! {}
+    } else {
+      let docs = format!(" {}", type_decl.docs);
+      quote! { #[doc = #docs] }
+    };
     let sdk_type_derive = sdk_type_derive_tokens();
 
     if type_decl.kind == TypeKind::LeafTextAlias {
@@ -1823,7 +1828,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       if can_alias_leaf_text_wrapper_decl(type_decl, &attr_fields) {
         token_stream_list.push(quote! {
           #( #type_attrs )*
-          #[doc = #summary_doc]
+          #summary_doc
           pub type #struct_name_ident = #xml_content_type;
         });
 
@@ -1862,7 +1867,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
 
       token_stream_list.push(quote! {
         #( #type_attrs )*
-        #[doc = #summary_doc]
+        #summary_doc
         #sdk_type_derive
         #sdk_type_attrs
         pub struct #struct_name_ident {
@@ -1876,7 +1881,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     if can_alias_any_children_wrapper_decl(type_decl, &attr_fields) {
       token_stream_list.push(quote! {
         #( #type_attrs )*
-        #[doc = #summary_doc]
+        #summary_doc
         pub type #struct_name_ident = Vec<String>;
       });
 
@@ -1916,7 +1921,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
 
       token_stream_list.push(quote! {
         #( #type_attrs )*
-        #[doc = #summary_doc]
+        #summary_doc
         #sdk_type_derive
         #sdk_type_attrs
         pub struct #struct_name_ident(pub #base_type_ident);
@@ -2433,7 +2438,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
 
     token_stream_list.push(quote! {
       #( #type_attrs )*
-      #[doc = #summary_doc]
+      #summary_doc
       #sdk_type_derive
       #sdk_type_attrs
       pub struct #struct_name_ident {

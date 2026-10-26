@@ -34,6 +34,13 @@
   described in `docs/specs/visio_parts.md`, `docs/specs/visio_shapesheet.md`,
   and `docs/specs/visio_authoring.md`.
 
+### Fixed
+
+- Declare Visio and relationship namespaces on authored part roots and populate
+  the initial page's `Rel/@r:id` in `minimal_drawing()` with its page-part
+  relationship ID. Preserve unrelated imported prefix bindings and reject
+  conflicts with required prefixes before adding pages or masters.
+
 ## 0.14.0
 
 ### Breaking Changes

@@ -1,5 +1,5 @@
-use ooxmlsdk::common::SdkError;
-use ooxmlsdk::parts::image_part::ImagePart;
+use ooxmlsdk::common::{SdkError, XmlNamespace};
+use ooxmlsdk::namespaces::XmlKnownNamespace;
 use ooxmlsdk::parts::visio_comments_part::VisioCommentsPart;
 use ooxmlsdk::parts::visio_document::VisioDocument as VisioPackage;
 use ooxmlsdk::parts::visio_master_part::VisioMasterPart;
@@ -19,11 +19,8 @@ use crate::cells::{page_height, page_width};
 use crate::ids::Ids;
 
 const PAGES: &str = "http://schemas.microsoft.com/visio/2010/relationships/pages";
-const PAGE: &str = "http://schemas.microsoft.com/visio/2010/relationships/page";
 const MASTERS: &str = "http://schemas.microsoft.com/visio/2010/relationships/masters";
-const MASTER: &str = "http://schemas.microsoft.com/visio/2010/relationships/master";
 const COMMENTS: &str = "http://schemas.microsoft.com/visio/2010/relationships/comments";
-const IMAGE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 
 /// Append a page, its page part, and the page sheet's `PageWidth` and
 /// `PageHeight`. The page id comes from `ids`.
@@ -41,12 +38,12 @@ pub fn add_page(
       None => document.add_new_part_auto_id::<_, VisioPagesPart>(package)?,
     };
   let mut pages = read_xml::<Pages>(package, &pages_part)?;
-  let before = related_ids::<_, VisioPagePart>(&pages_part, package, PAGE);
+  ensure_namespaces(
+    &mut pages.xmlns,
+    &[XmlKnownNamespace::Visio, XmlKnownNamespace::R],
+  )?;
   let page_part = pages_part.add_new_part_auto_id::<_, VisioPagePart>(package)?;
-  let rel_id = related_ids::<_, VisioPagePart>(&pages_part, package, PAGE)
-    .into_iter()
-    .find(|id| !before.iter().any(|existing| existing == id))
-    .ok_or_else(|| SdkError::CommonError("page relationship id is missing".to_string()))?;
+  let rel_id = pages_part.get_id_of_part(package, &page_part)?.to_string();
   let page_id = ids.page();
   let mut sheet = PageSheet::default();
   page_width(&mut sheet, width);
@@ -61,7 +58,12 @@ pub fn add_page(
     ..Default::default()
   });
   pages_part.set_data(package, pages.to_xml()?.into_bytes())?;
-  page_part.set_data(package, PageContents::default().to_xml()?.into_bytes())?;
+  let mut contents = PageContents::default();
+  ensure_namespaces(
+    &mut contents.xmlns,
+    &[XmlKnownNamespace::Visio, XmlKnownNamespace::R],
+  )?;
+  page_part.set_data(package, contents.to_xml()?.into_bytes())?;
   Ok(page_id)
 }
 
@@ -78,12 +80,14 @@ pub fn add_master(
       None => document.add_new_part_auto_id::<_, VisioMastersPart>(package)?,
     };
   let mut masters = read_xml::<Masters>(package, &masters_part)?;
-  let before = related_ids::<_, VisioMasterPart>(&masters_part, package, MASTER);
+  ensure_namespaces(
+    &mut masters.xmlns,
+    &[XmlKnownNamespace::Visio, XmlKnownNamespace::R],
+  )?;
   let master_part = masters_part.add_new_part_auto_id::<_, VisioMasterPart>(package)?;
-  let rel_id = related_ids::<_, VisioMasterPart>(&masters_part, package, MASTER)
-    .into_iter()
-    .find(|id| !before.iter().any(|existing| existing == id))
-    .ok_or_else(|| SdkError::CommonError("master relationship id is missing".to_string()))?;
+  let rel_id = masters_part
+    .get_id_of_part(package, &master_part)?
+    .to_string();
   let master_id = ids.master();
   masters.master.push(Master {
     id: master_id,
@@ -92,7 +96,12 @@ pub fn add_master(
     ..Default::default()
   });
   masters_part.set_data(package, masters.to_xml()?.into_bytes())?;
-  master_part.set_data(package, MasterContents::default().to_xml()?.into_bytes())?;
+  let mut contents = MasterContents::default();
+  ensure_namespaces(
+    &mut contents.xmlns,
+    &[XmlKnownNamespace::Visio, XmlKnownNamespace::R],
+  )?;
+  master_part.set_data(package, contents.to_xml()?.into_bytes())?;
   Ok(master_id)
 }
 
@@ -135,7 +144,9 @@ pub fn add_color(package: &mut VisioPackage, index: u32, rgb: &str) -> Result<()
 
 pub(crate) fn read_drawing(package: &VisioPackage) -> Result<Drawing, SdkError> {
   let part = package.visio_document_part()?;
-  read_xml(package, &part)
+  let mut drawing = read_xml::<Drawing>(package, &part)?;
+  ensure_namespaces(&mut drawing.xmlns, &[XmlKnownNamespace::Visio])?;
+  Ok(drawing)
 }
 
 pub(crate) fn write_drawing(package: &mut VisioPackage, drawing: &Drawing) -> Result<(), SdkError> {
@@ -168,17 +179,13 @@ pub fn attach_image(
   package: &mut VisioPackage,
   image: ImageBytes<'_>,
 ) -> Result<String, SdkError> {
-  let before = related_ids::<_, ImagePart>(page_part, package, IMAGE);
   let image_part = page_part.add_image_part(package, image.content_type.to_string())?;
   image_part.set_data(package, image.bytes.to_vec())?;
-  let rel_id = related_ids::<_, ImagePart>(page_part, package, IMAGE)
-    .into_iter()
-    .find(|id| !before.iter().any(|existing| existing == id))
-    .ok_or_else(|| SdkError::CommonError("image relationship id is missing".to_string()))?;
+  let rel_id = page_part.get_id_of_part(package, &image_part)?.to_string();
   let foreign = ShapeChoice::ForeignData(Box::new(ForeignData {
     foreign_type: image.foreign_type.to_string(),
     object_type: image.object_type,
-    show_as_icon: image.show_as_icon.map(flag),
+    show_as_icon: image.show_as_icon.map(BooleanValue::from),
     object_width: image.object_width,
     object_height: image.object_height,
     mapping_mode: image.mapping_mode,
@@ -323,12 +330,47 @@ pub fn add_comment(package: &mut VisioPackage, comment: CommentRecord) -> Result
 
 fn read_comments(package: &VisioPackage) -> Result<Comments, SdkError> {
   let document = package.visio_document_part()?;
-  let Some(part) =
-    document.child_part_by_relationship_type::<_, VisioCommentsPart>(package, COMMENTS)
-  else {
-    return Ok(Comments::default());
-  };
-  read_xml(package, &part)
+  let mut comments =
+    match document.child_part_by_relationship_type::<_, VisioCommentsPart>(package, COMMENTS) {
+      Some(part) => read_xml::<Comments>(package, &part)?,
+      None => Comments::default(),
+    };
+  ensure_namespaces(&mut comments.xmlns, &[XmlKnownNamespace::Visio])?;
+  Ok(comments)
+}
+
+pub(crate) fn ensure_namespaces(
+  namespaces: &mut Vec<XmlNamespace>,
+  required: &[XmlKnownNamespace],
+) -> Result<(), SdkError> {
+  for &namespace in required {
+    let mut present = false;
+    for declaration in namespaces.iter() {
+      let (prefix, uri) = match declaration {
+        XmlNamespace::Known(existing) => (existing.prefix_bytes(), existing.uri_bytes()),
+        XmlNamespace::Raw(raw) => {
+          let mut parts = raw.splitn(2, |&byte| byte == 0);
+          (
+            parts.next().unwrap_or_default(),
+            parts.next().unwrap_or_default(),
+          )
+        }
+      };
+      if prefix == namespace.prefix_bytes() {
+        if uri != namespace.uri_bytes() {
+          return Err(SdkError::CommonError(format!(
+            "namespace prefix '{}' is already bound to a different URI",
+            String::from_utf8_lossy(prefix)
+          )));
+        }
+        present = true;
+      }
+    }
+    if !present {
+      namespaces.push(XmlNamespace::known(namespace));
+    }
+  }
+  Ok(())
 }
 
 fn write_comments(package: &mut VisioPackage, comments: &Comments) -> Result<(), SdkError> {
@@ -350,28 +392,5 @@ where
     T::from_bytes(&bytes)
   } else {
     Ok(T::default())
-  }
-}
-
-fn related_ids<Parent, Child>(
-  parent: &Parent,
-  package: &VisioPackage,
-  relationship_type: &str,
-) -> Vec<String>
-where
-  Parent: SdkPart,
-  Child: SdkPart,
-{
-  parent
-    .child_related_parts_by_relationship_type::<_, Child>(package, relationship_type)
-    .map(|related| related.relationship_id().to_string())
-    .collect()
-}
-
-fn flag(value: bool) -> BooleanValue {
-  if value {
-    BooleanValue::One
-  } else {
-    BooleanValue::Zero
   }
 }

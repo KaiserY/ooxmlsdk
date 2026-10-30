@@ -430,6 +430,7 @@
       "ClassName": "Worksheet",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true,
       "AlternateContent": [
         {
           "AfterField": "drawing",

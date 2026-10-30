@@ -2205,6 +2205,7 @@ pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// Revision Unique Identifier
   #[sdk(attr(qname = "xr:uid"))]
   pub xr_uid: Option<crate::simple_type::StringValue>,

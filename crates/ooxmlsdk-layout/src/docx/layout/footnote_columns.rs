@@ -250,7 +250,9 @@ fn build(
     }
   }
   let separator_height = footnote_separator_layout_height(document, flow, metrics);
-  let height = best.height_pt + separator_height;
+  let height = best.height_pt
+    + separator_height
+    + footnote_continuation_notice_height(document, flow, metrics);
   if height > flow.body_content_bottom_pt - flow.setup.margin_top_pt {
     // Independent physical-page note follows retain their established owner.
     // This balanced page plan only replaces complete areas that fit a page.
@@ -284,7 +286,7 @@ fn build(
       separator_flow.content_bottom,
     );
   } else {
-    layout_note_story_blocks(
+    layout_note_separator_story_blocks(
       &document.footnote_separator_stories.separator,
       separator_flow,
       &mut separator,
@@ -378,8 +380,9 @@ mod tests {
 
   fn section(page: PageSetup, count: usize, gap_pt: f32) -> crate::docx::ImportedSection {
     crate::docx::ImportedSection {
+      note_reference_order: Default::default(),
       break_kind: SectionBreakKind::Continuous,
-      discarded_carrier_spacing_after_pt: None,
+      discarded_carrier: None,
       section_properties: None,
       page,
       columns: SectionColumns {

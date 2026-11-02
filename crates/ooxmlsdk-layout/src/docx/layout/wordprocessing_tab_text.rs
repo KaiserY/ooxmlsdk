@@ -10,6 +10,119 @@ use std::sync::Arc;
 
 const PIXEL_PT: f32 = 72.0 / 600.0;
 
+/// A tab ends a Line Services batch. Its leader starts after that batch's
+/// balanced printer cells, not after the sum of unrounded layout advances.
+/// Native 18-character Arial controls cross a leader cell at this boundary.
+pub(super) fn realize_ltr_leaders(items: &mut [PageItem], metrics: &mut TextMetrics) {
+  for index in 0..items.len() {
+    let PageItem::Text(leader) = &items[index] else {
+      continue;
+    };
+    let Some(native) = leader.style.wordprocessing_tab_leader else {
+      continue;
+    };
+    let Some((left, right)) = leader.style.wordprocessing_tab_leader_span else {
+      continue;
+    };
+    if native.paragraph_bidi || leader.paragraph_bidi {
+      continue;
+    }
+    let Some(fill) = super::tab_leader_text_char(leader) else {
+      continue;
+    };
+    let Some(&advance) = leader
+      .style
+      .semantic_character_advances_pt
+      .as_deref()
+      .and_then(|a| a.first())
+    else {
+      continue;
+    };
+    let left = leader.x_pt + left;
+    let right = leader.x_pt + right;
+    let Some(start) = ltr_prefix_end(&items[..index], leader.y_pt, left, metrics) else {
+      continue;
+    };
+    let (x, count) = super::word_tab_leader_device_span(start, right, native.source_advance_pt);
+    let PageItem::Text(leader) = &mut items[index] else {
+      unreachable!("verified leader")
+    };
+    leader.x_pt = x;
+    leader.text = fill.to_string().repeat(count);
+    // Keep authored endpoints for another field-resolution pass.
+    leader.style.wordprocessing_tab_leader_span = Some((left - x, right - x));
+    leader.style.semantic_character_advances_pt = Some(vec![advance; count].into());
+  }
+}
+
+fn ltr_prefix_end(
+  items: &[PageItem],
+  y: f32,
+  mut end: f32,
+  metrics: &mut TextMetrics,
+) -> Option<f32> {
+  let mut runs = Vec::new();
+  let mut count = 0;
+  let mut frame = None;
+  for item in items.iter().rev() {
+    let PageItem::Text(text) = item else { break };
+    let style = &text.style;
+    if (text.y_pt - y).abs() >= 0.01
+      || text.paragraph_bidi
+      || text.pdf_text_segmentation != super::PdfTextSegmentation::WordLine
+      || !style.wordprocessingml_font_slots
+      || !style.use_windows_font_metrics
+      || style.rotation_deg != 0.0
+      || style.semantic_only
+      || style.semantic_character_advances_pt.is_some()
+      || style.wordprocessing_justification_expansion_pt.is_some()
+      || style.pdf_glyph_outline_options.is_some()
+      || text.word_spacing_pt != 0.0
+      || crate::fonts::wordprocessingml_punctuation_affects_advances(&text.text, style)
+    {
+      break;
+    }
+    let Some(line) = text.wordprocessing_line_metrics else {
+      break;
+    };
+    let origin = f64::from(text.x_pt) + line.frame_origin_offset_x_pt;
+    if frame.is_some_and(|seen: f64| (origin - seen).abs() > 0.00001) {
+      break;
+    }
+    let width = metrics.measure_text(&text.text, style);
+    let error = f32::EPSILON * (count + text.text.len() + 8) as f32 * end.abs().max(1.0);
+    if (text.x_pt + width - end).abs() > error {
+      break;
+    }
+    let Some(values) = metrics.word_printer_character_metrics(&text.text, style) else {
+      break;
+    };
+    if values.is_empty() {
+      break;
+    }
+    frame = Some(origin);
+    count += values.len();
+    end = text.x_pt;
+    runs.push((text, line, values));
+  }
+  let (first, line, _) = runs.last()?;
+  let origin = common::wordprocessing_device::line_origin(
+    first.x_pt,
+    line.frame_origin_offset_x_pt,
+    line.alignment,
+  );
+  let values = runs
+    .iter()
+    .rev()
+    .flat_map(|(_, _, values)| values.iter().copied())
+    .collect::<Vec<_>>();
+  let pixels: i64 = common::wordprocessing_device::balance_advances(&values)
+    .into_iter()
+    .map(i64::from)
+    .sum();
+  Some(origin + pixels as f32 * PIXEL_PT)
+}
+
 #[derive(Default)]
 struct SpaceBalance {
   ideal: i64,
@@ -113,6 +226,7 @@ fn plan(items: &[PageItem], y: f32, metrics: &mut TextMetrics) -> Option<(f32, V
     let mut device = common::WordprocessingKashida {
       retain_trailing_blank: true,
       unshaped_blanks: false,
+      glyph_advances: Vec::new(),
       font_width_percent: style.wordprocessing_font_width_percent.unwrap_or(100),
       space_expansions: Vec::new(),
     };

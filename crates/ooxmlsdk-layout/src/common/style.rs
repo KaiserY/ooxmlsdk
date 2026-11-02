@@ -39,6 +39,9 @@ pub(crate) struct VmlTextShadowSource {
   pub color: Color,
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,
+  /// Single-shadow offsets belong to the axis-aligned drawing space, after
+  /// shape rotation (MS-ODRAW shadowOffsetX/Y). Perspective maps stay local.
+  pub offset_is_page_relative: bool,
   /// VML matrix order: sxx, sxy, syx, syy.
   pub matrix: [f32; 4],
   /// Perspective coefficients in inverse EMUs when the offset has absolute
@@ -470,7 +473,15 @@ pub struct GradientFill<'doc> {
   /// without forcing PDF backends to reconstruct DrawingML shape transforms.
   pub line: Option<(super::Point, super::Point)>,
   pub interpolation: GradientInterpolation,
+  /// Paint this gradient without stop opacity in the final PDF. Keep the
+  /// authored stop alpha for effect sampling: Word's archival output still
+  /// derives a shape's shadow from its transparent source material.
+  pub opaque_for_pdf: bool,
   pub scaled: bool,
+  /// Legacy VML maps the gradient normal through the inverse transpose of
+  /// the host transform. Transforming endpoints instead changes the color
+  /// planes when a nonsquare shape is resized.
+  pub transform_as_normal: bool,
   /// Unresolved DrawingML `rotWithShape` intent. Hosts that lower a shape
   /// before its final page transform retain this until they can resolve the
   /// gradient line/path into page coordinates.

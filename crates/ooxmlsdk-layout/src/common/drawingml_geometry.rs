@@ -26,6 +26,29 @@ pub(crate) fn append_transformed_quadrant_arc(path: &mut BezPath, arc: Arc, tran
   });
 }
 
+/// Word shapes consume full quarter turns from the start, then the remainder.
+/// Native adjusted, non-circular moon paths distinguish this from distributing
+/// the sweep evenly over the same number of cubics. Keep Kurbo's standard
+/// tangent controls, but give each complete quarter turn its own segment.
+pub(crate) fn append_transformed_word_shape_arc(path: &mut BezPath, arc: Arc, transform: Affine) {
+  let quadrant = std::f64::consts::FRAC_PI_2;
+  let sweep = arc.sweep_angle.abs();
+  let direction = arc.sweep_angle.signum();
+  for index in 0..(sweep / quadrant).ceil() as usize {
+    let start = index as f64 * quadrant;
+    let end = ((index + 1) as f64 * quadrant).min(sweep);
+    append_transformed_quadrant_arc(
+      path,
+      Arc {
+        start_angle: arc.start_angle + direction * start,
+        sweep_angle: direction * (end - start),
+        ..arc
+      },
+      transform,
+    );
+  }
+}
+
 pub(crate) fn bez_path_commands(path: BezPath) -> Vec<PathCommand> {
   path_elements_to_commands(path.into_elements())
 }

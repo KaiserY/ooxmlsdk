@@ -11,13 +11,12 @@
 use super::{
   Chart3DView, ImageItem, PlotRect, RadialChartStyle, RadialPerspectiveProjection, RadialSlice,
   RgbColor, chart_3d_scene_image, common_rect, office_perspective_chart_diffuse_color,
-  word_chart_lathe_maximum_step, word_pie_3d_pen_width,
+  word_chart_lathe_maximum_step,
 };
 use crate::common::drawingml_shape_raster::PageToRasterMapping;
 use crate::common::{Fill, GradientFill, GradientStop, ShapeStyleValue};
 use image::{Rgba, RgbaImage};
 
-const HEX_APOTHEM: f64 = 0.866_025_403_784_438_6;
 type Point3 = [f64; 3];
 
 #[derive(Clone, Copy)]
@@ -61,11 +60,85 @@ impl LinearMaterial {
     }
   }
 
+  fn position(&self, uv: [f64; 2]) -> f64 {
+    uv[0] * self.axis[0] + uv[1] * self.axis[1] + self.offset
+  }
+
   fn color(&self, uv: [f64; 2]) -> [f64; 3] {
-    let position = (uv[0] * self.axis[0] + uv[1] * self.axis[1] + self.offset) as f32;
+    let position = self.position(uv) as f32;
     let c = crate::common::drawingml_gradient::sample(&self.stops, position);
     [f64::from(c.r), f64::from(c.g), f64::from(c.b)]
   }
+}
+
+/// Parallel faces are affine: transform the texture gradient's normal, not
+/// its endpoints. All faces retain the same source UV and independent light.
+pub(super) fn projected_linear_gradient(
+  gradient: &GradientFill<'static>,
+  size: [f64; 2],
+  points: [[f32; 2]; 3],
+  uv: [[f64; 2]; 3],
+  diffuse: f32,
+) -> Fill<'static> {
+  let material = LinearMaterial::new(gradient, [0.0, 0.0, size[0], size[1]]);
+  let positions = uv.map(|uv| material.position(uv));
+  let light = |v: u8| (f32::from(v) * diffuse).round().clamp(0.0, 255.0) as u8;
+  let solid = || {
+    let color = crate::common::drawingml_gradient::sample(&material.stops, positions[0] as f32);
+    Fill::Solid(crate::common::Color {
+      r: light(color.r),
+      g: light(color.g),
+      b: light(color.b),
+      a: color.a,
+    })
+  };
+  let a = [
+    f64::from(points[1][0] - points[0][0]),
+    f64::from(points[1][1] - points[0][1]),
+  ];
+  let b = [
+    f64::from(points[2][0] - points[0][0]),
+    f64::from(points[2][1] - points[0][1]),
+  ];
+  let determinant = a[0] * b[1] - a[1] * b[0];
+  if determinant.abs() <= f64::EPSILON {
+    return solid();
+  }
+  let ta = positions[1] - positions[0];
+  let tb = positions[2] - positions[0];
+  let normal = [
+    (ta * b[1] - tb * a[1]) / determinant,
+    (tb * a[0] - ta * b[0]) / determinant,
+  ];
+  let length_squared = normal[0] * normal[0] + normal[1] * normal[1];
+  if length_squared <= f64::EPSILON {
+    return solid();
+  }
+  let endpoint = |position: f64| {
+    super::common_point(
+      (f64::from(points[0][0]) + normal[0] * (position - positions[0]) / length_squared) as f32,
+      (f64::from(points[0][1]) + normal[1] * (position - positions[0]) / length_squared) as f32,
+    )
+  };
+  let stops = material
+    .stops
+    .iter()
+    .map(|stop| GradientStop {
+      position: stop.position,
+      color: crate::common::Color {
+        r: light(stop.color.r),
+        g: light(stop.color.g),
+        b: light(stop.color.b),
+        a: stop.color.a,
+      },
+      scheme: None,
+    })
+    .collect();
+  Fill::Gradient(GradientFill {
+    stops,
+    line: Some((endpoint(0.0), endpoint(1.0))),
+    ..Default::default()
+  })
 }
 
 #[derive(Default)]
@@ -129,6 +202,12 @@ fn diffuse(color: RgbColor, normal: [f32; 3]) -> [f64; 3] {
 
 fn vertex_rgb(color: RgbColor) -> [f64; 3] {
   rgb(color).map(|c| (c * 128.0 / 255.0).round() * 255.0 / 128.0)
+}
+
+fn pie_model_pen_radius(width: f32, plot_width: f32) -> f64 {
+  // Native .5/2/4/8pt and independent viewport/elevation controls normalize
+  // the authored pen to the nominal plot width, before fitting the camera.
+  f64::from(width.max(1.0) / (2.0 * plot_width))
 }
 
 fn pie_texture_bounds(start: f32, sweep: f32) -> [f64; 4] {
@@ -232,7 +311,17 @@ pub(super) fn lower(
       parallel: view.right_angle_axes,
     };
     let paint = style.point_styles.get(slice.index);
-    let bounds = pie_texture_bounds(slice.start_angle, slice.sweep);
+    let pen_radius = match paint.map(|p| &p.stroke) {
+      Some(ShapeStyleValue::Paint(stroke)) => pie_model_pen_radius(stroke.width.0, plot.width),
+      _ => 0.0,
+    };
+    // Native gradient UV includes the outline's model-space support. The
+    // same source sector with noFill on its line has the unexpanded bounds.
+    let mut bounds = pie_texture_bounds(slice.start_angle, slice.sweep);
+    bounds[0] -= pen_radius;
+    bounds[1] -= pen_radius;
+    bounds[2] += pen_radius;
+    bounds[3] += pen_radius;
     let material = match paint.map(|p| &p.fill) {
       Some(ShapeStyleValue::Paint(Fill::Gradient(gradient))) => {
         let index = scene.materials.len();
@@ -326,27 +415,25 @@ pub(super) fn lower(
       }
     }
     if let Some(ShapeStyleValue::Paint(stroke)) = paint.map(|p| &p.stroke) {
-      // Preserve the independently verified wire tessellation. Material
-      // boundaries and six-sided pen tubes are separate native primitives.
-      let segments = ((slice.sweep.to_degrees().abs() / 2.0).ceil() as usize).max(2);
-      let ring = pie_ring(slice.start_angle, slice.sweep, segments);
-      let radius =
-        f64::from(word_pie_3d_pen_width(stroke.width.0, projection) / projection.radii.0)
-          / (2.0 * HEX_APOTHEM);
+      // The independent arc pens share the body's source chord budget.
+      // Their six-sided section is transported from the last endpoint;
+      // flat-capped tubes per chord lose the native joins and end caps.
+      let radius = pen_radius;
       let color = rgb(RgbColor {
         r: stroke.color.r,
         g: stroke.color.g,
         b: stroke.color.b,
       });
-      for pair in ring.windows(2) {
-        scene.tube(&projector, pair[0].1, pair[1].1, radius, color);
-        scene.tube(
-          &projector,
-          bottom(pair[0].1),
-          bottom(pair[1].1),
+      for z in [0.0, -thickness] {
+        for face in pie_arc_tube(
+          f64::from(slice.start_angle),
+          f64::from(slice.sweep),
+          z,
           radius,
-          color,
-        );
+          segments,
+        ) {
+          scene.triangle(&projector, face, [color; 3]);
+        }
       }
       for outer in [ring[0].1, ring[segments].1] {
         // Native rotation controls distinguish outward radial edges from
@@ -364,6 +451,72 @@ pub(super) fn lower(
     style.fixed_output_raster_dpi,
     Some(&scene),
   )
+}
+
+// The same rounded-tube construction as word_lathe_outline, with the pie
+// producer's reversed arc traversal and transported initial section. Native
+// 7/8/17/42-segment arcs verify every indexed face, including cap diagonals.
+fn pie_arc_tube(start: f64, sweep: f64, z: f64, radius: f64, segments: usize) -> Vec<[Point3; 3]> {
+  let start = start + sweep;
+  let step = -sweep / segments as f64;
+  let half = step * 0.5;
+  let phase = -start - half;
+  let center = |angle: f64| [angle.sin(), -angle.cos(), z];
+  let section = |index: usize, outgoing: bool| {
+    let angle = start + index as f64 * step;
+    let center = center(angle);
+    std::array::from_fn::<_, 6, _>(|sector| {
+      let theta = phase - sector as f64 * std::f64::consts::TAU / 6.0;
+      let radial = radius * theta.cos();
+      let (direction, scale) = if radial > 0.0 && index > 0 && index < segments {
+        (angle, 1.0 / half.cos())
+      } else {
+        (angle + if outgoing { half } else { -half }, 1.0)
+      };
+      [
+        center[0] + direction.sin() * radial * scale,
+        center[1] - direction.cos() * radial * scale,
+        z + radius * theta.sin(),
+      ]
+    })
+  };
+  let mut triangles = Vec::with_capacity(12 * segments + 36);
+  for index in 0..segments {
+    let first = section(index, true);
+    let last = section(index + 1, false);
+    for i in 0..6 {
+      let j = (i + 1) % 6;
+      triangles.push([first[i], last[i], first[j]]);
+      triangles.push([first[j], last[i], last[j]]);
+    }
+  }
+  for (index, outgoing, sign) in [(0, true, -1.0), (segments, false, 1.0)] {
+    let angle = start + index as f64 * step;
+    let edge = angle + if outgoing { half } else { -half };
+    let center = center(angle);
+    let direction = [-edge.cos() * sign, -edge.sin() * sign, 0.0];
+    let base = section(index, outgoing);
+    let middle: [Point3; 6] = std::array::from_fn(|i| {
+      std::array::from_fn(|axis| {
+        center[axis]
+          + (base[i][axis] - center[axis] + radius * direction[axis])
+            * std::f64::consts::FRAC_1_SQRT_2
+      })
+    });
+    let pole = std::array::from_fn(|axis| center[axis] + radius * direction[axis]);
+    for i in 0..6 {
+      let j = (i + 1) % 6;
+      if outgoing {
+        triangles.push([base[i], middle[i], middle[j]]);
+        triangles.push([base[i], middle[j], base[j]]);
+      } else {
+        triangles.push([base[i], middle[i], base[j]]);
+        triangles.push([base[j], middle[i], middle[j]]);
+      }
+      triangles.push([middle[i], pole, middle[j]]);
+    }
+  }
+  triangles
 }
 
 fn cross(a: Point3, b: Point3) -> Point3 {
@@ -390,6 +543,54 @@ fn tube_ring(direction: Point3, radius: f64) -> [Point3; 6] {
 }
 
 impl Scene {
+  pub(super) fn linear_material(
+    &mut self,
+    gradient: &GradientFill<'static>,
+    bounds: [f64; 4],
+  ) -> usize {
+    let index = self.materials.len();
+    self.materials.push(LinearMaterial::new(gradient, bounds));
+    index
+  }
+
+  pub(super) fn projected_textured_triangle(
+    &mut self,
+    points: [[f64; 2]; 3],
+    depth: [f64; 3],
+    uv: [[f64; 2]; 3],
+    material: usize,
+    diffuse: f32,
+  ) {
+    self.triangles.push(Triangle {
+      vertices: std::array::from_fn(|i| Vertex {
+        point: points[i],
+        depth: depth[i],
+        color: [255.0 * f64::from(diffuse); 3],
+        texture: [uv[i][0] * depth[i], uv[i][1] * depth[i], depth[i]],
+      }),
+      material: Some(material),
+    });
+  }
+
+  /// Reuse the depth-tested mesh for Cartesian surface triangles. Projected
+  /// depth is reciprocal clip-W; materials are resolved before submission.
+  pub(super) fn projected_triangle(
+    &mut self,
+    points: [[f64; 2]; 3],
+    depth: [f64; 3],
+    color: RgbColor,
+  ) {
+    self.triangles.push(Triangle {
+      vertices: std::array::from_fn(|i| Vertex {
+        point: points[i],
+        depth: depth[i],
+        color: rgb(color),
+        texture: [0.0, 0.0, 1.0],
+      }),
+      material: None,
+    });
+  }
+
   fn triangle(&mut self, projector: &Projector, points: [Point3; 3], colors: [[f64; 3]; 3]) {
     self.triangles.push(Triangle {
       vertices: std::array::from_fn(|i| projector.vertex(points[i], colors[i])),
@@ -601,7 +802,134 @@ fn raster_triangle(
 
 #[cfg(test)]
 mod tests {
+
+  #[test]
+  fn pie_arc_tubes_match_native_end_caps_and_transported_sections() {
+    // Captured unlit VF3 buffers. Independent sector angles distinguish
+    // transported six-sided sections from a fixed global ring phase.
+    for (start, sweep, segments, expected) in [
+      (
+        12.8,
+        1.2,
+        7,
+        [
+          -0.5252124786376953,
+          -1.0128148651123048,
+          -0.011352968215942384,
+          0.012824327945709228,
+          -0.8461388397216797,
+          0.011352970600128173,
+        ],
+      ),
+      (
+        11.4,
+        1.4,
+        8,
+        [
+          -0.9307310485839844,
+          -0.8701849365234375,
+          -0.012814946174621582,
+          -0.5008771896362305,
+          -0.38135581970214844,
+          0.012814947366714478,
+        ],
+      ),
+      (
+        8.2,
+        3.2,
+        17,
+        [
+          -1.0125043487548828,
+          -0.4050287628173828,
+          -0.012003519535064698,
+          -0.5003983688354492,
+          0.8709156036376953,
+          0.012003518342971801,
+        ],
+      ),
+      (
+        0.0,
+        8.2,
+        42,
+        [
+          -0.5246782684326172,
+          -1.0112840270996093,
+          -0.012828474044799804,
+          1.0112849426269532,
+          1.0112226104736328,
+          0.012828474044799804,
+        ],
+      ),
+    ] {
+      let faces = super::pie_arc_tube(
+        start / 14.0 * std::f64::consts::TAU,
+        sweep / 14.0 * std::f64::consts::TAU,
+        0.0,
+        0.012_833_812_236_785_89,
+        segments,
+      );
+      assert_eq!(faces.len(), segments * 12 + 36);
+      let mut bounds = [f64::INFINITY; 6];
+      bounds[3..].fill(f64::NEG_INFINITY);
+      for point in faces.into_iter().flatten() {
+        for axis in 0..3 {
+          bounds[axis] = bounds[axis].min(point[axis]);
+          bounds[axis + 3] = bounds[axis + 3].max(point[axis]);
+        }
+      }
+      for (actual, expected) in bounds.into_iter().zip(expected) {
+        assert!((actual - expected).abs() < 0.000_003);
+      }
+    }
+  }
+  #[test]
+  fn pie_pen_radius_matches_native_viewport_and_width_controls() {
+    // Actual first endpoint poles from eight independent native GFX uploads.
+    for (width, plot_width, native_radius) in [
+      (2.0, 155.83835, 0.6416906118392944),
+      (8.0, 155.83835, 2.5667624473571777),
+      (4.0, 243.78835, 0.8203837275505067),
+      (4.0, 373.78836, 0.5350621342658997),
+      (4.0, 155.83835, 1.2833812236785889), // taller viewport
+      (4.0, 155.83835, 1.2833812236785889), // elevation60
+      (4.0, 155.83835, 1.2833812236785889), // perspective0
+      (0.5, 155.83835, 0.3208453059196472),
+    ] {
+      let actual = super::pie_model_pen_radius(width, plot_width) * 100.0;
+      assert!((actual - native_radius).abs() < 0.000001);
+    }
+  }
+
   use super::*;
+
+  #[test]
+  fn projected_surface_depth_resolves_crossing_faces_independently_of_order() {
+    let points = [[0.0, 0.0], [12.0, 0.0], [0.0, 12.0]];
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let blue = RgbColor { r: 0, g: 0, b: 255 };
+    let render = |reverse| {
+      let mut scene = Scene::default();
+      let triangles = [(red, [1.0, 3.0, 1.0]), (blue, [2.0; 3])];
+      for i in if reverse { [1, 0] } else { [0, 1] } {
+        scene.projected_triangle(points, triangles[i].1, triangles[i].0);
+      }
+      scene
+        .rasterize(PageToRasterMapping {
+          width_px: 12,
+          height_px: 12,
+          scale_x: 1.0,
+          scale_y: 1.0,
+          translate_x: 0.0,
+          translate_y: 0.0,
+          text_hinting: None,
+        })
+        .unwrap()
+    };
+    let image = render(false);
+    assert_eq!(image, render(true));
+    assert_eq!(image.get_pixel(1, 1).0, [0, 0, 255, 255]);
+    assert_eq!(image.get_pixel(8, 1).0, [255, 0, 0, 255]);
+  }
 
   #[test]
   fn gradient_sector_geometry_matches_native_mesh_counts_and_source_uv() {
@@ -803,7 +1131,10 @@ mod tests {
         let direction = [angle.sin(), -angle.cos(), 0.0];
         let normal = [s * angle.cos(), angle.sin()];
         let norm = normal[0].hypot(normal[1]);
-        let ring = tube_ring(direction, 4.0 * radius_px / (500.0 * HEX_APOTHEM));
+        let ring = tube_ring(
+          direction,
+          4.0 * radius_px / (500.0 * std::f64::consts::FRAC_PI_6.cos()),
+        );
         let extent = ring.map(|p| (p[0] * normal[0] + (s * p[1] - c * p[2]) * normal[1]) / norm);
         let width = extent.into_iter().fold(f64::NEG_INFINITY, f64::max)
           - extent.into_iter().fold(f64::INFINITY, f64::min);

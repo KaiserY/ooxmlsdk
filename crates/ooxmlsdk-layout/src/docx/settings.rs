@@ -159,16 +159,14 @@ fn page_bottom_hyphenation(
   allow_at_page_bottom: bool,
   use_word2013_page_bottom: bool,
 ) -> PageBottomHyphenation {
-  if allow_at_page_bottom || !use_word2013_page_bottom {
-    // MS-DOCX describes explicit false as moving only the hyphenated word,
-    // and LibreOffice imports it that way. Microsoft 365 fixed output
-    // 16.0.20131 nevertheless leaves the selected hyphen at the page bottom
-    // (tdf165354.docx). Follow the Office PDF calibration used by this
-    // renderer; explicit true or an omitted setting retains the Word 2013
-    // whole-line behavior below.
+  if allow_at_page_bottom {
     PageBottomHyphenation::Allow
-  } else {
+  } else if use_word2013_page_bottom {
     PageBottomHyphenation::MoveLine
+  } else {
+    // MS-DOCX 2.3.7/2.3.8 and native cached/uncached Word controls distinguish
+    // moving the word from allowing its hyphen to remain at the track bottom.
+    PageBottomHyphenation::MoveWord
   }
 }
 
@@ -440,21 +438,35 @@ fn no_leading_value(settings: &w::Settings) -> bool {
     .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool()))
 }
 
-pub(super) fn split_page_break_and_paragraph_mark(
+pub(super) fn page_break_compatibility(
   package: &WordprocessingDocument,
   main: &MainDocumentPart,
-) -> bool {
-  main
+  mode: u16,
+) -> (bool, bool) {
+  // Word 2013 compatibility discards these legacy flags on load, including
+  // explicitly authored true values. Native WordOpenXML and fixed output
+  // agree; retaining the raw split flag would create an extra follow mark.
+  if mode >= 15 {
+    return (false, false);
+  }
+  let Some(settings) = main
     .document_settings_part(package)
     .and_then(|part| part.root_element(package).ok())
-    .and_then(|settings| {
-      settings
-        .compatibility
-        .iter()
-        .find_map(|compat| compat.split_page_break_and_paragraph_mark.as_ref())
-        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
-    })
-    .unwrap_or(false)
+  else {
+    return (false, false);
+  };
+  (
+    settings
+      .compatibility
+      .iter()
+      .find_map(|compat| compat.split_page_break_and_paragraph_mark.as_ref())
+      .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool())),
+    settings
+      .compatibility
+      .iter()
+      .find_map(|compat| compat.suppress_spacing_before_after_page_break.as_ref())
+      .is_some_and(|setting| setting.val.is_none_or(|value| value.as_bool())),
+  )
 }
 
 pub(super) fn update_fields_on_open(
@@ -557,7 +569,7 @@ mod tests {
     );
     assert_eq!(
       page_bottom_hyphenation(false, false),
-      PageBottomHyphenation::Allow
+      PageBottomHyphenation::MoveWord
     );
   }
 

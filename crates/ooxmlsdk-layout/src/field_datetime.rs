@@ -52,8 +52,8 @@ pub(crate) fn format_date_time_field(
     DefaultFieldFormat::DocumentDateTime
   } else if field_name.eq_ignore_ascii_case("CREATEDATE") {
     // CREATEDATE is sourced from the absolute dcterms:created core property.
-    // Unlike PRINTDATE/SAVEDATE, preserve its recorded seconds after the
-    // caller-selected time-zone conversion.
+    // Its importer supplies the resolved property precision and time zone;
+    // formatting must not substitute the current field-update clock.
     DefaultFieldFormat::DocumentDateTime
   } else {
     return None;

@@ -4,6 +4,19 @@ pub struct LayoutOptions {
   /// Complete storage path used by Word's FILENAME \\p field. When supplied,
   /// its final component also owns bare FILENAME; no filesystem access occurs.
   pub source_file_path: Option<String>,
+  /// Explicit application user name for unlocked Word USERNAME fields when
+  /// field evaluation is requested. This is independent of document authors.
+  /// `None` preserves the cached result; an empty string is an empty name.
+  pub field_user_name: Option<String>,
+  /// Explicit application initials for Word USERINITIALS fields. Initials
+  /// are independent of the name and are never inferred from the host.
+  pub field_user_initials: Option<String>,
+  /// Resolved Word document template, as an OOXML package. When the document
+  /// enables `w:linkStyles`, import its style definitions on open. The caller
+  /// resolves either the attached template or its application Normal template;
+  /// no filesystem/network lookup occurs. An absent or invalid template leaves
+  /// document styles unchanged. Clones share these immutable package bytes.
+  pub linked_styles_template: Option<std::sync::Arc<[u8]>>,
   /// BCP 47 user-interface language used for application-generated labels,
   /// such as an automatic chart title that is not persisted in the package.
   pub ui_language: Option<String>,
@@ -26,6 +39,17 @@ pub struct LayoutOptions {
   /// empty list disables automatic dictionary breaks. Authored soft hyphens
   /// remain available independently of this installation setting.
   pub automatic_hyphenation_languages: Option<Vec<String>>,
+  /// Optional English proofing data for matching an application's dictionary.
+  /// Immutable parsed data is shared across runs and repeated layout passes.
+  pub english_hyphenation_dictionary:
+    Option<std::sync::Arc<crate::hyphenation::EnglishHyphenationDictionary>>,
+  /// Word's print-time field update policy. `Some(false)` preserves cached
+  /// body fields that require an explicit print update, such as TOC and
+  /// MERGEFIELD. Pagination/display fields and repeating headers/footers
+  /// still follow their own update rules; field locks remain effective.
+  /// `None` retains the existing update behavior. This does not request a
+  /// document-open update or provide a clock for date/time fields.
+  pub update_fields_at_print: Option<bool>,
   /// Local civil time to use when an application explicitly refreshes
   /// unlocked WordprocessingML DATE, TIME, PRINTDATE, and SAVEDATE fields or
   /// generated PresentationML `datetime` text fields. SpreadsheetML formula

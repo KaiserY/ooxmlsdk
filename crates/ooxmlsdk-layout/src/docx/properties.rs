@@ -50,6 +50,67 @@ fn ordinary_run_color_identity(
   }
 }
 
+pub(super) fn header_layout(
+  format: &ParagraphFormat,
+  styles: &StylesCatalog,
+) -> impl PartialEq + use<> {
+  let recovered_defaults = styles.uses_office_recovered_paragraph_defaults();
+  let mut justification = format.justification;
+  justification.adjust = match justification.adjust {
+    super::ParagraphAdjust::Start => super::ParagraphAdjust::Left,
+    super::ParagraphAdjust::End => super::ParagraphAdjust::Right,
+    value => value,
+  };
+  justification.logical_start = false;
+  justification.physical_left = false;
+  (
+    (
+      format.bidi,
+      format.alignment,
+      justification,
+      format.keep_with_next,
+      format.keep_lines,
+      format.widow_control.unwrap_or(true),
+      format.contextual_spacing,
+    ),
+    (
+      format.spacing_before_pt,
+      format.spacing_before_lines.unwrap_or(0.0),
+      format.spacing_before_auto.unwrap_or(false),
+      format.spacing_before_auto_pt.unwrap_or(0.0),
+      if recovered_defaults && !format.spacing_after_set {
+        super::OFFICE_RECOVERED_PARAGRAPH_AFTER_PT
+      } else {
+        format.spacing_after_pt
+      },
+      format.spacing_after_lines.unwrap_or(0.0),
+      format.spacing_after_auto.unwrap_or(false),
+      format.spacing_after_auto_pt.unwrap_or(0.0),
+    ),
+    (
+      format.line_height_rule,
+      format.line_height_pt.unwrap_or(if recovered_defaults {
+        super::OFFICE_RECOVERED_LINE_HEIGHT_MULTIPLE
+      } else {
+        1.0
+      }),
+    ),
+    (
+      format.indent_left_pt,
+      format.indent_right_pt,
+      format.first_line_indent_pt,
+      format.indent_left_character_units,
+      format.indent_right_character_units,
+      format.first_line_indent_character_units,
+    ),
+    (
+      format.tab_stops.clone(),
+      format.tab_stop_clear_positions_pt.clone(),
+    ),
+    format.borders,
+  )
+}
+
 pub(super) fn paragraph_format(
   styles: &StylesCatalog,
   style_id: Option<&str>,
@@ -62,61 +123,22 @@ pub(super) fn paragraph_format(
   // direct alignment, direction, spacing, pagination, indent or tabs differ.
   // Run/paragraph-mark fonts and merely authoring the same value do not.
   // Compare resolved values before source-presence flags obscure inheritance.
-  let header_layout = |format: &ParagraphFormat| {
-    let mut justification = format.justification;
-    justification.adjust = match justification.adjust {
-      super::ParagraphAdjust::Start => super::ParagraphAdjust::Left,
-      super::ParagraphAdjust::End => super::ParagraphAdjust::Right,
-      value => value,
-    };
-    justification.logical_start = false;
-    justification.physical_left = false;
-    (
-      (
-        format.bidi,
-        format.alignment,
-        justification,
-        format.keep_with_next,
-        format.keep_lines,
-        format.widow_control.unwrap_or(true),
-        format.contextual_spacing,
-      ),
-      (
-        format.spacing_before_pt,
-        format.spacing_before_lines.unwrap_or(0.0),
-        format.spacing_before_auto.unwrap_or(false),
-        format.spacing_before_auto_pt.unwrap_or(0.0),
-        format.spacing_after_pt,
-        format.spacing_after_lines.unwrap_or(0.0),
-        format.spacing_after_auto.unwrap_or(false),
-        format.spacing_after_auto_pt.unwrap_or(0.0),
-      ),
-      (
-        format.line_height_rule,
-        format.line_height_pt.unwrap_or(1.0),
-      ),
-      (
-        format.indent_left_pt,
-        format.indent_right_pt,
-        format.first_line_indent_pt,
-        format.indent_left_character_units,
-        format.indent_right_character_units,
-        format.first_line_indent_character_units,
-      ),
-      (
-        format.tab_stops.clone(),
-        format.tab_stop_clear_positions_pt.clone(),
-      ),
-    )
-  };
-  let inherited_header_layout = header_layout(&format);
+  let inherited_header_layout = header_layout(&format, styles);
+  if direct_properties
+    .and_then(|properties| properties.numbering_properties())
+    .and_then(|properties| properties.numbering_id.as_ref())
+    .is_some_and(|id| id.val == 0)
+  {
+    super::reset_numbering_indents(&mut format);
+  }
   merge_paragraph_format_with_theme(
     &mut format,
     direct_properties,
     styles.import_settings,
     &styles.theme_colors,
   );
-  format.header_layout_differs_from_style = header_layout(&format) != inherited_header_layout;
+  format.header_layout_differs_from_style =
+    header_layout(&format, styles) != inherited_header_layout;
   format
 }
 
@@ -171,6 +193,7 @@ fn run_style_with_character_style_policy(
     Some(RunProps::Direct(properties)),
     &styles.theme_fonts,
     &styles.theme_colors,
+    styles.import_settings.compatibility_mode,
   );
   styles.apply_word_font_table_mappings(&mut style, RunProps::Direct(properties).run_fonts());
   styles.automatic_escapement_fonts.resolve(&mut style);
@@ -198,6 +221,7 @@ pub(super) fn paragraph_mark_run_style(
     Some(RunProps::ParagraphMark(properties)),
     &styles.theme_fonts,
     &styles.theme_colors,
+    styles.import_settings.compatibility_mode,
   );
   styles
     .apply_word_font_table_mappings(&mut style, RunProps::ParagraphMark(properties).run_fonts());
@@ -233,6 +257,7 @@ pub(super) fn paragraph_mark_run_style_for_numbering(
     &styles.theme_fonts,
     &styles.theme_colors,
     RunStyleMergePolicy::NUMBERING_PARAGRAPH_MARK,
+    styles.import_settings.compatibility_mode,
   );
   styles
     .apply_word_font_table_mappings(&mut style, RunProps::ParagraphMark(properties).run_fonts());
@@ -266,6 +291,7 @@ pub(super) fn merge_run_style(
   properties: Option<RunProps<'_>>,
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
+  compatibility_mode: u16,
 ) {
   merge_run_style_with_policy(
     style,
@@ -273,6 +299,7 @@ pub(super) fn merge_run_style(
     theme_fonts,
     theme_colors,
     RunStyleMergePolicy::ALL,
+    compatibility_mode,
   );
 }
 
@@ -404,6 +431,7 @@ pub(super) fn toc_numbering_run_style(
     Some(RunProps::Numbering(&selected)),
     &styles.theme_fonts,
     &styles.theme_colors,
+    styles.import_settings.compatibility_mode,
   );
   styles.apply_word_font_table_mappings(&mut style, selected.run_fonts.first());
   styles.automatic_escapement_fonts.resolve(&mut style);
@@ -416,6 +444,7 @@ fn merge_run_style_with_policy(
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
   policy: RunStyleMergePolicy,
+  compatibility_mode: u16,
 ) {
   // This merger is WordprocessingML-specific. Preserve the rFonts slot
   // classifier even for styles constructed outside the document-default
@@ -975,13 +1004,16 @@ fn merge_run_style_with_policy(
   if let Some(vanish) = properties.vanish() {
     style.hidden = vanish.val.is_none_or(|value| value.as_bool());
   }
+  if let Some(no_proof) = properties.no_proof() {
+    style.wordprocessingml_no_proof = no_proof.val.is_none_or(|value| value.as_bool());
+  }
   if policy.escapement
     && let Some(vertical_alignment) = properties.vertical_text_alignment()
   {
     apply_vertical_text_alignment(style, vertical_alignment.val);
   }
   if let Some(highlight) = properties.highlight() {
-    style.highlight = highlight_color(highlight.val);
+    style.highlight = highlight_color(highlight.val, compatibility_mode);
   }
   if style.color_is_automatic {
     style.color = super::RgbColor { r: 0, g: 0, b: 0 };
@@ -1131,6 +1163,7 @@ pub(super) fn merge_doc_default_run_style(
   properties: Option<&w::RunPropertiesBaseStyle>,
   theme_fonts: &ThemeFonts,
   theme_colors: &ThemeColors,
+  compatibility_mode: u16,
 ) {
   let Some(properties) = properties else {
     return;
@@ -1146,6 +1179,7 @@ pub(super) fn merge_doc_default_run_style(
     Some(RunProps::BaseStyle(&effective)),
     theme_fonts,
     theme_colors,
+    compatibility_mode,
   );
   if effective.run_fonts.as_ref().is_some_and(|fonts| {
     fonts.east_asia_theme.is_none()
@@ -1374,11 +1408,27 @@ fn resolve_word_run_font(
     .map(Arc::from)
 }
 
-fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {
-  // ECMA-376 Part 1 §17.18.40 defines this palette explicitly. In particular,
-  // it is not the legacy indexed Word/RTF palette (128-valued dark colors,
-  // gray 128/192). Office fixed output uses these RGB values in body text,
-  // standalone WPS textboxes and grouped WPS textboxes alike.
+pub(super) fn highlight_color(
+  value: w::HighlightColorValues,
+  compatibility_mode: u16,
+) -> Option<super::RgbColor> {
+  // Word 2007 and earlier retain the indexed palette. Word 2010 and later
+  // use ECMA-376 §17.18.40's explicit RGB values. Native modes11/12/14/15
+  // distinguish all17 tokens in ordinary text and both legacy form fields.
+  if compatibility_mode < 14 {
+    let rgb = match value {
+      w::HighlightColorValues::DarkBlue => Some([0, 0, 128]),
+      w::HighlightColorValues::DarkCyan => Some([0, 128, 128]),
+      w::HighlightColorValues::DarkGreen => Some([0, 128, 0]),
+      w::HighlightColorValues::DarkRed => Some([128, 0, 0]),
+      w::HighlightColorValues::DarkGray => Some([128, 128, 128]),
+      w::HighlightColorValues::LightGray => Some([192, 192, 192]),
+      _ => None,
+    };
+    if let Some([r, g, b]) = rgb {
+      return Some(super::RgbColor { r, g, b });
+    }
+  }
   Some(match value {
     w::HighlightColorValues::Black => super::RgbColor { r: 0, g: 0, b: 0 },
     w::HighlightColorValues::Blue => super::RgbColor { r: 0, g: 0, b: 255 },
@@ -1524,6 +1574,7 @@ mod tests {
         Some(RunProps::Direct(&direct)),
         &ThemeFonts::default(),
         &ThemeColors::default(),
+        15,
       );
       assert_eq!(style.font_family.as_deref(), Some(name));
       assert_eq!(style.high_ansi_font_family.as_deref(), Some(name));
@@ -1551,6 +1602,8 @@ mod tests {
   #[test]
   fn empty_header_layout_compares_effective_paragraph_properties() {
     let styles = StylesCatalog {
+      has_styles_part: true,
+      has_default_paragraph_properties: true,
       doc_default_paragraph: ParagraphFormat {
         spacing_after_pt: 10.0,
         line_height_pt: Some(1.15),
@@ -1609,6 +1662,8 @@ mod tests {
   #[test]
   fn empty_header_layout_keeps_identical_style_overrides_inactive() {
     let styles = StylesCatalog {
+      has_styles_part: true,
+      has_default_paragraph_properties: true,
       doc_default_paragraph: ParagraphFormat {
         alignment: super::super::ParagraphAlignment::Center,
         justification: super::super::ParagraphJustification {
@@ -1632,6 +1687,102 @@ mod tests {
         Some(ParagraphProps::Direct(&direct)),
       );
       assert_eq!(got.header_layout_differs_from_style, changed);
+    }
+  }
+
+  #[test]
+  fn empty_header_activation_compares_recovered_spacing_and_resolved_borders() {
+    let mut styles = StylesCatalog {
+      has_styles_part: true,
+      ..Default::default()
+    };
+    let border =
+      r#"<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="000000"/></w:pBdr>"#;
+    let xml = format!(
+      r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{border}</w:pPr>"#
+    );
+    let inherited = w::ParagraphProperties::from_bytes(xml.as_bytes()).unwrap();
+    styles.doc_default_paragraph = paragraph_format(
+      &styles,
+      None,
+      ParagraphFormat::default(),
+      Some(ParagraphProps::Direct(&inherited)),
+    );
+    for (properties, changed) in [
+      (String::new(), false),
+      (border.to_string(), false),
+      (border.replace("000000", "FF0000"), true),
+      (
+        r#"<w:spacing w:after="160" w:line="278" w:lineRule="auto"/>"#.to_string(),
+        false,
+      ),
+      (r#"<w:spacing w:after="0"/>"#.to_string(), true),
+      (
+        r#"<w:spacing w:line="240" w:lineRule="auto"/>"#.to_string(),
+        true,
+      ),
+    ] {
+      let xml = format!(
+        r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{properties}</w:pPr>"#
+      );
+      let direct = w::ParagraphProperties::from_bytes(xml.as_bytes()).unwrap();
+      let actual = paragraph_format(
+        &styles,
+        None,
+        ParagraphFormat::default(),
+        Some(ParagraphProps::Direct(&direct)),
+      );
+      assert_eq!(
+        actual.header_layout_differs_from_style, changed,
+        "{properties}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_highlight_palette_tracks_compatibility_in_runs_and_paragraph_marks() {
+    use w::HighlightColorValues as H;
+    for mode in [11, 12, 14, 15] {
+      let styles = StylesCatalog {
+        import_settings: super::super::ImportSettings {
+          compatibility_mode: mode,
+          ..Default::default()
+        },
+        ..Default::default()
+      };
+      for (token, legacy, modern) in [
+        (H::DarkBlue, [0, 0, 128], [0, 0, 139]),
+        (H::DarkCyan, [0, 128, 128], [0, 139, 139]),
+        (H::DarkGreen, [0, 128, 0], [0, 100, 0]),
+        (H::DarkRed, [128, 0, 0], [139, 0, 0]),
+        (H::DarkGray, [128, 128, 128], [169, 169, 169]),
+        (H::LightGray, [192, 192, 192], [211, 211, 211]),
+      ] {
+        let [r, g, b] = if mode < 14 { legacy } else { modern };
+        let expected = Some(super::super::RgbColor { r, g, b });
+        let direct = w::RunProperties {
+          run_properties_choice: vec![w::RunPropertiesChoice::Highlight(w::Highlight {
+            val: token,
+          })],
+          ..Default::default()
+        };
+        assert_eq!(
+          run_style(Some(&direct), TextStyle::default(), &styles).highlight,
+          expected,
+          "direct run, mode={mode}, token={token:?}",
+        );
+        let mark = w::ParagraphMarkRunProperties {
+          paragraph_mark_run_properties_choice2: vec![
+            w::ParagraphMarkRunPropertiesChoice2::Highlight(w::Highlight { val: token }),
+          ],
+          ..Default::default()
+        };
+        assert_eq!(
+          paragraph_mark_run_style(Some(&mark), TextStyle::default(), &styles).highlight,
+          expected,
+          "paragraph mark, mode={mode}, token={token:?}",
+        );
+      }
     }
   }
 
@@ -1671,6 +1822,7 @@ mod tests {
         Some(RunProps::Direct(&empty)),
         &ThemeFonts::default(),
         &ThemeColors::default(),
+        15,
       );
       assert_eq!(style.highlight, inherited);
       let properties = w::RunProperties {
@@ -1684,6 +1836,7 @@ mod tests {
         Some(RunProps::Direct(&properties)),
         &ThemeFonts::default(),
         &ThemeColors::default(),
+        15,
       );
       assert_eq!(
         style.highlight,

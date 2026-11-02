@@ -210,6 +210,8 @@ pub struct SurfaceChartGroup<'a> {
   pub wireframe: bool,
   /// Optional per-value-band fills, keyed by `c:bandFmt/c:idx`.
   pub band_fills: Vec<ChartDataPointFill<'a>>,
+  /// Complete band paint, including gradients and explicit noFill.
+  pub band_formats: Option<&'a c::BandFormats>,
 }
 
 /// Lines and bars authored on one cartesian chart group rather than on an
@@ -1787,6 +1789,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             .as_ref()
             .is_some_and(|wireframe| wireframe.val.is_none_or(|value| value.as_bool())),
           band_fills: surface_band_fills(chart.band_formats.as_ref()),
+          band_formats: chart.band_formats.as_ref(),
         });
       }
       c::PlotAreaChoice::Surface3DChart(chart) => {
@@ -1814,6 +1817,7 @@ pub fn cartesian_chart_for_host_locales<'a>(
             .as_ref()
             .is_some_and(|wireframe| wireframe.val.is_none_or(|value| value.as_bool())),
           band_fills: surface_band_fills(chart.band_formats.as_ref()),
+          band_formats: chart.band_formats.as_ref(),
         });
       }
       c::PlotAreaChoice::BubbleChart(chart) => {
@@ -8824,7 +8828,7 @@ mod tests {
   #[test]
   fn three_dimensional_cartesian_groups_preserve_depth_and_surface_semantics() {
     let chart_space = c::ChartSpace::from_bytes(
-      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:area3DChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:gapDepth val="275"/><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:area3DChart><c:line3DChart><c:grouping val="standard"/><c:ser><c:idx val="1"/><c:order val="1"/><c:val><c:numLit><c:pt idx="0"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser><c:gapDepth val="80"/><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:line3DChart><c:surface3DChart><c:wireframe/><c:ser><c:idx val="2"/><c:order val="2"/><c:val><c:numLit><c:pt idx="0"><c:v>3</c:v></c:pt></c:numLit></c:val></c:ser><c:bandFmts><c:bandFmt><c:idx val="4"/><c:spPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></c:spPr></c:bandFmt></c:bandFmts><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:surface3DChart></c:plotArea></c:chart></c:chartSpace>"#,
+      br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:area3DChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:val><c:numLit><c:pt idx="0"><c:v>1</c:v></c:pt></c:numLit></c:val></c:ser><c:gapDepth val="275"/><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:area3DChart><c:line3DChart><c:grouping val="standard"/><c:ser><c:idx val="1"/><c:order val="1"/><c:val><c:numLit><c:pt idx="0"><c:v>2</c:v></c:pt></c:numLit></c:val></c:ser><c:gapDepth val="80"/><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:line3DChart><c:surface3DChart><c:wireframe/><c:ser><c:idx val="2"/><c:order val="2"/><c:val><c:numLit><c:pt idx="0"><c:v>3</c:v></c:pt></c:numLit></c:val></c:ser><c:bandFmts><c:bandFmt><c:idx val="4"/><c:spPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></c:spPr></c:bandFmt><c:bandFmt><c:idx val="5"/><c:spPr><a:gradFill><a:gsLst><a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs><a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs></a:gsLst><a:lin ang="16200000" scaled="0"/></a:gradFill></c:spPr></c:bandFmt></c:bandFmts><c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:surface3DChart></c:plotArea></c:chart></c:chartSpace>"#,
     )
     .expect("chart space");
 
@@ -8838,6 +8842,20 @@ mod tests {
     assert_eq!(chart.surface_groups[0].first_series_index, 2);
     assert_eq!(chart.surface_groups[0].series_count, 1);
     assert_eq!(chart.surface_groups[0].band_fills[0].index, 4);
+    let formats = chart.surface_groups[0]
+      .band_formats
+      .expect("complete band paint");
+    assert_eq!(formats.band_format.len(), 2);
+    let gradient = &formats.band_format[1];
+    assert_eq!(gradient.index.val, 5);
+    assert!(matches!(
+      gradient
+        .chart_shape_properties
+        .as_ref()
+        .unwrap()
+        .chart_shape_properties_choice2,
+      Some(c::ChartShapePropertiesChoice2::GradientFill(_))
+    ));
   }
 
   #[test]

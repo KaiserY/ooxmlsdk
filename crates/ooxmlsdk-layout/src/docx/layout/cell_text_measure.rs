@@ -15,6 +15,7 @@ use super::{
 #[derive(Clone, Copy)]
 pub(super) struct TableCellMeasureContext {
   pub setup: PageSetup,
+  pub in_header_footer: bool,
   pub horizontal_rule_reference_width_pt: Option<f32>,
   pub default_tab_stop_pt: f32,
   pub horizontal_borders: Option<(f32, f32, bool)>,
@@ -29,6 +30,8 @@ impl TableCellMeasureContext {
   ) -> Self {
     let (left, right) = cell_horizontal_border_widths(table, row, cell);
     self.horizontal_borders = Some((left, right, row_has_separate_borders(table, row)));
+    self.in_header_footer = table.in_header_footer;
+    self.setup = super::table_story_setup(self.setup, self.in_header_footer);
     self
   }
 }
@@ -37,6 +40,7 @@ impl From<PageSetup> for TableCellMeasureContext {
   fn from(setup: PageSetup) -> Self {
     Self {
       setup,
+      in_header_footer: false,
       horizontal_rule_reference_width_pt: None,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
       horizontal_borders: None,
@@ -48,6 +52,7 @@ impl From<BlockArea> for TableCellMeasureContext {
   fn from(area: BlockArea) -> Self {
     Self {
       setup: area.setup,
+      in_header_footer: false,
       horizontal_rule_reference_width_pt: area.horizontal_rule_reference_width_pt,
       default_tab_stop_pt: area.default_tab_stop_pt,
       horizontal_borders: None,
@@ -62,7 +67,7 @@ pub(super) fn paragraph_extents(
 ) -> Option<EstimatedParagraphContentExtents> {
   if flow.text_segmentation != TextSegmentation::TableCell
     || !flow.horizontal_table_cell
-    || !supports_paragraph(paragraph)
+    || !supports_measurement(paragraph)
   {
     return None;
   }
@@ -102,6 +107,8 @@ pub(super) fn paragraph_extents(
     floating_bottom: 0.0,
     paragraph_floating_bottom: 0.0,
     cell_print_floating_bottom: 0.0,
+    paragraph_alignment_floating_bottom: 0.0,
+    cell_print_alignment_floating_bottom: 0.0,
     leading_line_heights_pt: leading,
     first_line_page_fit_height_pt: leading[0],
     line_count: count,
@@ -109,6 +116,12 @@ pub(super) fn paragraph_extents(
 }
 
 pub(super) fn supports_paragraph(paragraph: &crate::docx::Paragraph) -> bool {
+  // Split-row alignment and column-widow callers have separate numbering
+  // ownership. Extending intrinsic measurement must not broaden those gates.
+  paragraph.list_label.is_none() && supports_measurement(paragraph)
+}
+
+fn supports_measurement(paragraph: &crate::docx::Paragraph) -> bool {
   // Bookmarks carry source anchors, not text advances. Native joined,
   // split and bookmarked controls retain the same physical cell lines.
   // Let their ordinary text use this formatter too: the fallback estimate
@@ -126,7 +139,6 @@ pub(super) fn supports_paragraph(paragraph: &crate::docx::Paragraph) -> bool {
     || paragraph_frame(paragraph).is_some()
     || paragraph.format.word_text_frame_story
     || paragraph.format.wordprocessing_shape_story
-    || paragraph.list_label.is_some()
     || paragraph.list_label_image.is_some()
     || paragraph
       .format
@@ -204,7 +216,7 @@ mod tests {
     assert_eq!(extents.line_count, 2);
     assert_eq!(extents.flow_height, 36.0);
     assert_eq!(extents.leading_line_heights_pt, [18.0, 18.0]);
-    let (height, floating_bottom) = table_cell_paragraph_height(
+    let measured = table_cell_paragraph_height(
       BlockNeighbors::direct(None, None),
       &paragraph,
       flow,
@@ -212,8 +224,8 @@ mod tests {
       false,
       false,
     );
-    assert_eq!(height, 48.0);
-    assert_eq!(floating_bottom, 0.0);
+    assert_eq!(measured.height, 48.0);
+    assert_eq!(measured.cell_print_bottom, 0.0);
   }
 
   #[test]
@@ -302,7 +314,7 @@ mod tests {
           .expect("ordinary bookmarked text is measured by its physical formatter");
         assert_eq!(extents.line_count, 1);
         assert_eq!(extents.flow_height, 18.0);
-        let (height, _) = table_cell_paragraph_height(
+        let measured = table_cell_paragraph_height(
           BlockNeighbors::direct(None, None),
           &paragraph,
           flow,
@@ -310,7 +322,7 @@ mod tests {
           false,
           false,
         );
-        assert_eq!(height, 20.0);
+        assert_eq!(measured.height, 20.0);
         let blocks = vec![Block::Paragraph(Box::new(paragraph.clone())); 3];
         assert_eq!(
           table_cell_blocks_content_height(

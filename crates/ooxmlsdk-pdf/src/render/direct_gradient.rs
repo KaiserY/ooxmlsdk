@@ -53,6 +53,10 @@ struct ExponentialFunction<const N: usize> {
 #[derive(Clone, Debug)]
 enum GradientFunction<const N: usize> {
   Exponential(ExponentialFunction<N>),
+  Sampled {
+    id: Ref,
+    samples: Vec<u8>,
+  },
   Stitching {
     id: Ref,
     segments: Vec<ExponentialFunction<N>>,
@@ -64,7 +68,7 @@ impl<const N: usize> GradientFunction<N> {
   fn root_id(&self) -> Ref {
     match self {
       Self::Exponential(function) => function.id,
-      Self::Stitching { id, .. } => *id,
+      Self::Stitching { id, .. } | Self::Sampled { id, .. } => *id,
     }
   }
 }
@@ -481,6 +485,25 @@ fn allocate_function<const N: usize>(
   refs: &mut RefAllocator,
   components: impl Fn(&ColorStop) -> [f32; N],
 ) -> Result<GradientFunction<N>> {
+  // A dense uniform table of byte colors is represented exactly by a
+  // type-0 function. Avoid allocating hundreds of type-2 objects for it.
+  if stops.len() >= 256
+    && stops
+      .iter()
+      .enumerate()
+      .all(|(i, stop)| stop.position == i as f32 / (stops.len() - 1) as f32)
+  {
+    let samples = stops
+      .iter()
+      .flat_map(|stop| {
+        components(stop).map(|value| (value * 255.0).round().clamp(0.0, 255.0) as u8)
+      })
+      .collect();
+    return Ok(GradientFunction::Sampled {
+      id: refs.alloc()?,
+      samples,
+    });
+  }
   if let [start, end] = stops {
     return Ok(GradientFunction::Exponential(ExponentialFunction {
       id: refs.alloc()?,
@@ -518,6 +541,18 @@ fn allocate_function<const N: usize>(
 fn write_function<const N: usize>(pdf: &mut Pdf, function: &GradientFunction<N>) {
   match function {
     GradientFunction::Exponential(function) => write_exponential(pdf, function),
+    GradientFunction::Sampled { id, samples } => {
+      let count = samples.len() / N;
+      pdf
+        .sampled_function(*id, samples)
+        .domain([0.0, 1.0])
+        .range((0..N).flat_map(|_| [0.0, 1.0]))
+        .size([count as i32])
+        .bits_per_sample(8)
+        .order(pdf_writer::types::InterpolationOrder::Linear)
+        .encode([0.0, (count - 1) as f32])
+        .decode((0..N).flat_map(|_| [0.0, 1.0]));
+    }
     GradientFunction::Stitching {
       id,
       segments,
@@ -654,6 +689,37 @@ fn write_soft_mask_objects(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn uniform_gradient_samples_preserve_rgb_alpha_and_nonuniform_fallback() {
+    let mut stops: Vec<_> = (0..256)
+      .map(|i| ColorStop {
+        position: i as f32 / 255.0,
+        rgb: [i as f32 / 255.0, 1.0 - i as f32 / 255.0, 0.0],
+        alpha: i as u8,
+      })
+      .collect();
+    let color = allocate_function(&stops, &mut RefAllocator::default(), |s| s.rgb).unwrap();
+    let GradientFunction::Sampled { samples, .. } = color else {
+      panic!("dense table must use one sampled function");
+    };
+    assert_eq!(samples.len(), 768);
+    assert_eq!(&samples[..3], &[0, 255, 0]);
+    assert_eq!(&samples[765..], &[255, 0, 0]);
+    let alpha = allocate_function(&stops, &mut RefAllocator::default(), |s| {
+      [f32::from(s.alpha) / 255.0]
+    })
+    .unwrap();
+    let GradientFunction::Sampled { samples, .. } = alpha else {
+      panic!("alpha table must preserve its samples");
+    };
+    assert_eq!(samples, (0..=255).collect::<Vec<u8>>());
+    stops[128].position += 0.0001;
+    assert!(matches!(
+      allocate_function(&stops, &mut RefAllocator::default(), |s| s.rgb).unwrap(),
+      GradientFunction::Stitching { .. }
+    ));
+  }
 
   #[test]
   fn hard_edge_functions_keep_colors_and_alpha_without_empty_intervals() {

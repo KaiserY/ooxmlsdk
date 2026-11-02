@@ -542,6 +542,7 @@ fn inline_image_from_math_box(
     static3d: None,
     width_pt: math_box.width_pt + padding * 2.0,
     height_pt: math_box.ascent_pt + math_box.descent_pt + padding * 2.0,
+    inline_frame_axes_swapped: false,
     inline_offset_x_pt: 0.0,
     inline_offset_y_pt: 0.0,
     effect_left_pt: 0.0,
@@ -1711,9 +1712,9 @@ fn normalize_automatic_math_text(text: String) -> String {
   }
   // OfficeMath's automatic math input replaces the non-mathematical source
   // characters U+002D, U+2329, and U+232A with their mathematical Unicode
-  // counterparts U+2212, U+27E8, and U+27E9. ECMA-376's m:lit and m:nor
-  // properties take the early return above and therefore preserve the source
-  // scalar and suppress this operator interpretation.
+  // counterparts U+2212, U+27E8, and U+27E9. Literal/normal runs bypass
+  // automatic atom interpretation. The shared run reader already resolves
+  // Word's minus display mapping, including literal runs but excluding m:nor.
   text
     .chars()
     .map(normalize_automatic_math_character)
@@ -2339,8 +2340,47 @@ fn run_background_base_mut(node: &mut MathNode) -> &mut MathNode {
 }
 
 fn normalize_row_automatic_math(nodes: &mut [MathNode]) {
+  normalize_row_automatic_math_decimal_separators(nodes);
   normalize_row_automatic_math_clause_separators(nodes);
   normalize_row_automatic_math_ellipsis(nodes);
+}
+
+fn normalize_row_automatic_math_decimal_separators(nodes: &mut [MathNode]) {
+  fn text_edge(node: &MathNode, first: bool) -> Option<char> {
+    match node {
+      MathNode::Text { text, .. } => {
+        if first {
+          text.chars().next()
+        } else {
+          text.chars().next_back()
+        }
+      }
+      MathNode::RunBackground { base, .. } | MathNode::Argument { base, .. } => {
+        text_edge(base, first)
+      }
+      MathNode::Row(nodes) => text_edge(if first { nodes.first()? } else { nodes.last()? }, first),
+      _ => None,
+    }
+  }
+
+  // UnicodeMath §3.14 gives ASCII comma/period between ASCII digits ordinary
+  // spacing. Resolve the adjacent text atoms after flattening m:r boundaries:
+  // Word gives 2.35 and three runs containing 2 / . / 35 identical advances.
+  // Explicit spaces and structural math objects remain syntax boundaries.
+  for index in 1..nodes.len().saturating_sub(1) {
+    if text_edge(&nodes[index - 1], false).is_some_and(|c| c.is_ascii_digit())
+      && text_edge(&nodes[index + 1], true).is_some_and(|c| c.is_ascii_digit())
+      && let MathNode::Text {
+        text,
+        math_class_override,
+        ..
+      } = run_background_base_mut(&mut nodes[index])
+      && math_class_override.is_none()
+      && matches!(text.as_str(), "." | ",")
+    {
+      *math_class_override = Some(MathClass::Normal);
+    }
+  }
 }
 
 fn normalize_row_automatic_math_clause_separators(nodes: &mut [MathNode]) {
@@ -2597,6 +2637,29 @@ impl MathBox {
     placement: MathSemanticTextPlacement,
     x_pt: f32,
   ) {
+    let mut glyphs = self.items.iter().filter_map(|item| match item {
+      MathPaintItem::SemanticText { glyph_id, .. } => *glyph_id,
+      _ => None,
+    });
+    if let Some(first) = glyphs.next()
+      && glyphs.next() == Some(first)
+      && glyphs.all(|glyph| glyph == first)
+    {
+      // A homogeneous MATH assembly (for example Cambria's overline) repeats
+      // one glyph, including its terminal part. Configured Office PDFs use
+      // that same CID/ToUnicode mapping for every occurrence. Preserve each
+      // part's advance/origin and source scalar instead of collapsing the
+      // assembly to the normal accent's unrelated cmap outline.
+      for item in &mut self.items {
+        if let MathPaintItem::SemanticText {
+          text: part_text, ..
+        } = item
+        {
+          text.clone_into(part_text);
+        }
+      }
+      return;
+    }
     if !self
       .items
       .iter()
@@ -2605,10 +2668,8 @@ impl MathBox {
       return;
     }
 
-    // ECMA-376 Part 1 §22.1.2.1 defines m:acc as the base followed by one
-    // combining diacritical mark. A prepared MATH variant or assembly owns
-    // the visible outline geometry, but it must not replace that source
-    // scalar with its wider part origins in the searchable PDF layer. Keep a
+    // For other accents, the prepared MATH outline and searchable source mark
+    // have distinct geometry in the configured Office PDF. Keep a
     // single clipped Unicode object at the base cmap glyph's attachment
     // position and retain the normal glyph's text matrix. OpenType MATH then
     // independently aligns the visible variant by TopAccentAttachment.
@@ -7778,6 +7839,99 @@ mod tests {
     assert_eq!(extended_shape.bottom_accent_attachment_pt(), 4.0);
     assert_eq!(ordinary_glyph.top_accent_attachment_pt(), 6.0);
     assert_eq!(ordinary_glyph.bottom_accent_attachment_pt(), 4.0);
+  }
+
+  #[test]
+  fn repeated_accent_parts_retain_their_source_mapping_and_assembly_positions() {
+    let style = TextStyle::default();
+    let mut accent = MathBox::empty();
+    for index in 0..5 {
+      accent.items.push(MathPaintItem::SemanticText {
+        text: if index == 0 { "\u{0305}" } else { " " }.into(),
+        style: style.clone(),
+        x_pt: index as f32 * 3.4,
+        baseline_y_pt: -2.0,
+        horizontal_scale: 1.0,
+        glyph_id: Some(3364),
+      });
+    }
+    accent.replace_variant_semantics_with_combining_accent(
+      "\u{0305}",
+      MathSemanticTextPlacement {
+        style,
+        x_pt: 0.0,
+        baseline_y_pt: 0.0,
+        horizontal_scale: 1.0,
+      },
+      9.0,
+    );
+    assert_eq!(accent.items.len(), 5);
+    for (index, item) in accent.items.iter().enumerate() {
+      let MathPaintItem::SemanticText {
+        text,
+        x_pt,
+        baseline_y_pt,
+        glyph_id,
+        ..
+      } = item
+      else {
+        panic!("assembly text part")
+      };
+      assert_eq!(text, "\u{0305}");
+      assert_eq!(*x_pt, index as f32 * 3.4);
+      assert_eq!(*baseline_y_pt, -2.0);
+      assert_eq!(*glyph_id, Some(3364));
+    }
+  }
+
+  #[test]
+  fn numeric_math_separators_use_ordinary_spacing_across_run_boundaries() {
+    for (source, punctuation) in [
+      ("2.35", false),
+      ("2,35", false),
+      ("2.3.5", false),
+      ("2,3,5", false),
+      ("a.35", true),
+      ("2.a", true),
+      (".35", true),
+      (",35", true),
+      ("2. 35", true),
+      ("2, 35", true),
+      ("٢.٣٥", true),
+    ] {
+      for split in [false, true] {
+        let strings = if split {
+          source.chars().map(|c| c.to_string()).collect()
+        } else {
+          vec![source.to_string()]
+        };
+        let node = MathNode::row(
+          strings
+            .into_iter()
+            .map(|text| split_math_text(text, TextStyle::default(), true)),
+        );
+        let nodes = match &node {
+          MathNode::Row(nodes) => nodes.as_slice(),
+          _ => std::slice::from_ref(&node),
+        };
+        let separators = nodes.iter().filter(|node| {
+          matches!(node, MathNode::Text { text, .. } if matches!(text.as_str(), "." | ","))
+        }).collect::<Vec<_>>();
+        assert!(!separators.is_empty());
+        for separator in separators {
+          assert_eq!(
+            super::math_node_classes(separator).unwrap().class,
+            if punctuation {
+              MathClass::Punctuation
+            } else {
+              MathClass::Normal
+            },
+            "{source:?}, split={split}"
+          );
+        }
+        assert_eq!(node.semantic_text(), source);
+      }
+    }
   }
 
   #[test]

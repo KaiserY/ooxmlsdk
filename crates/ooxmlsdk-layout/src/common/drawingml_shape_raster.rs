@@ -1201,6 +1201,10 @@ fn realize_word_shadow_minimum_strokes(items: &mut [DisplayItem<'static>], pixel
     if let Some(stroke) = stroke
       && stroke.width.0.is_finite()
       && stroke.width.0 >= 0.0
+      && stroke
+        .drawingml_device
+        .as_ref()
+        .is_none_or(|source| source.realized_width_emu.is_none())
     {
       stroke.width.0 = stroke.width.0.max(minimum_width);
     }
@@ -1428,6 +1432,51 @@ fn apply_wpf_grayscale_alpha_correction(image: &mut RgbaImage) {
     let luminance = (u16::from(pixel[0]) + u16::from(pixel[1]) * 2 + u16::from(pixel[2])) >> 2;
     pixel[3] = (table_f1 + ((table_f2 * luminance) >> 8)).min(255) as u8;
   }
+}
+
+/// Resolves the exact source area of each destination pixel. Word's grouped
+/// story surface uses this box integral for both Screen and Print output.
+/// Integer overlap weights preserve fractional boundary samples without a
+/// floating point phase or an intermediate full-size premultiplied allocation.
+pub(crate) fn resize_premultiplied_rgba_area(
+  source: &RgbaImage,
+  width: u32,
+  height: u32,
+) -> RgbaImage {
+  if source.width() == 0 || source.height() == 0 || width == 0 || height == 0 {
+    return RgbaImage::new(width, height);
+  }
+  let sw = u64::from(source.width());
+  let sh = u64::from(source.height());
+  let dw = u64::from(width);
+  let dh = u64::from(height);
+  let area = sw * sh;
+  RgbaImage::from_fn(width, height, |x, y| {
+    let left = u64::from(x) * sw;
+    let right = left + sw;
+    let top = u64::from(y) * sh;
+    let bottom = top + sh;
+    let mut alpha_sum = 0_u64;
+    let mut color_sum = [0_u64; 3];
+    for sy in top / dh..bottom.div_ceil(dh) {
+      let wy = bottom.min((sy + 1) * dh) - top.max(sy * dh);
+      for sx in left / dw..right.div_ceil(dw) {
+        let wx = right.min((sx + 1) * dw) - left.max(sx * dw);
+        let pixel = source.get_pixel(sx as u32, sy as u32);
+        let weight = wx * wy * u64::from(pixel[3]);
+        alpha_sum += weight;
+        for channel in 0..3 {
+          color_sum[channel] += weight * u64::from(pixel[channel]);
+        }
+      }
+    }
+    if alpha_sum == 0 {
+      return image::Rgba([0; 4]);
+    }
+    let alpha = ((alpha_sum + area / 2) / area) as u8;
+    let color = color_sum.map(|sum| ((sum + alpha_sum / 2) / alpha_sum) as u8);
+    image::Rgba([color[0], color[1], color[2], alpha])
+  })
 }
 
 pub(crate) fn resize_premultiplied_rgba(
@@ -3028,6 +3077,10 @@ fn effect_pixels_per_point_with_budget(
   (max_pixels / (width_pt * height_pt))
     .sqrt()
     .clamp(0.25, max_pixels_per_point.max(0.25))
+    // A blur can explicitly request a tier below the preview density floor.
+    // The allocation safeguard may reduce that density, but must not raise
+    // it: doing so changes source coverage and the completed effect kernel.
+    .min(max_pixels_per_point)
 }
 
 /// Selects the bounded effect density and encloses a logical output rectangle
@@ -6050,6 +6103,24 @@ mod tests {
     assert_eq!(result.pixel(0, 0).unwrap().alpha(), 0);
   }
 
+  #[test]
+  fn story_area_resolve_weights_fractional_edges_and_premultiplied_colors() {
+    let source =
+      image::RgbaImage::from_raw(3, 1, vec![255, 0, 0, 255, 0, 0, 255, 255, 0, 255, 0, 0]).unwrap();
+    let resolved = super::resize_premultiplied_rgba_area(&source, 2, 1);
+    assert_eq!(resolved.get_pixel(0, 0).0, [170, 0, 85, 255]);
+    assert_eq!(resolved.get_pixel(1, 0).0, [0, 0, 255, 85]);
+    let vertical = image::imageops::rotate90(&source);
+    assert_eq!(
+      super::resize_premultiplied_rgba_area(&vertical, 1, 2),
+      image::imageops::rotate90(&resolved),
+    );
+    let identity = super::resize_premultiplied_rgba_area(&source, 3, 1);
+    assert_eq!(identity.get_pixel(0, 0), source.get_pixel(0, 0));
+    assert_eq!(identity.get_pixel(1, 0), source.get_pixel(1, 0));
+    assert_eq!(identity.get_pixel(2, 0).0, [0; 4]);
+  }
+
   use super::{
     MAX_EFFECT_RASTER_PIXELS, PageToRasterMapping, RasterPrimitiveAntialiasing, RasterSourceExtent,
     SourceLayer, WordShapeEffectSourceProfile, bounded_effect_raster_grid,
@@ -6457,8 +6528,13 @@ mod tests {
       }
     }
     // The caller's actual blur/output tier still owns the upper density.
-    let (_, blurred) = super::fixed_output_effect_raster_grid(rect(0.0, 0.0, 500.0, 500.0), 0.5);
-    assert_eq!(blurred, 0.5);
+    for requested in [0.5, 0.25, (96.0 / 72.0) / 7.0, (96.0 / 72.0) / 9.0] {
+      let (_, blurred) =
+        super::fixed_output_effect_raster_grid(rect(0.0, 0.0, 500.0, 500.0), requested);
+      assert_eq!(blurred, requested);
+      let source = super::fixed_output_effect_pixels_per_point(500.0, 500.0, requested);
+      assert_eq!(source, requested);
+    }
     // Allocation protection is independent of that tier; it is not removed.
     let (large, capped) =
       super::fixed_output_effect_raster_grid(rect(0.0, 0.0, 4000.0, 4000.0), density);
@@ -6952,6 +7028,26 @@ mod tests {
       unreachable!()
     };
     assert!(actual.stroke.is_none());
+    let width = 1.492_683;
+    let mut realized = [DisplayItem::Rect(RectItem {
+      bounds: rect(2.0, 2.0, 8.0, 6.0),
+      fill: Fill::None,
+      stroke: Some(Stroke {
+        width: Pt(width),
+        drawingml_device: Some(Box::new(super::super::DrawingMlDeviceStroke {
+          width_emu: 12_700,
+          emu_to_points: [1.0 / 12_700.0, 0.0, 0.0, 1.0 / 12_700.0],
+          snap: true,
+          realized_width_emu: Some(f64::from(width) * 12_700.0),
+        })),
+        ..Stroke::default()
+      }),
+    })];
+    super::realize_word_shadow_minimum_strokes(&mut realized, 48.0 / 72.0);
+    let DisplayItem::Rect(actual) = &realized[0] else {
+      unreachable!()
+    };
+    assert_eq!(actual.stroke.as_ref().unwrap().width.0, width);
   }
 
   #[test]

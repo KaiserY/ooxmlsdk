@@ -18,11 +18,11 @@ use fontique::{
 use harfrust::{
   Direction as HarfDirection, Feature as HarfFeature, FontRef as HarfFontRef,
   Language as HarfLanguage, Script as HarfScript, ShapeOptions as HarfShapeOptions, ShapePlan,
-  ShaperData, Tag as HarfTag, UnicodeBuffer, script,
+  ShaperData, ShaperInstance, Tag as HarfTag, UnicodeBuffer, script,
 };
 use icu_properties::{
   CodePointMapData, CodePointSetData,
-  props::{CanonicalCombiningClass, EmojiPresentation},
+  props::{CanonicalCombiningClass, EastAsianWidth, EmojiPresentation},
 };
 use icu_segmenter::GraphemeClusterSegmenter;
 use skrifa::{
@@ -118,9 +118,20 @@ impl<'a> From<Cow<'a, [u8]>> for FontBytes {
   }
 }
 
+/// A named `fvar` instance of a physical font face. The location includes `avar`
+/// normalization and is shared by resolution, shaping, measurement and paint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NamedFontInstance {
+  pub index: u16,
+  pub location: skrifa::instance::Location,
+}
+
 struct RuntimeFace {
   faces: Yoke<RuntimeFaces<'static>, Box<FontBytes>>,
   shaper_data: ShaperData,
+  named_instance: Option<Arc<NamedFontInstance>>,
+  shaper_instance: Option<ShaperInstance>,
+  proportional_cjk_kerning: [bool; 2],
   glyph_bounds: RwLock<HashMap<u16, Option<GlyphBounds>>>,
   shape_plans: RwLock<HashMap<ShapePlanKey, Arc<ShapePlan>>>,
 }
@@ -167,7 +178,11 @@ struct RuntimeFaces<'a> {
 }
 
 impl RuntimeFace {
-  fn new(data: FontBytes, face_index: u32) -> Result<Self> {
+  fn new(
+    data: FontBytes,
+    face_index: u32,
+    named_instance: Option<Arc<NamedFontInstance>>,
+  ) -> Result<Self> {
     let faces =
       Yoke::<RuntimeFaces<'static>, Box<FontBytes>>::try_attach_to_cart(Box::new(data), |data| {
         let harf = HarfFontRef::from_index(data.as_slice(), face_index)
@@ -177,9 +192,36 @@ impl RuntimeFace {
         Ok(RuntimeFaces { harf, skrifa })
       })?;
     let shaper_data = ShaperData::new(&faces.get().harf);
+    let shaper_instance = named_instance.as_ref().map(|instance| {
+      ShaperInstance::from_coords(
+        &faces.get().harf,
+        instance.location.coords().iter().copied(),
+      )
+    });
+    let proportional_cjk_kerning = faces
+      .get()
+      .skrifa
+      .gpos()
+      .and_then(|table| table.feature_list())
+      .map(|list| {
+        let has = |tag| {
+          list
+            .feature_records()
+            .iter()
+            .any(|record| record.feature_tag() == tag)
+        };
+        [
+          has(skrifa::Tag::new(b"palt")) && !has(skrifa::Tag::new(b"apkn")),
+          has(skrifa::Tag::new(b"vpal")) && !has(skrifa::Tag::new(b"vapk")),
+        ]
+      })
+      .unwrap_or_default();
     Ok(Self {
       faces,
       shaper_data,
+      named_instance,
+      shaper_instance,
+      proportional_cjk_kerning,
       glyph_bounds: RwLock::new(HashMap::new()),
       shape_plans: RwLock::new(HashMap::new()),
     })
@@ -193,8 +235,21 @@ impl RuntimeFace {
     &self.faces.get().skrifa
   }
 
+  fn location(&self) -> SkrifaLocationRef<'_> {
+    self
+      .named_instance
+      .as_ref()
+      .map_or_else(SkrifaLocationRef::default, |instance| {
+        (&instance.location).into()
+      })
+  }
+
   fn shape(&self, buffer: UnicodeBuffer, features: &[HarfFeature]) -> harfrust::GlyphBuffer {
-    let shaper = self.shaper_data.shaper(self.harf()).build();
+    let shaper = self
+      .shaper_data
+      .shaper(self.harf())
+      .instance(self.shaper_instance.as_ref())
+      .build();
     let key = ShapePlanKey::new(&buffer, features);
     let cached = self
       .shape_plans
@@ -237,7 +292,7 @@ impl RuntimeFace {
 
     let face = self.skrifa();
     let bounds = face
-      .glyph_metrics(SkrifaSize::new(1.0), SkrifaLocationRef::default())
+      .glyph_metrics(SkrifaSize::new(1.0), self.location())
       .bounds(SkrifaGlyphId::new(u32::from(glyph_id)))
       .map(glyph_bounds_from_skrifa);
     self
@@ -306,6 +361,7 @@ impl<'a> FontRegistry<'a> {
       pitch: face.pitch,
       charset: None,
       face_index: face.face_index,
+      named_instance: face.named_instance.clone(),
       origin_priority: 0,
       runtime_face: OnceLock::new(),
     });
@@ -450,10 +506,14 @@ impl<'a> FontRegistry<'a> {
         .as_deref()
         .or_else(|| face.family_names.first().map(Cow::as_ref))
         .unwrap_or("unknown");
-      let font_id = format!(
+      let mut font_id = format!(
         "system-query:{}:{}",
         postscript_name, platform_font.face_index
       );
+      if let Some(instance) = &face.named_instance {
+        use std::fmt::Write;
+        let _ = write!(font_id, ":instance:{}", instance.index);
+      }
       if self
         .sources
         .iter()
@@ -683,6 +743,7 @@ impl<'a> FontRegistry<'a> {
       font_id: font_id.clone(),
       source: registered.source.clone(),
       face_index: registered.face_index,
+      named_instance: registered.named_instance.clone(),
       family_names: registered.family_names.clone(),
       style_name: registered.style_name.clone(),
       data: registered.source.data_handle(),
@@ -744,7 +805,13 @@ impl<'a> FontRegistry<'a> {
       } => {
         let runtime_face = self
           .runtime_face_for_font(&resolved.font_id)
-          .or_else(|| runtime_face_for_data(data.clone(), resolved.face_index))
+          .or_else(|| {
+            runtime_face_for_data(
+              data.clone(),
+              resolved.face_index,
+              resolved.named_instance.clone(),
+            )
+          })
           .ok_or(FontError::InvalidFace)?;
         resolved.shape_with_runtime_face(text, &runtime_face, options)
       }
@@ -1298,7 +1365,13 @@ impl<'a> FontRegistry<'a> {
       } => {
         let runtime_face = self
           .runtime_face_for_font(&font.resolved.font_id)
-          .or_else(|| runtime_face_for_data(data.clone(), font.resolved.face_index))
+          .or_else(|| {
+            runtime_face_for_data(
+              data.clone(),
+              font.resolved.face_index,
+              font.resolved.named_instance.clone(),
+            )
+          })
           .ok_or(FontError::InvalidFace)?;
         font
           .resolved
@@ -1353,6 +1426,7 @@ impl<'a> FontRegistry<'a> {
         .map(|face| face.source.clone())
         .unwrap_or(FontSource::System),
       face_index: face.face_index,
+      named_instance: face.named_instance.clone(),
       synthetic_bold: false,
       synthetic_italic: false,
       metrics: face.metrics.clone(),
@@ -1519,6 +1593,7 @@ impl<'a> FontBook<'a> {
         .map(|face| face.source.clone())
         .unwrap_or(FontSource::System),
       face_index: face.face_index,
+      named_instance: face.named_instance.clone(),
       synthetic_bold,
       synthetic_italic,
       metrics: face.metrics.clone(),
@@ -1568,6 +1643,7 @@ pub struct FontFaceInfo<'a> {
   pub embedding_plan: FontEmbeddingPlan<'a>,
   pub bounds: FontBounds,
   pub face_index: u32,
+  pub named_instance: Option<Arc<NamedFontInstance>>,
 }
 
 impl<'a> FontFaceInfo<'a> {
@@ -1591,6 +1667,7 @@ impl<'a> FontFaceInfo<'a> {
       embedding_plan: FontEmbeddingPlan::default(),
       bounds: FontBounds::default(),
       face_index: 0,
+      named_instance: None,
     }
   }
 
@@ -1654,7 +1731,7 @@ impl<'a> FontFaceInfo<'a> {
       variable: !axes.is_empty(),
       kashida_positions: face.morx().is_err(),
     };
-    let metrics = font_metrics_from_skrifa(&face, 1.0);
+    let metrics = font_metrics_from_skrifa(&face, 1.0, SkrifaLocationRef::default());
     let attributes = face.attributes();
     let (weight, stretch) = os2
       .as_ref()
@@ -1684,6 +1761,7 @@ impl<'a> FontFaceInfo<'a> {
       embedding_plan: font_embedding_plan_from_skrifa(&face),
       bounds: font_bounds_from_skrifa(&face),
       face_index,
+      named_instance: None,
     })
   }
 }
@@ -1860,6 +1938,7 @@ pub struct RegisteredFontFace<'a> {
   pub pitch: FontPitch,
   pub charset: Option<FontCharset>,
   pub face_index: u32,
+  pub named_instance: Option<Arc<NamedFontInstance>>,
   pub origin_priority: u16,
   runtime_face: OnceLock<Option<Arc<RuntimeFace>>>,
 }
@@ -1876,7 +1955,9 @@ impl RegisteredFontFace<'_> {
         self
           .source
           .data_handle()
-          .and_then(|data| RuntimeFace::new(data, self.face_index).ok())
+          .and_then(|data| {
+            RuntimeFace::new(data, self.face_index, self.named_instance.clone()).ok()
+          })
           .map(Arc::new)
       })
       .clone()
@@ -1895,6 +1976,7 @@ impl<'a> Clone for RegisteredFontFace<'a> {
       pitch: self.pitch,
       charset: self.charset,
       face_index: self.face_index,
+      named_instance: self.named_instance.clone(),
       origin_priority: self.origin_priority,
       runtime_face: OnceLock::new(),
     }
@@ -1914,6 +1996,7 @@ impl<'a> fmt::Debug for RegisteredFontFace<'a> {
       .field("pitch", &self.pitch)
       .field("charset", &self.charset)
       .field("face_index", &self.face_index)
+      .field("named_instance", &self.named_instance)
       .field("origin_priority", &self.origin_priority)
       .finish()
   }
@@ -1930,6 +2013,7 @@ impl<'a> PartialEq for RegisteredFontFace<'a> {
       && self.pitch == other.pitch
       && self.charset == other.charset
       && self.face_index == other.face_index
+      && self.named_instance == other.named_instance
       && self.origin_priority == other.origin_priority
   }
 }
@@ -2014,6 +2098,7 @@ pub struct ResolvedFont<'book> {
   pub resolved_family: Cow<'book, str>,
   pub source: FontSource<'book>,
   pub face_index: u32,
+  pub named_instance: Option<Arc<NamedFontInstance>>,
   pub synthetic_bold: bool,
   pub synthetic_italic: bool,
   pub metrics: FontMetrics,
@@ -2045,6 +2130,7 @@ pub struct FontFaceData<'a> {
   pub font_id: FontId,
   pub source: FontSource<'a>,
   pub face_index: u32,
+  pub named_instance: Option<Arc<NamedFontInstance>>,
   pub family_names: Vec<Cow<'a, str>>,
   pub style_name: Option<Cow<'a, str>>,
   pub data: Option<FontBytes>,
@@ -2164,6 +2250,9 @@ pub struct ShapeOptions<'a> {
   /// Source-qualified OOXML noBreakHyphen controls paint U+002D while
   /// retaining their U+2011 text, source clusters and line-break semantics.
   pub wordprocessingml_no_break_hyphen: bool,
+  /// Keep Wide/Fullwidth characters on their fixed cells when a font's
+  /// legacy kern/vkrn lookups require palt/vpal proportional metrics.
+  pub wordprocessingml_fixed_cjk_metrics: bool,
   pub scan_registered_fallbacks: bool,
   pub features: Vec<FeatureValue<'a>>,
   pub variations: Vec<VariationValue<'a>>,
@@ -2188,6 +2277,7 @@ impl Default for ShapeOptions<'_> {
       preserve_default_ignorables: false,
       wordprocessingml_blank_separators: false,
       wordprocessingml_no_break_hyphen: false,
+      wordprocessingml_fixed_cjk_metrics: false,
       scan_registered_fallbacks: true,
       features: Vec::new(),
       variations: Vec::new(),
@@ -2214,6 +2304,7 @@ impl<'a> ShapeOptions<'a> {
       preserve_default_ignorables: false,
       wordprocessingml_blank_separators: false,
       wordprocessingml_no_break_hyphen: false,
+      wordprocessingml_fixed_cjk_metrics: false,
       scan_registered_fallbacks: true,
       features: request.features.clone(),
       variations: request.variations.clone(),
@@ -2268,7 +2359,8 @@ impl<'book> ResolvedFont<'book> {
     options: &ShapeOptions<'_>,
   ) -> Result<ShapedRun<'text, 'book>> {
     let runtime_face =
-      runtime_face_for_data(data.into(), self.face_index).ok_or(FontError::InvalidFace)?;
+      runtime_face_for_data(data.into(), self.face_index, self.named_instance.clone())
+        .ok_or(FontError::InvalidFace)?;
     self.shape_with_runtime_face(text, &runtime_face, options)
   }
 
@@ -2340,7 +2432,24 @@ impl<'book> ResolvedFont<'book> {
     {
       buffer.set_language(language);
     }
-    let features = harf_features(&options.features);
+    let mut features = harf_features(&options.features);
+    if options.wordprocessingml_fixed_cjk_metrics {
+      let vertical = matches!(
+        options.direction,
+        TextDirection::TopToBottom | TextDirection::BottomToTop
+      );
+      let proportional_tag = if vertical { "vpal" } else { "palt" };
+      if runtime_face.proportional_cjk_kerning[usize::from(vertical)]
+        && !options
+          .features
+          .iter()
+          .rev()
+          .find(|feature| feature.tag == proportional_tag)
+          .is_some_and(|feature| feature.value != 0)
+      {
+        suppress_fixed_cjk_kerning(&shaped_text, vertical, &mut features);
+      }
+    }
     let output = font_timing("harfrust shape", || runtime_face.shape(buffer, &features));
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
@@ -2404,7 +2513,7 @@ impl<'book> ResolvedFont<'book> {
         let x_advance_pt = if let Some((dash, divisor)) = fractional_space {
           let advance = runtime_face
             .skrifa()
-            .glyph_metrics(SkrifaSize::unscaled(), SkrifaLocationRef::default())
+            .glyph_metrics(SkrifaSize::unscaled(), runtime_face.location())
             .advance_width(SkrifaGlyphId::new(dash))
             .unwrap_or_default();
           // Word measures the dash in integral ideal units before dividing;
@@ -2494,7 +2603,15 @@ impl<'book> ResolvedFont<'book> {
       SkrifaFontRef::from_index(data, self.face_index).map_err(|_| FontError::InvalidFace)?;
     Ok(
       face
-        .glyph_metrics(SkrifaSize::new(size.0), SkrifaLocationRef::default())
+        .glyph_metrics(
+          SkrifaSize::new(size.0),
+          self
+            .named_instance
+            .as_ref()
+            .map_or_else(SkrifaLocationRef::default, |instance| {
+              (&instance.location).into()
+            }),
+        )
         .bounds(SkrifaGlyphId::new(glyph_id))
         .map(glyph_bounds_from_skrifa),
     )
@@ -3467,10 +3584,6 @@ const DEFAULT_OFFICE_ALIASES: &[(&str, &str)] = &[
   ("Helvetica Neue", "Arial"),
   ("Helvetica Neue Light", "Arial"),
   ("Helvetica Neue Medium", "Arial"),
-  // Nyala is an optional Windows Ethiopic supplemental font. Office fixed
-  // output without that feature uses Calibri for its Latin portions and the
-  // system African-script face from the requested-family fallback below.
-  ("Nyala", "Calibri"),
   // Apache POI bug65228.pptx carries a macOS Graphik theme, while Office's
   // fixed PDF substitutes Calibri for the unavailable family.
   ("Graphik", "Calibri"),
@@ -3518,9 +3631,10 @@ fn default_family_specific_chains<'a>() -> Vec<FontFallbackChain<'a>> {
     // BMP glyphs when the Ext-B member is unavailable; true Extension-B
     // characters that it cannot cover continue through script fallback.
     office_family_fallback("SimSun-ExtB", &["SimSun"]),
-    // Ebrima is Windows' default African-language face and supplies real
-    // regular/bold Ethiopic fonts when optional Nyala is unavailable.
-    office_family_fallback("Nyala", &["Ebrima"]),
+    // Nyala covers Latin and Ethiopic itself. Only substitute when it is
+    // unavailable: Calibri supplies Latin and Ebrima supplies Ethiopic.
+    // An installed Nyala face or a document alternate must take precedence.
+    office_family_fallback("Nyala", &["Calibri", "Ebrima"]),
     // AR PL SungtiL GB is the legacy Simplified Chinese Song face written by
     // older LibreOffice documents. Current LibreOffice's zh-CN CJK_TEXT list
     // starts with Source Han/Noto Serif CJK SC before SimSun-style fallbacks;
@@ -3572,6 +3686,17 @@ fn default_family_substitution_chains<'a>() -> Vec<FontFallbackChain<'a>> {
 
 fn default_glyph_fallback_chains<'a>() -> Vec<FontFallbackChain<'a>> {
   let mut chains = default_family_specific_chains();
+  chains.push(FontFallbackChain {
+    unicode_ranges: Vec::new(),
+    requested_family: Some(Cow::Borrowed("Lohit Devanagari")),
+    script: Some(TextScript::Latin),
+    language: None,
+    // Word links this Indic face's missing Latin letters to Cambria, including
+    // extended Latin and requested bold/italic styles. Native English/Hindi
+    // controls keep covered digits and punctuation on Lohit; this is a glyph
+    // link, not a replacement for the authored face or its Devanagari glyphs.
+    families: vec![Cow::Borrowed("Cambria")],
+  });
   chains.push(FontFallbackChain {
     unicode_ranges: Vec::new(),
     requested_family: Some(Cow::Borrowed("Noto Sans Arabic UI")),
@@ -4129,6 +4254,84 @@ struct PlatformFontCandidate {
   face: Arc<FontFaceInfo<'static>>,
 }
 
+fn named_instance_face(
+  base: &FontFaceInfo<'static>,
+  data: &[u8],
+  requested: &str,
+) -> Option<FontFaceInfo<'static>> {
+  if !base.flags.variable {
+    return None;
+  }
+  let font = SkrifaFontRef::from_index(data, base.face_index).ok()?;
+  let normalized = normalize_family(requested);
+  for (index, instance) in font.named_instances().iter().enumerate() {
+    let postscript = instance
+      .postscript_name_id()
+      .and_then(|id| skrifa_name_by_id(&font, id));
+    let style =
+      font
+        .localized_strings(instance.subfamily_name_id())
+        .find_map(|style| {
+          let style = style.to_string();
+          (base.family_names.iter().any(|family| {
+            normalized_family_eq_normalized(&format!("{family} {style}"), &normalized)
+          }) || postscript
+            .as_deref()
+            .is_some_and(|name| normalized_family_eq_normalized(name, &normalized)))
+          .then_some(style)
+        });
+    let Some(style) = style else {
+      continue;
+    };
+    let mut face = base.clone();
+    face
+      .family_names
+      .insert(0, Cow::Owned(requested.to_owned()));
+    face.style_name = Some(Cow::Owned(style));
+    if let Some(postscript) = postscript {
+      face.postscript_name = Some(Cow::Owned(postscript));
+    }
+    for (axis, value) in font.axes().iter().zip(instance.user_coords()) {
+      match &axis.tag().to_be_bytes() {
+        b"wght" => {
+          face.weight = font_weight_from_opentype(value.round() as u16);
+          face.flags.bold = value >= 700.0;
+        }
+        b"wdth" => {
+          // Registered OpenType width-axis values correspond to OS/2 classes.
+          let widths = [
+            50.0_f32, 62.5, 75.0, 87.5, 100.0, 112.5, 125.0, 150.0, 200.0,
+          ];
+          let class = widths
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| (**a - value).abs().total_cmp(&(**b - value).abs()))?
+            .0
+            + 1;
+          face.stretch = font_stretch_from_opentype(class as u16);
+        }
+        b"ital" => {
+          face.slant = if value != 0.0 {
+            FontSlant::Italic
+          } else {
+            FontSlant::Upright
+          }
+        }
+        b"slnt" if value != 0.0 => face.slant = FontSlant::Oblique,
+        _ => {}
+      }
+    }
+    let location = instance.location();
+    face.metrics = font_metrics_from_skrifa(&font, 1.0, (&location).into());
+    face.named_instance = Some(Arc::new(NamedFontInstance {
+      index: u16::try_from(index).ok()?,
+      location,
+    }));
+    return Some(face);
+  }
+  None
+}
+
 fn platform_font_system() -> &'static Mutex<PlatformFontSystem> {
   static SYSTEM: OnceLock<Mutex<PlatformFontSystem>> = OnceLock::new();
   SYSTEM.get_or_init(|| Mutex::new(PlatformFontSystem::new()))
@@ -4298,13 +4501,24 @@ fn platform_system_query_fonts(
                 .as_deref()
                 .is_some_and(|candidate| normalized_family_eq_normalized(candidate, &normalized))
             {
-              continue;
+              // Fontconfig can expose only the base face. A GDI family name
+              // may instead select an fvar named instance (family + subfamily).
+              // Resolve it once inside the existing platform-query cache.
+              let Some(instance) = named_instance_face(&face, &data, name) else {
+                continue;
+              };
+              family_candidates.push(PlatformFontCandidate {
+                data,
+                face_index: font.index(),
+                face: Arc::new(instance),
+              });
+            } else {
+              family_candidates.push(PlatformFontCandidate {
+                data,
+                face_index: font.index(),
+                face,
+              });
             }
-            family_candidates.push(PlatformFontCandidate {
-              data,
-              face_index: font.index(),
-              face,
-            });
           }
 
           // DirectWrite and CoreText expose legacy subfamilies such as
@@ -4527,8 +4741,14 @@ fn platform_font_width(request: &FontRequest<'_>) -> PlatformFontWidth {
   }
 }
 
-fn runtime_face_for_data(data: FontBytes, face_index: u32) -> Option<Arc<RuntimeFace>> {
-  RuntimeFace::new(data, face_index).ok().map(Arc::new)
+fn runtime_face_for_data(
+  data: FontBytes,
+  face_index: u32,
+  named_instance: Option<Arc<NamedFontInstance>>,
+) -> Option<Arc<RuntimeFace>> {
+  RuntimeFace::new(data, face_index, named_instance)
+    .ok()
+    .map(Arc::new)
 }
 
 fn font_supports_char(
@@ -4798,8 +5018,12 @@ fn stretch_distance(left: FontStretch, right: FontStretch) -> i32 {
   (font_stretch_number(left) - font_stretch_number(right)).abs()
 }
 
-fn font_metrics_from_skrifa(face: &SkrifaFontRef<'_>, em_size: f32) -> FontMetrics {
-  let metrics = face.metrics(SkrifaSize::new(em_size), SkrifaLocationRef::default());
+fn font_metrics_from_skrifa(
+  face: &SkrifaFontRef<'_>,
+  em_size: f32,
+  location: SkrifaLocationRef<'_>,
+) -> FontMetrics {
+  let metrics = face.metrics(SkrifaSize::new(em_size), location);
   let units_per_em = f32::from(metrics.units_per_em.max(1));
   let to_em = |value: i32| value as f32 / units_per_em * em_size;
   let ascender = metrics.ascent.max(0.0);
@@ -5561,6 +5785,34 @@ fn harf_features(features: &[FeatureValue<'_>]) -> Vec<HarfFeature> {
     .collect()
 }
 
+fn suppress_fixed_cjk_kerning(text: &str, vertical: bool, features: &mut Vec<HarfFeature>) {
+  // OpenType kern/vkrn explicitly exclude fixed CJK cells when the font
+  // stores their proportional kerning in the older palt/vpal model. Use
+  // the specification's East_Asian_Width alternative to coverage scanning.
+  // Coalesce ranges; a wholly CJK run keeps one global feature and shares
+  // the same cached shaping plan regardless of its text or length.
+  let widths = CodePointMapData::<EastAsianWidth>::new();
+  let tag = HarfTag::new(if vertical { b"vkrn" } else { b"kern" });
+  let mut start = None;
+  for (offset, character) in text.char_indices() {
+    if matches!(
+      widths.get(character),
+      EastAsianWidth::Wide | EastAsianWidth::Fullwidth
+    ) {
+      start.get_or_insert(offset);
+    } else if let Some(start) = start.take() {
+      features.push(HarfFeature::new(tag, 0, start..offset));
+    }
+  }
+  if let Some(start) = start {
+    features.push(if start == 0 {
+      HarfFeature::new(tag, 0, ..)
+    } else {
+      HarfFeature::new(tag, 0, start..text.len())
+    });
+  }
+}
+
 fn push_unicode_range(ranges: &mut Vec<Range<u32>>, codepoint: u32) {
   if let Some(range) = ranges.iter_mut().find(|range| {
     range.start <= codepoint.saturating_add(1) && codepoint <= range.end.saturating_add(1)
@@ -5731,6 +5983,59 @@ mod tests {
   use super::*;
 
   #[test]
+  fn platform_named_instances_keep_distinct_shaping_and_cache_identity() {
+    if !platform_has_font("Bahnschrift", "Bahnschrift") {
+      return;
+    }
+    let mut registry = FontRegistry::with_default_policy();
+    let mut faces = Vec::new();
+    let mut advances = Vec::new();
+    for (family, index) in [
+      ("Bahnschrift", None),
+      ("Bahnschrift Light", Some(0)),
+      ("Bahnschrift SemiBold", Some(3)),
+      ("Bahnschrift Condensed", Some(12)),
+    ] {
+      let request = FontRequest {
+        family: Some(Cow::Borrowed(family)),
+        size_pt: FontSize(11.0),
+        ..Default::default()
+      };
+      registry.register_system_query_fonts(&request).unwrap();
+      let resolved = registry.resolve(&request).unwrap();
+      assert_eq!(resolved.resolved_family, family);
+      assert_eq!(
+        resolved
+          .named_instance
+          .as_ref()
+          .map(|instance| instance.index),
+        index
+      );
+      assert!(!resolved.synthetic_bold && !resolved.synthetic_italic);
+      let run = registry
+        .shape_text(&request, "Numbering", TextDirection::LeftToRight)
+        .unwrap();
+      assert!(!run.approximate);
+      assert!(run.glyphs.iter().all(|glyph| glyph.glyph_id != 0));
+      advances.push(run.advance_pt);
+      faces.push(resolved.font_id);
+      assert_eq!(registry.register_system_query_fonts(&request).unwrap(), 0);
+    }
+    for (index, face) in faces.iter().enumerate() {
+      assert!(faces[..index].iter().all(|prior| prior != face));
+    }
+    assert!(advances[3] < advances[0] * 0.85);
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Bahnschrift")),
+      ..Default::default()
+    };
+    assert_eq!(registry.resolve(&request).unwrap().font_id, faces[0]);
+    let base = registry.face(&faces[0]).unwrap();
+    let (bytes, _) = registry.font_face_binary(&faces[0]).unwrap();
+    assert!(named_instance_face(base, &bytes, "Bahnschrift NotAnInstance").is_none());
+  }
+
+  #[test]
   fn first_family_substitution_does_not_try_later_list_members() {
     let mut registry = FontRegistry::new();
     for name in ["Installed", "Recovered"] {
@@ -5879,6 +6184,78 @@ mod tests {
     assert_eq!(
       registry.resolve(&request).unwrap().resolved_family,
       "Albany"
+    );
+  }
+
+  #[test]
+  fn nyala_substitution_preserves_available_faces_and_document_alternates() {
+    for bold in [false, true] {
+      let mut registry = FontRegistry::with_default_policy();
+      for family in ["Calibri", "Ebrima", "Cambria"] {
+        registry.register_face(FontSource::System, FontFaceInfo::synthetic(family, family));
+      }
+      let request = FontRequest {
+        family: Some(Cow::Borrowed("Nyala")),
+        bold,
+        ..FontRequest::default()
+      };
+      assert_eq!(
+        registry.resolve(&request).unwrap().resolved_family,
+        "Calibri"
+      );
+      registry.book.family_substitution_chains.insert(
+        0,
+        FontFallbackChain {
+          requested_family: Some(Cow::Borrowed("Nyala")),
+          families: vec![Cow::Borrowed("Cambria")],
+          ..FontFallbackChain::default()
+        },
+      );
+      assert_eq!(
+        registry.resolve(&request).unwrap().resolved_family,
+        "Cambria"
+      );
+      registry.register_face(
+        FontSource::System,
+        FontFaceInfo::synthetic("Nyala", "Nyala"),
+      );
+      let resolved = registry.resolve(&request).unwrap();
+      assert_eq!(resolved.resolved_family, "Nyala");
+      assert_eq!(resolved.synthetic_bold, bold);
+      assert!(resolved.substitution.is_none());
+    }
+  }
+
+  #[test]
+  fn nyala_missing_face_links_ethiopic_but_available_face_keeps_both_scripts() {
+    let mut registry = FontRegistry::with_default_policy();
+    for (family, range) in [("Calibri", 0x20..0x7f), ("Ebrima", 0x1200..0x1380)] {
+      let mut face = FontFaceInfo::synthetic(family, family);
+      face.coverage.unicode_ranges = std::iter::once(range).collect();
+      registry.register_face(FontSource::System, face);
+    }
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("Nyala")),
+      ..FontRequest::default()
+    };
+    let missing = registry
+      .shape_text_runs(&request, "A\u{12a5}", TextDirection::LeftToRight)
+      .unwrap();
+    assert_eq!(missing.len(), 2);
+    assert_eq!(missing[0].font_id, FontId(Arc::from("Calibri")));
+    assert_eq!(missing[1].font_id, FontId(Arc::from("Ebrima")));
+
+    let mut nyala = FontFaceInfo::synthetic("Nyala", "Nyala");
+    nyala.coverage.unicode_ranges = vec![0x20..0x7f, 0x1200..0x1380];
+    registry.register_face(FontSource::System, nyala);
+    let installed = registry
+      .shape_text_runs(&request, "A\u{12a5}", TextDirection::LeftToRight)
+      .unwrap();
+    assert!(!installed.is_empty());
+    assert!(
+      installed
+        .iter()
+        .all(|run| run.font_id == FontId(Arc::from("Nyala")))
     );
   }
 
@@ -6541,6 +6918,7 @@ mod tests {
       resolved_family: Cow::Borrowed("Example"),
       source: FontSource::System,
       face_index: 0,
+      named_instance: None,
       synthetic_bold: false,
       synthetic_italic: false,
       metrics: FontMetrics::default(),
@@ -7369,6 +7747,76 @@ mod tests {
       .expect("pan-CJK fallback");
     assert!(symbol < generic);
     assert!(generic < cjk);
+  }
+
+  #[test]
+  fn lohit_latin_fallback_preserves_authored_coverage_and_emphasis() {
+    for (bold, italic) in [(false, false), (true, false), (false, true), (true, true)] {
+      let mut registry = FontRegistry::with_default_policy();
+      let mut primary = FontFaceInfo::synthetic("lohit", "Lohit Devanagari");
+      primary.coverage.unicode_ranges = vec![0x20..0x41, 0x900..0x980];
+      registry.register_face(FontSource::System, primary);
+      for (face_bold, face_italic) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut face =
+          FontFaceInfo::synthetic(format!("cambria-{face_bold}-{face_italic}"), "Cambria");
+        face.coverage.unicode_ranges = vec![0x20..0x250, 0x900..0x980];
+        if face_bold {
+          face.weight = FontWeight::Bold;
+        }
+        if face_italic {
+          face.slant = FontSlant::Italic;
+        }
+        registry.register_face(FontSource::System, face);
+      }
+      let mut symbol = FontFaceInfo::synthetic("symbol", "Segoe UI Symbol");
+      symbol.coverage.unicode_ranges = std::iter::once(0x20..0x250).collect();
+      registry.register_face(FontSource::System, symbol);
+      let request = FontRequest {
+        family: Some(Cow::Borrowed("Lohit Devanagari")),
+        script: Some(TextScript::Latin),
+        bold,
+        italic,
+        ..FontRequest::default()
+      };
+      let chain = registry.resolve_font_chain(&request).unwrap();
+      for cached in [false, true] {
+        let text = ".Aéअ";
+        let runs = if cached {
+          registry.shape_text_runs_with_font_chain(
+            &chain,
+            text,
+            &ShapeOptions::from_request(&request, TextDirection::LeftToRight),
+          )
+        } else {
+          registry.shape_text_runs(&request, text, TextDirection::LeftToRight)
+        }
+        .unwrap();
+        assert_eq!(
+          runs.len(),
+          3,
+          "bold={bold}, italic={italic}, cached={cached}"
+        );
+        assert_eq!(runs[0].font_id, FontId(Arc::from("lohit")));
+        assert_eq!(
+          runs[1].font_id,
+          FontId(Arc::from(format!("cambria-{bold}-{italic}")))
+        );
+        assert_eq!(runs[2].font_id, FontId(Arc::from("lohit")));
+        assert_eq!(
+          runs[1].diagnostics.fallback_runs[0].reason,
+          FontSubstitutionReason::MissingGlyph
+        );
+      }
+      // Metrics-only requests must not eagerly load a script-specific link.
+      assert!(
+        !registry
+          .fallback_families(&FontRequest {
+            script: None,
+            ..request
+          })
+          .contains(&"Cambria")
+      );
+    }
   }
 
   #[test]

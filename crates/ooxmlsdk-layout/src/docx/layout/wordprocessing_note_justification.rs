@@ -285,6 +285,7 @@ mod tests {
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: text.into(),
           style,

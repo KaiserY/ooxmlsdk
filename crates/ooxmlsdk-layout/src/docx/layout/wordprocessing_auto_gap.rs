@@ -101,6 +101,7 @@ pub(super) fn materialize(
 }
 
 pub(super) struct Fit<'a> {
+  pub modern_justified: bool,
   pub items: &'a mut [PageItem],
   pub start: usize,
   pub y: f32,
@@ -189,6 +190,7 @@ pub(super) fn contract(fit: Fit<'_>, metrics: &mut TextMetrics) {
   let (natural, limit) = line_cjk_compression_fit(
     CjkLineFit {
       overflow_punctuation: fit.overflow_punctuation,
+      modern_justified: fit.modern_justified,
       x: *fit.x + *fit.leading - needed as f32 / 4096.0,
       line_right: fit.right,
       items: fit.items,

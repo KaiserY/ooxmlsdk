@@ -7,6 +7,7 @@ const MAX_PACKAGE_DEPTH: usize = 32;
 pub(super) struct ImportedContent {
   pub(super) sections: Vec<ImportedSection>,
   pub(super) trailing_blocks: Vec<Block>,
+  pub(super) trailing_note_reference_order: note_reference_order::Order,
 }
 
 pub(super) fn import(
@@ -38,7 +39,8 @@ pub(super) fn import(
   })
   .ok()?;
   let mut body = document.body.as_deref()?.clone();
-  let source = StylesCatalog::load(&package, &main, host.import_settings, &host.locales).ok()?;
+  let source =
+    StylesCatalog::load(&package, &main, host.import_settings, &host.locales, None).ok()?;
   let keep_source = chunk
     .alt_chunk_properties
     .as_deref()
@@ -96,10 +98,13 @@ pub(super) fn import(
       fixed_html_paragraph_auto_spacing: host.import_settings.fixed_html_paragraph_auto_spacing,
     },
   );
-  let trailing_blocks = sections.pop()?.blocks;
+  let trailing = sections.pop()?;
+  let trailing_blocks = trailing.blocks;
+  let trailing_note_reference_order = trailing.note_reference_order;
   Some(ImportedContent {
     sections,
     trailing_blocks,
+    trailing_note_reference_order,
   })
 }
 

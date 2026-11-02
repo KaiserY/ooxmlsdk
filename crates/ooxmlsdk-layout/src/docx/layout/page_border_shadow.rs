@@ -1,4 +1,4 @@
-//! Simple page-border shadows (ECMA-376 17.6.2/7/15/21).
+//! Simple page-border frames and shadows (ECMA-376 17.6.2/7/15/21).
 //! Native independent-side, width, color, missing-side and text-offset controls
 //! distinguish the border's reserved frame from its colored and shadow bands.
 use super::{
@@ -71,7 +71,10 @@ pub(super) fn paint(
   borders: CellBordersModel,
 ) -> bool {
   let sources = [borders.top, borders.right, borders.bottom, borders.left];
-  if !sources.iter().flatten().any(|border| border.shadow) {
+  // The zero-shadow case uses these same filled bands and closed corners.
+  // Independent centered strokes leave a missing quarter-square at each
+  // join. Native plain/shadow controls share the device-grid frame rules.
+  if sources.iter().all(Option::is_none) {
     return false;
   }
   let mut sides = [Side::default(); 4];
@@ -366,9 +369,20 @@ mod tests {
   }
 
   #[test]
+  fn plain_page_frame_closes_all_four_corners_without_shadow() {
+    let mut page = frame();
+    assert!(paint(&mut page, (0.0, 0.0, 612.0, 792.0), borders(0)));
+    for (x, y) in [(24.5, 24.5), (587.5, 24.5), (24.5, 767.5), (587.5, 767.5)] {
+      assert_eq!(pixel(&page, x, y), Some(YELLOW));
+    }
+    assert_eq!(pixel(&page, 30.5, 30.5), None);
+    assert_eq!(pixel(&page, 588.5, 40.0), None);
+  }
+
+  #[test]
   fn page_shadow_does_not_take_other_border_painters() {
     for sides in [
-      borders(0),
+      CellBordersModel::default(),
       {
         let mut b = borders(15);
         b.top.as_mut().unwrap().compound = true;

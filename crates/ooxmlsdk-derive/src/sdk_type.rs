@@ -466,27 +466,43 @@ fn qname_dispatch_match_arms_inner(
       let Some(first_arm) = arms.first() else {
         return quote! {};
       };
-      if let Some(mismatch_tokens) = mismatch_tokens {
-        let mut seen_qnames = std::collections::HashSet::new();
-        let qname_arms = arms.iter().filter_map(|arm| {
-          let qname = qname_match_key(&arm.qname);
-          if !seen_qnames.insert(qname.clone()) {
-            return None;
-          }
-          let qname_lit = LitByteStr::new(qname.as_bytes(), Span::call_site());
-          let tokens = &arm.tokens;
-          Some(quote! {
-            #qname_lit => {
-              #tokens
-            }
+      let namespace_arms: Option<Vec<_>> = mismatch_tokens.and_then(|_| {
+        arms
+          .iter()
+          .map(|arm| {
+            let prefix = parse_qname_info(&arm.qname).tag_prefix;
+            known_namespace_variant_tokens(&prefix).map(|namespace| (namespace, &arm.tokens))
           })
-        });
+          .collect()
+      });
+      if let (Some(mismatch_tokens), Some(namespace_arms)) = (mismatch_tokens, namespace_arms) {
+        let mut seen = std::collections::HashSet::new();
+        let namespace_arms = namespace_arms
+          .into_iter()
+          .filter_map(|(namespace, tokens)| {
+            seen.insert(namespace.to_string()).then(|| {
+              quote! {
+                Some(#namespace) => { #tokens }
+              }
+            })
+          });
+        // Preserve local-name compatibility when no binding is available,
+        // while resolving declared aliases/default namespaces by their URI.
+        let fallback = qname_dispatch_match_arms_inner(
+          &std::collections::BTreeMap::from([(local_name.clone(), arms.clone())]),
+          default_tag_prefix,
+          None,
+        );
         return quote! {
           #local_name_lit => {
-            match e.name().into_inner() {
-              #( #qname_arms )*
-              _ => {
-                #mismatch_tokens
+            match read_context.known_element_namespace(&e, decoder)? {
+              Some(namespace) => match namespace {
+                #( #namespace_arms )*
+                _ => { #mismatch_tokens }
+              },
+              None => match event_name {
+                #( #fallback )*
+                _ => unreachable!(),
               }
             }
           }
@@ -5702,9 +5718,14 @@ fn expand_named_struct(
   );
   let child_match_tokens_borrowed =
     qname_dispatch_match_arms(&child_match_tokens_borrowed, &default_dispatch_prefix);
-  let child_choice_match_tokens_borrowed = qname_dispatch_match_arms(
+  // Open extension choices must keep a foreign namespace in their Any
+  // payload even when its local name matches a known child. Otherwise a
+  // foreign svgBlip, for example, activates an unsupported SVG resource
+  // instead of preserving the outer picture's bitmap preview.
+  let child_choice_match_tokens_borrowed = qname_dispatch_match_arms_inner(
     &child_choice_match_tokens_borrowed,
     &default_dispatch_prefix,
+    choice_any_fallback_tokens_borrowed.as_ref(),
   );
 
   let has_child_dispatch = !child_fields.is_empty()

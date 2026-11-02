@@ -3,6 +3,7 @@ pub mod docx;
 pub mod error;
 mod field_datetime;
 pub mod fonts;
+pub mod hyphenation;
 #[doc(hidden)]
 pub mod localization;
 mod model;

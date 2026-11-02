@@ -1,4 +1,4 @@
-//! Word's BitmapMissingFonts realization for document-private CFF faces.
+//! Word's bitmap realization for private CFF and variable font faces.
 //!
 //! The private CFF versus TrueType and bitmap-option controls distinguish this
 //! branch from ordinary font substitution. Font rasters are glyph surfaces,
@@ -11,7 +11,7 @@ use ooxmlsdk_layout::fonts::{FontFaceCacheKey, FontFaceData};
 use resvg::tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Transform};
 use skrifa::{
   FontRef, GlyphId, MetadataProvider,
-  instance::{LocationRef, Size},
+  instance::Size,
   outline::{DrawSettings, HintingInstance, Target},
   raw::TableProvider,
 };
@@ -75,18 +75,23 @@ impl FontBitmaps {
     page_width_pt: f32,
     page_height_pt: f32,
     metrics: &mut TextMetrics,
+    bitmap_missing_fonts: bool,
   ) {
     for item in items {
       match item {
         PaintItem::Text(text) => {
-          if let Some((images, baseline)) =
-            self.images(text, quality, page_width_pt, page_height_pt)
-          {
+          if let Some((images, baseline, semantic_x)) = self.images(
+            text,
+            quality,
+            page_width_pt,
+            page_height_pt,
+            bitmap_missing_fonts,
+          ) {
             let mut semantic = text.item.clone();
-            semantic.x_pt = text
-              .portions
-              .first()
-              .map_or(semantic.x_pt, |portion| portion.x_pt);
+            semantic.x_pt = semantic_x;
+            if semantic.text.starts_with(' ') {
+              semantic.text = Cow::Owned(semantic.text.trim_start_matches(' ').to_owned());
+            }
             semantic.y_pt = baseline;
             semantic.origin_is_baseline = true;
             semantic.style.baseline_shift_pt = 0.0;
@@ -130,9 +135,14 @@ impl FontBitmaps {
             };
           }
         }
-        PaintItem::Group { items, .. } => {
-          self.realize(items, quality, page_width_pt, page_height_pt, metrics)
-        }
+        PaintItem::Group { items, .. } => self.realize(
+          items,
+          quality,
+          page_width_pt,
+          page_height_pt,
+          metrics,
+          bitmap_missing_fonts,
+        ),
         _ => {}
       }
     }
@@ -144,12 +154,12 @@ impl FontBitmaps {
     quality: PdfOptimizeFor,
     page_width_pt: f32,
     page_height_pt: f32,
-  ) -> Option<(Vec<ImageItem<'doc>>, f32)> {
+    bitmap_missing_fonts: bool,
+  ) -> Option<(Vec<ImageItem<'doc>>, f32, f32)> {
     let style = &text.item.style;
     // Decorated/warped text needs its own composition contract. Leave those
     // runs on the vector path until their independent effects can be retained.
-    if style.embedded_fonts.is_none()
-      || style.semantic_only
+    if style.semantic_only
       || style.opacity != 1.0
       || style.rotation_deg != 0.0
       || style.pdf_glyph_outlines
@@ -175,17 +185,37 @@ impl FontBitmaps {
     let device = common::wordprocessing_device::page_coordinates(page_width_pt, page_height_pt)?;
     let mut images = Vec::new();
     let mut semantic_baseline = None;
+    let mut semantic_x = None;
     for portion in &text.portions {
       let runs = portion.glyphs.as_ref()?;
       for run in runs {
         let font = FontRef::from_index(run.font_face.data.as_slice(), run.font_face.index).ok()?;
-        if !run.font_face.document_embedded
+        let variable = !font.axes().is_empty();
+        let private_cff =
+          bitmap_missing_fonts && run.font_face.document_embedded && font.cff().is_ok();
+        if !(variable || private_cff)
           || run.font_face.synthetic_bold
           || run.font_face.synthetic_italic
-          || font.cff().is_err()
         {
           return None;
         }
+        // Word drops a leading blank into its own unpainted portion before
+        // rasterizing text; trailing and internal blanks remain in the cell.
+        let skip = run
+          .glyphs
+          .iter()
+          .take_while(|glyph| text.item.text.get(glyph.text_range.clone()) == Some(" "))
+          .count();
+        let glyphs = &run.glyphs[skip..];
+        if glyphs.is_empty() {
+          continue;
+        }
+        let leading = run.glyphs[..skip]
+          .iter()
+          .map(|glyph| glyph.x_advance * run.font_size_pt)
+          .sum::<f32>();
+        let origin_x = portion.x_pt + run.x_offset_pt + leading;
+        semantic_x.get_or_insert(origin_x);
         let upem = f32::from(font.head().ok()?.units_per_em());
         let os2 = font.os2().ok()?;
         let ascent = f32::from(os2.us_win_ascent()) / upem;
@@ -194,10 +224,21 @@ impl FontBitmaps {
         // character cells own the bitmap extent, independently of the ideal
         // advances used to position the separately rasterized glyphs.
         let printer_em = (run.font_size_pt * 600.0 / 72.0).round();
-        let natural = font.glyph_metrics(Size::new(printer_em), LocationRef::default());
-        let advance_px = run.glyphs.iter().try_fold(0_i64, |total, glyph| {
-          Some(total + natural.advance_width(GlyphId::new(glyph.glyph_id))?.round() as i64)
-        })?;
+        let natural = font.glyph_metrics(Size::new(printer_em), run.font_face.location());
+        let advance_px = if variable {
+          // Completed Word device advances, already balanced across the body
+          // line. Natural metrics alone lose GPOS and neighbouring rounding.
+          (glyphs
+            .iter()
+            .map(|glyph| glyph.x_advance * run.font_size_pt)
+            .sum::<f32>()
+            / 0.12)
+            .round() as i64
+        } else {
+          glyphs.iter().try_fold(0_i64, |total, glyph| {
+            Some(total + natural.advance_width(GlyphId::new(glyph.glyph_id))?.round() as i64)
+          })?
+        };
         let ascent_px = (ascent * printer_em).round() as i64;
         let height_px = (cell_height * printer_em).round() as i64;
         let source_y = common::wordprocessing_device::source_coordinate(text.item.y_pt);
@@ -210,12 +251,18 @@ impl FontBitmaps {
         semantic_baseline.get_or_insert(baseline_px as f32 * 0.12);
         let baseline_pt = device.map_device_point(0, baseline_px).1;
         let ascent_pt = device.map_device_point(0, ascent_px).1;
-        let width_pt = device.map_device_point(advance_px, 0).0 * 1.2;
-        let height_pt = device.map_device_point(0, height_px).1;
+        // MSO's bitmap allocator reserves one average glyph beyond the text.
+        // Keep replay FLOAT division/multiplication before pixel truncation:
+        // a 392-dot span can become 440.99997 pixels, whose width is 440.
+        let (_, _, advance_pt, cell_height_pt) =
+          device.map_device_bitmap_rectangle((0, 0, advance_px, height_px));
+        let width_pt = advance_pt + advance_pt / glyphs.len() as f32;
+        let height_pt = cell_height_pt;
         if !width_pt.is_finite() || !height_pt.is_finite() || width_pt <= 0.0 || height_pt <= 0.0 {
           return None;
         }
-        let width = (width_pt * dpi / 72.0).floor() as u32;
+        let cell_width = advance_pt * dpi / 72.0;
+        let width = (cell_width + cell_width / glyphs.len() as f32).floor() as u32;
         let height = (height_pt * dpi / 72.0).floor() as u32;
         let ppem = (printer_em * dpi / 600.0).round() as u32;
         // Bound generated surfaces like the existing SVG raster path. An
@@ -231,7 +278,7 @@ impl FontBitmaps {
         let mut alpha = vec![0; width as usize * height as usize];
         let baseline = (ascent * ppem as f32).round();
         let mut cursor = 0.0;
-        for glyph in &run.glyphs {
+        for glyph in glyphs {
           if let Some(bitmap) = self.glyph(&run.font_face, ppem, glyph.glyph_id)? {
             // GetGlyphOutline(GGO_BITMAP) realizes one glyph independently.
             // Native CFF controls reproduce both complete golden masks with
@@ -254,7 +301,7 @@ impl FontBitmaps {
         );
         images.push(ImageItem {
           font_bitmap: Some(raster),
-          x_pt: image_number(device.map_point(portion.x_pt + run.x_offset_pt, 0.0).0),
+          x_pt: image_number(device.map_point(origin_x, 0.0).0),
           y_pt: page_height_pt
             - image_number(page_height_pt - baseline_pt + ascent_pt - height_pt)
             - image_number(height_pt),
@@ -281,7 +328,7 @@ impl FontBitmaps {
         });
       }
     }
-    Some((images, semantic_baseline?))
+    Some((images, semantic_baseline?, semantic_x?))
   }
 
   fn glyph(&mut self, face: &FontFaceData, ppem: u32, glyph: u32) -> Option<Option<&RasterGlyph>> {
@@ -293,7 +340,7 @@ impl FontBitmaps {
         hinting: HintingInstance::new(
           &outlines,
           Size::new(ppem as f32),
-          LocationRef::default(),
+          face.location(),
           Target::Mono,
         )
         .ok()?,

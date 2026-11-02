@@ -13,16 +13,22 @@ mod line_baseline;
 pub use line_baseline::realize as line_baseline;
 
 mod line_advances;
-pub use line_advances::{MAX_IDEAL_ADVANCE, balance_advances};
+pub use line_advances::{MAX_IDEAL_ADVANCE, balance_advances, balance_complex_advances};
 
 /// Select a verified standard reference DC without replacing the page viewport.
 /// Word retains that DC when the authored size rounds to the same whole-mm
-/// dimensions. Native controls cover all six stocks in both orientations.
+/// dimensions. Native controls cover all seven stocks in both orientations.
 /// This conservative recognition does not infer other custom-paper profiles.
 pub fn page_coordinates(width_pt: f32, height_pt: f32) -> Option<PageCoordinates> {
   let size = [width_pt, height_pt];
   let millimeters = size.map(|pt| (f64::from(pt) * 25.4 / 72.0).round() as i32);
-  for (dots, mm) in super::fixed_output_device::STANDARD_REFERENCES {
+  // Actual Word PDF EMF headers also select the A6 reference DC. Keep this
+  // additional stock in Word: the shared Excel reference selector has its
+  // own independently verified domain.
+  let references = super::fixed_output_device::STANDARD_REFERENCES
+    .into_iter()
+    .chain([([2480, 3496], [105, 148])]);
+  for (dots, mm) in references {
     for (dots, mm) in [(dots, mm), ([dots[1], dots[0]], [mm[1], mm[0]])] {
       if millimeters == mm {
         let viewport = size
@@ -45,6 +51,27 @@ pub fn source_coordinate_precise(pt: f64) -> i64 {
   let reference = (pt * 4096.0).round() as i64;
   let product = i128::from(reference) * 600;
   ((product + product.signum() * (294912 / 2)) / 294912) as i64
+}
+
+/// Realize the containing frame before its paragraph-local line offset.
+/// Positioned tab portions and the PDF painter share this source origin.
+pub fn line_origin(
+  source: f32,
+  frame_offset: f64,
+  alignment: Option<super::WordprocessingLineAlignment>,
+) -> f32 {
+  let frame = f64::from(source) + frame_offset;
+  let (local, alignment_offset) = alignment.map_or((-frame_offset, 0), |alignment| {
+    (
+      -frame_offset - alignment.logical_offset_pt,
+      alignment.device_offset_px,
+    )
+  });
+  ((source_coordinate_precise(frame)
+    + source_coordinate_precise(local)
+    + i64::from(alignment_offset)) as f64
+    * 72.0
+    / 600.0) as f32
 }
 
 /// Unserialized Word LOGFONT width ratio on the selected physical face.
@@ -92,6 +119,13 @@ pub fn font_width_ratio_from_average(average_pixels: u32, percent: u16) -> Optio
   }
   let width = (average_pixels.checked_mul(u32::from(percent))? / 100).max(1);
   Some(f64::from(width) / f64::from(average_pixels))
+}
+
+/// Word's fixed-output font matrix retains five significant decimal digits.
+/// Upright vertical glyphs use the inverse of the same logical-width ratio.
+pub fn serialize_font_width_ratio(ratio: f64) -> f32 {
+  let decimal_scale = 10.0_f64.powi(4 - ratio.log10().floor() as i32);
+  ((ratio * decimal_scale).round() / decimal_scale) as f32
 }
 
 /// Word's shaped advances retain signed GPOS adjustments. Native call/return
@@ -252,6 +286,23 @@ impl MeasurementFont {
 #[cfg(test)]
 mod tests {
   use super::{MeasurementFont, PageCoordinates, page_coordinates};
+
+  #[test]
+  fn a6_word_pages_retain_the_native_reference_dc_and_rounded_viewport() {
+    // Current Word PDF EMF: landscape viewport3497x2481, reference3496x2480
+    // dots at148x105mm, frame14800x10500. Portrait is independently captured
+    // by the standard-paper controls. These are output-device observations.
+    for (size, source, expected) in [
+      ([419.6, 297.7], [2006, 960], [240.792, 115.248]),
+      ([297.7, 419.6], [960, 2006], [115.248, 240.792]),
+    ] {
+      let device = page_coordinates(size[0], size[1]).unwrap();
+      let (x, y) = device.map_device_point(source[0], source[1]);
+      assert!((x - expected[0]).abs() < 0.0001);
+      assert!((y - expected[1]).abs() < 0.0001);
+    }
+    assert!(PageCoordinates::for_standard_size(297.6, 419.52).is_none());
+  }
 
   #[test]
   fn rounded_standard_pages_retain_native_reference_device_and_viewport() {

@@ -1,7 +1,10 @@
-//! Word page-border three-band frames: MS-DOC BrcType 0x18/0x19.
+//! Word page-border three-band frames: double and MS-DOC BrcType 0x18/0x19.
 //! Native width, direction, partial/asymmetric-frame and text-offset controls
 //! distinguish filled printer-grid bands from independent centered strokes.
-use super::{BorderStyle, FillItem, Page, PageItem, RgbColor, ShadingPaint, units};
+use super::{
+  BorderCompoundPattern, BorderDashPattern, BorderStyle, FillItem, Page, PageItem, RgbColor,
+  ShadingPaint, units,
+};
 use crate::docx::{CellBordersModel, border_3d};
 
 #[derive(Clone, Copy, Default)]
@@ -15,6 +18,35 @@ impl Bands {
     let Some(border) = border else {
       return Some(Self::default());
     };
+    if border.compound_pattern == BorderCompoundPattern::Double {
+      if !border.compound
+        || border.shadow
+        || border.relief.is_some()
+        || border.dash_pattern != BorderDashPattern::Solid
+        || !border.width_pt.is_finite()
+        || border.width_pt <= 0.0
+      {
+        return None;
+      }
+      // Word resolves each authored rail in whole twips before truncating
+      // to 600-DPI printer dots. Native sz3/13/25 distinguish the two stages.
+      // The middle band is opaque white, including over a page background.
+      let twips = (f64::from(border.width_pt) / 3.0 * 20.0).trunc();
+      let dots = (twips * 5.0 / 12.0).trunc().max(1.0);
+      let width = dots as f32 * units::POINTS_PER_INCH / super::WORD_FIXED_OUTPUT_DPI;
+      return Some(Self {
+        widths: [width; 3],
+        colors: [
+          border.color,
+          RgbColor {
+            r: 255,
+            g: 255,
+            b: 255,
+          },
+          border.color,
+        ],
+      });
+    }
     let widths = border_3d::device_band_widths(border)?
       .map(|dots| dots as f32 * units::POINTS_PER_INCH / super::WORD_FIXED_OUTPUT_DPI);
     let mut colors = border_3d::band_colors(border);
@@ -253,6 +285,165 @@ mod tests {
       }
       _ => None,
     })
+  }
+
+  #[test]
+  fn double_page_native_widths_joined_rails_and_opaque_gap() {
+    for (size, dots) in [
+      (1, 1),
+      (2, 2),
+      (3, 2),
+      (4, 4),
+      (5, 5),
+      (6, 6),
+      (7, 7),
+      (8, 8),
+      (9, 9),
+      (10, 10),
+      (11, 11),
+      (12, 12),
+      (13, 13),
+      (14, 14),
+      (15, 15),
+      (16, 16),
+      (23, 23),
+      (24, 25),
+      (25, 25),
+      (48, 50),
+    ] {
+      let mut page = frame();
+      let border = border(w::BorderValues::Double, size);
+      assert_eq!(border.compound_pattern, BorderCompoundPattern::Double);
+      let borders = CellBordersModel {
+        top: Some(border),
+        right: Some(border),
+        bottom: Some(border),
+        left: Some(border),
+      };
+      assert!(paint(&mut page, (0.0, 0.0, 612.0, 792.0), borders));
+      let width = dots as f32 * 0.12;
+      for (index, gray) in [0, 255, 0].into_iter().enumerate() {
+        let offset = (index as f32 + 0.5) * width;
+        let color = Some(RgbColor {
+          r: gray,
+          g: gray,
+          b: gray,
+        });
+        assert_eq!(pixel(&page, 306.0, 24.0 + offset), color);
+        assert_eq!(pixel(&page, 588.12 - offset, 396.0), color);
+        assert_eq!(pixel(&page, 24.0 + offset, 24.0 + offset), color);
+      }
+      assert_eq!(pixel(&page, 588.13, 396.0), None);
+      assert_eq!(pixel(&page, 306.0, 768.13), None);
+      assert!(
+        page
+          .items
+          .iter()
+          .all(|item| matches!(item, PageItem::Fill(_)))
+      );
+    }
+  }
+
+  #[test]
+  fn double_page_partial_colored_and_mixed_frames_keep_corner_owners() {
+    let red = RgbColor { r: 255, g: 0, b: 0 };
+    let blue = RgbColor { r: 0, g: 0, b: 255 };
+    let top = BorderStyle {
+      color: red,
+      ..border(w::BorderValues::Double, 4)
+    };
+    let left = BorderStyle { color: blue, ..top };
+    let mut borders = CellBordersModel {
+      top: Some(top),
+      left: Some(left),
+      right: Some(top),
+      bottom: Some(top),
+    };
+    let mut page = frame();
+    assert!(paint(&mut page, (0.0, 0.0, 612.0, 792.0), borders));
+    assert_eq!(pixel(&page, 24.2, 24.2), Some(red));
+    assert_eq!(pixel(&page, 24.2, 25.0), Some(blue));
+    assert_eq!(
+      pixel(&page, 24.7, 24.7),
+      Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255
+      })
+    );
+    borders.left = Some(border(w::BorderValues::ThreeDEmboss, 4));
+    page.items.clear();
+    assert!(paint(&mut page, (0.0, 0.0, 612.0, 792.0), borders));
+    assert_eq!(pixel(&page, 24.2, 24.2), Some(red));
+    assert_eq!(
+      pixel(&page, 24.2, 25.6),
+      Some(RgbColor {
+        r: 192,
+        g: 192,
+        b: 192
+      })
+    );
+    borders.top = None;
+    page.items.clear();
+    assert!(paint(&mut page, (0.0, 0.0, 612.0, 792.0), borders));
+    assert_eq!(
+      pixel(&page, 24.2, 0.1),
+      Some(RgbColor {
+        r: 192,
+        g: 192,
+        b: 192
+      })
+    );
+    assert_eq!(pixel(&page, 306.0, 24.2), None);
+  }
+
+  #[test]
+  fn double_page_text_reference_keeps_the_gap_outside_the_text() {
+    let mut page = frame();
+    page.setup.borders_offset_from_text = true;
+    let border = border(w::BorderValues::Double, 4);
+    let borders = CellBordersModel {
+      top: Some(border),
+      right: Some(border),
+      bottom: Some(border),
+      left: Some(border),
+    };
+    assert!(paint(&mut page, (72.0, 72.0, 540.0, 720.0), borders));
+    assert_eq!(pixel(&page, 306.0, 46.6), Some(RgbColor::default()));
+    assert_eq!(
+      pixel(&page, 306.0, 47.2),
+      Some(RgbColor {
+        r: 255,
+        g: 255,
+        b: 255
+      })
+    );
+    assert_eq!(pixel(&page, 306.0, 48.1), None);
+    assert_eq!(pixel(&page, 565.6, 396.0), None);
+  }
+
+  #[test]
+  fn double_page_does_not_acquire_unclassified_compounds_or_shadows() {
+    for border in [
+      border(w::BorderValues::Triple, 4),
+      border(w::BorderValues::Single, 4),
+      BorderStyle {
+        shadow: true,
+        ..border(w::BorderValues::Double, 4)
+      },
+    ] {
+      assert!(!matches!(border.compound_pattern, BorderCompoundPattern::Double) || border.shadow);
+      let mut page = frame();
+      assert!(!paint(
+        &mut page,
+        (0.0, 0.0, 612.0, 792.0),
+        CellBordersModel {
+          top: Some(border),
+          ..Default::default()
+        }
+      ));
+      assert!(page.items.is_empty());
+    }
   }
 
   #[test]

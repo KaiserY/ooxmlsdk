@@ -21,8 +21,7 @@ pub(super) fn font_horizontal_scale(
 }
 
 fn serialize_font_width_ratio(ratio: f64) -> f32 {
-  let decimal_scale = 10.0_f64.powi(4 - ratio.log10().floor() as i32);
-  ((ratio * decimal_scale).round() / decimal_scale) as f32
+  common::wordprocessing_device::serialize_font_width_ratio(ratio)
 }
 
 /// Native ordinary leader operations serialize Tc with three significant

@@ -41,6 +41,8 @@ const WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-shape-story+png";
 const WORD_SHAPE_STORY_PAINT_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-shape-story-paint+png";
+const WORD_SHAPE_SOFT_EDGE_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-soft-edge+png";
 const WORD_GROUP_GLOW_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-group-glow+png";
 const WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE: &str =
@@ -232,6 +234,7 @@ struct RasterExportOptions {
   use_lossless_compression: bool,
   jpeg_quality: Option<u8>,
   max_size_px: Option<RasterPixelLimits>,
+  stroked_border_size: Option<WordStrokedBorderSize>,
   downsample_trigger_px: Option<RasterPixelLimits>,
   word_print_jpeg_downsample_trigger_px: Option<RasterPixelLimits>,
   exact_downsample_trigger: bool,
@@ -331,9 +334,11 @@ enum RasterOwner {
   WordLockedCanvasDevice,
   WordShapeStory,
   WordShapeStoryPaint,
+  WordShapeSoftEdge,
   WordStatic3d,
   PowerPointStatic3d,
   WordTableBorder,
+  WordStrokedBorder,
   MetafilePreview,
 }
 
@@ -380,6 +385,10 @@ impl RasterOwner {
     {
       Self::WordShapeStoryPaint
     } else if content_type
+      .is_some_and(|value| value.eq_ignore_ascii_case(WORD_SHAPE_SOFT_EDGE_BITMAP_CONTENT_TYPE))
+    {
+      Self::WordShapeSoftEdge
+    } else if content_type
       .is_some_and(|value| value.eq_ignore_ascii_case(WORD_STATIC_3D_BITMAP_CONTENT_TYPE))
     {
       Self::WordStatic3d
@@ -395,6 +404,10 @@ impl RasterOwner {
       .is_some_and(|value| value.eq_ignore_ascii_case(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE))
     {
       Self::WordTableBorder
+    } else if content_type.is_some_and(|value| {
+      value.eq_ignore_ascii_case("application/vnd.ooxmlsdk.wordprocessing-stroked-border+png")
+    }) {
+      Self::WordStrokedBorder
     } else {
       Self::Source
     }
@@ -405,6 +418,29 @@ impl RasterOwner {
 struct RasterPixelLimits {
   width_bits: u64,
   height_bits: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct WordStrokedBorderSize {
+  width_bits: u32,
+  height_bits: u32,
+  dpi: u32,
+}
+
+impl WordStrokedBorderSize {
+  fn pixels(self, source: (u32, u32)) -> (u32, u32) {
+    let dimension = |dots: u32, points: u32| {
+      // Native Word bitmap sizing first derives effective source DPI from
+      // the FLOAT physical extent, then truncates the reduced pixel count.
+      // Preserve both divisions: an algebraic simplification loses ties.
+      let source_dpi = dots as f32 / (f32::from_bits(points) / 72.0);
+      ((self.dpi as f32 * dots as f32 / source_dpi) as u32).clamp(1, dots)
+    };
+    (
+      dimension(source.0, self.width_bits),
+      dimension(source.1, self.height_bits),
+    )
+  }
 }
 
 impl RasterPixelLimits {
@@ -586,6 +622,7 @@ impl RasterExportOptions {
         options.effective_jpeg_quality()
       },
       max_size_px,
+      stroked_border_size: None,
       downsample_trigger_px,
       word_print_jpeg_downsample_trigger_px: profile
         .is_word_print()
@@ -647,7 +684,10 @@ impl RasterExportOptions {
     display_width_pt: f32,
     display_height_pt: f32,
   ) -> Self {
-    if owner != RasterOwner::WordStatic3d {
+    if !matches!(
+      owner,
+      RasterOwner::WordStatic3d | RasterOwner::WordStrokedBorder
+    ) {
       return self;
     }
     let dpi = match self.profile {
@@ -663,11 +703,20 @@ impl RasterExportOptions {
         return self;
       }
     };
-    self.max_size_px = RasterPixelLimits::from_word_static_3d_fixed_output_display_size(
-      display_width_pt,
-      display_height_pt,
-      dpi,
-    );
+    self.max_size_px = if owner == RasterOwner::WordStrokedBorder {
+      self.stroked_border_size = Some(WordStrokedBorderSize {
+        width_bits: display_width_pt.to_bits(),
+        height_bits: display_height_pt.to_bits(),
+        dpi,
+      });
+      RasterPixelLimits::from_display_size(display_width_pt, display_height_pt, dpi)
+    } else {
+      RasterPixelLimits::from_word_static_3d_fixed_output_display_size(
+        display_width_pt,
+        display_height_pt,
+        dpi,
+      )
+    };
     self
   }
 
@@ -942,7 +991,7 @@ impl ImageSet {
     if let Some(scene) = self.svgs.get(&key) {
       return Ok(scene.clone());
     }
-    let scene = Arc::new(super::direct_svg::prepare_svg(data, svg_options())?);
+    let scene = Arc::new(super::direct_svg::prepare_svg(data, svg_options(false))?);
     self.svgs.insert(key, scene.clone());
     Ok(scene)
   }
@@ -1037,7 +1086,7 @@ impl ImageSet {
     }
     let scene = Arc::new(super::direct_svg::prepare_office_math_svg(
       data,
-      svg_options(),
+      svg_options(true),
     )?);
     self.office_math_svgs.insert(key, scene.clone());
     Ok(scene)
@@ -1173,13 +1222,54 @@ fn svg_raster_dimensions(
   Ok((width as u32, height as u32))
 }
 
-fn svg_options() -> &'static usvg::Options<'static> {
-  static OPTIONS: OnceLock<usvg::Options<'static>> = OnceLock::new();
-  OPTIONS.get_or_init(|| {
-    let mut options = usvg::Options::default();
-    options.fontdb_mut().load_system_fonts();
+fn svg_options(office_math: bool) -> &'static usvg::Options<'static> {
+  static IMAGE_OPTIONS: OnceLock<usvg::Options<'static>> = OnceLock::new();
+  static MATH_OPTIONS: OnceLock<usvg::Options<'static>> = OnceLock::new();
+  let cached = if office_math {
+    &MATH_OPTIONS
+  } else {
+    &IMAGE_OPTIONS
+  };
+  cached.get_or_init(|| {
+    let select_font = usvg::FontResolver::default_font_selector();
+    let select_fallback = usvg::FontResolver::default_fallback_selector();
+    let mut options = usvg::Options {
+      font_resolver: usvg::FontResolver {
+        select_font: Box::new(move |font, database| {
+          initialize_svg_system_fonts(database);
+          select_font(font, database)
+        }),
+        select_fallback: Box::new(move |character, used_fonts, database| {
+          initialize_svg_system_fonts(database);
+          select_fallback(character, used_fonts, database)
+        }),
+      },
+      ..usvg::Options::default()
+    };
+    if !office_math {
+      // Word's package-SVG controls use Arial 12 when the source omits a font.
+      // Generated OfficeMath has a separately owned source-font contract.
+      options.font_family = "Arial".to_owned();
+    }
     options
   })
+}
+
+fn initialize_svg_system_fonts(database: &mut Arc<usvg::fontdb::Database>) {
+  if !database.is_empty() {
+    return;
+  }
+  // Our options start each tree with an empty database. Install its initial
+  // shared face-ID namespace only on the first actual font request; never
+  // replace a nonempty database whose IDs may already be used by the tree.
+  // usvg forwards these callbacks to nested SVGs as well. Path-only artwork
+  // does not need a system font scan or a separate XML prepass.
+  static SYSTEM_FONTS: OnceLock<Arc<usvg::fontdb::Database>> = OnceLock::new();
+  *database = Arc::clone(SYSTEM_FONTS.get_or_init(|| {
+    let mut database = usvg::fontdb::Database::new();
+    database.load_system_fonts();
+    Arc::new(database)
+  }));
 }
 
 fn image_data_key(data: &[u8]) -> (usize, usize) {
@@ -1308,10 +1398,55 @@ fn decode_image(
     return export_wordprocessing_static_3d_image(raster, export_options, layers);
   }
 
+  if owner == RasterOwner::WordShapeSoftEdge {
+    // Native line/radius/geometry and Screen/Print controls classify the
+    // completed black-associated color plane, just like a generated 3-D
+    // surface. An ordinary PNG's palette shortcut instead discards the
+    // JPEG/Matte representation of curved soft edges. Keep the final grid
+    // and the separately observed no-interpolation policy.
+    return prepare_completed_wordprocessing_paint_image(
+      decode_dynamic_image(data, RasterImageFormat::Png)?,
+      RasterExportOptions {
+        allow_interpolation: false,
+        ..export_options
+      },
+    );
+  }
+
+  if owner == RasterOwner::WordStrokedBorder {
+    let raster = decode_dynamic_image(data, RasterImageFormat::Png)?;
+    let source = raster.image.to_rgba8();
+    let sampled = if let Some(size) = export_options.stroked_border_size {
+      let (width, height) = size.pixels(source.dimensions());
+      sample_word_stroked_border(&source, width, height)
+    } else if let Some(limit) = export_options.max_size_px {
+      let (width, height) = limit.pixels();
+      let width = (width as u32).clamp(1, source.width());
+      let height = (height as u32).clamp(1, source.height());
+      sample_word_stroked_border(&source, width, height)
+    } else {
+      source
+    };
+    return prepare_sampled_image(
+      PdfRasterImage::from_dynamic_preserving_hidden_rgb(
+        DynamicImage::ImageRgba8(sampled),
+        raster.icc_profile,
+      ),
+      false,
+      None,
+    );
+  }
+
   if matches!(
     owner,
     RasterOwner::WordShapeStoryPaint | RasterOwner::WordTableBorder
   ) {
+    let data = if owner == RasterOwner::WordTableBorder && export_options.profile.is_office_screen()
+    {
+      png_chunk_data(data, *b"oxDr").unwrap_or(data)
+    } else {
+      data
+    };
     let raster = decode_dynamic_image(data, RasterImageFormat::Png)?;
     return prepare_sampled_image(
       PdfRasterImage::from_dynamic_preserving_hidden_rgb(raster.image, raster.icc_profile),
@@ -1344,16 +1479,10 @@ fn decode_image(
       "image/png" => {
         let image = decode_png_relaxed(&raster.data)
           .map_err(|err| PdfError::Image(format!("failed to decode EMF/WMF PNG: {err}")))?;
-        // Office fixed output keeps generated metafile previews lossless and
-        // marks their image XObjects `/Interpolate false`. Do not apply the
-        // ordinary source-bitmap downsampling/JPEG policy to a completed GDI
-        // replay; the PDF image matrix consumes that device surface directly
-        // and preserves its reconstructed soft mask. The decoder returns
-        // straight-alpha PNG samples, whereas Office associates the generated
-        // color plane with black and records /Matte on the mask. Carry both
-        // parts of that contract, including for binary coverage: a PDF reader
-        // can resample the color and mask before compositing them.
-        prepare_metafile_preview(image, export_options.profile.is_office_fixed_output())
+        // This PNG transports a completed GDI surface, not an authored PNG.
+        // Preserve its device grid and soft mask; Word Screen chooses its
+        // color encoding without source PNG properties or another resize.
+        prepare_metafile_preview(image, export_options)
       }
       content_type => Err(PdfError::Image(format!(
         "unsupported EMF/WMF raster content type: {content_type}"
@@ -1392,24 +1521,31 @@ fn decode_image(
         if owner == RasterOwner::Source
           && format_export_options.profile.is_word_print()
           && should_try_jpeg(format, format_export_options, owner)
-          && raster.image.color() == image::ColorType::Rgb8
+          && matches!(
+            raster.image.color(),
+            image::ColorType::Rgb8 | image::ColorType::Rgba8
+          )
           && metadata.is_some_and(|value| value.orientation == Orientation::NoTransforms)
         {
           let target_size =
             format_export_options.downsample_source_size(raster.image.dimensions(), format, owner);
-          let trial_metadata_bytes = match (format, target_size) {
+          let trial_metadata_bytes = match (format, target_size, raster.image.color()) {
             // Word classifies the realized bitmap, including a reduced PNG,
             // with the same Print score and bounded compression estimate.
             // Bitmap(Image,width,height) creates a surface without source
             // properties, so its JPEG trial has no source Exif overhead.
             // Native sRGB/plain PNG pairs retain identical decisions/pixels.
-            (RasterImageFormat::Png, Some(_)) => Some(0),
-            (_, None) => word_print_codec::trial_metadata_size(data, format),
+            (RasterImageFormat::Png, Some(_), image::ColorType::Rgb8 | image::ColorType::Rgba8) => {
+              Some(0)
+            }
+            (_, None, image::ColorType::Rgb8) => {
+              word_print_codec::trial_metadata_size(data, format)
+            }
             _ => None,
           };
           if let Some(trial_metadata_bytes) = trial_metadata_bytes {
             if let Some(target_size) = target_size {
-              raster.image = resize_for_gdiplus_bitmap(raster.image, target_size);
+              raster.image = resize_for_word_print_bitmap(raster.image, target_size);
             }
             return export_word_print_rgb_image(
               raster,
@@ -1458,6 +1594,35 @@ fn decode_image(
   )
 }
 
+fn sample_word_stroked_border(
+  source: &image::RgbaImage,
+  width: u32,
+  height: u32,
+) -> image::RgbaImage {
+  // Word filters the 600-DPI cosmetic pen, then quantizes its coverage to
+  // one bit. Native Screen/Print phase controls distinguish this from nearest
+  // sampling: both neighbours survive an exact half sample. Integer weights
+  // preserve that inclusive 50% threshold without floating-point tie drift.
+  image::RgbaImage::from_fn(width, height, |x, y| {
+    let sx = u64::from(x) * u64::from(source.width());
+    let sy = u64::from(y) * u64::from(source.height());
+    let w = u64::from(width);
+    let h = u64::from(height);
+    let fx = sx % w;
+    let fy = sy % h;
+    let x0 = (sx / w) as u32;
+    let y0 = (sy / h) as u32;
+    let x1 = (x0 + 1).min(source.width() - 1);
+    let y1 = (y0 + 1).min(source.height() - 1);
+    let mut pixel = *source.get_pixel(x0, y0);
+    let alpha = |x, y| u64::from(source.get_pixel(x, y)[3]);
+    let coverage = (h - fy) * ((w - fx) * alpha(x0, y0) + fx * alpha(x1, y0))
+      + fy * ((w - fx) * alpha(x0, y1) + fx * alpha(x1, y1));
+    pixel[3] = if coverage * 2 >= 255 * w * h { 255 } else { 0 };
+    pixel
+  })
+}
+
 fn raster_interpolation(format: RasterImageFormat, export_options: RasterExportOptions) -> bool {
   // Word's fixed-format output marks photographic JPEG XObjects for smooth
   // interpolation while leaving lossless pixel graphics such as PNG
@@ -1468,9 +1633,10 @@ fn raster_interpolation(format: RasterImageFormat, export_options: RasterExportO
 
 fn prepare_metafile_preview(
   mut image: PdfRasterImage,
-  office_fixed_output: bool,
+  export_options: RasterExportOptions,
 ) -> Result<PreparedRasterImage> {
-  let associate_with_black = office_fixed_output && image.pixels.alpha.is_some();
+  let associate_with_black =
+    export_options.profile.is_office_fixed_output() && image.pixels.alpha.is_some();
   if associate_with_black {
     let mut pixels = Arc::unwrap_or_clone(image.pixels);
     if let Some(alpha) = &pixels.alpha {
@@ -1481,6 +1647,56 @@ fn prepare_metafile_preview(
       }
     }
     image.pixels = Arc::new(pixels);
+  }
+  if export_options.profile.is_word()
+    && export_options.profile.is_office_screen()
+    && !export_options.use_lossless_compression
+    && let Some(quality) = export_options.jpeg_quality
+  {
+    let pixels = &image.pixels;
+    let raw_bytes = u64::from(pixels.width) * u64::from(pixels.height) * 3;
+    // The native wrapper rejects surfaces smaller than the JPEG header before
+    // entering the Screen trial. Larger surfaces can avoid the full lossless
+    // trial with the same bounded BGR estimate already used by Word Print.
+    if raw_bytes >= 650 {
+      let rgba = image::RgbaImage::from_fn(pixels.width, pixels.height, |x, y| {
+        let index = (y as usize * pixels.width as usize + x as usize) * 3;
+        Rgba([
+          pixels.rgb[index],
+          pixels.rgb[index + 1],
+          pixels.rgb[index + 2],
+          255,
+        ])
+      });
+      let estimated_photographic = raw_bytes > 128 * 1024
+        && word_print_codec::estimated_lossless_size(&rgba)
+          .is_some_and(|estimate| estimate as f32 > raw_bytes as f32 * 0.2);
+      let jpeg = encode_office_h2v2_jpeg(&rgba, quality)?;
+      // Unlike an authored PNG, this generated bitmap has no 60-byte Exif
+      // overhead. Compare the actual JPEG trial with bounded BGR scanlines,
+      // not with the RGB stream subsequently written to the PDF.
+      let keep_jpeg = estimated_photographic
+        || jpeg.len() < office_png_trial_deflate_size(&rgba).unwrap_or(usize::MAX);
+      if keep_jpeg {
+        let pixels = Arc::unwrap_or_clone(image.pixels);
+        let direct = DirectRasterImage {
+          width: pixels.width,
+          height: pixels.height,
+          color_space: DirectRasterColorSpace::Rgb,
+          bits_per_component: 8,
+          encoding: DirectRasterEncoding::Dct {
+            data: jpeg.into(),
+            icc_profile: pixels.icc_profile.map(Into::into),
+            invert_cmyk: false,
+            alpha: pixels.alpha.map(Into::into),
+          },
+          interpolate: export_options.allow_interpolation,
+          soft_mask_interpolate: false,
+          matte: associate_with_black.then_some([0.0; 3]),
+        };
+        return Ok(PreparedRasterImage::new(direct));
+      }
+    }
   }
   prepare_sampled_image(image, false, associate_with_black.then_some([0.0; 3]))
 }
@@ -1527,8 +1743,10 @@ fn should_try_jpeg(
       | RasterOwner::WordLockedCanvasDevice
       | RasterOwner::WordShapeStory
       | RasterOwner::WordShapeStoryPaint
+      | RasterOwner::WordShapeSoftEdge
       | RasterOwner::WordStatic3d
-      | RasterOwner::WordTableBorder => false,
+      | RasterOwner::WordTableBorder
+      | RasterOwner::WordStrokedBorder => false,
     },
   }
 }
@@ -2038,9 +2256,28 @@ fn export_word_print_rgb_image(
   trial_metadata_bytes: usize,
 ) -> Result<PreparedRasterImage> {
   let rgba = raster.image.to_rgba8();
+  // The Print classifier reads straight RGB. The PDF color plane instead
+  // truncates its black-matte association and carries A8 independently.
+  // Native reduced RGBA controls pin the sampled classifier bytes as well
+  // as the complete lossless RGB/A8 planes; alpha is not a lossless override.
+  let associated = rgba.pixels().any(|pixel| pixel[3] != u8::MAX).then(|| {
+    image::RgbaImage::from_fn(rgba.width(), rgba.height(), |x, y| {
+      let pixel = rgba.get_pixel(x, y);
+      let alpha = u16::from(pixel[3]);
+      Rgba([
+        (u16::from(pixel[0]) * alpha / 255) as u8,
+        (u16::from(pixel[1]) * alpha / 255) as u8,
+        (u16::from(pixel[2]) * alpha / 255) as u8,
+        pixel[3],
+      ])
+    })
+  });
   let selection = word_print_codec::select(&rgba);
   if selection != word_print_codec::Selection::Lossless {
-    let jpeg = encode_office_h2v2_jpeg(&rgba, export_options.jpeg_quality.unwrap_or(90))?;
+    let jpeg = encode_office_h2v2_jpeg(
+      associated.as_ref().unwrap_or(&rgba),
+      export_options.jpeg_quality.unwrap_or(90),
+    )?;
     let keep_jpeg = match selection {
       word_print_codec::Selection::Jpeg => true,
       word_print_codec::Selection::JpegTrial { limit } => jpeg
@@ -2050,6 +2287,16 @@ fn export_word_print_rgb_image(
       word_print_codec::Selection::Lossless => false,
     };
     if keep_jpeg {
+      if associated.is_some() {
+        return prepare_encoded_jpeg_image_with_soft_mask(
+          jpeg,
+          raster.icc_profile,
+          &rgba,
+          export_options.allow_interpolation,
+          false,
+          [0.0; 3],
+        );
+      }
       return prepare_encoded_jpeg_image(
         jpeg,
         raster.icc_profile,
@@ -2057,10 +2304,12 @@ fn export_word_print_rgb_image(
       );
     }
   }
+  let matte = associated.as_ref().map(|_| [0.0; 3]);
+  let image = associated.map_or(raster.image, DynamicImage::ImageRgba8);
   prepare_sampled_image(
-    PdfRasterImage::from_dynamic_with_icc(raster.image, raster.icc_profile),
+    PdfRasterImage::from_dynamic_with_icc(image, raster.icc_profile),
     false,
-    None,
+    matte,
   )
 }
 
@@ -2118,12 +2367,17 @@ fn export_decoded_image(
     };
     resized = true;
   }
-  if resized && format == RasterImageFormat::Jpeg && export_options.profile.is_office_fixed_output()
+  if format == RasterImageFormat::Jpeg
+    && export_options.profile.is_office_fixed_output()
+    && (resized || (office_source_jpeg && !office_gray_jpeg))
   {
     // Controlled Word Print/Screen matrices vary ICC, Photoshop 8BIM, JFIF
     // density, and the display-DPI boundary while keeping the JPEG scan bytes
-    // fixed. Every reduced result discards the source profile and declares the
-    // PDF image as DeviceRGB; an ICCBased resource changes the RGB result.
+    // fixed. Every reduced result discards the source profile. Word also
+    // declares retained RGB source JPEGs as DeviceRGB: their ICC metadata can
+    // remain inside the JPEG, but it is not the PDF image's color space.
+    // Independent profile-only pairs retain identical decoded RGB samples;
+    // binding ICCBased would apply a conversion that Word never made.
     // Requested exports still preserve the caller's profile below.
     raster.icc_profile = None;
   }
@@ -2739,7 +2993,7 @@ fn export_wordprocessing_static_3d_image(
     raster.image = resize_for_export(raster.image, target_size, export_options);
   }
 
-  prepare_completed_wordprocessing_static_3d_image(raster, export_options)
+  prepare_completed_wordprocessing_paint_image(raster, export_options)
 }
 
 fn export_wordprocessing_static_3d_reference_image(
@@ -2753,10 +3007,10 @@ fn export_wordprocessing_static_3d_reference_image(
   // Resolving a new mesh coverage grid here discards alpha and filters color
   // and effects in different domains. Hosted final-grid planes are separate.
   raster.image = resize_for_word_screen_bitmap(raster.image, target_size);
-  prepare_completed_wordprocessing_static_3d_image(raster, export_options)
+  prepare_completed_wordprocessing_paint_image(raster, export_options)
 }
 
-fn prepare_completed_wordprocessing_static_3d_image(
+fn prepare_completed_wordprocessing_paint_image(
   raster: DecodedRasterImage,
   export_options: RasterExportOptions,
 ) -> Result<PreparedRasterImage> {
@@ -3276,11 +3530,45 @@ fn resize_for_gdiplus_bitmap(image: DynamicImage, target_size: (u32, u32)) -> Dy
   if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
     let source = image.into_rgba8();
     if source.pixels().all(|pixel| pixel[3] == 255) {
-      return resize_for_gdiplus_opaque_bilinear(source, target_size);
+      return resize_for_gdiplus_bilinear(source, target_size);
     }
     return resize_for_office_screen(DynamicImage::ImageRgba8(source), target_size);
   }
   resize_for_gdiplus_fixed_area(image, target_size)
+}
+
+fn resize_for_word_print_bitmap(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
+  if !image.color().has_alpha() {
+    return resize_for_gdiplus_bitmap(image, target_size);
+  }
+  let source = image.into_rgba8();
+  if source.pixels().all(|pixel| pixel[3] == u8::MAX) {
+    return resize_for_gdiplus_bitmap(DynamicImage::ImageRgba8(source), target_size);
+  }
+  // Bitmap(Image,w,h) filters associated color and alpha with its bilinear
+  // or area kernel, then exposes straight RGB through GDI+'s truncated Q15
+  // reciprocal. The same 419/420 boundary applies to transparent sources.
+  // Wine gdiplus/image.c getpixel_32bppPARGB documents the same conversion;
+  // native Word classifier samples and PDF planes independently verify it.
+  let associated = apply_black_matte(&source);
+  let mut resized = if source.width().max(source.height()) < GDIPLUS_BITMAP_AREA_THRESHOLD {
+    resize_for_gdiplus_bilinear(associated, target_size)
+  } else {
+    resize_for_gdiplus_fixed_area(DynamicImage::ImageRgba8(associated), target_size)
+  }
+  .into_rgba8();
+  for pixel in resized.pixels_mut() {
+    let alpha = u32::from(pixel[3]);
+    let reciprocal = (255_u32 << 15).checked_div(alpha).unwrap_or_default();
+    for channel in &mut pixel.0[..3] {
+      *channel = if u32::from(*channel) > alpha {
+        255
+      } else {
+        ((u32::from(*channel) * reciprocal) >> 15) as u8
+      };
+    }
+  }
+  DynamicImage::ImageRgba8(resized)
 }
 
 fn gdiplus_round_down_f32(value: f64) -> f32 {
@@ -3294,10 +3582,7 @@ fn gdiplus_round_down_f32(value: f64) -> f32 {
   }
 }
 
-fn resize_for_gdiplus_opaque_bilinear(
-  source: image::RgbaImage,
-  target_size: (u32, u32),
-) -> DynamicImage {
+fn resize_for_gdiplus_bilinear(source: image::RgbaImage, target_size: (u32, u32)) -> DynamicImage {
   let (source_width, source_height) = source.dimensions();
   let (target_width, target_height) = target_size;
   if source_width == 0
@@ -3361,6 +3646,7 @@ fn resize_for_gdiplus_opaque_bilinear(
 
   // Native bilinear spans retain both Q11 axes until the final rounded Q22
   // result; rounding the horizontal colors first changes otherwise opaque RGB.
+  // Partial-alpha callers supply associated RGB and filter A8 in the same pass.
   DynamicImage::ImageRgba8(image::RgbaImage::from_fn(
     target_width,
     target_height,
@@ -3379,8 +3665,8 @@ fn resize_for_gdiplus_opaque_bilinear(
         (ONE - fx) * fy,
         fx * fy,
       ];
-      let mut result = [0, 0, 0, 255];
-      for (channel, output) in result[..3].iter_mut().enumerate() {
+      let mut result = [0; 4];
+      for (channel, output) in result.iter_mut().enumerate() {
         let accumulated = samples
           .iter()
           .zip(weights)
@@ -3879,6 +4165,64 @@ mod tests {
   use image::codecs::{jpeg::JpegEncoder as ImageJpegEncoder, tiff::TiffEncoder};
 
   #[test]
+  fn stroked_border_sampling_matches_native_screen_and_print_masks() {
+    let source = image::RgbaImage::from_fn(48, 25, |x, y| {
+      let covered = y < 24 && matches!((683 + x + y + 6) % 48, 0 | 6 | 12 | 18 | 24 | 36);
+      Rgba([0, 0, 0, if covered { 255 } else { 0 }])
+    });
+    // Independent Office PDF masks for the same 600-DPI source brush.
+    for (width, expected) in [
+      (7, vec![".#.....", ".......", ".#.....", "#......"]),
+      (
+        16,
+        vec![
+          "................",
+          "................",
+          "................",
+          "................",
+          "..#...#.#.#.#.#.",
+          ".#...#.#.#.#.#..",
+          "#...#.#.#.#.#...",
+          "...#.#.#.#.#...#",
+        ],
+      ),
+    ] {
+      let sampled = sample_word_stroked_border(&source, width, expected.len() as u32);
+      for (row, expected) in sampled.rows().zip(expected) {
+        let actual: String = row
+          .map(|pixel| if pixel[3] == 255 { '#' } else { '.' })
+          .collect();
+        assert_eq!(actual, expected);
+      }
+    }
+  }
+
+  #[test]
+  fn stroked_border_allocation_keeps_native_float_resolution_boundaries() {
+    // Independent MSO entry/final captures: identical 25x25 corner sources,
+    // varied page phases, Screen/Print. Display extents are captured FLOAT
+    // bits, not decimal PDF bounds or inferred transparent-resource sizes.
+    for (width_bits, height_bits, expected) in [
+      (0x403f_ffe0, 0x403f_ffe0, (3, 3)),
+      (0x4041_8980, 0x403f_ffe0, (4, 3)),
+      (0x403f_ffe0, 0x4040_0040, (3, 4)),
+      (0x4041_8980, 0x4040_0040, (4, 4)),
+      (0x403f_ffe0, 0x4040_0000, (3, 4)),
+    ] {
+      let size = WordStrokedBorderSize {
+        width_bits,
+        height_bits,
+        dpi: 96,
+      };
+      assert_eq!(size.pixels((25, 25)), expected);
+      assert_eq!(
+        WordStrokedBorderSize { dpi: 200, ..size }.pixels((25, 25)),
+        (8, 8)
+      );
+    }
+  }
+
+  #[test]
   fn sampled_matte_follows_normalized_soft_mask_presence() {
     for alpha in [0, 128, 255] {
       let rgba = image::RgbaImage::from_pixel(2, 1, Rgba([40, 80, 120, alpha]));
@@ -3889,6 +4233,61 @@ mod tests {
       assert_eq!(prepared.direct().matte, (alpha != 255).then_some([0.0; 3]));
       assert_eq!(prepared.direct().alpha().is_some(), alpha != 255);
     }
+  }
+
+  fn metafile_test_options() -> RasterExportOptions {
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    RasterExportOptions::new(&options, 72.0, 72.0)
+  }
+
+  #[test]
+  fn word_screen_metafile_keeps_its_device_grid_and_independent_alpha() {
+    let mut options = metafile_test_options();
+    options.profile = RasterExportProfile::MicrosoftOfficeFixedOutput {
+      document_kind: PdfDocumentKind::Docx,
+      optimize_for: PdfOptimizeFor::Screen,
+    };
+    options.jpeg_quality = Some(59);
+    let source = image::RgbaImage::from_fn(102, 65, |x, y| {
+      Rgba([(x * 2) as u8, (y * 3) as u8, (x + y) as u8, 128])
+    });
+    let image = PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None);
+    let expected_alpha = image.pixels.alpha.clone();
+    let prepared = prepare_metafile_preview(image.clone(), options).unwrap();
+    assert_eq!(
+      (prepared.direct().width, prepared.direct().height),
+      (102, 65)
+    );
+    assert!(matches!(
+      prepared.direct().encoding,
+      DirectRasterEncoding::Dct { .. }
+    ));
+    assert_eq!(prepared.direct().alpha(), expected_alpha.as_deref());
+    assert!(prepared.direct().interpolate);
+    assert!(!prepared.direct().soft_mask_interpolate);
+    assert_eq!(prepared.direct().matte, Some([0.0; 3]));
+    // Print retains its independently established lossless preview policy.
+    let print = prepare_metafile_preview(image, metafile_test_options()).unwrap();
+    assert!(matches!(
+      print.direct().encoding,
+      DirectRasterEncoding::Sampled { .. }
+    ));
+    let flat = PdfRasterImage::from_dynamic_with_icc(
+      DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+        102,
+        65,
+        Rgba([200, 50, 150, 128]),
+      )),
+      None,
+    );
+    let flat = prepare_metafile_preview(flat, options).unwrap();
+    assert!(matches!(
+      flat.direct().encoding,
+      DirectRasterEncoding::Sampled { .. }
+    ));
+    assert!(!flat.direct().interpolate);
   }
 
   #[test]
@@ -3906,7 +4305,7 @@ mod tests {
       Some(vec![1, 2, 3]),
     );
     let shared_pixels = source.pixels.clone();
-    let office = prepare_metafile_preview(source, true).unwrap();
+    let office = prepare_metafile_preview(source, metafile_test_options()).unwrap();
     let expected = PdfRasterImage::from_dynamic_with_icc(
       DynamicImage::ImageRgba8(apply_black_matte(&rgba)),
       Some(vec![1, 2, 3]),
@@ -3921,7 +4320,7 @@ mod tests {
       PdfRasterImage {
         pixels: shared_pixels,
       },
-      false,
+      RasterExportOptions::new(&PdfOptions::default(), 72.0, 72.0),
     )
     .unwrap();
     assert!(requested.direct().matte.is_none());
@@ -3945,7 +4344,7 @@ mod tests {
         }),
       };
       let expected = source.clone();
-      let actual = prepare_metafile_preview(source, true).unwrap();
+      let actual = prepare_metafile_preview(source, metafile_test_options()).unwrap();
       assert_sampled_image(&actual, &expected, false);
       assert_eq!(actual.direct().matte, (!opaque).then_some([0.0; 3]));
     }
@@ -4103,6 +4502,64 @@ mod tests {
         }
       }
     }
+  }
+
+  #[test]
+  fn word_retained_rgb_jpeg_ignores_pdf_icc_without_changing_encoded_samples() {
+    let source = image::RgbaImage::from_fn(87, 41, |x, y| {
+      Rgba([
+        (x * 3 + y * 7) as u8,
+        (x * 11 + y * 2) as u8,
+        (x * 5 + y * 13) as u8,
+        255,
+      ])
+    });
+    let jpeg = encode_office_h2v2_jpeg(&source, 91).unwrap();
+    let mut profile = vec![0_u8; 132];
+    profile[..4].copy_from_slice(&132_u32.to_be_bytes());
+    profile[16..20].copy_from_slice(b"RGB ");
+    profile[36..40].copy_from_slice(b"acsp");
+    // Add only an ICC APP2 segment; the JPEG scan and quantizers stay exact.
+    let mut profiled = jpeg[..2].to_vec();
+    profiled.extend_from_slice(&[0xff, 0xe2]);
+    profiled.extend_from_slice(&((profile.len() + 16) as u16).to_be_bytes());
+    profiled.extend_from_slice(b"ICC_PROFILE\0\x01\x01");
+    profiled.extend_from_slice(&profile);
+    profiled.extend_from_slice(&jpeg[2..]);
+
+    for optimize_for in [PdfOptimizeFor::Print, PdfOptimizeFor::Screen] {
+      for archival in [false, true] {
+        let mut options = PdfOptions {
+          optimize_for,
+          ..PdfOptions::default()
+        };
+        if archival {
+          options.standards = vec![crate::options::PdfStandard::PdfA3b];
+        }
+        options.images.optimization_policy =
+          PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+        let export_options = RasterExportOptions::new(&options, 144.0, 72.0);
+        let plain = decode_image(&jpeg, Some("image/jpeg"), export_options, None).unwrap();
+        let actual = decode_image(&profiled, Some("image/jpeg"), export_options, None).unwrap();
+        assert_eq!(plain.size(), (87, 41));
+        assert_eq!(actual.size(), plain.size());
+        assert!(actual.direct().icc_profile().is_none());
+        let DirectRasterEncoding::Dct { data, .. } = &plain.direct().encoding else {
+          panic!("Word retains the source JPEG's DCT owner");
+        };
+        assert_dct_image(&actual, data, plain.direct().interpolate);
+      }
+    }
+
+    let requested = decode_image(
+      &profiled,
+      Some("image/jpeg"),
+      RasterExportOptions::new(&PdfOptions::default(), 144.0, 72.0),
+      None,
+    )
+    .unwrap();
+    assert_eq!(requested.direct().icc_profile(), Some(profile.as_slice()));
+    assert_dct_image(&requested, &profiled, true);
   }
 
   #[test]
@@ -5239,7 +5696,7 @@ mod tests {
           .unwrap();
         let actual = decode_image(&png, Some("image/png"), export, None).unwrap();
         let expected = if width.max(height) < GDIPLUS_BITMAP_AREA_THRESHOLD {
-          resize_for_gdiplus_opaque_bilinear(dynamic.into_rgba8(), (55, 34))
+          resize_for_gdiplus_bilinear(dynamic.into_rgba8(), (55, 34))
         } else {
           resize_for_gdiplus_fixed_area(dynamic, (55, 34))
         };
@@ -5487,6 +5944,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: false,
@@ -5528,6 +5986,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -5562,6 +6021,7 @@ mod tests {
         max_size_px: None,
         downsample_trigger_px: None,
         word_print_jpeg_downsample_trigger_px: None,
+        stroked_border_size: None,
         exact_downsample_trigger: false,
         use_gdiplus_jpeg_resampler: false,
         allow_interpolation: interpolate,
@@ -5721,6 +6181,52 @@ mod tests {
   }
 
   #[test]
+  fn word_print_reduced_rgba_keeps_native_color_and_alpha_planes() {
+    // Independent 707x707 -> 171x171 Office controls, with/without alpha.
+    // This catches both the old JPEG choice and the missing GDI+ reciprocal
+    // conversion between area sampling and the final PDF matte association.
+    for (alpha, expected_rgb_crc, expected_alpha_crc) in [
+      (128, 2_802_681_996, Some(1_342_016_648)),
+      (255, 1_397_335_623, None),
+    ] {
+      let source = image::RgbaImage::from_pixel(707, 707, Rgba([200, 50, 150, alpha]));
+      let mut png = Vec::new();
+      PngEncoder::new(&mut png)
+        .write_image(source.as_raw(), 707, 707, ColorType::Rgba8.into())
+        .unwrap();
+      let mut options = PdfOptions {
+        optimize_for: PdfOptimizeFor::Print,
+        ..PdfOptions::default()
+      };
+      options.images.optimization_policy =
+        PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+      let actual = decode_image(
+        &png,
+        Some("image/png"),
+        RasterExportOptions::new(&options, 61.7, 61.7),
+        None,
+      )
+      .unwrap();
+      assert_eq!(actual.size(), (171, 171));
+      let DirectRasterEncoding::Sampled { pixels } = &actual.direct().encoding else {
+        panic!("native Print controls keep this color plane lossless");
+      };
+      let mut crc = flate2::Crc::new();
+      crc.update(&pixels.rgb);
+      assert_eq!(crc.sum(), expected_rgb_crc);
+      let actual_alpha_crc = actual.direct().alpha().map(|alpha| {
+        let mut crc = flate2::Crc::new();
+        crc.update(alpha);
+        crc.sum()
+      });
+      assert_eq!(actual_alpha_crc, expected_alpha_crc);
+      assert_eq!(actual.direct().matte, expected_alpha_crc.map(|_| [0.0; 3]));
+      assert!(!actual.direct().interpolate);
+      assert!(!actual.direct().soft_mask_interpolate);
+    }
+  }
+
+  #[test]
   fn word_print_png_opaque_resampling_matches_native_color_planes() {
     // Independent Word exports cover three patterns across the small/large
     // GDI+ bitmap boundary. CRC32 pins every RGB sample, not just dimensions.
@@ -5780,6 +6286,70 @@ mod tests {
         );
       }
     }
+  }
+
+  #[test]
+  fn word_print_small_png_bilinear_matches_native_color_and_alpha() {
+    // Complete GDI+ Bitmap(Image,w,h) planes, independently observed for
+    // ramp/noise/edge PNGs, opaque/partial alpha, and two reduction ratios.
+    let native_crc = [
+      1_800_669_230,
+      32_924_228,
+      2_162_849_741,
+      2_004_040_249,
+      3_837_293_241,
+      4_016_153_602,
+      2_482_989_404,
+      157_299_024,
+      2_257_517_118,
+      180_352_580,
+      1_742_168_475,
+      1_206_199_699,
+    ];
+    let mut case = 0;
+    for pattern in 0..3 {
+      for partial in [false, true] {
+        for size in [22, 39] {
+          let source = image::RgbaImage::from_fn(256, 256, |x, y| {
+            let rgb = match pattern {
+              0 => [(x * 3 + y * 5) % 256, (x + y * 2) % 256, (x * 7 + y) % 256],
+              1 => {
+                let mut state = x + y * 256 + 1;
+                state = (state ^ (state >> 16)).wrapping_mul(0x7feb_352d);
+                state = (state ^ (state >> 15)).wrapping_mul(0x846c_a68b);
+                state ^= state >> 16;
+                [state & 255, (state >> 8) & 255, (state >> 16) & 255]
+              }
+              _ => {
+                let value = if (x / 7 + y / 11) % 2 == 0 { 255 } else { 0 };
+                [value, 255 - value, (x * 13 + y * 3) % 256]
+              }
+            };
+            Rgba([
+              rgb[0] as u8,
+              rgb[1] as u8,
+              rgb[2] as u8,
+              if partial {
+                ((x * 37 + y * 11) % 256) as u8
+              } else {
+                255
+              },
+            ])
+          });
+          let resized =
+            resize_for_word_print_bitmap(DynamicImage::ImageRgba8(source), (size, size));
+          let mut crc = flate2::Crc::new();
+          crc.update(resized.to_rgba8().as_raw());
+          assert_eq!(
+            crc.sum(),
+            native_crc[case],
+            "pattern={pattern}, partial={partial}, size={size}"
+          );
+          case += 1;
+        }
+      }
+    }
+    assert_eq!(case, native_crc.len());
   }
 
   #[test]
@@ -5925,6 +6495,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -6327,6 +6898,7 @@ mod tests {
       max_size_px: RasterPixelLimits::from_pixels(285.0, 182.0),
       downsample_trigger_px: RasterPixelLimits::from_pixels(445.5, 285.0),
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -6374,6 +6946,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -6393,6 +6966,48 @@ mod tests {
     .unwrap();
     let expected = PdfRasterImage::from_dynamic_with_icc(DynamicImage::ImageRgba8(source), None);
     assert_sampled_image(&actual, &expected, false);
+  }
+
+  #[test]
+  fn word_soft_edge_preserves_final_grid_and_independent_mask() {
+    let source = image::RgbaImage::from_fn(160, 120, |x, y| {
+      let mixed = (x + y * 160)
+        .wrapping_mul(1_664_525)
+        .wrapping_add(1_013_904_223);
+      Rgba([
+        mixed as u8,
+        (mixed >> 8) as u8,
+        (mixed >> 16) as u8,
+        (x + y) as u8,
+      ])
+    });
+    let mut png = Vec::new();
+    DynamicImage::ImageRgba8(source.clone())
+      .write_to(&mut Cursor::new(&mut png), RasterImageFormat::Png)
+      .unwrap();
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..PdfOptions::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    // A small PDF rectangle would resample an ordinary source. This is
+    // already the final generated effect grid; only its color codec changes.
+    let actual = decode_image(
+      &png,
+      Some(WORD_SHAPE_SOFT_EDGE_BITMAP_CONTENT_TYPE),
+      RasterExportOptions::new(&options, 10.0, 10.0),
+      None,
+    )
+    .unwrap();
+    let direct = actual.direct();
+    assert_eq!((direct.width, direct.height), source.dimensions());
+    assert!(matches!(direct.encoding, DirectRasterEncoding::Dct { .. }));
+    let alpha = source.pixels().map(|pixel| pixel.0[3]).collect::<Vec<_>>();
+    assert_eq!(direct.alpha(), Some(alpha.as_slice()));
+    assert_eq!(direct.matte, Some([0.0, 0.0, 0.0]));
+    assert!(!direct.interpolate);
+    assert!(!direct.soft_mask_interpolate);
   }
 
   #[test]
@@ -6430,6 +7045,7 @@ mod tests {
           max_size_px: None,
           downsample_trigger_px: None,
           word_print_jpeg_downsample_trigger_px: None,
+          stroked_border_size: None,
           exact_downsample_trigger: false,
           use_gdiplus_jpeg_resampler: false,
           allow_interpolation: true,
@@ -6490,6 +7106,7 @@ mod tests {
         max_size_px: None,
         downsample_trigger_px: None,
         word_print_jpeg_downsample_trigger_px: None,
+        stroked_border_size: None,
         exact_downsample_trigger: false,
         use_gdiplus_jpeg_resampler: false,
         allow_interpolation: true,
@@ -6541,6 +7158,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -6595,6 +7213,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -6652,6 +7271,7 @@ mod tests {
         max_size_px: None,
         downsample_trigger_px: None,
         word_print_jpeg_downsample_trigger_px: None,
+        stroked_border_size: None,
         exact_downsample_trigger: false,
         use_gdiplus_jpeg_resampler: false,
         allow_interpolation: true,
@@ -6700,6 +7320,7 @@ mod tests {
       max_size_px: None,
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,
@@ -7236,6 +7857,7 @@ mod tests {
       max_size_px: RasterPixelLimits::from_display_size(263.25, 213.0, 96),
       downsample_trigger_px: None,
       word_print_jpeg_downsample_trigger_px: None,
+      stroked_border_size: None,
       exact_downsample_trigger: false,
       use_gdiplus_jpeg_resampler: false,
       allow_interpolation: true,

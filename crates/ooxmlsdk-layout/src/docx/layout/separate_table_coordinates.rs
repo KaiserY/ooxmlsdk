@@ -165,13 +165,21 @@ pub(super) fn text_left(
   // half-width paint offset to a grid-only centered table.
   let (leading, trailing) = if table.right_to_left {
     (
-      border_twips(last.borders.right),
-      border_twips(first.borders.right),
+      border_twips(cell_inherited_vertical_border(
+        table, first_row, last, false,
+      )),
+      border_twips(cell_inherited_vertical_border(
+        table, first_row, first, false,
+      )),
     )
   } else {
     (
-      border_twips(first.borders.left),
-      border_twips(last.borders.right),
+      border_twips(cell_inherited_vertical_border(
+        table, first_row, first, true,
+      )),
+      border_twips(cell_inherited_vertical_border(
+        table, first_row, last, false,
+      )),
     )
   };
   let leading_half = (leading + 1) / 2;
@@ -201,7 +209,7 @@ pub(super) fn text_left(
   let margin = (f64::from(cell.margins.left_pt) * 20.0).round() as i64;
   let local_text = if table.right_to_left { 0 } else { leading_half }
     + local_grid
-    + border_twips(cell.borders.left)
+    + border_twips(cell_inherited_vertical_border(table, row, cell, true))
     + margin;
   // The cell coordinate helper converts its complete text edge before the
   // frame subtracts the margin. Zero spacing then charges the logical start
@@ -209,9 +217,9 @@ pub(super) fn text_left(
   // separate: an eight-twip margin distinguishes their rounding by 1/4096pt.
   let text_margin = if row_cell_spacing_pt(table, row) == 0.0 {
     let border = if table.right_to_left {
-      cell.borders.right
+      cell_inherited_vertical_border(table, row, cell, false)
     } else {
-      cell.borders.left
+      cell_inherited_vertical_border(table, row, cell, true)
     };
     (margin - border_twips(border) / 2).max(0)
   } else {

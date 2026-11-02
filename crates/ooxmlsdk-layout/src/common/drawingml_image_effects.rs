@@ -6580,6 +6580,31 @@ fn apply_soft_edge_on_raster(
   radius_px: f32,
   scale: EffectRasterScale,
 ) {
+  apply_soft_edge_with_source_on_raster(image, None, radius_px, scale);
+}
+
+/// A vector soft edge retains antialiased color, but its alphaOutset branch
+/// wraps the original primitive in IEffectAliased before taking coverage.
+/// An already rasterized picture cannot recover this independent source.
+pub(crate) fn apply_word_shape_soft_edge_on_raster(
+  image: &mut image::RgbaImage,
+  aliased_source: &image::RgbaImage,
+  radius_px: f32,
+  scale: EffectRasterScale,
+) -> Option<()> {
+  if image.dimensions() != aliased_source.dimensions() || !scale.is_valid() {
+    return None;
+  }
+  apply_soft_edge_with_source_on_raster(image, Some(aliased_source), radius_px, scale);
+  Some(())
+}
+
+fn apply_soft_edge_with_source_on_raster(
+  image: &mut image::RgbaImage,
+  aliased_source: Option<&image::RgbaImage>,
+  radius_px: f32,
+  scale: EffectRasterScale,
+) {
   if radius_px <= f32::EPSILON {
     return;
   }
@@ -6594,7 +6619,12 @@ fn apply_soft_edge_on_raster(
   // than eroding only fully opaque texels. The public Gaussian radius is
   // three standard deviations; it is not itself sigma. Native 1/5/10pt
   // opaque and semitransparent controls distinguish both errors.
-  let inset = alpha_outset_mask(&alpha, rx, ry, false);
+  let aliased_alpha = aliased_source.map(|source| {
+    image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
+      image::Luma([source.get_pixel(x, y).0[3]])
+    })
+  });
+  let inset = alpha_outset_mask(aliased_alpha.as_ref().unwrap_or(&alpha), rx, ry, false);
   if inset.as_raw().iter().all(|alpha| *alpha == 0) {
     // A completely inset-away picture contributes no mask. In particular,
     // an oversized authored radius must not allocate a huge Gaussian kernel
@@ -9836,6 +9866,49 @@ mod tests {
     assert!((bounds.top_pt + 20.0).abs() < 0.01);
     assert!((bounds.right_pt - 100.0).abs() < 0.01);
     assert!((bounds.bottom_pt - 80.0).abs() < 0.01);
+  }
+
+  #[test]
+  fn word_shape_soft_edge_uses_aliased_mask_without_replacing_paint() {
+    let mut paint = RgbaImage::from_pixel(49, 37, Rgba([40, 80, 160, 0]));
+    let mut mask = RgbaImage::new(49, 37);
+    for y in 5..32 {
+      for x in 5..44 {
+        paint.get_pixel_mut(x, y).0[3] = 128;
+        if (6..43).contains(&x) && (6..31).contains(&y) {
+          mask.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+        }
+      }
+    }
+    let mut expected_mask = mask.clone();
+    super::apply_soft_edge_on_raster(&mut expected_mask, 4.0, Default::default());
+    let original = paint.clone();
+    let mut old = paint.clone();
+    super::apply_soft_edge_on_raster(&mut old, 4.0, Default::default());
+    super::apply_word_shape_soft_edge_on_raster(&mut paint, &mask, 4.0, Default::default())
+      .unwrap();
+    assert_eq!(paint.get_pixel(24, 18).0, [40, 80, 160, 128]);
+    assert!(paint.get_pixel(8, 18).0[3] < old.get_pixel(8, 18).0[3]);
+    for y in 6..31 {
+      for x in 6..43 {
+        assert_eq!(
+          paint.get_pixel(x, y).0[3],
+          ((u16::from(expected_mask.get_pixel(x, y).0[3]) * 128 + 127) / 255) as u8
+        );
+      }
+    }
+    assert!(paint.pixels().all(|pixel| pixel.0[..3] == [40, 80, 160]));
+    let mut invalid = original.clone();
+    assert!(
+      super::apply_word_shape_soft_edge_on_raster(
+        &mut invalid,
+        &RgbaImage::new(1, 1),
+        4.0,
+        Default::default(),
+      )
+      .is_none()
+    );
+    assert_eq!(invalid, original);
   }
 
   #[test]

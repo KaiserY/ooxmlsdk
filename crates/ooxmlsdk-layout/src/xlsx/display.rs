@@ -12269,6 +12269,7 @@ fn lower_drawing_chart(
       category_minor_gridline,
       value_minor_gridline: None,
       category_major_gridline_stroke: None,
+      series_axis_strokes: Vec::new(),
       series_colors,
       series_point_colors,
       series_styles,
@@ -12288,6 +12289,7 @@ fn lower_drawing_chart(
       group_decoration_styles,
       series_point_styles,
       surface_band_colors,
+      surface_band_styles: Vec::new(),
       data_label_fill_colors: chart
         .series
         .iter()
@@ -13519,6 +13521,8 @@ fn xlsx_chart_gradient_fill(
   };
   let interpolation = office_drawing_gradient_interpolation(stops.len());
   Some(common::Fill::Gradient(common::GradientFill {
+    transform_as_normal: false,
+    opaque_for_pdf: false,
     stops,
     angle_degrees,
     definition_bounds: None,
@@ -15986,6 +15990,8 @@ fn drawing_object_gradient_fill_with_placeholder(
 
   let interpolation = office_drawing_gradient_interpolation(stops.len());
   Some(common::Fill::Gradient(common::GradientFill {
+    transform_as_normal: false,
+    opaque_for_pdf: false,
     stops,
     angle_degrees,
     definition_bounds: Some(if follows_shape {

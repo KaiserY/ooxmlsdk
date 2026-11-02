@@ -45,6 +45,7 @@ pub enum PdfOptionFeature {
   DocumentLanguage,
   FieldUpdateDateTime,
   FieldUpdateTimeZone,
+  UpdateFieldsAtPrint,
   PaperSize,
   TaggedPdf,
   Bookmarks,
@@ -63,7 +64,7 @@ pub enum PdfOptionFeature {
 }
 
 impl PdfOptionFeature {
-  pub const ALL: [Self; 25] = [
+  pub const ALL: [Self; 26] = [
     Self::PdfVersion,
     Self::PdfA,
     Self::PdfUa,
@@ -74,6 +75,7 @@ impl PdfOptionFeature {
     Self::DocumentLanguage,
     Self::FieldUpdateDateTime,
     Self::FieldUpdateTimeZone,
+    Self::UpdateFieldsAtPrint,
     Self::PaperSize,
     Self::TaggedPdf,
     Self::Bookmarks,
@@ -105,6 +107,7 @@ impl fmt::Display for PdfOptionFeature {
       Self::DocumentLanguage => "document-language",
       Self::FieldUpdateDateTime => "field-update-date-time",
       Self::FieldUpdateTimeZone => "field-update-time-zone",
+      Self::UpdateFieldsAtPrint => "update-fields-at-print",
       Self::PaperSize => "paper-size",
       Self::TaggedPdf => "tagged-pdf",
       Self::Bookmarks => "bookmarks",
@@ -160,13 +163,16 @@ pub const fn pdf_option_support(
     | Feature::FieldUpdateTimeZone
     | Feature::Links
     | Feature::Attachments => Support::SupportedWithRestrictions,
-    Feature::FormFields if matches!(document_kind, PdfDocumentKind::Docx) => {
+    Feature::FormFields | Feature::UpdateFieldsAtPrint
+      if matches!(document_kind, PdfDocumentKind::Docx) =>
+    {
       Support::SupportedWithRestrictions
     }
     Feature::SkipEmptyPages
     | Feature::TransparencyFlattening
     | Feature::PaperSize
     | Feature::FormFields
+    | Feature::UpdateFieldsAtPrint
     | Feature::Watermark
     | Feature::SinglePageSheets => Support::Unsupported,
   }
@@ -222,6 +228,19 @@ pub struct PdfOptions {
   /// This is rendering context; the converter does not open this path.
   pub source_file_path: Option<String>,
 
+  /// Explicit application user name for Word USERNAME field updates.
+  /// Independent of document authors; absent context preserves field caches.
+  pub field_user_name: Option<String>,
+
+  /// Explicit application initials for Word USERINITIALS field updates.
+  /// These are not inferred from the name or the rendering host.
+  pub field_user_initials: Option<String>,
+
+  /// Resolved OOXML Word template for documents enabling `w:linkStyles`.
+  /// The caller supplies the actual attached/default template; the converter
+  /// does not locate templates on the rendering host.
+  pub linked_styles_template: Option<Arc<[u8]>>,
+
   /// BCP 47 user-interface language for generated document labels.
   pub ui_language: Option<String>,
 
@@ -239,6 +258,19 @@ pub struct PdfOptions {
   /// matching an application installation with a restricted proofing set;
   /// authored soft hyphens remain supported.
   pub automatic_hyphenation_languages: Option<Vec<String>>,
+
+  /// Optional English application proofing data. Parsed immutable tables are
+  /// shared with layout; no native hyphenator is loaded by the converter.
+  pub english_hyphenation_dictionary:
+    Option<Arc<ooxmlsdk_layout::hyphenation::EnglishHyphenationDictionary>>,
+
+  /// Word's print-time field update policy. `Some(false)` retains cached
+  /// body fields that require a print update; pagination/display fields and
+  /// headers/footers retain their independent rules. Locked results stay
+  /// protected. `None` preserves the existing behavior. Date/time fields
+  /// still require `field_update_datetime`; this is not an on-open update.
+  /// Supported for DOCX only.
+  pub update_fields_at_print: Option<bool>,
 
   /// Local civil time used to refresh unlocked WordprocessingML DATE, TIME,
   /// PRINTDATE, SAVEDATE, and PresentationML datetime fields, and to evaluate
@@ -276,10 +308,15 @@ impl Default for PdfOptions {
       jpeg_quality: None,
       source_file_name: None,
       source_file_path: None,
+      field_user_name: None,
+      field_user_initials: None,
+      linked_styles_template: None,
       ui_language: None,
       format_locale: None,
       default_document_language: None,
       automatic_hyphenation_languages: None,
+      english_hyphenation_dictionary: None,
+      update_fields_at_print: None,
       field_update_datetime: None,
       field_update_time_zone: None,
       include_hidden_slides: false,
@@ -350,12 +387,17 @@ impl PdfOptions {
     ooxmlsdk_layout::options::LayoutOptions {
       source_file_name: self.source_file_name.clone(),
       source_file_path: self.source_file_path.clone(),
+      field_user_name: self.field_user_name.clone(),
+      field_user_initials: self.field_user_initials.clone(),
+      linked_styles_template: self.linked_styles_template.clone(),
       ui_language: self.ui_language.clone(),
       format_locale: self.format_locale.clone(),
       default_document_language: self.default_document_language.clone(),
       automatic_hyphenation_languages: self.automatic_hyphenation_languages.clone(),
+      english_hyphenation_dictionary: self.english_hyphenation_dictionary.clone(),
       field_update_datetime: self.field_update_datetime,
       field_update_time_zone: self.field_update_time_zone.clone(),
+      update_fields_at_print: self.update_fields_at_print,
       include_hidden_slides: self.include_hidden_slides,
       // WdExportOptimizeFor selects the fixed-output bitmap surface itself:
       // Word's controlled static-3D screen export realizes a 34.5-point face
@@ -394,6 +436,13 @@ impl PdfOptions {
   }
 
   pub(crate) fn resolve_for(self, document_kind: PdfDocumentKind) -> Result<ResolvedPdfOptions> {
+    if self.update_fields_at_print.is_some() && document_kind != PdfDocumentKind::Docx {
+      return unsupported(
+        document_kind,
+        PdfOptionFeature::UpdateFieldsAtPrint,
+        "print-time field updates apply only to WordprocessingML",
+      );
+    }
     let mut effective = self;
     let mut adjustments = Vec::new();
 
@@ -1345,6 +1394,27 @@ mod tests {
         .iter()
         .any(|adjustment| adjustment.feature == PdfOptionFeature::ImageCompression)
     );
+  }
+
+  #[test]
+  fn field_user_profile_reaches_layout_without_inference_or_normalization() {
+    let template: Arc<[u8]> = Arc::from(&b"resolved immutable template"[..]);
+    let options = PdfOptions {
+      field_user_name: Some("Mixed Name".into()),
+      field_user_initials: Some(String::new()),
+      update_fields_at_print: Some(true),
+      linked_styles_template: Some(template.clone()),
+      ..Default::default()
+    };
+    let resolved = options.resolve_for(PdfDocumentKind::Docx).unwrap();
+    let layout = resolved.effective.layout_options();
+    assert_eq!(layout.field_user_name.as_deref(), Some("Mixed Name"));
+    assert_eq!(layout.field_user_initials.as_deref(), Some(""));
+    assert_eq!(layout.update_fields_at_print, Some(true));
+    assert!(Arc::ptr_eq(
+      layout.linked_styles_template.as_ref().unwrap(),
+      &template
+    ));
   }
 
   #[test]

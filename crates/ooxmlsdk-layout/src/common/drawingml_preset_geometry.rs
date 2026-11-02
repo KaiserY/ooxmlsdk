@@ -43,6 +43,17 @@ pub(crate) fn text_rectangle(
   )
 }
 
+pub(crate) fn paths_with_word_shape_arcs(
+  preset: &a::PresetGeometry,
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+) -> Option<Vec<DrawingPath>> {
+  let geometry = drawingml_preset_data::geometry(preset);
+  drawingml_custom_geometry::paths_with_word_shape_arcs(&geometry, left, top, width, height)
+}
+
 /// Compatibility adapter for hosts that have not migrated to per-path paint.
 ///
 /// A missing preset is the DrawingML rectangle default. Invalid preset data
@@ -89,6 +100,127 @@ mod tests {
     a::PresetGeometry {
       preset: value.parse().unwrap(),
       ..Default::default()
+    }
+  }
+
+  #[test]
+  fn word_shape_arcs_match_native_adjusted_ellipses() {
+    // Word fixed-format PDF controls: three moon adjustments, both aspect
+    // ratios, 45-degree rotation, no glow or wrapping. Coordinates retain
+    // native two-decimal serialization; the tolerance only accounts for it.
+    let cases = [
+      (
+        25000,
+        90.0,
+        45.0,
+        &[
+          [(236.51, 199.78), (215.14, 164.17), (223.93, 155.38)],
+          [(232.72, 146.59), (268.33, 167.96), (303.48, 203.11)],
+          [(265.77, 170.53), (236.39, 159.54), (237.85, 178.58)],
+          [(238.76, 190.36), (251.51, 211.61), (271.66, 234.93)],
+        ][..],
+      ),
+      (
+        25000,
+        45.0,
+        90.0,
+        &[
+          [(199.77, 239.86), (199.77, 211.36), (217.34, 193.79)],
+          [(234.91, 176.22), (263.41, 176.22), (280.98, 193.79)],
+          [(258.28, 181.34), (229.79, 189.65), (217.34, 212.35)],
+          [(209.64, 226.39), (209.64, 243.39), (217.34, 257.43)],
+        ][..],
+      ),
+      (
+        50000,
+        90.0,
+        45.0,
+        &[
+          [(236.51, 199.78), (215.14, 164.17), (223.93, 155.38)],
+          [(232.72, 146.59), (268.33, 167.96), (303.48, 203.11)],
+          [(261.74, 174.55), (242.15, 179.90), (259.73, 215.04)],
+          [(262.74, 221.07), (266.76, 227.77), (271.66, 234.93)],
+        ][..],
+      ),
+      (
+        50000,
+        45.0,
+        90.0,
+        &[
+          [(199.77, 239.86), (199.77, 211.36), (217.34, 193.79)],
+          [(234.91, 176.22), (263.41, 176.22), (280.98, 193.79)],
+          [(250.23, 189.40), (221.73, 210.77), (217.34, 241.52)],
+          [(216.59, 246.80), (216.59, 252.15), (217.34, 257.43)],
+        ][..],
+      ),
+      (
+        75000,
+        90.0,
+        45.0,
+        &[
+          [(236.51, 199.78), (215.14, 164.17), (223.93, 155.38)],
+          [(232.72, 146.59), (268.33, 167.96), (303.48, 203.11)],
+          [(272.32, 191.84), (260.39, 203.77), (271.66, 234.93)],
+        ][..],
+      ),
+      (
+        75000,
+        45.0,
+        90.0,
+        &[
+          [(199.77, 239.86), (199.77, 211.36), (217.34, 193.79)],
+          [(234.91, 176.22), (263.41, 176.22), (280.98, 193.79)],
+          [(250.49, 203.07), (226.62, 226.94), (217.34, 257.43)],
+        ][..],
+      ),
+    ];
+    for (adjustment, width, height, expected) in cases {
+      let mut shape = preset("moon");
+      shape.adjust_value_list = Some(a::AdjustValueList {
+        shape_guide: vec![a::ShapeGuide {
+          name: "adj".into(),
+          formula: format!("val {adjustment}"),
+        }],
+      });
+      let paths = super::paths_with_word_shape_arcs(&shape, 0.0, 0.0, width, height)
+        .expect("valid moon geometry");
+      let center = kurbo::Vec2::new(f64::from(width) / 2.0, f64::from(height) / 2.0);
+      let transform = kurbo::Affine::translate((210.75, 164.7))
+        * kurbo::Affine::translate(center)
+        * kurbo::Affine::rotate(std::f64::consts::FRAC_PI_4)
+        * kurbo::Affine::translate(-center);
+      let curves: Vec<_> = paths
+        .iter()
+        .flat_map(|path| &path.commands)
+        .filter_map(|command| {
+          if let PathCommand::CubicTo {
+            control1,
+            control2,
+            end,
+          } = command
+          {
+            Some(
+              [control1, control2, end]
+                .map(|p| transform * kurbo::Point::new(f64::from(p.x.0), f64::from(p.y.0))),
+            )
+          } else {
+            None
+          }
+        })
+        .collect();
+      assert_eq!(
+        curves.len(),
+        expected.len(),
+        "{adjustment}/{width}/{height}"
+      );
+      for (actual, expected) in curves.iter().zip(expected) {
+        for (actual, &(x, y)) in actual.iter().zip(expected) {
+          assert!(
+            (actual.x - x).abs() <= 0.006 && (actual.y - y).abs() <= 0.006,
+            "{adjustment}/{width}/{height}: {actual:?} != ({x}, {y})"
+          );
+        }
+      }
     }
   }
 

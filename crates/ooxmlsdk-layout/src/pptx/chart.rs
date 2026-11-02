@@ -208,6 +208,7 @@ pub(crate) struct ClusteredColumnStyle {
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub value_minor_gridline: Option<crate::common::Stroke<'static>>,
   pub category_major_gridline_stroke: Option<crate::common::Stroke<'static>>,
+  pub series_axis_strokes: Vec<Option<crate::common::Stroke<'static>>>,
   pub series_colors: Vec<RgbColor>,
   /// Automatic per-point colors for a single `varyColors` cartesian series.
   /// Explicit `c:dPt/c:spPr` paint in `series_point_styles` still wins.
@@ -254,6 +255,7 @@ pub(crate) struct ClusteredColumnStyle {
   /// Surface-chart value-band colors keyed by `c:bandFmt/c:idx`, one vector
   /// per surface plot-area group.
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
+  pub surface_band_styles: Vec<Vec<(u32, crate::common::ShapeStyle<'static>)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub legend_frame_style: crate::common::ShapeStyle<'static>,
   pub chart_area_style: crate::common::ShapeStyle<'static>,
@@ -1803,12 +1805,7 @@ pub(crate) fn lower_clustered_column_chart(
       .series
       .iter()
       .all(|series| series.kind == ChartSeriesKind::Column);
-  let word_parallel_bar_layout = word_parallel_layout_base
-    && horizontal_bar_only
-    && chart
-      .series
-      .iter()
-      .all(|series| series.grouping == ChartSeriesGrouping::Clustered);
+  let word_parallel_bar_layout = word_parallel_layout_base && horizontal_bar_only;
   let word_parallel_layout = word_parallel_column_layout || word_parallel_bar_layout;
   let word_perspective_column_layout = style.layout_profile == ChartLayoutProfile::Word
     && chart.view_3d.is_some_and(|view| !view.right_angle_axes)
@@ -1816,6 +1813,16 @@ pub(crate) fn lower_clustered_column_chart(
       .series
       .iter()
       .all(|series| series.kind == ChartSeriesKind::Column);
+  let word_surface_model = (style.layout_profile == ChartLayoutProfile::Word
+    && chart.view_3d.is_some_and(|view| !view.right_angle_axes)
+    && !chart.category_axis_shifted
+    && chart.surface_groups.len() == 1
+    && chart.surface_groups[0].is_3d
+    && chart
+      .series
+      .iter()
+      .all(|series| series.kind == ChartSeriesKind::Surface))
+  .then(|| word_surface_model_aspect(chart.surface_groups[0].series_count, category_count));
   // Office's numeric label reservation also measures the two inner samples
   // min + major and max - major, even on a logarithmic axis where these are
   // not painted ticks. Conditional-number-format COM controls identify these
@@ -2178,7 +2185,8 @@ pub(crate) fn lower_clustered_column_chart(
     || word_category_title_column_layout
     || word_quarter_turn_labels.is_some()
     || word_manual_filled_column_layout
-    || word_manual_inner_layout)
+    || word_manual_inner_layout
+    || word_manual_scatter_layout(chart, style))
     && value_tick_labels_visible
   {
     // Native 8/10/14pt and independent label-content/offset controls reserve
@@ -3097,6 +3105,7 @@ pub(crate) fn lower_clustered_column_chart(
     }
   }
   let mut projection_3d = None;
+  let mut word_surface_axis_layout = None;
   let mut scene_raster_bounds = None;
   if let Some(mut view) = chart.view_3d {
     if (word_parallel_layout || word_perspective_column_layout) && !view.height_percent_is_explicit
@@ -3108,9 +3117,11 @@ pub(crate) fn lower_clustered_column_chart(
       view.height_percent = 100.0 * (plot_bottom - plot_top) / (plot_right - plot_left);
       view.height_percent_is_explicit = true;
     }
-    let preferred_model_aspect = if word_parallel_bar_layout {
+    let preferred_model_aspect = if let Some((_, depth)) = word_surface_model {
+      (depth, false)
+    } else if word_parallel_bar_layout {
       (
-        word_clustered_model_depth(chart, category_count) * view.height_percent / 100.0,
+        word_category_slot_model_depth(chart, category_count) * view.height_percent / 100.0,
         false,
       )
     } else if word_perspective_column_layout
@@ -3121,7 +3132,7 @@ pub(crate) fn lower_clustered_column_chart(
     {
       // Independent Word GapWidth/GapDepth controls retain square logical
       // marker slots in perspective as well as parallel projection.
-      (word_clustered_model_depth(chart, category_count), false)
+      (word_category_slot_model_depth(chart, category_count), false)
     } else {
       cartesian_3d_preferred_model_aspect(chart, category_count)
     };
@@ -3131,7 +3142,18 @@ pub(crate) fn lower_clustered_column_chart(
       width: plot_right - plot_left,
       height: plot_bottom - plot_top,
     };
-    if !horizontal_bar_only && !word_parallel_column_layout && !word_perspective_column_layout {
+    let surface_plot = word_surface_model.and_then(|aspect| {
+      word_surface_automatic_plot(frame, chart, style, scale, aspect, &mut metrics)
+    });
+    if let Some(layout) = surface_plot {
+      scene_plot = layout.plot;
+      word_surface_axis_layout = layout.series_axis;
+    }
+    if !horizontal_bar_only
+      && !word_parallel_column_layout
+      && !word_perspective_column_layout
+      && surface_plot.is_none()
+    {
       // LibreOffice VDiagram::adjustPosAndSize_3d fits the projected scene
       // while preserving its aspect ratio, then centers that scene in the
       // available rectangle. Axis text is the stable physical scale for the
@@ -3156,14 +3178,16 @@ pub(crate) fn lower_clustered_column_chart(
         scene_plot.height -= vertical_inset * 2.0;
       }
     }
-    if let Some((reserve_on_right, reservation)) = cartesian_3d_series_axis_reservation(
-      chart,
-      scene_plot,
-      view,
-      preferred_model_aspect,
-      style,
-      &mut metrics,
-    ) {
+    if surface_plot.is_none()
+      && let Some((reserve_on_right, reservation)) = cartesian_3d_series_axis_reservation(
+        chart,
+        scene_plot,
+        view,
+        preferred_model_aspect,
+        style,
+        &mut metrics,
+      )
+    {
       // Office balances the projected scene and the series-axis label band as
       // one automatic-layout unit. The scene retains its physical box and is
       // translated by half the label width; shrinking the projection itself
@@ -3173,6 +3197,18 @@ pub(crate) fn lower_clustered_column_chart(
       if style.layout_profile == ChartLayoutProfile::PowerPoint {
         scene_plot.top += frame.height_pt * profiles::POWERPOINT_CARTESIAN_3D_SERIES_AXIS_TOP_RATIO;
       }
+    }
+    if let Some((height_factor, _)) = word_surface_model {
+      // Native surface dimensions use the logical grid, independently of
+      // DepthPercent. AutoScaling supplies the nominal viewport aspect;
+      // authored HeightPercent replaces that aspect, not the grid factor.
+      view.height_percent = height_factor
+        * if view.height_percent_is_explicit {
+          view.height_percent
+        } else {
+          100.0 * scene_plot.height / scene_plot.width
+        };
+      view.height_percent_is_explicit = true;
     }
     plot_left = scene_plot.left;
     plot_top = scene_plot.top;
@@ -3187,7 +3223,7 @@ pub(crate) fn lower_clustered_column_chart(
     );
     if word_parallel_layout {
       scene_raster_bounds = Some(projection.fit_word_parallel_volume(style.stroke_scale));
-    } else if word_perspective_column_layout {
+    } else if word_perspective_column_layout || word_surface_model.is_some() {
       scene_raster_bounds = Some(projection.fit_word_perspective_volume(view));
     }
     projection_3d = Some(projection);
@@ -3345,8 +3381,17 @@ pub(crate) fn lower_clustered_column_chart(
   } else if word_untitled_column_initial_layout {
     // Native height thresholds and independent category-font controls use
     // the outer automatic plot (11pt at each end), before category labels
-    // determine the final inside rectangle. This also precedes auto rotation.
-    (frame.height_pt - 22.0 * style.stroke_scale).max(0.0)
+    // determine the final inside rectangle. A bottom legend has already
+    // reserved its natural frame; overlay/deleted legends reserve nothing.
+    // This also precedes automatic category-label rotation.
+    let legend_band = if has_bottom_legend {
+      let slot =
+        word_chart_symbol_line_height(metrics.vertical_metrics_for_text("Mg", &style.legend)) * 0.9;
+      word_bottom_legend_reservation_with_slot(frame, chart, style, scale, &mut metrics, slot)
+    } else {
+      0.0
+    };
+    (frame.height_pt - 22.0 * style.stroke_scale - legend_band).max(0.0)
   } else if let Some((_, outer_diameter)) = word_radar_plot {
     // Office's automatic polar capacity precedes the category-label inset.
     // Native category-font controls shrink the painted net while retaining
@@ -3834,9 +3879,10 @@ pub(crate) fn lower_clustered_column_chart(
       }
       let y = value_y(*value, scale, plot_top, plot_height);
       if let Some(projection) = projection_3d {
-        let (front_x, front_y) = projection.project(plot_left, y, 0.0);
-        let (back_left_x, back_left_y) = projection.project(plot_left, y, 1.0);
-        let (back_right_x, back_right_y) = projection.project(plot_right, y, 1.0);
+        let [front, back_left, back_right] = projection.value_grid_points(y);
+        let (front_x, front_y) = front;
+        let (back_left_x, back_left_y) = back_left;
+        let (back_right_x, back_right_y) = back_right;
         if word_perspective_column_layout {
           lower_word_perspective_value_grid(
             &mut items,
@@ -3993,13 +4039,7 @@ pub(crate) fn lower_clustered_column_chart(
       }
       let points = projection_3d.map_or_else(
         || vec![(plot_left, y), (plot_right, y)],
-        |projection| {
-          vec![
-            projection.project(plot_left, y, 0.0),
-            projection.project(plot_left, y, 1.0),
-            projection.project(plot_right, y, 1.0),
-          ]
-        },
+        |projection| projection.value_grid_points(y).to_vec(),
       );
       push_chart_styled_polyline(
         &mut items,
@@ -4240,26 +4280,31 @@ pub(crate) fn lower_clustered_column_chart(
     style,
     category_count,
   );
-  lower_series_geometry(
-    &mut items,
-    chart,
-    style,
-    SeriesPlotGeometry {
-      plot: PlotRect {
-        left: plot_left,
-        top: plot_top,
-        width: plot_width,
-        height: plot_height,
-      },
-      axis_scales: &axis_scales,
-      bubble_reference_extent,
-      category_count,
-      projection_3d,
+  let series_geometry = SeriesPlotGeometry {
+    plot: PlotRect {
+      left: plot_left,
+      top: plot_top,
+      width: plot_width,
+      height: plot_height,
     },
-  );
+    axis_scales: &axis_scales,
+    bubble_reference_extent,
+    category_count,
+    projection_3d,
+  };
+  let surface_point_start = items.len();
+  let surface_mesh = word_surface_mesh(chart, style, series_geometry);
+  if surface_mesh.is_none() {
+    lower_series_geometry(&mut items, chart, style, series_geometry);
+  }
+  let mut surface_axis_items = Vec::new();
   if let Some(projection) = projection_3d {
     lower_series_axes(
-      &mut items,
+      if surface_mesh.is_some() {
+        &mut surface_axis_items
+      } else {
+        &mut items
+      },
       chart,
       PlotRect {
         left: plot_left,
@@ -4269,6 +4314,7 @@ pub(crate) fn lower_clustered_column_chart(
       },
       projection,
       style,
+      word_surface_axis_layout,
       &mut metrics,
     );
   }
@@ -4592,15 +4638,24 @@ pub(crate) fn lower_clustered_column_chart(
   // levels in both exports establish this, independently of PDF compression.
   if style.layout_profile == ChartLayoutProfile::Word
     && projection_3d.is_some()
-    && let Some(image) = cartesian_3d_scene_image(
+    && let Some(image) = chart_3d_scene_image(
       &items[scene_start..],
       scene_raster_bounds,
       style.fixed_output_raster_dpi,
+      surface_mesh.as_ref(),
     )
   {
     items.truncate(scene_start);
     items.push(PageItem::Image(image));
+  } else if surface_mesh.is_some() {
+    // Preserve geometry if the output budget or an unsupported scene item
+    // prevents rasterization. Selecting the mesh must not discard content.
+    let mut fallback = Vec::new();
+    lower_series_geometry(&mut fallback, chart, style, series_geometry);
+    items.splice(surface_point_start..surface_point_start, fallback);
   }
+
+  items.extend(surface_axis_items);
 
   let defer_data_labels = !scatter_only && !horizontal_bar_only && !radar_only;
   let mut deferred_data_label_items = Vec::new();
@@ -6044,14 +6099,20 @@ fn lower_cartesian_3d_walls(
   horizontal_bar: bool,
 ) {
   let first_wall = items.len();
-  let front_top_left = projection.project(plot.left, plot.top, 0.0);
-  let front_top_right = projection.project(plot.left + plot.width, plot.top, 0.0);
-  let front_bottom_left = projection.project(plot.left, plot.top + plot.height, 0.0);
-  let front_bottom_right = projection.project(plot.left + plot.width, plot.top + plot.height, 0.0);
-  let back_top_left = projection.project(plot.left, plot.top, 1.0);
-  let back_top_right = projection.project(plot.left + plot.width, plot.top, 1.0);
-  let back_bottom_left = projection.project(plot.left, plot.top + plot.height, 1.0);
-  let back_bottom_right = projection.project(plot.left + plot.width, plot.top + plot.height, 1.0);
+  let back_depth = projection
+    .word_perspective_wall_edges()
+    .map_or(1.0, |(_, back)| back);
+  let front_depth = 1.0 - back_depth;
+  let front_top_left = projection.project(plot.left, plot.top, front_depth);
+  let front_top_right = projection.project(plot.left + plot.width, plot.top, front_depth);
+  let front_bottom_left = projection.project(plot.left, plot.top + plot.height, front_depth);
+  let front_bottom_right =
+    projection.project(plot.left + plot.width, plot.top + plot.height, front_depth);
+  let back_top_left = projection.project(plot.left, plot.top, back_depth);
+  let back_top_right = projection.project(plot.left + plot.width, plot.top, back_depth);
+  let back_bottom_left = projection.project(plot.left, plot.top + plot.height, back_depth);
+  let back_bottom_right =
+    projection.project(plot.left + plot.width, plot.top + plot.height, back_depth);
 
   let back_color = (style.chart_style_id > 32)
     .then(|| chart_style_fill_fallback_color(&style.plot_area_style))
@@ -7797,7 +7858,21 @@ pub(crate) fn lower_radial_chart(
     } else {
       profiles::WORD_RIGHT_RADIAL_UNFRAMED_LEGEND_PADDING_PT
     };
-    let legend_reservation = if side_legend {
+    let legend_reservation = if side_legend && !chart_shape_has_paint(&style.legend_frame_style) {
+      // Native 2-D and 3-D unframed legends reserve the same realized
+      // caption/key frame. Font-size ratios lose Arial's symbol metrics.
+      word_filled_legend_metrics(
+        chart
+          .visible_legend_indices
+          .iter()
+          .filter_map(|&index| chart.categories.get(index).map(String::as_str)),
+        &style.legend,
+        1.0,
+        &mut metrics,
+      )
+      .frame_width
+        + 6.0
+    } else if side_legend {
       maximum_side_legend_label_width
         + legend_font_size
           * (profiles::WORD_RIGHT_RADIAL_LEGEND_MARKER_EM
@@ -11121,10 +11196,20 @@ fn word_exploded_pie_3d_projection(
   } else {
     half_thickness * c - tangent * (radius * c - half_thickness * s)
   };
-  let distance = ((radius * s + half_thickness * c) * envelope / tangent + half_thickness * s).max(
-    ((2.0 * focal * envelope * radius / plot.width).powi(2) + (radius * c).powi(2)).sqrt()
-      + thickness * s,
-  );
+  // Native camera fitting uses cardinal points plus 25 reflected samples
+  // at 7.2-degree intervals on both cylinder planes (208 support points).
+  // Expand the complete frustum support, including its half-thickness.
+  // A continuous circle and padding only its screen-X term both move the
+  // silhouette, particularly when the viewport width limits the fit.
+  let horizontal = 2.0 * focal / plot.width;
+  let mut support = horizontal.max(c);
+  for index in 0..25 {
+    let angle = f64::from(index) * std::f64::consts::TAU / 50.0;
+    let (sin, cos) = angle.sin_cos();
+    support = support.max(horizontal * sin.abs() as f32 + c * cos.abs() as f32);
+  }
+  let distance = ((radius * s + half_thickness * c) * envelope / tangent + half_thickness * s)
+    .max((radius * support + half_thickness * s) * envelope + half_thickness * s);
   let top_distance = distance - thickness * s;
   let top_y = eye_y - thickness * c;
   let strength = c / top_distance;
@@ -11645,7 +11730,11 @@ fn chart_3d_scene_image(
     text_hinting: None,
   };
   let image = if let Some(mesh) = mesh {
-    mesh.rasterize(mapping)?
+    if display.is_empty() {
+      mesh.rasterize(mapping)?
+    } else {
+      word_scene_tiles::rasterize_with_mesh(&display, viewport?, printer_size?, mapping, mesh)?
+    }
   } else if let Some(viewport) = viewport {
     word_scene_tiles::rasterize(&display, viewport, printer_size?, mapping)?
   } else {
@@ -11972,6 +12061,8 @@ fn radial_3d_outer_wall_paths(
         commands: Vec::new(),
         closed: true,
         fill: crate::common::Fill::Gradient(crate::common::GradientFill {
+          transform_as_normal: false,
+          opaque_for_pdf: false,
           stops: vec![
             crate::common::GradientStop {
               position: 0.0,
@@ -12291,9 +12382,11 @@ fn lower_radial_legend(
     }
     return;
   }
-  if let Some(title_band) = word_pie_3d_title_band {
-    // The native pie controls use the same natural-line row and filled key
-    // slots as Word's Cartesian 3-D legend (8/10/14pt and left/right).
+  if word_pie_3d_title_band.is_some()
+    || (word_auto_side_center_y.is_some() && !chart_shape_has_paint(&style.legend_frame_style))
+  {
+    // Native unframed 2-D and 3-D pies share the natural-line row and filled
+    // key slots of Word's Cartesian legend (8/10/14pt and left/right).
     let legend = word_filled_legend_metrics(
       chart
         .visible_legend_indices
@@ -12310,7 +12403,9 @@ fn lower_radial_legend(
       } else {
         frame.x_pt + frame.width_pt - 6.0 - legend.frame_width
       },
-      top: frame.y_pt + (frame.height_pt - height + title_band) * 0.5,
+      top: word_auto_side_center_y.unwrap_or_else(|| {
+        frame.y_pt + (frame.height_pt + word_pie_3d_title_band.unwrap_or(0.0)) * 0.5
+      }) - height * 0.5,
       width: legend.frame_width,
       height,
     };
@@ -13020,9 +13115,25 @@ impl Chart3DProjection {
     let guard = profiles::WORD_PERSPECTIVE_MODEL_GUARD_RATIO * self.model_width;
     let mut minimum = [f32::INFINITY; 2];
     let mut maximum = [f32::NEG_INFINITY; 2];
-    for x in [-self.model_width * 0.5 - guard, self.model_width * 0.5] {
+    // Native camera bounds extend the visible side of each base plane.
+    // Independent 0/170/180/270-degree controls distinguish the quadrants;
+    // keeping the guards on the same model edges changes the camera center.
+    let rotation = view.rotate_y_deg.rem_euclid(360.0);
+    let guard_x = if rotation < 180.0 { -guard } else { guard };
+    let guard_z = if (90.0..270.0).contains(&rotation) {
+      -guard
+    } else {
+      guard
+    };
+    for x in [
+      -self.model_width * 0.5 + guard_x.min(0.0),
+      self.model_width * 0.5 + guard_x.max(0.0),
+    ] {
       for y in [-self.model_height * 0.5, self.model_height * 0.5 + guard] {
-        for z in [-self.model_depth * 0.5, self.model_depth * 0.5 + guard] {
+        for z in [
+          -self.model_depth * 0.5 + guard_z.min(0.0),
+          self.model_depth * 0.5 + guard_z.max(0.0),
+        ] {
           let rotated = rotate_chart_model_point(self.rotate_x_rad, self.rotate_y_rad, [x, y, z]);
           for (axis, tangent) in [tan_x, tan_y].into_iter().enumerate() {
             minimum[axis] = minimum[axis].min(rotated[axis] + rotated[2] * tangent);
@@ -13193,6 +13304,42 @@ impl Chart3DProjection {
     let back = self.project(x, y, 1.0);
     (back.0 - front.0, back.1 - front.1)
   }
+
+  fn word_perspective_wall_edges(self) -> Option<(f32, f32)> {
+    if !self.word_scene_materials || self.right_angle_axes {
+      return None;
+    }
+    // Office's 0/30/90/170/180/225/270-degree surface controls move
+    // the enclosing walls with the camera. In this model convention the
+    // back plane changes with cos(rotation), the side with sin(rotation).
+    // See also ThreeDHelper's automatic cuboid-plane selection in LibreOffice.
+    // Resolve cardinal ties in angle space instead of the f32 sine residual.
+    let rotation = self.rotate_y_rad.rem_euclid(std::f32::consts::TAU);
+    let side = if rotation < std::f32::consts::PI {
+      self.input.left
+    } else {
+      self.input.left + self.input.width
+    };
+    let back =
+      if (std::f32::consts::FRAC_PI_2..3.0 * std::f32::consts::FRAC_PI_2).contains(&rotation) {
+        0.0
+      } else {
+        1.0
+      };
+    Some((side, back))
+  }
+
+  fn value_grid_points(self, y: f32) -> [(f32, f32); 3] {
+    let (side, back) = self
+      .word_perspective_wall_edges()
+      .unwrap_or((self.input.left, 1.0));
+    let opposite = self.input.left * 2.0 + self.input.width - side;
+    [
+      self.project(side, y, 1.0 - back),
+      self.project(side, y, back),
+      self.project(opposite, y, back),
+    ]
+  }
 }
 
 #[derive(Clone, Copy)]
@@ -13244,19 +13391,368 @@ struct HorizontalTaperedBounds {
   end_half_height: f32,
 }
 
-fn word_clustered_model_depth(chart: &ClusteredColumnChart<'_>, category_count: usize) -> f32 {
+fn word_surface_model_aspect(series_count: usize, category_count: usize) -> (f32, f32) {
+  // Native independent row/column counts, HeightPercent, DepthPercent and
+  // viewport controls. The unshifted category grid subtracts one endpoint
+  // before the integer average; retaining a fractional half changes height.
+  let categories = category_count.max(1);
+  let series = series_count.max(1);
+  let height_slots = (series + categories - 1) / 2;
+  (
+    height_slots as f32 / categories as f32,
+    series as f32 / categories as f32,
+  )
+}
+
+#[derive(Clone, Copy)]
+struct WordSurfaceAutomaticLayout {
+  plot: PlotRect,
+  series_axis: Option<WordSurfaceAxisLayout>,
+}
+
+#[derive(Clone, Copy)]
+struct WordSurfaceAxisLayout {
+  side: bool,
+  side_on_left: bool,
+  natural_line: f32,
+  label_rhythm: Option<usize>,
+}
+
+fn word_surface_automatic_plot(
+  frame: ChartFrame,
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  mut scale: crate::render::chart::LinearAxisScale,
+  model_aspect: (f32, f32),
+  metrics: &mut TextMetrics,
+) -> Option<WordSurfaceAutomaticLayout> {
+  let category_count = chart
+    .series
+    .iter()
+    .map(|series| series.values.len())
+    .chain(std::iter::once(chart.categories.len()))
+    .max()
+    .unwrap_or(0);
+  let mut seen_budgets = [false; 11];
+  loop {
+    let layout = word_surface_plot_for_scale(frame, chart, style, scale, model_aspect, metrics)?;
+    let plot = layout.plot;
+    // Surface legend entries represent numeric bands, not source series.
+    // Reconcile their reservation with the projected numeric capacity. A
+    // ten-increment provisional scale can require extra legend rows that
+    // disappear after the actual scale is resolved. Native axis captures
+    // confirm that layout revisits the plot; retaining that provisional row
+    // shortens every gridline and changes the camera's automatic height.
+    let mut view = chart.view_3d?;
+    view.height_percent = model_aspect.0
+      * if view.height_percent_is_explicit {
+        view.height_percent
+      } else {
+        100.0 * plot.height / plot.width
+      };
+    view.height_percent_is_explicit = true;
+    let mut projection =
+      cartesian_3d_projection(view, plot, style.layout_profile, model_aspect.1, false);
+    projection.fit_word_perspective_volume(view);
+    let labels = scale_tick_labels(
+      scale.minimum,
+      scale.maximum,
+      scale.major_unit,
+      vertical_axis_number_format_code(chart, 0),
+      scale.logarithmic_base,
+      chart.value_axis.map_or(1.0, value_axis_display_unit),
+    );
+    let rotation = category_axis_text_rotation_degrees(
+      chart
+        .value_axis
+        .and_then(|axis| axis.text_properties.as_deref()),
+    );
+    let pitch = maximum_tick_label_axis_pitch(
+      &labels,
+      &style.value_label,
+      style.layout_profile,
+      rotation,
+      false,
+      metrics,
+    );
+    let budget = suppress_duplicate_formatted_tick_budget(
+      maximum_auto_main_increment_count(
+        style.layout_profile,
+        projection.vertical_axis_length(plot, chart.value_axis.is_some_and(value_axis_is_on_right)),
+        pitch,
+      ),
+      &labels,
+    );
+    // The existing numeric estimator has ten possible capacities. Visiting
+    // each at most once also bounds pathological legend/scale cycles.
+    if seen_budgets[budget] {
+      return Some(layout);
+    }
+    seen_budgets[budget] = true;
+    let next = cartesian_axis_scales(
+      chart,
+      style.layout_profile,
+      category_count,
+      budget,
+      10,
+      Some((plot.width, plot.height)),
+    )
+    .first()?
+    .y;
+    if next.minimum == scale.minimum
+      && next.maximum == scale.maximum
+      && next.major_unit == scale.major_unit
+    {
+      return Some(layout);
+    }
+    scale = next;
+  }
+}
+
+fn word_surface_plot_for_scale(
+  frame: ChartFrame,
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
+  model_aspect: (f32, f32),
+  metrics: &mut TextMetrics,
+) -> Option<WordSurfaceAutomaticLayout> {
+  // Word's native axis layout reserves physical text bands before the final
+  // surface camera fit. Manual plots, visible category labels and titles
+  // have additional layout owners; retain their existing route here.
+  if chart.plot_layout.is_some()
+    || chart.title.is_some()
+    || chart.axis_sets.len() != 1
+    || chart.category_axis.is_none_or(category_axis_is_visible)
+    || chart.category_axis_title.is_some()
+    || chart.value_axis_title.is_some()
+    || !chart.additional_axis_titles.is_empty()
+    || chart.legend_layout.is_some()
+    || !matches!(
+      chart.legend_position,
+      None | Some(ChartLegendPosition::Bottom)
+    )
+  {
+    return None;
+  }
+  let mut view = chart.view_3d?;
+  let group = chart.surface_groups.first()?;
+  let device = style.stroke_scale;
+  let value_line =
+    word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.value_label));
+  let endpoint = (11.0 * device).max(5.0 * device + value_line * 0.5);
+  let legend = if chart.legend_position.is_some() && !chart.legend_overlay {
+    let slot =
+      word_chart_symbol_line_height(metrics.vertical_metrics_for_text("Mg", &style.legend)) * 0.9;
+    word_bottom_legend_reservation_with_slot(frame, chart, style, scale, metrics, slot)
+  } else {
+    0.0
+  };
+  let mut left = 11.0 * device;
+  let mut right = left;
+  let mut bottom = endpoint + legend;
+  let rotation = view.rotate_y_deg.rem_euclid(360.0);
+  let value_labels_visible = chart.value_axis.is_none_or(|axis| {
+    value_axis_is_visible(axis)
+      && axis
+        .tick_label_position
+        .as_ref()
+        .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None))
+  });
+  if value_labels_visible && !(90.0..270.0).contains(&rotation) {
+    let labels = scale_tick_labels(
+      scale.minimum,
+      scale.maximum,
+      scale.major_unit,
+      vertical_axis_number_format_code(chart, 0),
+      scale.logarithmic_base,
+      chart.value_axis.map_or(1.0, value_axis_display_unit),
+    );
+    let width = labels
+      .iter()
+      .map(|(_, text)| word_chart_tick_label_width(text, &style.value_label, metrics))
+      .fold(0.0_f32, f32::max);
+    left = left.max(6.5 * device + width + value_line * 0.76);
+  }
+  let axis = chart.axis_sets[0].series_axis;
+  let mut series_axis = None;
+  if let Some(axis) = axis.filter(|axis| {
+    !axis
+      .delete
+      .as_ref()
+      .is_some_and(|delete| delete.val.is_none_or(|value| value.as_bool()))
+  }) {
+    let labels_visible = axis
+      .tick_label_position
+      .as_ref()
+      .is_none_or(|position| position.val != Some(c::TickLabelPositionValues::None));
+    let initial_plot = PlotRect {
+      left: frame.x_pt + left,
+      top: frame.y_pt + endpoint,
+      width: frame.width_pt - left - right,
+      height: frame.height_pt - endpoint - bottom,
+    };
+    if initial_plot.width <= 0.0 || initial_plot.height <= 0.0 {
+      return None;
+    }
+    // Read-only CHART camera/axis captures: label admission uses the outer
+    // 5pt viewport's model aspect, projected into the endpoint-inset plot.
+    // The final surface camera below instead uses its completed viewport.
+    view.height_percent = model_aspect.0
+      * if view.height_percent_is_explicit {
+        view.height_percent
+      } else {
+        100.0 * (frame.height_pt - 10.0 * device - legend)
+          / (frame.width_pt - 10.0 * device).max(device)
+      };
+    view.height_percent_is_explicit = true;
+    let mut projection = cartesian_3d_projection(
+      view,
+      initial_plot,
+      style.layout_profile,
+      model_aspect.1,
+      false,
+    );
+    projection.fit_word_perspective_volume(view);
+    let (wall_x, _) = projection.word_perspective_wall_edges()?;
+    let x = initial_plot.left * 2.0 + initial_plot.width - wall_x;
+    let start = projection.project(x, initial_plot.top + initial_plot.height, 0.0);
+    let end = projection.project(x, initial_plot.top + initial_plot.height, 1.0);
+    let span_x = (end.0 - start.0).abs();
+    let span_y = (end.1 - start.1).abs();
+    let width = chart
+      .series
+      .iter()
+      .skip(group.first_series_index)
+      .take(group.series_count)
+      .map(|series| word_chart_tick_label_width(&series.name, &style.series_label, metrics))
+      .fold(0.0_f32, f32::max);
+    let natural_line =
+      word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.series_label));
+    // Native CHART axis-mode selection compares 2/3 of the horizontal
+    // projection with its vertical projection (not a 45-degree slope).
+    let side = span_y >= span_x * (2.0 / 3.0);
+    let side_on_left = (90.0..180.0).contains(&rotation) || rotation >= 270.0;
+    let mut label_rhythm = None;
+    if labels_visible {
+      let capacity;
+      if side {
+        capacity = (span_y * 0.9 / natural_line.max(f32::EPSILON)).floor() as usize;
+        let band = 6.5 * device + width + natural_line * 0.5;
+        if side_on_left {
+          left = left.max(band);
+        } else {
+          right = right.max(band);
+        }
+      } else {
+        let properties = axis.text_properties.as_deref();
+        let automatic = properties
+          .is_none_or(|properties| properties.body_properties.rotation == Some(-60_000_000));
+        let angle = if automatic {
+          let (angle, count) =
+            word_surface_series_label_rotation(width, natural_line, span_x, group.series_count);
+          capacity = count;
+          angle
+        } else {
+          let angle = category_axis_text_rotation_degrees(properties);
+          let pitch =
+            width * angle.to_radians().cos().abs() + natural_line * angle.to_radians().sin().abs();
+          capacity = (span_x * 0.9 / pitch.max(f32::EPSILON)).floor() as usize;
+          angle
+        };
+        let cosine = angle.to_radians().cos().abs();
+        let sine = angle.to_radians().sin().abs();
+        bottom = bottom.max(legend + 6.5 * device + width * sine + natural_line * (cosine + 0.5));
+        let (first, last) = if angle.abs() <= f32::EPSILON {
+          (width * 0.5, width * 0.5)
+        } else if angle < 0.0 {
+          (width * cosine, natural_line * cosine)
+        } else {
+          (natural_line * cosine, width * cosine)
+        };
+        left = left.max(6.5 * device + first);
+        right = right.max(6.5 * device + last);
+      }
+      // TickLabelSpacing belongs to this admission viewport, before the final
+      // camera fit. Native COM/native-axis captures agree across the rotation,
+      // font and extent controls. A later collision check on painted anchors
+      // uses a different span and can incorrectly restore suppressed labels.
+      label_rhythm = Some(axis.tick_label_skip.as_ref().map_or_else(
+        || group.series_count.div_ceil(capacity.max(1)).max(1),
+        |skip| skip.val.max(1) as usize,
+      ));
+    }
+    series_axis = Some(WordSurfaceAxisLayout {
+      side,
+      side_on_left,
+      natural_line,
+      label_rhythm,
+    });
+  }
+  let plot = PlotRect {
+    left: frame.x_pt + left,
+    top: frame.y_pt + endpoint,
+    width: frame.width_pt - left - right,
+    height: frame.height_pt - endpoint - bottom,
+  };
+  (plot.width > 0.0 && plot.height > 0.0)
+    .then_some(WordSurfaceAutomaticLayout { plot, series_axis })
+}
+
+fn word_surface_series_label_rotation(
+  width: f32,
+  line: f32,
+  span: f32,
+  count: usize,
+) -> (f32, usize) {
+  if count <= 1 || width <= 0.0 || line <= 0.0 {
+    return (0.0, count.max(1));
+  }
+  // Native unwrapped series-label formatter tries 0/45/90 degrees, retaining
+  // 90% of the axis span. Oblique labels can interleave vertically; counting
+  // only their bounding boxes misses this capacity. Prefer 45 degrees when
+  // it displays as many labels as the quarter turn (font/extent controls).
+  let available = span * 0.9;
+  let horizontal = (available / width).floor() as usize;
+  if horizontal >= count {
+    return (0.0, horizontal);
+  }
+  let diagonal_pitch = available / count as f32 * std::f32::consts::FRAC_1_SQRT_2;
+  let diagonal = ((available / ((width + line) * std::f32::consts::FRAC_1_SQRT_2)).floor()
+    as usize)
+    .max((count + 1) / ((line / diagonal_pitch.max(f32::EPSILON)).floor() as usize + 1));
+  let vertical = (available / line).floor() as usize;
+  if diagonal >= count || diagonal >= vertical {
+    (-45.0, diagonal)
+  } else {
+    (-90.0, vertical)
+  }
+}
+
+fn word_category_slot_model_depth(chart: &ClusteredColumnChart<'_>, category_count: usize) -> f32 {
   // Native independent category-count, series-count and both gap controls:
   // the marker's Y and Z dimensions share a logical slot. Normalized to
-  // scene height, one cluster contains N markers plus GapWidth; the depth
-  // contains one marker plus GapDepth.
+  // scene height, one cluster contains N markers plus GapWidth; a stack
+  // occupies one marker slot. The depth contains one marker plus GapDepth.
+  // Native stacked horizontal controls retain this rule for automatic and
+  // authored height, independently varied GapDepth and DepthPercent.
   let gap_width = chart.gap_width_percent as f32 / 100.0;
   let gap_depth = chart
     .series
     .first()
     .map_or(150.0, |series| series.gap_depth_percent as f32)
     / 100.0;
-  (1.0 + gap_depth)
-    / (category_count.max(1) as f32 * (chart.series.len().max(1) as f32 + gap_width))
+  let peer_count = if chart.series.iter().all(|series| {
+    matches!(
+      series.grouping,
+      ChartSeriesGrouping::Stacked | ChartSeriesGrouping::PercentStacked
+    )
+  }) {
+    1
+  } else {
+    chart.series.len().max(1)
+  };
+  (1.0 + gap_depth) / (category_count.max(1) as f32 * (peer_count as f32 + gap_width))
 }
 
 fn cartesian_3d_preferred_model_aspect(
@@ -13471,10 +13967,14 @@ fn lower_word_perspective_value_grid(
   let half = width.max(device) * projection.model_width / projection.input.width * 0.5;
   let model_y =
     ((y - projection.input.top) / projection.input.height - 0.5) * projection.model_height;
-  let left = -projection.model_width * 0.5;
-  let right = projection.model_width * 0.5;
-  let front = -projection.model_depth * 0.5;
-  let back = projection.model_depth * 0.5;
+  let (side, back_ratio) = projection
+    .word_perspective_wall_edges()
+    .unwrap_or((projection.input.left, 1.0));
+  let left =
+    ((side - projection.input.left) / projection.input.width - 0.5) * projection.model_width;
+  let right = -left;
+  let back = (back_ratio - 0.5) * projection.model_depth;
+  let front = -back;
   for corners in [
     [
       [left, model_y - half, back],
@@ -14543,6 +15043,7 @@ fn bubble_marker_radius_fraction(
   (fraction.is_finite() && fraction > 0.0).then_some(f64::from(fraction))
 }
 
+#[derive(Clone, Copy)]
 struct SeriesPlotGeometry<'a> {
   plot: PlotRect,
   axis_scales: &'a [CartesianAxisScales],
@@ -15304,22 +15805,241 @@ fn lower_surface_wireframe(items: &mut Vec<PageItem>, context: SurfaceRenderCont
   }
 }
 
-fn lower_filled_surface(
-  items: &mut Vec<PageItem>,
-  group_index: usize,
-  context: SurfaceRenderContext<'_, '_>,
-) {
-  let SurfaceRenderContext {
+fn word_surface_diagonal(values: [f64; 4]) -> [[usize; 3]; 2] {
+  // Native uploaded meshes for all 24 permutations of a 2x2 cell choose
+  // the upper convex envelope. Equal sums are coplanar, so either diagonal
+  // represents the same surface. Split BEFORE clipping the value bands.
+  if values[0] + values[2] >= values[1] + values[3] {
+    [[0, 1, 2], [0, 2, 3]]
+  } else {
+    [[0, 1, 3], [1, 2, 3]]
+  }
+}
+
+fn word_surface_diffuse(normal: [f32; 3]) -> f32 {
+  // Captured GFX meshes at 0/30/90/170/270 degrees retain white lighting
+  // separately from the band texture: ambient .4 and a .75 diagonal light
+  // in camera space. The uploaded diffuse attribute is truncated to 1/128,
+  // including values above 1; clamp only after multiplying the texture.
+  ((0.4 + 0.75 / 3.0_f32.sqrt() * (normal[0] - normal[1] - normal[2]).max(0.0)) * 128.0).floor()
+    / 128.0
+}
+
+fn word_surface_texture_bounds<'a>(vertices: impl Iterator<Item = &'a SurfaceVertex>) -> PlotRect {
+  let mut left = f32::INFINITY;
+  let mut top = f32::INFINITY;
+  let mut right = f32::NEG_INFINITY;
+  let mut bottom = f32::NEG_INFINITY;
+  for vertex in vertices {
+    left = left.min(vertex.x);
+    right = right.max(vertex.x);
+    top = top.min(vertex.depth_ratio);
+    bottom = bottom.max(vertex.depth_ratio);
+  }
+  PlotRect {
+    left,
+    top,
+    width: (right - left).max(f32::EPSILON),
+    height: (bottom - top).max(f32::EPSILON),
+  }
+}
+
+fn word_surface_texture_coordinates(vertex: SurfaceVertex, bounds: PlotRect) -> [f64; 2] {
+  [
+    f64::from((vertex.x - bounds.left) / bounds.width),
+    f64::from(1.0 - (vertex.depth_ratio - bounds.top) / bounds.height),
+  ]
+}
+
+fn word_surface_mesh(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  geometry: SeriesPlotGeometry<'_>,
+) -> Option<word_pie_scene::Scene> {
+  let projection = geometry.projection_3d?;
+  if style.layout_profile != ChartLayoutProfile::Word
+    || !projection.word_scene_materials
+    || projection.right_angle_axes
+    || chart.surface_groups.len() != 1
+    || chart
+      .series
+      .iter()
+      .any(|series| series.kind != ChartSeriesKind::Surface)
+  {
+    return None;
+  }
+  let group = chart.surface_groups.first()?;
+  let scale = geometry.axis_scales.get(group.axis_set_index)?.y;
+  if !group.is_3d || group.wireframe || scale.logarithmic_base.is_some() {
+    return None;
+  }
+  let context = SurfaceRenderContext {
     chart,
     style,
     group,
-    plot,
+    plot: geometry.plot,
     scale,
+    category_count: geometry.category_count,
+    projection_3d: Some(projection),
+  };
+  let model = |vertex: SurfaceVertex| {
+    let value_ratio = axis_value_ratio_unclamped(vertex.value, scale) as f32;
+    let y_ratio = if scale.reversed {
+      value_ratio
+    } else {
+      1.0 - value_ratio
+    };
+    [
+      ((vertex.x - projection.input.left) / projection.input.width - 0.5) * projection.model_width,
+      (y_ratio - 0.5) * projection.model_height,
+      (vertex.depth_ratio - 0.5) * projection.model_depth,
+    ]
+  };
+  let mut scene = word_pie_scene::Scene::default();
+  let band_styles = style
+    .surface_band_styles
+    .first()
+    .map_or(&[][..], Vec::as_slice);
+  let mut bands: std::collections::BTreeMap<usize, Vec<([SurfaceVertex; 3], f32)>> =
+    std::collections::BTreeMap::new();
+
+  for cell in surface_cells(context) {
+    for indices in word_surface_diagonal(cell.map(|vertex| vertex.value)) {
+      let triangle = indices.map(|index| cell[index]);
+      let points = triangle.map(model);
+      let a: [f32; 3] = std::array::from_fn(|i| points[1][i] - points[0][i]);
+      let b: [f32; 3] = std::array::from_fn(|i| points[2][i] - points[0][i]);
+      let normal = [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+      ];
+      let length = normal.iter().map(|n| n * n).sum::<f32>().sqrt();
+      if length <= f32::EPSILON {
+        continue;
+      }
+      let mut normal = rotate_chart_model_point(
+        projection.rotate_x_rad,
+        projection.rotate_y_rad,
+        normal.map(|v| v / length),
+      );
+      let center = rotate_chart_model_point(
+        projection.rotate_x_rad,
+        projection.rotate_y_rad,
+        std::array::from_fn(|i| (points[0][i] + points[1][i] + points[2][i]) / 3.0),
+      );
+      let to_surface = [
+        center[0] - projection.camera_plane_center.0,
+        center[1] - projection.camera_plane_center.1,
+        center[2] + projection.camera_distance.unwrap_or(0.0),
+      ];
+      if (0..3).map(|i| normal[i] * to_surface[i]).sum::<f32>() > 0.0 {
+        normal = normal.map(|v| -v);
+      }
+      let diffuse = word_surface_diffuse(normal);
+      let minimum = triangle
+        .iter()
+        .map(|v| v.value)
+        .fold(f64::INFINITY, f64::min);
+      let maximum = triangle
+        .iter()
+        .map(|v| v.value)
+        .fold(f64::NEG_INFINITY, f64::max);
+      for band in surface_band_index(minimum, scale)..=surface_band_index(maximum, scale) {
+        let lower = scale.minimum + band as f64 * scale.major_unit;
+        let upper = (lower + scale.major_unit).min(scale.maximum);
+        let polygon = clip_surface_polygon(&triangle, lower, true);
+        let polygon = clip_surface_polygon(&polygon, upper, false);
+        for i in 1..polygon.len().saturating_sub(1) {
+          bands
+            .entry(band)
+            .or_default()
+            .push(([polygon[0], polygon[i], polygon[i + 1]], diffuse));
+        }
+      }
+    }
+  }
+  for (band, triangles) in bands {
+    let paint = band_styles
+      .iter()
+      .find_map(|(index, paint)| (*index == band as u32).then_some(paint));
+    let color = match paint.map(|paint| &paint.fill) {
+      Some(
+        crate::common::ShapeStyleValue::NoPaint
+        | crate::common::ShapeStyleValue::Paint(crate::common::Fill::None),
+      ) => continue,
+      Some(crate::common::ShapeStyleValue::Paint(crate::common::Fill::Solid(color))) => RgbColor {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+      },
+      _ => surface_band_color(style, 0, band as u32),
+    };
+    // Native uploaded UVs are normalized to the clipped band's XZ bounds,
+    // shared by all its disconnected pieces, not to the entire chart floor.
+    let bounds = word_surface_texture_bounds(triangles.iter().flat_map(|(v, _)| v.iter()));
+    let material = match paint.map(|paint| &paint.fill) {
+      Some(crate::common::ShapeStyleValue::Paint(crate::common::Fill::Gradient(gradient)))
+        if gradient.path.is_none() && gradient.stops.iter().all(|stop| stop.color.a == 255) =>
+      {
+        Some(scene.linear_material(
+          gradient,
+          [
+            0.0,
+            0.0,
+            f64::from(bounds.width / projection.input.width * projection.model_width),
+            f64::from(bounds.height * projection.model_depth),
+          ],
+        ))
+      }
+      _ => None,
+    };
+    for (vertices, diffuse) in triangles {
+      let points = vertices.map(|v| {
+        let p = projection.project_model(model(v));
+        [f64::from(p.0), f64::from(p.1)]
+      });
+      // Reciprocal clip-W is screen-linear and larger for nearer faces.
+      // A mean-depth painter order fails when surface peaks overlap.
+      let depth = vertices.map(|v| {
+        let camera =
+          rotate_chart_model_point(projection.rotate_x_rad, projection.rotate_y_rad, model(v));
+        projection
+          .camera_distance
+          .map_or(-f64::from(camera[2]), |distance| {
+            1.0 / (f64::from(distance) + f64::from(camera[2]))
+          })
+      });
+      if let Some(material) = material {
+        let uv = vertices.map(|v| word_surface_texture_coordinates(v, bounds));
+        scene.projected_textured_triangle(points, depth, uv, material, diffuse);
+      } else {
+        let channel = |v: u8| (f32::from(v) * diffuse).round().clamp(0.0, 255.0) as u8;
+        scene.projected_triangle(
+          points,
+          depth,
+          RgbColor {
+            r: channel(color.r),
+            g: channel(color.g),
+            b: channel(color.b),
+          },
+        );
+      }
+    }
+  }
+  Some(scene)
+}
+
+fn surface_cells(context: SurfaceRenderContext<'_, '_>) -> Vec<[SurfaceVertex; 4]> {
+  let SurfaceRenderContext {
+    chart,
+    group,
+    plot,
     category_count,
-    projection_3d,
+    ..
   } = context;
   if group.series_count < 2 || category_count < 2 {
-    return;
+    return Vec::new();
   }
   let mut cells = Vec::new();
   for row_index in 0..group.series_count - 1 {
@@ -15379,6 +16099,27 @@ fn lower_filled_surface(
       ]);
     }
   }
+  cells
+}
+
+fn lower_filled_surface(
+  items: &mut Vec<PageItem>,
+  group_index: usize,
+  context: SurfaceRenderContext<'_, '_>,
+) {
+  let SurfaceRenderContext {
+    style,
+    group,
+    plot,
+    scale,
+    category_count,
+    projection_3d,
+    ..
+  } = context;
+  if group.series_count < 2 || category_count < 2 {
+    return;
+  }
+  let mut cells = surface_cells(context);
   if group.is_3d {
     cells.sort_by(|left, right| {
       let left_depth = left.iter().map(|vertex| vertex.depth_ratio).sum::<f32>();
@@ -15502,6 +16243,7 @@ fn lower_series_axes(
   plot: PlotRect,
   projection: Chart3DProjection,
   style: &ClusteredColumnStyle,
+  word_surface_axis_layout: Option<WordSurfaceAxisLayout>,
   metrics: &mut TextMetrics,
 ) {
   for (axis_set_index, axes) in chart.axis_sets.iter().enumerate() {
@@ -15552,7 +16294,7 @@ fn lower_series_axes(
     }
 
     let axis_position = axis.axis_position.val;
-    let base = match axis_position {
+    let mut base = match axis_position {
       c::AxisPositionValues::Bottom => (
         projection.x_for_visual_side(plot, true, plot.top + plot.height, 0.0),
         plot.top + plot.height,
@@ -15570,18 +16312,55 @@ fn lower_series_axes(
         plot.top + plot.height,
       ),
     };
+    if surface_group.is_some()
+      && axis_position == c::AxisPositionValues::Bottom
+      && let Some((wall_x, _)) = projection.word_perspective_wall_edges()
+    {
+      // The depth axis belongs to the open edge opposite the side wall.
+      // Selecting the visually rightmost X edge puts it behind the surface
+      // after a half turn (native 170/180/225-degree controls).
+      base.0 = plot.left * 2.0 + plot.width - wall_x;
+    }
     let start = projection.project(base.0, base.1, 0.0);
     let end = projection.project(base.0, base.1, 1.0);
     let axis_width = style.axis_line_width_pt.unwrap_or(0.75) * style.stroke_scale;
-    items.push(PageItem::Line(LineItem {
-      x1_pt: start.0,
-      y1_pt: start.1,
-      x2_pt: end.0,
-      y2_pt: end.1,
-      width_pt: axis_width,
-      color: style.gridline_color,
-      kind: LineItemKind::Stroke,
-    }));
+    let word_stroke =
+      word_surface_axis_layout.and_then(|_| style.series_axis_strokes.get(axis_set_index));
+    let mut push_axis_segment = |start: (f32, f32), end: (f32, f32)| {
+      if let Some(stroke) = word_stroke {
+        if let Some(stroke) = stroke {
+          let bounds = common_rect(
+            start.0.min(end.0),
+            start.1.min(end.1),
+            (end.0 - start.0).abs(),
+            (end.1 - start.1).abs(),
+          );
+          items.push(PageItem::Path(crate::common::PathItem {
+            bounds,
+            points: vec![common_point(start.0, start.1), common_point(end.0, end.1)],
+            commands: Vec::new(),
+            closed: false,
+            fill: crate::common::Fill::None,
+            stroke: Some(bind_chart_stroke_to_bounds(
+              stroke,
+              bounds,
+              style.stroke_scale,
+            )),
+          }));
+        }
+      } else {
+        items.push(PageItem::Line(LineItem {
+          x1_pt: start.0,
+          y1_pt: start.1,
+          x2_pt: end.0,
+          y2_pt: end.1,
+          width_pt: axis_width,
+          color: style.gridline_color,
+          kind: LineItemKind::Stroke,
+        }));
+      }
+    };
+    push_axis_segment(start, end);
 
     let labels_visible = axis
       .tick_label_position
@@ -15599,12 +16378,16 @@ fn lower_series_axes(
       .iter()
       .map(|(_, depth_ratio)| projection.project(base.0, base.1, *depth_ratio))
       .collect::<Vec<_>>();
-    let rhythm = series_axis_label_rhythm(
-      maximum_label_width,
-      style.series_label.font_size_pt,
-      &label_points,
-      explicit_rhythm,
-    );
+    let rhythm = word_surface_axis_layout
+      .and_then(|layout| layout.label_rhythm)
+      .unwrap_or_else(|| {
+        series_axis_label_rhythm(
+          maximum_label_width,
+          style.series_label.font_size_pt,
+          &label_points,
+          explicit_rhythm,
+        )
+      });
     let center = (plot.left + plot.width * 0.5, plot.top + plot.height * 0.5);
     let midpoint = ((start.0 + end.0) * 0.5, (start.1 + end.1) * 0.5);
     let outward = {
@@ -15617,27 +16400,62 @@ fn lower_series_axes(
       }
     };
     let tick_length = style.series_label.font_size_pt * 0.3;
+    let tick_direction = word_surface_axis_layout.map_or(outward, |layout| {
+      if layout.side {
+        (if layout.side_on_left { -1.0 } else { 1.0 }, 0.0)
+      } else {
+        (0.0, 1.0)
+      }
+    });
+    let native_tick_length =
+      word_surface_axis_layout.map_or(tick_length, |layout| layout.natural_line * 0.26);
+    let tick_mark = axis.major_tick_mark.as_ref().and_then(|mark| mark.val);
+    let tick_offsets = if word_surface_axis_layout.is_some() {
+      chartsheet_tick_offsets(tick_mark, native_tick_length)
+    } else {
+      (0.0, tick_length)
+    };
+    let tick_skip = if word_surface_axis_layout.is_some() {
+      axis
+        .tick_mark_skip
+        .as_ref()
+        .map_or(1, |skip| skip.val.max(1) as usize)
+    } else {
+      1
+    };
+    for point in label_points.iter().step_by(tick_skip) {
+      if tick_offsets.0 != tick_offsets.1 {
+        push_axis_segment(
+          (
+            point.0 + tick_direction.0 * tick_offsets.0,
+            point.1 + tick_direction.1 * tick_offsets.0,
+          ),
+          (
+            point.0 + tick_direction.0 * tick_offsets.1,
+            point.1 + tick_direction.1 * tick_offsets.1,
+          ),
+        );
+      }
+    }
     for (index, ((label, _), point)) in labels.into_iter().zip(label_points).enumerate() {
-      items.push(PageItem::Line(LineItem {
-        x1_pt: point.0,
-        y1_pt: point.1,
-        x2_pt: point.0 + outward.0 * tick_length,
-        y2_pt: point.1 + outward.1 * tick_length,
-        width_pt: axis_width,
-        color: style.gridline_color,
-        kind: LineItemKind::Stroke,
-      }));
       if labels_visible && index % rhythm == 0 {
         let width = metrics.measure_text(label, &style.series_label);
         push_text(
           items,
           point.0 + outward.0 * tick_length * 1.8 - if outward.0 < 0.0 { width } else { 0.0 },
-          point.1 + outward.1 * tick_length * 1.8
-            - if outward.1 < 0.0 {
-              line_height(&style.series_label)
-            } else {
-              0.0
-            },
+          if let Some(layout) = word_surface_axis_layout.filter(|layout| layout.side) {
+            // Native 8/10/14/20pt controls center the DirectWrite natural
+            // line on the axis point, independently of the tick type/pen.
+            point.1 - layout.natural_line * 0.5
+              + word_chart_text_baseline_adjustment(metrics, label, &style.series_label)
+          } else {
+            point.1 + outward.1 * tick_length * 1.8
+              - if outward.1 < 0.0 {
+                line_height(&style.series_label)
+              } else {
+                0.0
+              }
+          },
           label.to_string(),
           style.series_label.clone(),
         );
@@ -16721,6 +17539,9 @@ fn lower_3d_bar_marker(
       );
     }
   }
+  if series.shape_3d == c::ShapeValues::Box {
+    apply_word_parallel_bar_box_gradient(&mut items[first_item..], marker, bounds, depth, style);
+  }
   apply_3d_marker_no_fill(items, first_item, marker, style);
   if matches!(
     series.shape_3d,
@@ -16734,6 +17555,83 @@ fn lower_3d_bar_marker(
       values.1,
     );
     word_lathe_outline::lower_horizontal(items, marker, bounds, depth, taper, style);
+  }
+}
+
+fn word_parallel_box_diffuse(normal: [f32; 3]) -> f32 {
+  // The separate white diffuse attributes in native gradient boxes are
+  // 129/97/82/51, unlike solid fills quantized after material multiplication.
+  let light_scale = 0.75 / (0.4_f32 * 0.4 + 0.6 * 0.6 + 1.0).sqrt();
+  let light = (normal[0] * 0.4 + normal[1] * 0.6 + normal[2]) * light_scale;
+  ((0.4 + light.max(0.0)) * 128.0).floor() / 128.0
+}
+
+fn apply_word_parallel_bar_box_gradient(
+  items: &mut [PageItem],
+  marker: Marker3DContext<'_, '_, '_>,
+  bounds: HorizontalMarkerBounds,
+  depth: MarkerDepth,
+  style: &ClusteredColumnStyle,
+) {
+  let projection = marker.projection;
+  if !projection.word_scene_materials || !projection.right_angle_axes {
+    return;
+  }
+  let Some(crate::common::ShapeStyleValue::Paint(crate::common::Fill::Gradient(gradient))) =
+    chart_series_fill_style(style, marker.series_index, Some(marker.category_index))
+  else {
+    return;
+  };
+  if gradient.path.is_some() || gradient.stops.iter().any(|stop| stop.color.a != 255) {
+    return;
+  }
+  let left = bounds.start_x.min(bounds.end_x);
+  let right = bounds.start_x.max(bounds.end_x);
+  let top = bounds.y;
+  let bottom = bounds.y + bounds.height;
+  let corners = [(left, top), (right, top), (right, bottom), (left, bottom)];
+  let front = corners.map(|(x, y)| projection.project(x, y, depth.front));
+  let back = corners.map(|(x, y)| projection.project(x, y, depth.back));
+  let ascending = bounds.end_x >= bounds.start_x;
+  let u_left = if ascending { 0.0 } else { 1.0 };
+  let u_right = 1.0 - u_left;
+  // All six native faces share the marker's XY texture coordinates;
+  // extrusion depth changes visibility and lighting, not the texture.
+  let uv = [[u_left, 0.0], [u_right, 0.0], [u_right, 1.0], [u_left, 1.0]];
+  let size = [
+    f64::from((right - left) / projection.input.width * projection.model_width),
+    f64::from(bounds.height / projection.input.height * projection.model_height),
+  ];
+  if size.iter().any(|extent| *extent <= f64::EPSILON) {
+    return;
+  }
+  let (depth_x, depth_y) = projection.depth_vector();
+  let (s0, s1) = if depth_x >= 0.0 { (1, 2) } else { (0, 3) };
+  let (c0, c1) = if depth_y <= 0.0 { (0, 1) } else { (3, 2) };
+  let faces = [
+    (back, uv, [0.0, 0.0, -1.0]),
+    (
+      [front[s0], back[s0], back[s1], front[s1]],
+      [uv[s0], uv[s0], uv[s1], uv[s1]],
+      [if depth_x >= 0.0 { 1.0 } else { -1.0 }, 0.0, 0.0],
+    ),
+    (
+      [front[c0], back[c0], back[c1], front[c1]],
+      [uv[c0], uv[c0], uv[c1], uv[c1]],
+      [0.0, if depth_y <= 0.0 { 1.0 } else { -1.0 }, 0.0],
+    ),
+    (front, uv, [0.0, 0.0, 1.0]),
+  ];
+  for (item, (points, uv, normal)) in items.iter_mut().zip(faces) {
+    if let PageItem::Path(path) = item {
+      path.fill = word_pie_scene::projected_linear_gradient(
+        gradient,
+        size,
+        std::array::from_fn(|i| [points[i].0, points[i].1]),
+        std::array::from_fn(|i| uv[i]),
+        word_parallel_box_diffuse(normal),
+      );
+    }
   }
 }
 
@@ -20452,22 +21350,30 @@ fn lower_scatter_x_axis(
         && matches!(chart.title.as_ref(), Some(ChartTitleText::Explicit(_)))
         && chart.series.len() == 1
         && chart.legend_position.is_none();
+      let label_gap = if word_manual_scatter_layout(chart, style) {
+        // The authored inner plot does not author the tick caption band.
+        // Word's independent 8/9/12/16pt axis controls retain 0.6 natural
+        // caption lines between the plot and the horizontal label box.
+        word_chart_natural_line_height(
+          metrics.vertical_metrics_for_text(&label, &style.category_label),
+        ) * 0.6
+      } else {
+        style.category_label.font_size_pt
+          * if (style.layout_profile == ChartLayoutProfile::Excel
+            && (scatter_uses_index_x_values(chart)
+              || has_modern_single_series_scatter_title_layout))
+            || powerpoint_derived_single_series_title_layout(chart, style)
+            || word_automatic_scatter_layout(chart, style)
+          {
+            0.70
+          } else {
+            0.25
+          }
+      };
       push_text(
         items,
         x - width * 0.5,
-        plot.top
-          + plot.height
-          + style.category_label.font_size_pt
-            * if (style.layout_profile == ChartLayoutProfile::Excel
-              && (scatter_uses_index_x_values(chart)
-                || has_modern_single_series_scatter_title_layout))
-              || powerpoint_derived_single_series_title_layout(chart, style)
-              || word_automatic_scatter_layout(chart, style)
-            {
-              0.70
-            } else {
-              0.25
-            },
+        plot.top + plot.height + label_gap,
         label,
         style.category_label.clone(),
       );
@@ -23424,6 +24330,37 @@ fn word_automatic_scatter_layout(
     })
 }
 
+fn word_manual_scatter_layout(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+) -> bool {
+  style.layout_profile == ChartLayoutProfile::Word
+    && chart
+      .plot_layout
+      .is_some_and(|layout| layout.targets_inner_plot)
+    && chart.view_3d.is_none()
+    && chart.data_table.is_none()
+    && chart.axis_sets.len() <= 1
+    && chart.series.iter().all(|series| {
+      matches!(
+        series.kind,
+        ChartSeriesKind::Scatter | ChartSeriesKind::Bubble
+      )
+    })
+}
+
+fn word_manual_scatter_line_legend(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+) -> bool {
+  word_manual_scatter_layout(chart, style)
+    && chart.legend_layout.is_none()
+    && !chart.legend_overlay
+    && chart.legend_position == Some(ChartLegendPosition::Right)
+    && chart.title_layout.is_none()
+    && chart_has_visible_line_legend_entry(chart)
+}
+
 fn word_automatic_combination_layout(
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
@@ -23464,7 +24401,10 @@ fn word_automatic_bottom_column_category_layout(
   chart: &ClusteredColumnChart<'_>,
   style: &ClusteredColumnStyle,
 ) -> bool {
-  word_automatic_titled_bottom_layout(chart, style)
+  (word_automatic_titled_bottom_layout(chart, style)
+    || (word_automatic_untitled_column_layout(chart, style)
+      && chart.legend_position == Some(ChartLegendPosition::Bottom)
+      && !chart.legend_overlay))
     && chart.data_table.is_none()
     && chart.category_hierarchy.is_none()
     && chart.category_axis_title.is_none()
@@ -23571,7 +24511,7 @@ fn word_automatic_untitled_column_layout(
     && chart.legend_layout.is_none()
     && matches!(
       chart.legend_position,
-      None | Some(ChartLegendPosition::Right)
+      None | Some(ChartLegendPosition::Right | ChartLegendPosition::Bottom)
     )
     && chart.date_axis.is_none()
     && chart.category_axis.is_some_and(|axis| {
@@ -23617,7 +24557,8 @@ fn word_untitled_column_category_rotation(
   let natural_value =
     word_chart_natural_line_height(metrics.vertical_metrics_for_text("0", &style.value_label));
   let left = 6.5 * style.stroke_scale + maximum_tick_width + 0.76 * natural_value;
-  let right = if chart.legend_position.is_some() && !chart.legend_overlay {
+  let right = if chart.legend_position == Some(ChartLegendPosition::Right) && !chart.legend_overlay
+  {
     word_filled_vertical_legend(chart, style, scale, metrics)
       .map_or(0.0, |legend| legend.frame_width)
       + 17.0 * style.stroke_scale
@@ -23765,6 +24706,7 @@ fn word_has_fixed_right_line_legend(
   style: &ClusteredColumnStyle,
 ) -> bool {
   word_data_table_has_right_line_legend(chart, style)
+    || word_manual_scatter_line_legend(chart, style)
     || (word_mixed_line_column_legend(chart, style)
       && chart.legend_position == Some(ChartLegendPosition::Right))
     || (word_automatic_scatter_layout(chart, style)
@@ -25597,7 +26539,7 @@ fn word_marker_legend_frame_width(
   )
 }
 
-struct WordFilledVerticalLegend {
+struct WordAutomaticVerticalLegend {
   key_width: f32,
   row_height: f32,
   frame_width: f32,
@@ -25608,7 +26550,7 @@ fn word_filled_vertical_legend(
   style: &ClusteredColumnStyle,
   scale: crate::render::chart::LinearAxisScale,
   metrics: &mut TextMetrics,
-) -> Option<WordFilledVerticalLegend> {
+) -> Option<WordAutomaticVerticalLegend> {
   if !(excel_legacy_embedded_automatic_column_layout(chart, style)
     || (style.layout_profile == ChartLayoutProfile::Word
       && (chart.view_3d.is_some()
@@ -25643,7 +26585,7 @@ fn word_filled_legend_metrics<'a>(
   style: &TextStyle,
   stroke_scale: f32,
   metrics: &mut TextMetrics,
-) -> WordFilledVerticalLegend {
+) -> WordAutomaticVerticalLegend {
   let vertical = metrics.vertical_metrics_for_text("Mg", style);
   let symbol_line = word_chart_symbol_line_height(vertical);
   let key_width = symbol_line * 0.45;
@@ -25656,11 +26598,54 @@ fn word_filled_legend_metrics<'a>(
   // Calibri's typographic ascent/descent is smaller than this Windows box;
   // Arial's natural line also includes external leading. Their independent
   // font controls distinguish both from the required symbol measurement.
-  WordFilledVerticalLegend {
+  WordAutomaticVerticalLegend {
     key_width,
     row_height: symbol_line * 0.99 + 6.0 * stroke_scale,
     frame_width: maximum_label_width + key_width * 2.0 + 6.0 * stroke_scale,
   }
+}
+
+fn word_fixed_line_legend_metrics<'a>(
+  labels: impl Iterator<Item = &'a str>,
+  style: &TextStyle,
+  stroke_scale: f32,
+  metrics: &mut TextMetrics,
+) -> WordAutomaticVerticalLegend {
+  let symbol_line = word_chart_symbol_line_height(metrics.vertical_metrics_for_text("Mg", style));
+  let label_width = labels
+    .map(|label| word_chart_tick_label_width(label, style, metrics))
+    .fold(0.0_f32, f32::max);
+  // Native line keys reserve a fixed physical width, unlike filled keys.
+  // Their automatic row slots use the same Windows symbol box and 6pt
+  // clearance, including when the plot itself has a manual layout.
+  WordAutomaticVerticalLegend {
+    row_height: symbol_line * 0.99 + 6.0 * stroke_scale,
+    key_width: WORD_DATA_TABLE_LINE_LEGEND_KEY_WIDTH_PT * stroke_scale,
+    frame_width: label_width
+      + (WORD_DATA_TABLE_LINE_LEGEND_LEFT_PADDING_PT
+        + WORD_DATA_TABLE_LINE_LEGEND_KEY_WIDTH_PT
+        + WORD_DATA_TABLE_LINE_LEGEND_KEY_GAP_PT
+        + WORD_DATA_TABLE_LINE_LEGEND_RIGHT_PADDING_PT)
+        * stroke_scale,
+  }
+}
+
+fn word_automatic_vertical_legend(
+  chart: &ClusteredColumnChart<'_>,
+  style: &ClusteredColumnStyle,
+  scale: crate::render::chart::LinearAxisScale,
+  metrics: &mut TextMetrics,
+) -> Option<WordAutomaticVerticalLegend> {
+  if word_manual_scatter_line_legend(chart, style) {
+    let entries = cartesian_legend_entries(chart, style, scale);
+    return Some(word_fixed_line_legend_metrics(
+      entries.iter().map(|entry| entry.label.as_ref()),
+      &style.legend,
+      style.stroke_scale,
+      metrics,
+    ));
+  }
+  word_filled_vertical_legend(chart, style, scale, metrics)
 }
 
 fn vertical_legend_width(
@@ -25669,7 +26654,7 @@ fn vertical_legend_width(
   scale: crate::render::chart::LinearAxisScale,
   metrics: &mut TextMetrics,
 ) -> f32 {
-  if let Some(legend) = word_filled_vertical_legend(chart, style, scale, metrics) {
+  if let Some(legend) = word_automatic_vertical_legend(chart, style, scale, metrics) {
     return legend.frame_width;
   }
   let marker_gap = if style.chartsheet {
@@ -25706,7 +26691,7 @@ fn lower_vertical_legend(
   scale: crate::render::chart::LinearAxisScale,
 ) {
   let mut native_metrics = TextMetrics::new();
-  if let Some(legend) = word_filled_vertical_legend(chart, style, scale, &mut native_metrics) {
+  if let Some(legend) = word_automatic_vertical_legend(chart, style, scale, &mut native_metrics) {
     let entries = cartesian_legend_entries(chart, style, scale);
     let height = entries.len() as f32 * legend.row_height;
     let bounds = PlotRect {
@@ -25720,7 +26705,18 @@ fn lower_vertical_legend(
     push_legend_frame(items, bounds, &style.legend_frame_style, style.stroke_scale);
     // COM entry leading is 1.5pt, with half a key inside the slot. The fixed
     // output key has the same additional .75pt leading as Word's bottom key.
-    let key_x = bounds.left + 2.25 * style.stroke_scale + legend.key_width * 0.5;
+    let line_keys = word_manual_scatter_line_legend(chart, style);
+    let key_x = bounds.left
+      + if line_keys {
+        WORD_DATA_TABLE_LINE_LEGEND_LEFT_PADDING_PT * style.stroke_scale
+      } else {
+        2.25 * style.stroke_scale + legend.key_width * 0.5
+      };
+    let key_gap = if line_keys {
+      WORD_DATA_TABLE_LINE_LEGEND_KEY_GAP_PT * style.stroke_scale
+    } else {
+      style.legend.font_size_pt * profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND.marker_gap_em
+    };
     for (index, entry) in entries.into_iter().enumerate() {
       let center_y = bounds.top + (index as f32 + 0.5) * legend.row_height;
       push_cartesian_legend_key(
@@ -25728,15 +26724,13 @@ fn lower_vertical_legend(
         chart,
         (key_x, center_y - legend.key_width * 0.5),
         legend.key_width,
-        CartesianLegendKeyKind::Filled,
+        cartesian_legend_key_kind(chart, &entry, style.automatic_line_width_pt),
         &entry,
         style,
       );
       push_text(
         items,
-        key_x
-          + legend.key_width
-          + style.legend.font_size_pt * profiles::DEFAULT_HORIZONTAL_CARTESIAN_LEGEND.marker_gap_em,
+        key_x + legend.key_width + key_gap,
         center_y - line_height(&style.legend) * 0.5,
         entry.label.into_owned(),
         style.legend.clone(),
@@ -27155,6 +28149,207 @@ fn push_data_table_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String,
 
 #[cfg(test)]
 mod tests {
+  #[test]
+  fn word_parallel_box_gradient_lighting_matches_native_face_attributes() {
+    // 48 actual native boxes: stacked/clustered, height/depth controls.
+    for (normal, byte) in [
+      ([0.0, 0.0, 1.0], 129.0),
+      ([0.0, 1.0, 0.0], 97.0),
+      ([1.0, 0.0, 0.0], 82.0),
+      ([0.0, 0.0, -1.0], 51.0),
+      ([0.0, -1.0, 0.0], 51.0),
+      ([-1.0, 0.0, 0.0], 51.0),
+    ] {
+      assert_eq!(super::word_parallel_box_diffuse(normal) * 128.0, byte);
+    }
+  }
+
+  #[test]
+  fn word_surface_native_uv_uses_clipped_band_bounds() {
+    // Actual GFX upload, low-value band of the 3x4 native control. The
+    // narrow band occupies only part of the floor, so global UVs are wrong.
+    let native = [
+      (64.10256_f32, 37.5_f32, 0.0_f64, 0.58620685338974_f64),
+      (66.666664_f32, 31.25_f32, 0.2777775824069977_f64, 0.0_f64),
+      (
+        66.666664_f32,
+        37.5_f32,
+        0.2777775824069977_f64,
+        0.58620685338974_f64,
+      ),
+      (
+        66.666664_f32,
+        41.911766_f32,
+        0.2777775824069977_f64,
+        1.0_f64,
+      ),
+      (
+        68.75_f32,
+        35.15625_f32,
+        0.5034722089767456_f64,
+        0.3663792610168457_f64,
+      ),
+      (
+        73.333336_f32,
+        37.5_f32,
+        0.9999999403953552_f64,
+        0.58620685338974_f64,
+      ),
+    ];
+    let vertices = native.map(|(x, z, _, _)| super::SurfaceVertex {
+      x,
+      value: 0.0,
+      depth_ratio: 1.0 - z / 75.0,
+    });
+    let bounds = super::word_surface_texture_bounds(vertices.iter());
+    for (vertex, (_, _, u, v)) in vertices.into_iter().zip(native) {
+      let actual = super::word_surface_texture_coordinates(vertex, bounds);
+      assert!((actual[0] - u).abs() < 0.000001);
+      assert!((actual[1] - v).abs() < 0.000001);
+    }
+  }
+
+  #[test]
+  fn word_surface_native_cell_diagonals_cover_all_value_permutations() {
+    // Actual GFX triangle planes, 24 independently exported 2x2 cells.
+    for (values, diagonal) in [
+      ([1.0, 2.0, 3.0, 5.0], 1),
+      ([1.0, 2.0, 5.0, 3.0], 0),
+      ([1.0, 3.0, 2.0, 5.0], 1),
+      ([1.0, 3.0, 5.0, 2.0], 0),
+      ([1.0, 5.0, 2.0, 3.0], 1),
+      ([1.0, 5.0, 3.0, 2.0], 1),
+      ([2.0, 1.0, 3.0, 5.0], 1),
+      ([2.0, 1.0, 5.0, 3.0], 0),
+      ([2.0, 3.0, 1.0, 5.0], 1),
+      ([2.0, 3.0, 5.0, 1.0], 0),
+      ([2.0, 5.0, 1.0, 3.0], 1),
+      ([2.0, 5.0, 3.0, 1.0], 1),
+      ([3.0, 1.0, 2.0, 5.0], 1),
+      ([3.0, 1.0, 5.0, 2.0], 0),
+      ([3.0, 2.0, 1.0, 5.0], 1),
+      ([3.0, 2.0, 5.0, 1.0], 0),
+      ([3.0, 5.0, 1.0, 2.0], 1),
+      ([3.0, 5.0, 2.0, 1.0], 1),
+      ([5.0, 1.0, 2.0, 3.0], 0),
+      ([5.0, 1.0, 3.0, 2.0], 0),
+      ([5.0, 2.0, 1.0, 3.0], 0),
+      ([5.0, 2.0, 3.0, 1.0], 0),
+      ([5.0, 3.0, 1.0, 2.0], 0),
+      ([5.0, 3.0, 2.0, 1.0], 0),
+    ] {
+      let expected = if diagonal == 0 {
+        [[0, 1, 2], [0, 2, 3]]
+      } else {
+        [[0, 1, 3], [1, 2, 3]]
+      };
+      assert_eq!(super::word_surface_diagonal(values), expected);
+    }
+  }
+
+  #[test]
+  fn word_surface_native_diffuse_attributes_match_rotated_and_scaled_meshes() {
+    // Actual uploaded seven-bit white diffuse values, independent of the
+    // band texture. Include both windings, different depths and rotations.
+    for (angle, native_normal, byte) in [
+      (
+        170.0_f32,
+        [0.381_886_72_f32, 0.866_122_3_f32, 0.322_482_08_f32],
+        51.0,
+      ),
+      (
+        170.0_f32,
+        [-0.381_886_72_f32, -0.866_122_3_f32, -0.322_482_08_f32],
+        145.0,
+      ),
+      (
+        170.0_f32,
+        [0.348_561_05_f32, -0.878_377_4_f32, 0.327_044_9_f32],
+        82.0,
+      ),
+      (
+        170.0_f32,
+        [0.397_711_5_f32, 0.902_013_06_f32, 0.167_922_62_f32],
+        51.0,
+      ),
+      (
+        170.0_f32,
+        [-0.397_711_5_f32, -0.902_013_06_f32, -0.167_922_62_f32],
+        141.0,
+      ),
+      (
+        170.0_f32,
+        [0.363_443_23_f32, -0.915_880_6_f32, 0.170_504_23_f32],
+        91.0,
+      ),
+      (
+        0.0_f32,
+        [0.050199707_f32, 0.978_345_45_f32, -0.200_798_85_f32],
+        51.0,
+      ),
+      (
+        0.0_f32,
+        [-0.050199707_f32, -0.978_345_45_f32, 0.200_798_85_f32],
+        124.0,
+      ),
+      (
+        0.0_f32,
+        [0.101_952_79_f32, -0.993_482_3_f32, 0.050_976_4_f32],
+        129.0,
+      ),
+      (
+        30.0_f32,
+        [0.040_004_18_f32, 0.986_303_3_f32, -0.160_016_73_f32],
+        51.0,
+      ),
+      (
+        30.0_f32,
+        [-0.040_004_18_f32, -0.986_303_3_f32, 0.160_016_73_f32],
+        118.0,
+      ),
+      (
+        30.0_f32,
+        [0.080_787_85_f32, -0.995_912_5_f32, 0.040393932_f32],
+        127.0,
+      ),
+      (
+        90.0_f32,
+        [0.039941492_f32, 0.986_346_54_f32, -0.159_765_99_f32],
+        51.0,
+      ),
+      (
+        90.0_f32,
+        [-0.039941492_f32, -0.986_346_54_f32, 0.159_765_99_f32],
+        111.0,
+      ),
+      (
+        90.0_f32,
+        [0.080658785_f32, -0.995_925_55_f32, 0.040329397_f32],
+        122.0,
+      ),
+      (
+        270.0_f32,
+        [0.040_004_18_f32, 0.986_303_3_f32, -0.160_016_73_f32],
+        51.0,
+      ),
+      (
+        270.0_f32,
+        [-0.040_004_18_f32, -0.986_303_3_f32, 0.160_016_73_f32],
+        131.0,
+      ),
+      (
+        270.0_f32,
+        [0.080_787_85_f32, -0.995_912_5_f32, 0.040393932_f32],
+        121.0,
+      ),
+    ] {
+      let normal = [native_normal[0], native_normal[1], -native_normal[2]];
+      let camera =
+        super::rotate_chart_model_point(20.0_f32.to_radians(), angle.to_radians(), normal);
+      assert_eq!(super::word_surface_diffuse(camera) * 128.0, byte);
+    }
+  }
+
   #[test]
   fn word_line_label_frames_match_native_position_controls() {
     use c::DataLabelPositionValues as Position;
@@ -28667,6 +29862,7 @@ mod tests {
       category_minor_gridline: None,
       value_minor_gridline: None,
       category_major_gridline_stroke: None,
+      series_axis_strokes: Vec::new(),
       series_colors: Vec::new(),
       series_point_colors: Vec::new(),
       series_styles: Vec::new(),
@@ -28686,6 +29882,7 @@ mod tests {
       group_decoration_styles: Vec::new(),
       series_point_styles: Vec::new(),
       surface_band_colors: Vec::new(),
+      surface_band_styles: Vec::new(),
       data_label_fill_colors: Vec::new(),
       legend_frame_style: ShapeStyle::default(),
       chart_area_style: ShapeStyle::default(),
@@ -29378,6 +30575,657 @@ mod tests {
       assert!(!super::word_automatic_untitled_column_layout(
         &chart, &style
       ));
+    }
+  }
+
+  #[test]
+  fn word_surface_plot_matches_native_axes_fonts_and_rotation_controls() {
+    // Native Word PDF/COM controls, with ChartArea's 4pt origin restored.
+    // The rotation/extent/font combinations include cases where fewer large
+    // labels prefer 45 degrees over 90 degrees; a pitch-only rule fails them.
+    for (
+      [rotation, elevation, width, series_font, value_font],
+      (prefix, flags, format),
+      expected,
+      expected_rhythm,
+    ) in [
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [0.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        1,
+      ),
+      (
+        [180.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [11.000000, 11.000000, 185.962_45, 109.324_88],
+        1,
+      ),
+      (
+        [270.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 196.248_35, 95.517_33],
+        1,
+      ),
+      (
+        [170.0, 20.0, 234.75, 8.0, 9.0],
+        ("Row ", 7, "General"),
+        [31.532598, 11.000000, 192.217_4, 109.324_88],
+        1,
+      ),
+      (
+        [170.0, 20.0, 234.75, 14.0, 9.0],
+        ("Row ", 7, "General"),
+        [50.300_08, 11.000000, 173.449_92, 109.324_88],
+        2,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("A", 7, "General"),
+        [23.457_56, 11.000000, 200.292_43, 109.324_88],
+        2,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("MMMMMMMM", 7, "General"),
+        [86.072_52, 11.000000, 137.677_47, 109.324_88],
+        2,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [11.000000, 11.000000, 212.75, 109.324_88],
+        0,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 14.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 13.544961, 185.962_45, 104.234_96],
+        2,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 5, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [30.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 204.340_87, 82.537_32],
+        1,
+      ),
+      (
+        [90.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        1,
+      ),
+      (
+        [225.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 195.311_26, 81.283_62],
+        1,
+      ),
+      (
+        [0.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [19.409134, 11.000000, 204.340_87, 109.324_88],
+        0,
+      ),
+      (
+        [30.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [19.409134, 11.000000, 204.340_87, 109.324_88],
+        0,
+      ),
+      (
+        [90.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [11.000000, 11.000000, 212.75, 109.324_88],
+        0,
+      ),
+      (
+        [180.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [11.000000, 11.000000, 212.75, 109.324_88],
+        0,
+      ),
+      (
+        [225.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [11.000000, 11.000000, 212.75, 109.324_88],
+        0,
+      ),
+      (
+        [270.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 6, "General"),
+        [19.409134, 11.000000, 204.340_87, 109.324_88],
+        0,
+      ),
+      (
+        [0.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 5, "General"),
+        [11.000000, 11.000000, 185.962_45, 109.324_88],
+        1,
+      ),
+      (
+        [90.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 5, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        1,
+      ),
+      (
+        [270.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 5, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        1,
+      ),
+      (
+        [0.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "000000"),
+        [42.209134, 11.000000, 154.753_31, 109.324_88],
+        1,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "000000"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [30.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 15, "General"),
+        [19.409134, 11.000000, 196.248_35, 95.517_33],
+        3,
+      ),
+      (
+        [225.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 15, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        2,
+      ),
+      (
+        [0.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 4, "General"),
+        [11.000000, 11.000000, 212.75, 109.324_88],
+        0,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 4, "General"),
+        [11.000000, 11.000000, 212.75, 109.324_88],
+        0,
+      ),
+      (
+        [170.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 3, "General"),
+        [37.787_56, 11.000000, 185.962_45, 132.2],
+        1,
+      ),
+      (
+        [10.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        2,
+      ),
+      (
+        [15.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        2,
+      ),
+      (
+        [18.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        2,
+      ),
+      (
+        [19.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        2,
+      ),
+      (
+        [20.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        2,
+      ),
+      (
+        [25.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        2,
+      ),
+      (
+        [40.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 195.311_26, 81.283_62],
+        1,
+      ),
+      (
+        [45.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 195.311_26, 81.283_62],
+        1,
+      ),
+      (
+        [60.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 196.248_35, 95.517_33],
+        1,
+      ),
+      (
+        [75.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 196.248_35, 95.517_33],
+        1,
+      ),
+      (
+        [105.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        1,
+      ),
+      (
+        [120.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        1,
+      ),
+      (
+        [135.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 195.311_26, 81.283_62],
+        1,
+      ),
+      (
+        [150.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [11.000000, 11.000000, 212.75, 82.537_32],
+        1,
+      ),
+      (
+        [160.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [161.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [162.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [165.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [195.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [11.000000, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [210.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [11.000000, 11.000000, 212.75, 82.537_32],
+        1,
+      ),
+      (
+        [240.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.092_52, 11.000000, 196.564_96, 95.517_33],
+        1,
+      ),
+      (
+        [300.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 196.248_35, 95.517_33],
+        1,
+      ),
+      (
+        [330.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 204.340_87, 82.537_32],
+        1,
+      ),
+      (
+        [345.0, 20.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [37.787_56, 11.000000, 185.962_45, 109.324_88],
+        2,
+      ),
+      (
+        [30.0, 20.0, 234.75, 8.0, 9.0],
+        ("Row ", 7, "General"),
+        [20.748_19, 11.000000, 200.596_92, 87.789213],
+        1,
+      ),
+      (
+        [30.0, 20.0, 234.75, 14.0, 9.0],
+        ("Row ", 7, "General"),
+        [31.429055, 11.000000, 184.736_54, 68.266_38],
+        2,
+      ),
+      (
+        [225.0, 20.0, 234.75, 8.0, 9.0],
+        ("Row ", 7, "General"),
+        [16.575039, 11.000000, 201.599_91, 99.177_32],
+        1,
+      ),
+      (
+        [225.0, 20.0, 234.75, 14.0, 9.0],
+        ("Row ", 7, "General"),
+        [11.000000, 11.000000, 212.75, 70.024_8],
+        1,
+      ),
+      (
+        [90.0, 20.0, 234.75, 8.0, 9.0],
+        ("Row ", 7, "General"),
+        [16.575039, 11.000000, 201.599_91, 99.177_32],
+        1,
+      ),
+      (
+        [90.0, 20.0, 234.75, 14.0, 9.0],
+        ("Row ", 7, "General"),
+        [31.429055, 11.000000, 184.736_54, 68.266_38],
+        1,
+      ),
+      (
+        [30.0, 20.0, 160.0, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 120.561_26, 81.283_62],
+        2,
+      ),
+      (
+        [30.0, 20.0, 320.0, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 280.561_25, 81.283_62],
+        1,
+      ),
+      (
+        [30.0, 10.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 195.311_26, 81.283_62],
+        1,
+      ),
+      (
+        [30.0, 40.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 177.553_31, 109.324_88],
+        1,
+      ),
+      (
+        [15.0, 10.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [24.308504, 11.000000, 195.311_26, 81.283_62],
+        2,
+      ),
+      (
+        [45.0, 40.0, 234.75, 10.0, 9.0],
+        ("Row ", 7, "General"),
+        [19.409134, 11.000000, 204.340_87, 82.537_32],
+        1,
+      ),
+    ] {
+      let series_labels = flags & 1 != 0;
+      let value_labels = flags & 2 != 0;
+      let legend = flags & 4 != 0;
+      let explicit_rotation = flags & 8 != 0;
+      let series = (0..3).map(|i| {
+        let values = (0..4).map(|j| format!(r#"<c:pt idx="{j}"><c:v>{}</c:v></c:pt>"#, if i == 2 && j == 3 { 5 } else { j + 1 })).collect::<String>();
+        format!(r#"<c:ser><c:idx val="{i}"/><c:order val="{i}"/><c:tx><c:v>{prefix}{}</c:v></c:tx><c:val><c:numLit><c:ptCount val="4"/>{values}</c:numLit></c:val></c:ser>"#, i + 1)
+      }).collect::<String>();
+      let series_label_position = if series_labels { "nextTo" } else { "none" };
+      let value_label_position = if value_labels { "nextTo" } else { "none" };
+      let legend_xml = if legend {
+        r#"<c:legend><c:legendPos val="b"/></c:legend>"#
+      } else {
+        ""
+      };
+      let text_body = if explicit_rotation {
+        r#"<c:txPr><a:bodyPr rot="0"/><a:p/></c:txPr>"#
+      } else {
+        ""
+      };
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:view3D><c:rotX val="{elevation}"/><c:rotY val="{rotation}"/><c:rAngAx val="0"/><c:perspective val="0"/></c:view3D><c:plotArea><c:surface3DChart>{series}<c:axId val="1"/><c:axId val="2"/><c:axId val="3"/></c:surface3DChart><c:catAx><c:axId val="1"/><c:scaling/><c:delete val="1"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="r"/><c:majorGridlines/><c:numFmt formatCode="{format}" sourceLinked="0"/><c:tickLblPos val="{value_label_position}"/><c:crossAx val="1"/><c:crossBetween val="midCat"/></c:valAx><c:serAx><c:axId val="3"/><c:scaling/><c:axPos val="b"/><c:tickLblPos val="{series_label_position}"/>{text_body}<c:crossAx val="2"/></c:serAx></c:plotArea>{legend_xml}</c:chart></c:chartSpace>"#
+      );
+      let space = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let mut chart = crate::render::chart::cartesian_chart_for_host_locales(
+        &space,
+        crate::render::chart::ChartHostApplication::Wordprocessing,
+        Some("zh-CN"),
+        Some("zh-CN"),
+      )
+      .unwrap();
+      chart.title = None;
+      let mut style = word_cartesian_test_style();
+      style.series_label.font_size_pt = series_font;
+      style.value_label.font_size_pt = value_font;
+      style.legend.font_size_pt = 9.0;
+      let layout = super::word_surface_automatic_plot(
+        super::ChartFrame {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: width,
+          height_pt: 154.2,
+        },
+        &chart,
+        &style,
+        super::cartesian_axis_scales(&chart, ChartLayoutProfile::Word, 4, 10, 10, None)[0].y,
+        super::word_surface_model_aspect(3, 4),
+        &mut crate::text_metrics::TextMetrics::new(),
+      )
+      .expect("automatic surface plot");
+      assert_eq!(
+        layout
+          .series_axis
+          .and_then(|axis| axis.label_rhythm)
+          .unwrap_or(0),
+        expected_rhythm,
+        "rotation={rotation}, font={series_font}, width={width}"
+      );
+      let plot = layout.plot;
+      for (actual, native) in [plot.left, plot.top, plot.width, plot.height]
+        .into_iter()
+        .zip(expected)
+      {
+        assert!(
+          (actual - native).abs() < 0.02,
+          "rotation={rotation}, elevation={elevation}, width={width}, font={series_font}/{value_font}, labels={series_labels}/{value_labels}, prefix={prefix}, legend={legend}, format={format}, explicit={explicit_rotation}: {actual} vs {native}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_untitled_bottom_columns_match_native_extent_and_font_controls() {
+    // Independent native Word controls vary frame dimensions, numeric and
+    // legend fonts, legend deletion and overlay. Plot coordinates include
+    // ChartArea's 4pt origin. Rotated category labels have a separate owner.
+    for (width, height, value_size, legend_size, legend, expected, major) in [
+      (
+        232.05,
+        161.8,
+        9.0,
+        9.0,
+        "b",
+        [19.40913, 11.0, 221.05, 115.72661],
+        1.0,
+      ),
+      (
+        232.05,
+        120.0,
+        9.0,
+        9.0,
+        "b",
+        [19.40913, 11.0, 221.05, 73.92661],
+        2.0,
+      ),
+      (
+        232.05,
+        220.0,
+        9.0,
+        9.0,
+        "b",
+        [19.40913, 11.0, 221.05, 173.926_6],
+        1.0,
+      ),
+      (
+        320.0,
+        161.8,
+        9.0,
+        9.0,
+        "b",
+        [19.40913, 11.0, 309.0, 115.72661],
+        1.0,
+      ),
+      (
+        232.05,
+        161.8,
+        14.0,
+        9.0,
+        "b",
+        [26.58331, 13.54496, 221.05, 115.72661],
+        2.0,
+      ),
+      (
+        232.05,
+        161.8,
+        9.0,
+        14.0,
+        "b",
+        [19.40913, 11.0, 221.05, 109.68276],
+        1.0,
+      ),
+      (
+        232.05,
+        161.8,
+        9.0,
+        9.0,
+        "none",
+        [19.40913, 11.0, 221.05, 138.60173],
+        1.0,
+      ),
+      (
+        232.05,
+        161.8,
+        9.0,
+        9.0,
+        "overlay",
+        [19.40913, 11.0, 221.05, 138.60173],
+        1.0,
+      ),
+    ] {
+      let category_size = 9.0;
+      let series = [[4.3, 2.5, 3.5, 4.5], [2.4, 4.4, 1.8, 2.8], [2.0, 2.0, 3.0, 5.0]]
+        .iter().enumerate().map(|(index, values)| {
+          let categories = (0..4).map(|i| format!(r#"<c:pt idx="{i}"><c:v>Category {}</c:v></c:pt>"#, i + 1)).collect::<String>();
+          let values = values.iter().enumerate().map(|(i, value)| format!(r#"<c:pt idx="{i}"><c:v>{value}</c:v></c:pt>"#)).collect::<String>();
+          format!(r#"<c:ser><c:idx val="{index}"/><c:order val="{index}"/><c:tx><c:v>Row {}</c:v></c:tx><c:cat><c:strLit><c:ptCount val="4"/>{categories}</c:strLit></c:cat><c:val><c:numLit><c:ptCount val="4"/>{values}</c:numLit></c:val></c:ser>"#, index + 1)
+        }).collect::<String>();
+      let legend_xml = if legend == "none" {
+        String::new()
+      } else {
+        format!(
+          r#"<c:legend><c:legendPos val="b"/><c:overlay val="{}"/></c:legend>"#,
+          u8::from(legend == "overlay")
+        )
+      };
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>{series}<c:gapWidth val="150"/><c:axId val="1"/><c:axId val="2"/></c:barChart><c:catAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:majorTickMark val="out"/><c:crossAx val="2"/><c:crosses val="autoZero"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:majorGridlines/><c:majorTickMark val="out"/><c:crossAx val="1"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>{legend_xml}</c:chart></c:chartSpace>"#
+      );
+      let space = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let mut chart = crate::render::chart::cartesian_chart_for_host_locales(
+        &space,
+        crate::render::chart::ChartHostApplication::Wordprocessing,
+        Some("zh-CN"),
+        Some("zh-CN"),
+      )
+      .unwrap();
+      // This is the no-c:title state produced by the DOCX consumer; a
+      // generated title from an authored empty c:title has another owner.
+      chart.title = None;
+      let mut style = word_cartesian_test_style();
+      style.value_label.font_size_pt = value_size;
+      style.category_label.font_size_pt = category_size;
+      style.legend.font_size_pt = legend_size;
+
+      let items = super::lower_clustered_column_chart(
+        super::ChartFrame {
+          x_pt: 0.0,
+          y_pt: 0.0,
+          width_pt: width,
+          height_pt: height,
+        },
+        &chart,
+        "Chart Title",
+        &style,
+      );
+      let axis = items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Line(line)
+            if (line.x1_pt - line.x2_pt).abs() < 0.001 && line.y2_pt - line.y1_pt > 30.0 =>
+          {
+            Some(line)
+          }
+          _ => None,
+        })
+        .expect("value axis");
+      let right = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Line(line)
+            if (line.y1_pt - line.y2_pt).abs() < 0.001 && line.x2_pt - line.x1_pt > 150.0 =>
+          {
+            Some(line.x2_pt)
+          }
+          _ => None,
+        })
+        .fold(f32::NEG_INFINITY, f32::max);
+      for (actual, native) in [axis.x1_pt, axis.y1_pt, right, axis.y2_pt]
+        .into_iter()
+        .zip(expected)
+      {
+        assert!(
+          (actual - native).abs() < 0.03,
+          "{width}x{height}/{value_size}/{legend_size}/{legend}: {actual} vs {native}"
+        );
+      }
+      let mut numeric = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if text.x_pt < axis.x1_pt => text.text.parse::<f32>().ok(),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      numeric.sort_by(f32::total_cmp);
+      assert_eq!(
+        numeric,
+        (0..=(6.0 / major) as usize)
+          .map(|i| i as f32 * major)
+          .collect::<Vec<_>>()
+      );
     }
   }
 
@@ -31940,6 +33788,39 @@ mod tests {
   }
 
   #[test]
+  fn word_pie_camera_matches_native_frustum_support() {
+    // Direct CHART camera readbacks and GFX clip matrices, rather than an
+    // ellipse fit: independent width, height, elevation and FOV controls.
+    for (width, height, elevation, perspective, native_distance) in [
+      (155.838_35, 104.29, 30.0, 50.0, 334.808_44),
+      (243.788_35, 104.29, 30.0, 50.0, 286.039_6),
+      (373.788_36, 104.29, 30.0, 50.0, 286.039_6),
+      (155.838_35, 190.24, 30.0, 50.0, 584.887_3),
+      (155.838_35, 104.29, 60.0, 50.0, 439.791_05),
+      (155.838_35, 104.29, 30.0, 0.0, 78_846.24),
+    ] {
+      let p = super::word_pie_3d_projection(
+        super::PlotRect {
+          left: 0.0,
+          top: 0.0,
+          width,
+          height,
+        },
+        Chart3DView {
+          rotate_x_deg: elevation,
+          perspective_half_degrees: perspective,
+          right_angle_axes: false,
+          height_percent: 100.0,
+          ..Chart3DView::default()
+        },
+      );
+      let (s, c) = elevation.to_radians().sin_cos();
+      let distance = 100.0 * (c / p.strength + 0.24 * s);
+      assert!((distance - native_distance).abs() < native_distance * 0.000_001);
+    }
+  }
+
+  #[test]
   fn word_pie_camera_matches_independent_view_frame_and_thickness_controls() {
     // Native lossless-image conics in logical PlotArea coordinates. Their
     // half-arc coverage fits have subpixel uncertainty; they independently
@@ -31983,6 +33864,34 @@ mod tests {
       if hub_y > 0.0 {
         assert!((projection.hub().1 - hub_y).abs() < 0.4);
       }
+    }
+  }
+
+  #[test]
+  fn word_line_side_legend_matches_native_independent_font_controls() {
+    // Word COM entry slots after configured PDF export; axis fonts were
+    // varied independently and do not change this automatic legend band.
+    let mut metrics = TextMetrics::new();
+    for (font_size, frame_width, row_height) in [
+      (8.0, 59.05016, 15.66732),
+      (9.0, 62.68016, 16.87512),
+      (12.0, 73.57512, 20.50354),
+      (16.0, 88.09512, 25.33465),
+    ] {
+      let style = TextStyle {
+        font_family: Some("Calibri".into()),
+        font_size_pt: font_size,
+        ..TextStyle::default()
+      };
+      let observed = super::word_fixed_line_legend_metrics(
+        ["Vout(dB)", "(-3dB)"].into_iter(),
+        &style,
+        1.0,
+        &mut metrics,
+      );
+      assert!((observed.frame_width - frame_width).abs() < 0.01);
+      assert!((observed.row_height - row_height).abs() < 0.001);
+      assert_eq!(observed.key_width, 19.2);
     }
   }
 
@@ -34973,7 +36882,7 @@ mod tests {
           height,
         },
         ChartLayoutProfile::Word,
-        super::word_clustered_model_depth(&chart, 4) * height / width,
+        super::word_category_slot_model_depth(&chart, 4) * height / width,
         false,
       );
       projection.fit_word_parallel_volume(1.0);
@@ -34984,6 +36893,417 @@ mod tests {
         "{width}/{height}/{gap_width}/{gap_depth}: {} vs {native_pitch}",
         second - first
       );
+    }
+  }
+
+  #[test]
+  fn word_surface_wall_grids_match_native_rotated_camera_endpoints() {
+    // Reproject native camera/model captures, with wall identities from the
+    // independent Office angle controls. Coordinates are inside-plot relative.
+    for (rotation, width, height, native) in [
+      (
+        170.0,
+        185.962_45,
+        109.324_88,
+        [
+          (174.560_79, 99.097_786),
+          (155.387_25, 62.091_396),
+          (11.370_887, 70.780_914),
+        ],
+      ),
+      (
+        0.0,
+        177.553_31,
+        109.324_88,
+        [
+          (11.744_136, 107.814_76),
+          (11.877_455, 68.265_63),
+          (165.697_39, 68.265_63),
+        ],
+      ),
+      (
+        180.0,
+        185.962_45,
+        109.324_88,
+        [
+          (13.693_732, 107.814_12),
+          (13.834_964, 67.109_33),
+          (172.149_64, 67.109_33),
+        ],
+      ),
+      (
+        270.0,
+        196.248_35,
+        95.517_33,
+        [
+          (148.916_43, 47.772_747),
+          (47.350_89, 47.772_747),
+          (47.232_56, 94.197_334),
+        ],
+      ),
+    ] {
+      let view = Chart3DView {
+        rotate_x_deg: 20.0,
+        rotate_y_deg: rotation,
+        height_percent: 75.0 * height / width,
+        height_percent_is_explicit: true,
+        depth_percent: 100.0,
+        depth_percent_is_explicit: true,
+        right_angle_axes: false,
+        perspective_half_degrees: 0.0,
+      };
+      let plot = PlotRect {
+        left: 0.0,
+        top: 0.0,
+        width,
+        height,
+      };
+      let mut projection =
+        cartesian_3d_projection(view, plot, ChartLayoutProfile::Word, 0.75, false);
+      projection.fit_word_perspective_volume(view);
+      for (actual, expected) in projection.value_grid_points(height).into_iter().zip(native) {
+        assert!(
+          (actual.0 - expected.0).abs() < 0.002 && (actual.1 - expected.1).abs() < 0.002,
+          "{rotation}: {actual:?} vs native {expected:?}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_surface_volume_matches_native_grid_and_camera_controls() {
+    // Direct native model and camera readback after configured export.
+    // Controls independently vary row/column counts, dimensions, authored
+    // height/depth, rotation, elevation and perspective; no fitted values.
+    for (
+      rows,
+      columns,
+      width,
+      height,
+      authored_height,
+      depth,
+      rotation,
+      elevation,
+      perspective,
+      native_model,
+      native_camera,
+    ) in [
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.440_915_14, 0.75],
+        [0.0004508875, 0.0003463383, 427.921_05],
+      ),
+      (
+        3,
+        4,
+        177.553_31,
+        109.324_88,
+        None,
+        100.0,
+        0.0,
+        20.0,
+        0.0,
+        [1.0, 0.461_797_45, 0.75],
+        [-0.0000699997, 0.0002804623, 406.788_48],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        180.0,
+        20.0,
+        0.0,
+        [1.0, 0.440_915_14, 0.75],
+        [-0.0000699997, 0.0002835978, 395.230_6],
+      ),
+      (
+        3,
+        4,
+        196.248_35,
+        95.517_33,
+        None,
+        100.0,
+        270.0,
+        20.0,
+        0.0,
+        [1.0, 0.365_037_44, 0.75],
+        [-0.0000700378, 0.0003974069, 403.596_3],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        Some(100.0),
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.75, 0.75],
+        [0.0004508875, 0.0003001931, 598.993_16],
+      ),
+      (
+        2,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.293_943_43, 0.5],
+        [0.0002791754, 0.0002673147, 371.177_03],
+      ),
+      (
+        4,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.440_915_14, 1.0],
+        [0.0006225996, 0.0004472666, 477.518_46],
+      ),
+      (
+        6,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.587_886_87, 1.5],
+        [0.000966024, 0.000627228, 658.059_1],
+      ),
+      (
+        3,
+        3,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.391_924_6, 1.0],
+        [0.0006225996, 0.0004545777, 450.403_2],
+      ),
+      (
+        3,
+        6,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.391_924_6, 0.5],
+        [0.0002791753, 0.0002526926, 371.194_24],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        200.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.440_915_14, 1.5],
+        [0.000966024, 0.0006491803, 576.713_26],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        50.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.440_915_14, 0.375],
+        [0.0001933193, 0.0001949078, 363.686_83],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        Some(40.0),
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.3, 0.75],
+        [0.0004508875, 0.0003673582, 386.210_2],
+      ),
+      (
+        3,
+        4,
+        111.212_44,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.737_270_6, 0.75],
+        [0.0002924716, 0.0003021119, 645.837_8],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        195.124_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        0.0,
+        [1.0, 0.786_952_8, 0.75],
+        [0.0002775919, 0.0002946976, 689.35875],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        20.0,
+        60.0,
+        [1.0, 0.440_915_14, 0.75],
+        [0.027_995_333, 0.094_696_596, 1.544_999_6],
+      ),
+      (
+        3,
+        4,
+        185.962_45,
+        109.324_88,
+        None,
+        100.0,
+        170.0,
+        40.0,
+        0.0,
+        [1.0, 0.440_915_14, 0.75],
+        [0.0003780597, 0.0001827796, 544.446_96],
+      ),
+    ] {
+      let (height_factor, preferred_depth) = super::word_surface_model_aspect(rows, columns);
+      let view = Chart3DView {
+        rotate_x_deg: elevation,
+        rotate_y_deg: rotation,
+        height_percent: height_factor * authored_height.unwrap_or(100.0 * height / width),
+        height_percent_is_explicit: true,
+        depth_percent: depth,
+        depth_percent_is_explicit: true,
+        right_angle_axes: false,
+        perspective_half_degrees: perspective,
+      };
+      let mut projection = cartesian_3d_projection(
+        view,
+        PlotRect {
+          left: 0.0,
+          top: 0.0,
+          width,
+          height,
+        },
+        ChartLayoutProfile::Word,
+        preferred_depth,
+        false,
+      );
+      projection.fit_word_perspective_volume(view);
+      for (actual, expected) in [
+        projection.model_width,
+        projection.model_height,
+        projection.model_depth,
+      ]
+      .into_iter()
+      .zip(native_model)
+      {
+        assert!(
+          (actual - expected).abs() < 0.000_002,
+          "model {rows}x{columns}: {actual} vs {expected}"
+        );
+      }
+      for (actual, expected) in [
+        projection.camera_plane_center.0,
+        projection.camera_plane_center.1,
+        projection.camera_distance.unwrap(),
+      ]
+      .into_iter()
+      .zip(native_camera)
+      {
+        assert!(
+          (actual - expected).abs() < 0.000_2,
+          "camera {rows}x{columns}/{rotation}/{elevation}: {actual} vs {expected}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_stacked_horizontal_volume_matches_native_group_height_and_depth_controls() {
+    // Independent Word point-box medians: the original stack, clustered
+    // counterexample, explicit height, zero gap depth and doubled depth.
+    for (grouping, width, authored_height, gap_depth, depth_percent, native_pitch) in [
+      ("stacked", 164.945_66, None, 150, 100.0, 17.511_496),
+      ("clustered", 167.225_66, None, 150, 100.0, 17.968_582),
+      ("stacked", 164.945_66, Some(100.0), 150, 100.0, 18.052_44),
+      ("stacked", 164.945_66, None, 0, 100.0, 18.134_724),
+      ("stacked", 164.945_66, None, 150, 200.0, 16.562_914),
+    ] {
+      let height = 79.136_61;
+      let series = (0..3).map(|i| format!(r#"<c:ser><c:idx val="{i}"/><c:order val="{i}"/><c:val><c:numLit><c:pt idx="0"><c:v>5</c:v></c:pt></c:numLit></c:val></c:ser>"#)).collect::<String>();
+      let source = c::ChartSpace::from_bytes(format!(r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:view3D><c:rAngAx val="1"/></c:view3D><c:plotArea><c:bar3DChart><c:barDir val="bar"/><c:grouping val="{grouping}"/>{series}<c:gapWidth val="150"/><c:gapDepth val="{gap_depth}"/></c:bar3DChart></c:plotArea></c:chart></c:chartSpace>"#).as_bytes()).unwrap();
+      let chart = crate::render::chart::cartesian_chart_for_ui_language(&source, None).unwrap();
+      let height_percent = authored_height.unwrap_or(100.0 * height / width);
+      let mut projection = cartesian_3d_projection(
+        Chart3DView {
+          rotate_x_deg: 15.0,
+          rotate_y_deg: 20.0,
+          right_angle_axes: true,
+          height_percent,
+          height_percent_is_explicit: true,
+          depth_percent,
+          depth_percent_is_explicit: true,
+          ..Chart3DView::default()
+        },
+        PlotRect {
+          left: 0.0,
+          top: 0.0,
+          width,
+          height,
+        },
+        ChartLayoutProfile::Word,
+        super::word_category_slot_model_depth(&chart, 4) * height_percent / 100.0,
+        false,
+      );
+      projection.fit_word_parallel_volume(1.0);
+      let first = projection.project(0.0, height * 0.125, 0.0).1;
+      let second = projection.project(0.0, height * 0.375, 0.0).1;
+      assert!((second - first - native_pitch).abs() < 0.0002);
     }
   }
 

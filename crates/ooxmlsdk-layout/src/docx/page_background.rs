@@ -1,11 +1,199 @@
-//! Word's legacy radial page brush is a repeated raster, independent of the
-//! paper and the VML target-screen hint. Keep this export owner separate from
-//! ordinary shape gradients, which have different interpolation defaults.
+//! Word legacy page brushes use a fixed physical period, independent of the
+//! paper and VML target-screen hint. Linear brushes remain vector gradients;
+//! radial brushes use repeated raster tiles.
 
 use image::{ImageEncoder, codecs::png::PngEncoder};
 
 use super::{ImageCrop, InlineShapeImageFill, InlineShapeImageFillMode, common, o, v};
 use crate::common::drawingml_gradient;
+
+/// One physical period of Word's legacy page brush. Repetition is resolved
+/// against each output page, so paper dimensions never stretch the brush.
+#[derive(Clone, Debug)]
+pub(crate) struct LinearGradient {
+  gradient: common::GradientFill<'static>,
+}
+
+pub(super) fn linear_gradient(background: &super::w::DocumentBackground) -> Option<LinearGradient> {
+  background.color.as_ref()?;
+  let shape = background.background.as_deref()?;
+  if !super::vml_background_fill_enabled(shape) {
+    return None;
+  }
+  let fill = shape.fill.as_deref()?;
+  if fill.r#type != Some(v::FillTypeValues::Gradient)
+    || fill
+      .fill_extended_properties
+      .as_ref()
+      .and_then(|fill| fill.r#type)
+      .is_some()
+  {
+    return None;
+  }
+  let model = crate::xlsx::object_resources::vml_background_model(shape);
+  let common::Fill::Gradient(mut gradient) =
+    super::word_vml_shape_common_fill(&model, kurbo::Affine::IDENTITY)
+  else {
+    return None;
+  };
+  let focus = model
+    .fill_focus
+    .as_deref()
+    .and_then(crate::xlsx::parse_vml_ratio)
+    .unwrap_or(0.0);
+  let authored_angle = model
+    .fill_angle
+    .as_deref()
+    .and_then(|s| s.parse::<f32>().ok())
+    .filter(|a| a.is_finite())
+    .unwrap_or(0.0);
+  let angle = gradient.angle_degrees.unwrap_or_default();
+  let mut direction = angle.rem_euclid(180.0);
+  if direction > 90.0 {
+    direction -= 180.0;
+  }
+  let explicit =
+    !crate::xlsx::vml_gradient_intermediate_stops(model.fill_colors.as_deref()).is_empty();
+  if !explicit && (angle - direction).rem_euclid(360.0) > 90.0 {
+    gradient.stops.reverse();
+    for stop in &mut gradient.stops {
+      stop.position = 1.0 - stop.position;
+    }
+  }
+  if explicit && focus.abs() > 0.0 && focus.abs() < 1.0 {
+    let mut stops = Vec::with_capacity(gradient.stops.len() * 2 - 1);
+    for stop in &gradient.stops {
+      let mut stop = stop.clone();
+      stop.position *= 0.5;
+      stops.push(stop);
+    }
+    for stop in gradient.stops.iter().rev().skip(1) {
+      let mut stop = stop.clone();
+      stop.position = 1.0 - stop.position * 0.5;
+      stops.push(stop);
+    }
+    gradient.stops = stops;
+  }
+  // Word's horizontal preset uses the small brush; custom angled/axial
+  // fills use the general 123x92.28pt period. Target-screen is a UI hint.
+  let (width, height) =
+    if authored_angle.rem_euclid(180.0) == 0.0 && (focus == 0.0 || focus.abs() == 1.0) {
+      (61.44, 46.08)
+    } else {
+      (123.0, 92.28)
+    };
+  gradient.line = super::vml_gradient::transformed_line(
+    Some(direction),
+    kurbo::Affine::scale_non_uniform(width, height),
+  );
+  gradient.angle_degrees = Some(direction);
+  for stop in &mut gradient.stops {
+    stop.color.a = 255;
+  }
+  Some(LinearGradient { gradient })
+}
+
+impl LinearGradient {
+  pub(super) fn for_page(&self, width: f32, height: f32) -> common::GradientFill<'static> {
+    let mut gradient = self.gradient.clone();
+    let (start, end) = gradient.line.expect("linear page brush");
+    let dx = end.x.0 - start.x.0;
+    let dy = end.y.0 - start.y.0;
+    let length2 = dx * dx + dy * dy;
+    let project = |x: f32, y: f32| ((x - start.x.0) * dx + (y - start.y.0) * dy) / length2;
+    let positions = [
+      project(0.0, 0.0),
+      project(width, 0.0),
+      project(0.0, height),
+      project(width, height),
+    ];
+    let mut first = positions.into_iter().fold(f32::INFINITY, f32::min).floor() as i32;
+    // Word's vertical page preset retains the preceding period. This also
+    // preserves the native sampled-function spacing at the first boundary.
+    if dx.abs() < f32::EPSILON && dy > 0.0 && first == 0 {
+      first = -1;
+    }
+    let last = positions
+      .into_iter()
+      .fold(f32::NEG_INFINITY, f32::max)
+      .ceil() as i32;
+    let count = (last - first).clamp(1, 4096) as usize;
+    let source = &self.gradient.stops;
+    let uniform = source.len() > 1
+      && source
+        .iter()
+        .enumerate()
+        .all(|(i, s)| (s.position - i as f32 / (source.len() - 1) as f32).abs() < 1e-6);
+    let mut stops = Vec::with_capacity(count * source.len());
+    for repetition in 0..count {
+      let reversed = (first + repetition as i32).rem_euclid(2) != 0;
+      for i in 0..source.len() {
+        let mut stop = source[if reversed { source.len() - 1 - i } else { i }].clone();
+        stop.position = if uniform {
+          // Sampled PDF functions retain both sides of a tile boundary.
+          (repetition * source.len() + i) as f32 / (count * source.len() - 1) as f32
+        } else {
+          (repetition as f32
+            + if reversed {
+              1.0 - stop.position
+            } else {
+              stop.position
+            })
+            / count as f32
+        };
+        stops.push(stop);
+      }
+    }
+    gradient.stops = stops;
+    gradient.line = Some((
+      common::Point {
+        x: common::Pt(start.x.0 + dx * first as f32),
+        y: common::Pt(start.y.0 + dy * first as f32),
+      },
+      common::Point {
+        x: common::Pt(start.x.0 + dx * (first as f32 + count as f32)),
+        y: common::Pt(start.y.0 + dy * (first as f32 + count as f32)),
+      },
+    ));
+    gradient
+  }
+}
+
+/// Word prints a page picture as a repeating bitmap at the 600-DPI reference
+/// device, even though ordinary VML frame fills stretch inside their host.
+/// Its pixel dimensions, not image density or VML size/aspect, own the period.
+/// Explicit origin/position retain their image/host-space phase. Keep ordinary
+/// tile fills and their natural-size policy separate.
+pub(super) fn frame_picture_texture(
+  fill: &v::Fill,
+  images: &super::ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  if fill.r#type != Some(v::FillTypeValues::Frame) {
+    return None;
+  }
+  let mut image = super::vml_fill_image(fill, fill.r#type, images)?;
+  // Read only dimensions here. The PDF image policy owns decoding,
+  // downsampling and compression once the physical tile is known.
+  let (width, height) =
+    crate::common::drawingml_image_tile::jpeg_dimensions(&image.data).or_else(|| {
+      image::ImageReader::new(std::io::Cursor::new(&image.data))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()
+    })?;
+  let reference_pixel_pt = crate::units::POINTS_PER_INCH / 600.0;
+  image.mode = InlineShapeImageFillMode::Tile {
+    size: Some(format!(
+      "{}pt,{}pt",
+      width as f32 * reference_pixel_pt,
+      height as f32 * reference_pixel_pt
+    )),
+    origin: fill.origin.clone(),
+    position: fill.position.clone(),
+  };
+  Some(image)
+}
 
 pub(super) fn radial_gradient_texture(background: &v::Background) -> Option<InlineShapeImageFill> {
   let fill = background.fill.as_deref()?;
@@ -161,6 +349,115 @@ mod tests {
   }
 
   const EXT: &str = r#"<o:fill type="gradientCenter"/>"#;
+
+  #[test]
+  fn frame_page_picture_uses_reference_pixels_and_ignores_shape_fill_geometry() {
+    for (width, height) in [(8, 8), (128, 128), (1024, 512)] {
+      let mut bytes = Vec::new();
+      PngEncoder::new(&mut bytes)
+        .write_image(
+          &vec![128; (width * height * 3) as usize],
+          width,
+          height,
+          image::ExtendedColorType::Rgb8,
+        )
+        .unwrap();
+      let mut images = super::super::ImageCatalog::default();
+      images.by_relationship_id.insert(
+        "picture".into(),
+        super::super::package::ImageResource {
+          data: bytes.into(),
+          content_type: Some("image/png".into()),
+        },
+      );
+      for extra in [
+        "",
+        r#"size="60pt,40pt" aspect="atMost" origin=".5,.5" position=".5,.5" opacity="50%""#,
+      ] {
+        let source=super::super::w::DocumentBackground::from_bytes(format!(r#"
+          <w:background xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:v="urn:schemas-microsoft-com:vml"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" w:color="FFFFFF">
+          <v:background><v:fill type="frame" r:id="picture" {extra}/></v:background></w:background>"#).as_bytes()).unwrap();
+        let texture = super::super::document_background_texture(&source, &images).unwrap();
+        let InlineShapeImageFillMode::Tile {
+          size,
+          origin,
+          position,
+        } = texture.mode
+        else {
+          panic!("frame page picture must repeat");
+        };
+        let (w, h) = super::super::vml_point_pair(size.as_deref().unwrap()).unwrap();
+        assert!((w - width as f32 * 0.12).abs() < 0.0001);
+        assert!((h - height as f32 * 0.12).abs() < 0.0001);
+        let phase = (!extra.is_empty()).then_some(".5,.5");
+        assert_eq!(origin.as_deref(), phase);
+        assert_eq!(position.as_deref(), phase);
+        assert_eq!(texture.data, images.by_relationship_id["picture"].data);
+      }
+    }
+  }
+
+  #[test]
+  fn linear_page_brush_repeats_without_stretching_and_keeps_activation() {
+    let source = |extra: &str, fill: &str| {
+      super::super::w::DocumentBackground::from_bytes(format!(r##"
+      <w:background xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:v="urn:schemas-microsoft-com:vml" w:color="FF00FF">
+        <v:background fillcolor="fuchsia" {extra}><v:fill type="gradient" color2="lime" {fill}/></v:background>
+      </w:background>"##).as_bytes()).unwrap()
+    };
+    let background = source("", r#"angle="225" focus="50%""#);
+    let brush = linear_gradient(&background).unwrap();
+    for (width, height, count) in [
+      (419.52, 297.0, 4),
+      (839.16, 594.0, 7),
+      (297.0, 419.52, 4),
+      (297.0, 297.0, 3),
+    ] {
+      let gradient = brush.for_page(width, height);
+      assert_eq!(gradient.stops.len(), count * 511);
+      let (start, end) = gradient.line.unwrap();
+      assert!((start.x.0 - 17.201569).abs() < 0.001);
+      assert!((start.y.0 + 12.905373).abs() < 0.001);
+      assert!((end.x.0 - start.x.0 - count as f32 * 88.59686).abs() < 0.001);
+      for index in [0, 510, 511] {
+        assert_eq!(
+          gradient.stops[index].color,
+          common::Color {
+            r: 255,
+            g: 0,
+            b: 255,
+            a: 255
+          }
+        );
+      }
+      assert_eq!(
+        gradient.stops[255].color,
+        common::Color {
+          r: 0,
+          g: 255,
+          b: 0,
+          a: 255
+        }
+      );
+    }
+    let vertical = linear_gradient(&source("", r#"angle="0" focus="50%""#))
+      .unwrap()
+      .for_page(419.52, 297.0);
+    assert_eq!(vertical.stops.len(), 2555);
+    assert!((vertical.line.unwrap().0.y.0 + 92.28).abs() < 0.001);
+    for (extra, fill) in [
+      (r#"fill="f""#, r#"angle="225" focus="50%""#),
+      ("", r#"on="f" angle="225" focus="50%""#),
+    ] {
+      assert!(linear_gradient(&source(extra, fill)).is_none());
+    }
+    let mut absent = background;
+    absent.color = None;
+    assert!(linear_gradient(&absent).is_none());
+  }
 
   #[test]
   fn radial_page_gradient_uses_a_fixed_tile_and_honors_activation() {

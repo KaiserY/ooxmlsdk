@@ -695,6 +695,11 @@ impl ImageCatalog {
         continue;
       }
       if let Ok(chart_space) = chart_part.root_element(package) {
+        let external_data_available =
+          classic_chart_external_data_is_available(package, &chart_part, chart_space);
+        if !external_data_available {
+          continue;
+        }
         let user_shapes = chart_space.user_shapes_reference.as_ref().and_then(|_| {
           chart_part
             .chart_drawing_part(package)
@@ -811,6 +816,28 @@ impl ImageCatalog {
   }
 }
 
+fn classic_chart_external_data_is_available(
+  package: &WordprocessingDocument,
+  chart_part: &ChartPart,
+  chart_space: &c::ChartSpace,
+) -> bool {
+  let Some(external_data) = chart_space.external_data.as_ref() else {
+    return true;
+  };
+  // ECMA-376 21.2.2.63 distinguishes cached-only charts from charts that
+  // explicitly reference an embedded workbook or linked data. Word's repair
+  // import removes a chart with an unresolved externalData relationship,
+  // including its inline extent in a footnote. A cache alone cannot rescue
+  // that reference. Linked workbooks remain valid without being fetched.
+  let relationship_id = external_data.id.as_str();
+  chart_part
+    .get_external_relationship(package, relationship_id)
+    .is_some()
+    || chart_part
+      .get_part_by_id(package, relationship_id)
+      .is_some()
+}
+
 fn has_extended_chart_root(xml: &[u8]) -> bool {
   let mut reader = quick_xml::NsReader::from_reader(xml);
   loop {
@@ -834,6 +861,59 @@ mod tests {
   use super::{
     biff_default_font_size_twips, has_extended_chart_root, signature_line_images_from_xml,
   };
+
+  #[test]
+  fn classic_chart_external_data_requires_its_own_resolvable_relationship() {
+    use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
+    use ooxmlsdk::parts::{chart_part::ChartPart, embedded_package_part::EmbeddedPackagePart};
+    use ooxmlsdk::sdk::WordprocessingDocumentType;
+
+    for (external_id, embedded_id, linked_id, expected) in [
+      (None, None, None, true),
+      (Some("rIdData"), None, None, false),
+      (Some("rIdData"), Some("rIdData"), None, true),
+      (Some("rIdData"), Some("rIdOther"), None, false),
+      (Some("rIdData"), None, Some("rIdData"), true),
+      (Some("rIdData"), None, Some("rIdOther"), false),
+    ] {
+      let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+      let main = package.add_main_document_part().unwrap();
+      let chart = main
+        .add_new_part::<_, ChartPart>(&mut package, "rIdChart")
+        .unwrap();
+      let external = external_id.map_or(String::new(), |id| {
+        format!(r#"<c:externalData r:id="{id}"/>"#)
+      });
+      chart.set_data(&mut package, format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart><c:plotArea/></c:chart>{external}</c:chartSpace>"#,
+      ).into_bytes()).unwrap();
+      if let Some(id) = embedded_id {
+        chart
+          .add_new_part_with_content_type::<_, EmbeddedPackagePart>(
+            &mut package,
+            id,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          )
+          .unwrap();
+      }
+      if let Some(id) = linked_id {
+        chart
+          .add_external_relationship(
+            &mut package,
+            id,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+            "file:///unavailable/chart-data.xlsx",
+          )
+          .unwrap();
+      }
+      let catalog = super::ImageCatalog::load(&package, &main);
+      assert_eq!(
+        catalog.charts_by_relationship_id.contains_key("rIdChart"),
+        expected,
+        "external={external_id:?}, embedded={embedded_id:?}, linked={linked_id:?}"
+      );
+    }
+  }
 
   #[test]
   fn biff_default_font_size_reads_first_font_record_after_other_globals() {

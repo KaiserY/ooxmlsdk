@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use pdf_writer::types::{LineCapStyle, LineJoinStyle, TextRenderingMode};
@@ -60,10 +61,107 @@ impl PreparedOfficeMathSvg {
 }
 
 pub(super) fn prepare_svg(data: &[u8], options: &usvg::Options<'_>) -> Result<PreparedSvg> {
-  let tree = usvg::Tree::from_data(data, options)
+  let data = office_svg_viewport(data)?;
+  let tree = usvg::Tree::from_data(&data, options)
     .map_err(|error| PdfError::Image(format!("failed to decode SVG image: {error}")))?;
   validate_tree_size(&tree, "SVG image")?;
   Ok(PreparedSvg { tree })
+}
+
+fn office_svg_viewport(data: &[u8]) -> Result<Cow<'_, [u8]>> {
+  let data = if data.starts_with(&[0x1f, 0x8b]) {
+    Cow::Owned(usvg::decompress_svgz(data).map_err(svg_viewport_error)?)
+  } else {
+    Cow::Borrowed(data)
+  };
+  let mut reader = Reader::from_reader(data.as_ref());
+  loop {
+    let begin = reader.buffer_position() as usize;
+    let event = reader.read_event().map_err(svg_viewport_error)?;
+    let empty = matches!(&event, Event::Empty(_));
+    let start = match event {
+      Event::Start(start) | Event::Empty(start) => start,
+      Event::Eof => return Ok(data),
+      _ => continue,
+    };
+    if start.local_name().as_ref() != b"svg" {
+      return Ok(data);
+    }
+    let mut width = None;
+    let mut height = None;
+    for attribute in start.attributes() {
+      let attribute = attribute.map_err(svg_viewport_error)?;
+      match attribute.key.as_ref() {
+        b"viewBox" => return Ok(data),
+        b"width" | b"height" => {
+          let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(svg_viewport_error)?
+            .into_owned();
+          if attribute.key.as_ref() == b"width" {
+            width = Some(value);
+          } else {
+            height = Some(value);
+          }
+        }
+        _ => {}
+      }
+    }
+    // SVG 1.1 lets the host supply the initial viewport. Word uses 500px per
+    // omitted axis; percentages resolve against that host size independently
+    // of DrawingML display extents. usvg otherwise replaces this viewport with
+    // the content bounds, even when Options.default_size is set. Materialize
+    // only these axes so both vector and raster output retain the same canvas.
+    let resolve_axis = |value: Option<&str>| match value {
+      None => Some("500".to_owned()),
+      Some(value) => value
+        .trim()
+        .strip_suffix('%')
+        .and_then(|percent| percent.trim().parse::<f32>().ok())
+        .map(|percent| percent * 5.0)
+        .filter(|pixels| pixels.is_finite() && *pixels > 0.0)
+        .map(|pixels| pixels.to_string()),
+    };
+    let width = resolve_axis(width.as_deref());
+    let height = resolve_axis(height.as_deref());
+    if width.is_none() && height.is_none() {
+      return Ok(data);
+    }
+    let mut resolved = start.to_owned();
+    resolved.clear_attributes();
+    for attribute in start.attributes() {
+      let attribute = attribute.map_err(svg_viewport_error)?;
+      if (width.is_some() && attribute.key.as_ref() == b"width")
+        || (height.is_some() && attribute.key.as_ref() == b"height")
+      {
+        continue;
+      }
+      resolved.push_attribute(attribute);
+    }
+    if let Some(width) = &width {
+      resolved.push_attribute(("width", width.as_str()));
+    }
+    if let Some(height) = &height {
+      resolved.push_attribute(("height", height.as_str()));
+    }
+    let mut writer = quick_xml::Writer::new(Vec::with_capacity(data.len() + 64));
+    writer.get_mut().extend_from_slice(&data[..begin]);
+    writer
+      .write_event(if empty {
+        Event::Empty(resolved)
+      } else {
+        Event::Start(resolved)
+      })
+      .map_err(svg_viewport_error)?;
+    writer
+      .get_mut()
+      .extend_from_slice(&data[reader.buffer_position() as usize..]);
+    return Ok(Cow::Owned(writer.into_inner()));
+  }
+}
+
+fn svg_viewport_error(error: impl std::fmt::Display) -> PdfError {
+  PdfError::Image(format!("failed to resolve SVG viewport: {error}"))
 }
 
 pub(super) fn prepare_office_math_svg(
@@ -1199,7 +1297,75 @@ fn unsupported<T>(feature: &'static str) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-  use super::{OfficeMathTextMarker, office_math_text_marker};
+  use super::{OfficeMathTextMarker, office_math_text_marker, office_svg_viewport, prepare_svg};
+
+  #[test]
+  fn office_svg_keeps_host_canvas_instead_of_fitting_visible_ink() {
+    let source = br##"<svg xmlns="http://www.w3.org/2000/svg"><rect x="20" y="20" width="100" height="100" fill="#00c030"/></svg>"##;
+    let scene = prepare_svg(source, &usvg::Options::default()).unwrap();
+    assert_eq!(scene.tree().size().width(), 500.0);
+    assert_eq!(scene.tree().size().height(), 500.0);
+    let mut raster = resvg::tiny_skia::Pixmap::new(500, 500).unwrap();
+    resvg::render(
+      scene.tree(),
+      resvg::tiny_skia::Transform::identity(),
+      &mut raster.as_mut(),
+    );
+    assert_eq!(raster.pixel(30, 30).unwrap().green(), 192);
+    assert_eq!(raster.pixel(300, 300).unwrap().alpha(), 0);
+  }
+
+  #[test]
+  fn office_svg_resolves_missing_and_percentage_axes_independently() {
+    for (dimensions, expected) in [
+      ("width='100'", (100.0, 500.0)),
+      ("height='100'", (500.0, 100.0)),
+      ("width='50%' height='25%'", (250.0, 125.0)),
+      ("width='50&#x25;'", (250.0, 500.0)),
+    ] {
+      let source = format!(
+        "<svg xmlns='http://www.w3.org/2000/svg' {dimensions}><rect width='10' height='10'/></svg>"
+      );
+      let scene = prepare_svg(source.as_bytes(), &usvg::Options::default()).unwrap();
+      assert_eq!(
+        (scene.tree().size().width(), scene.tree().size().height()),
+        expected,
+        "{dimensions}"
+      );
+    }
+  }
+
+  #[test]
+  fn office_svg_preserves_explicit_sizes_and_viewbox_inputs() {
+    for source in [
+      "<svg xmlns='http://www.w3.org/2000/svg' width='100' height='200'/>",
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 500'/>",
+      "<svg xmlns='http://www.w3.org/2000/svg' width='50%' viewBox='0 0 1000 500'/>",
+    ] {
+      assert!(matches!(
+        office_svg_viewport(source.as_bytes()).unwrap(),
+        std::borrow::Cow::Borrowed(_)
+      ));
+    }
+  }
+
+  #[test]
+  fn office_svg_root_resolution_preserves_prefixes_prolog_and_svgz() {
+    use std::io::Write;
+
+    let source = br#"<?xml version='1.0'?>
+<!-- before root -->
+<s:svg xmlns:s='http://www.w3.org/2000/svg' data-note='a &amp; b'><s:rect width='10' height='10'/></s:svg>"#;
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(source).unwrap();
+    let compressed = encoder.finish().unwrap();
+    for data in [source.as_slice(), compressed.as_slice()] {
+      let scene = prepare_svg(data, &usvg::Options::default()).unwrap();
+      assert_eq!(scene.tree().size().width(), 500.0);
+      assert_eq!(scene.tree().size().height(), 500.0);
+      assert!(!scene.tree().root().children().is_empty());
+    }
+  }
 
   #[test]
   fn office_math_text_markers_are_closed_and_exact() {

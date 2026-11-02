@@ -256,6 +256,7 @@ impl TableBuilder {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,

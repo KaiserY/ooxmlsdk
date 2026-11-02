@@ -108,7 +108,7 @@ pub(super) fn plan_kept_body_suffix(
     .collect::<Vec<_>>();
   let full_height = measured_note_stories_height(&stories, preceding, flow, &mut root.text_metrics)
     + if include_separator {
-      footnote_separator_layout_height(root.document, flow, &mut root.text_metrics)
+      footnote_area_overhead_height(root.document, flow, &mut root.text_metrics)
     } else {
       0.0
     };
@@ -161,7 +161,7 @@ pub(super) fn plan_reference_prefix(
     .collect::<Vec<_>>();
   let full_height = measured_note_stories_height(&stories, preceding, flow, &mut root.text_metrics)
     + if include_separator {
-      footnote_separator_layout_height(root.document, flow, &mut root.text_metrics)
+      footnote_area_overhead_height(root.document, flow, &mut root.text_metrics)
     } else {
       0.0
     };
@@ -209,13 +209,15 @@ fn format_pages<'a>(
     include_separator,
   } = space;
   let separator_height = footnote_separator_layout_height(document, flow, metrics);
+  let notice_height = footnote_continuation_notice_height(document, flow, metrics);
   let first_top = flow.body_content_bottom_pt - available;
   let left = flow.setup.margin_left_pt;
   let width = flow.setup.width_pt - left - flow.setup.margin_right_pt;
   let mut note_flow = footnote_story_flow(FlowContext {
     content_left_pt: left,
     content_width: width,
-    content_bottom: flow.body_content_bottom_pt,
+    content_bottom: flow.body_content_bottom_pt - notice_height,
+    note_continuation_bottom_inset_pt: notice_height,
     columns: SectionColumns::default(),
     column_index: 0,
     note_continuation_top_inset_pt: separator_height,
@@ -357,6 +359,11 @@ fn format_pages<'a>(
       0.0
     } else {
       (bottom - top).max(0.0)
+        + if i > 0 || include_separator {
+          notice_height
+        } else {
+          0.0
+        }
     };
     if i == 0 && height > available + LAYOUT_EPSILON_PT {
       return None;
@@ -385,7 +392,7 @@ fn format_separator(
   if document.footnote_separator_stories.separator.is_empty() {
     layout_footnote_separator(flow.setup, current, pages, y, flow.body_content_bottom_pt)
   } else {
-    layout_note_story_blocks(
+    layout_note_separator_story_blocks(
       &document.footnote_separator_stories.separator,
       footnote_story_flow(flow),
       current,
@@ -521,6 +528,7 @@ pub(super) mod tests {
       },
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: crate::docx::NoteSeparatorStories {

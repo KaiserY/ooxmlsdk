@@ -1,8 +1,8 @@
 pub use emfsdk::render::{
   DecodedMetafile, EmfTextAdvanceQuantization, MetafileBitmapLayer, MetafileBitmapPicture,
-  MetafilePhysicalSize, MetafileSolidRect, MetafileVectorDraw, MetafileVectorDrawing,
-  MetafileVectorFill, MetafileVectorFillRule, MetafileVectorPoint, MetafileVectorScene,
-  RenderOptions, WmfConversionProfile, WmfExternalHeader,
+  MetafileImageBounds, MetafilePhysicalSize, MetafileSolidRect, MetafileVectorDraw,
+  MetafileVectorDrawing, MetafileVectorFill, MetafileVectorFillRule, MetafileVectorPoint,
+  MetafileVectorScene, RenderOptions, WmfConversionProfile, WmfExternalHeader,
 };
 
 #[derive(Clone, Debug)]
@@ -67,6 +67,10 @@ pub fn metafile_physical_size(
   content_type: Option<&str>,
 ) -> Option<MetafilePhysicalSize> {
   emfsdk::render::metafile_physical_size(data, content_type)
+}
+
+pub fn metafile_image_bounds(data: &[u8]) -> Option<MetafileImageBounds> {
+  emfsdk::render::metafile_image_bounds(data)
 }
 
 pub fn extract_metafile_text_runs(

@@ -5824,6 +5824,8 @@ fn resolved_common_gradient(
     }
   };
   Some(crate::common::GradientFill {
+    transform_as_normal: false,
+    opaque_for_pdf: false,
     stops,
     angle_degrees,
     definition_bounds: Some(definition_bounds),

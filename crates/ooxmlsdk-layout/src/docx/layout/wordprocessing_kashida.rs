@@ -6,14 +6,20 @@
 use super::{LineJustificationContext, PageItem, TextMetrics, common, units};
 use std::sync::Arc;
 
+mod modern;
+
 const PIXEL_PT: f32 = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
 
 pub(super) fn adjust(
   items: &mut [PageItem],
   line: LineJustificationContext,
   last_text_index: Option<usize>,
+  modern: bool,
   metrics: &mut TextMetrics,
 ) -> Option<bool> {
+  if modern && let Some(adjusted) = modern::adjust(items, line, true, true, metrics) {
+    return Some(adjusted);
+  }
   if line.terminal_overhang_pt != 0.0 {
     return None;
   }
@@ -48,19 +54,13 @@ pub(super) fn adjust(
         && text.text.bytes().all(|byte| byte == b' ')
         && style.right_to_left != Some(true)
         && style.complex_script != Some(true),
+      glyph_advances: Vec::new(),
       font_width_percent: style.wordprocessing_font_width_percent.unwrap_or(100),
       space_expansions: Vec::new(),
     }));
     let shaped = metrics.shape_text(&text.text, &style)?;
     let width = (shaped.width_pt / PIXEL_PT).round() as i64;
     if Some(index) == last_text_index {
-      tail_is_rtl = style
-        .resolved_bidi_level
-        .map_or(style.right_to_left.unwrap_or(false), |level| level % 2 != 0);
-      ltr_blank_tail = !tail_is_rtl && text.text.bytes().all(|byte| byte == b' ');
-      let visible = text.text.trim_end_matches(' ');
-      natural_tail_pixels =
-        width - (metrics.measure_text(visible, &style) / PIXEL_PT).round() as i64;
       // A Word bidi embedding owns its complete portion, including the
       // logical final blank. Native w:dir controls retain that blank inside
       // the device target; ordinary RTL portions leave it outside the line.
@@ -69,6 +69,20 @@ pub(super) fn adjust(
         .as_deref()
         .is_some_and(|scopes| !scopes.is_empty())
         && style.resolved_bidi_level.is_none_or(|level| level > 1);
+      tail_is_rtl = style
+        .resolved_bidi_level
+        .map_or(style.right_to_left.unwrap_or(false), |level| level % 2 != 0)
+        // An LRE gives the final blank an even painting level, but does not
+        // turn the authored RTL portion's tail into foreign space glue.
+        // Native embedded-tail controls retain its fixed advance and exclude
+        // it from the same Kashida allocation before and after bidi splitting.
+        || (embedded_tail
+          && style.right_to_left == Some(true)
+          && text.text.bytes().all(|byte| byte == b' '));
+      ltr_blank_tail = !tail_is_rtl && text.text.bytes().all(|byte| byte == b' ');
+      let visible = text.text.trim_end_matches(' ');
+      natural_tail_pixels =
+        width - (metrics.measure_text(visible, &style) / PIXEL_PT).round() as i64;
       if tail_is_rtl && !embedded_tail {
         tail_pixels = natural_tail_pixels;
       }
@@ -341,6 +355,22 @@ pub(super) fn adjust(
   Some(true)
 }
 
+pub(super) fn adjust_ordinary(
+  items: &mut [PageItem],
+  line: LineJustificationContext,
+  metrics: &mut TextMetrics,
+) -> Option<bool> {
+  modern::adjust(items, line, false, true, metrics)
+}
+
+pub(super) fn adjust_ragged(
+  items: &mut [PageItem],
+  line: LineJustificationContext,
+  metrics: &mut TextMetrics,
+) -> Option<bool> {
+  modern::adjust(items, line, true, false, metrics)
+}
+
 fn device_target_width(line: LineJustificationContext) -> i64 {
   use common::wordprocessing_device::{source_coordinate, source_coordinate_precise};
 
@@ -427,6 +457,7 @@ mod tests {
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: text.to_owned(),
           style: TextStyle {
@@ -495,6 +526,7 @@ mod tests {
             preserve_foreign_tail: true,
           },
           Some(1),
+          false,
           &mut metrics,
         ),
         Some(expected.is_some()),
@@ -588,6 +620,9 @@ mod tests {
           Some(if consumed { 1 } else { 3 })
         );
       }
+      // UBA can split an embedded LTR trailing blank from its RTL letters.
+      // The native contract is the complete line, not a single TextItem.
+      let last_text_index = Some(items.len() - 1);
       let embedded = direction.is_some() && !consumed;
       assert_eq!(
         adjust(
@@ -602,29 +637,41 @@ mod tests {
             has_character_grid: false,
             preserve_foreign_tail: false,
           },
-          Some(0),
+          last_text_index,
+          false,
           &mut metrics,
         ),
         Some(true)
       );
-      let PageItem::Text(text) = &items[0] else {
-        unreachable!()
-      };
-      let shape = metrics.shape_text(&text.text, &text.style).unwrap();
+      let mut joined = String::new();
+      let mut width = 0.0;
+      let mut extenders = 0;
+      for item in &items {
+        let PageItem::Text(text) = item else {
+          unreachable!()
+        };
+        joined.push_str(&text.text);
+        width += metrics
+          .shape_text(&text.text, &text.style)
+          .unwrap()
+          .width_pt;
+        extenders += text
+          .style
+          .kashida_expansions
+          .as_deref()
+          .unwrap_or_default()
+          .iter()
+          .map(|join| join.glyph_count)
+          .sum::<usize>();
+      }
+      assert_eq!(joined, source);
       assert_eq!(
-        (shape.width_pt / PIXEL_PT).round() as i32,
+        (width / PIXEL_PT).round() as i32,
         if embedded { 2977 } else { 3008 },
         "embedding direction {direction:?}"
       );
       assert_eq!(
-        text
-          .style
-          .kashida_expansions
-          .as_deref()
-          .unwrap()
-          .iter()
-          .map(|join| join.glyph_count)
-          .sum::<usize>(),
+        extenders,
         if embedded { 16 } else { 24 },
         "embedding direction {direction:?}"
       );
@@ -662,7 +709,10 @@ mod tests {
             has_character_grid: false,
             preserve_foreign_tail: false,
           };
-          assert_eq!(adjust(&mut items, line, Some(0), &mut metrics), Some(true));
+          assert_eq!(
+            adjust(&mut items, line, Some(0), false, &mut metrics),
+            Some(true)
+          );
           let PageItem::Text(text) = &items[0] else {
             unreachable!()
           };
@@ -761,7 +811,10 @@ mod tests {
         has_character_grid: false,
         preserve_foreign_tail: false,
       };
-      assert_eq!(adjust(&mut items, line, Some(2), &mut metrics), Some(true));
+      assert_eq!(
+        adjust(&mut items, line, Some(2), false, &mut metrics),
+        Some(true)
+      );
       let PageItem::Text(arabic) = &items[1] else {
         unreachable!()
       };
@@ -826,7 +879,7 @@ mod tests {
       };
       let last = items.len() - 1;
       assert_eq!(
-        adjust(&mut items, line, Some(last), &mut metrics),
+        adjust(&mut items, line, Some(last), false, &mut metrics),
         Some(true)
       );
       let mut actual = Vec::new();
@@ -892,7 +945,7 @@ mod tests {
       };
       let last = items.len() - 1;
       assert_eq!(
-        adjust(&mut items, line, Some(last), &mut metrics),
+        adjust(&mut items, line, Some(last), false, &mut metrics),
         Some(true)
       );
       let mut full_pixels = 0;
@@ -971,7 +1024,10 @@ mod tests {
         has_character_grid: false,
         preserve_foreign_tail: false,
       };
-      assert_eq!(adjust(&mut items, line, Some(2), &mut metrics), Some(true));
+      assert_eq!(
+        adjust(&mut items, line, Some(2), false, &mut metrics),
+        Some(true)
+      );
       let actual = items
         .iter()
         .map(|item| {
@@ -1028,7 +1084,10 @@ mod tests {
         has_character_grid: false,
         preserve_foreign_tail: false,
       };
-      assert_eq!(adjust(&mut items, line, Some(1), &mut metrics), Some(true));
+      assert_eq!(
+        adjust(&mut items, line, Some(1), false, &mut metrics),
+        Some(true)
+      );
       let mut actual = Vec::new();
       let mut copies = 0;
       for item in &items {
@@ -1068,7 +1127,10 @@ mod tests {
         has_character_grid: false,
         preserve_foreign_tail: false,
       };
-      assert_eq!(adjust(&mut items, line, Some(0), &mut metrics), Some(true));
+      assert_eq!(
+        adjust(&mut items, line, Some(0), false, &mut metrics),
+        Some(true)
+      );
       let PageItem::Text(text) = &items[0] else {
         unreachable!()
       };
@@ -1104,7 +1166,10 @@ mod tests {
       has_character_grid: false,
       preserve_foreign_tail: false,
     };
-    assert_eq!(adjust(&mut items, line, Some(0), &mut metrics), Some(true));
+    assert_eq!(
+      adjust(&mut items, line, Some(0), false, &mut metrics),
+      Some(true)
+    );
     let PageItem::Text(text) = &items[0] else {
       unreachable!()
     };
@@ -1154,7 +1219,10 @@ mod tests {
       unreachable!()
     };
     first.text.insert(0, ' ');
-    assert_eq!(adjust(&mut leading, line, Some(4), &mut metrics), None);
+    assert_eq!(
+      adjust(&mut leading, line, Some(4), false, &mut metrics),
+      None
+    );
 
     // Note stories preserve text portions to retain source boundaries.
     // Their internal blanks still participate in device justification; that
@@ -1165,7 +1233,10 @@ mod tests {
       };
       text.preserve_text_portion = true;
     }
-    assert_eq!(adjust(&mut items, line, Some(4), &mut metrics), Some(true));
+    assert_eq!(
+      adjust(&mut items, line, Some(4), false, &mut metrics),
+      Some(true)
+    );
     let mut advances = Vec::new();
     let mut copies = 0;
     for item in &items {
@@ -1184,5 +1255,227 @@ mod tests {
     assert_eq!(advances.len(), 10);
     assert_eq!(advances.iter().sum::<i32>(), 339);
     assert_eq!(copies, 59);
+  }
+  #[test]
+  fn ordinary_rtl_uses_native_line_wide_printer_advances() {
+    let source = "متن فارسی با کلمات کوتاه. متن فارسی با کلمات خیییییییییییییییییییییییییییییییییییییییییییییییییییییییییلی طولانی. متن فارسی با جملات ";
+    let mut items = word_device_items(&[(72.0, source, 1)]);
+    let PageItem::Text(text) = &mut items[0] else {
+      unreachable!()
+    };
+    text.style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      complex_font_family: Some(Arc::from("Arial")),
+      font_size_pt: 11.0,
+      complex_font_size_pt: Some(11.0),
+      wordprocessing_legacy_font_measurement: Some(false),
+      wordprocessingml_font_slots: true,
+      right_to_left: Some(true),
+      resolved_bidi_level: Some(1),
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    assert_eq!(
+      adjust_ordinary(
+        &mut items,
+        LineJustificationContext {
+          item_start: 0,
+          has_character_grid: false,
+          y_pt: 20.0,
+          left_pt: 72.0,
+          right_pt: 523.3,
+          terminal_overhang_pt: 0.0,
+          source_frame_right_pt: None,
+          preserve_foreign_tail: false,
+        },
+        &mut metrics
+      ),
+      Some(true)
+    );
+    let PageItem::Text(text) = &items[0] else {
+      unreachable!()
+    };
+    assert!(text.style.kashida_expansions.is_none());
+    let shaped = metrics.shape_text(source, &text.style).unwrap();
+    let pixels: Vec<_> = shaped
+      .glyphs
+      .iter()
+      .map(|glyph| (glyph.x_advance_em * glyph.font_size_pt / PIXEL_PT).round() as i32)
+      .collect();
+    // Native Both input/output spans two shaping portions. Retain one
+    // ordinary LS carry across them and reverse only the painting order.
+    let expected = [
+      25, 65, 55, 36, 49, 26, 21, 22, 26, 53, 49, 45, 21, 25, 26, 48, 22, 36, 26, 26, 54, 22, 49,
+      40, 54, 26, 54, 19, 22, 22, 23, 22, 23, 22, 22, 23, 22, 22, 23, 22, 23, 22, 22, 23, 22, 23,
+      22, 22, 23, 22, 22, 23, 22, 23, 22, 22, 23, 22, 22, 23, 22, 22, 23, 23, 22, 22, 23, 22, 23,
+      22, 22, 23, 22, 22, 23, 22, 23, 22, 22, 23, 22, 22, 22, 22, 22, 49, 26, 65, 21, 36, 19, 36,
+      26, 21, 22, 26, 54, 49, 45, 20, 25, 26, 48, 22, 36, 26, 25, 26, 21, 22, 40, 36, 26, 65, 21,
+      36, 19, 36, 26, 21, 22, 26, 54, 49, 45, 21, 25, 26, 48, 22, 36,
+    ];
+    assert_eq!(pixels, expected);
+  }
+  #[test]
+  fn modern_kashida_foreign_and_ragged_native_printer_lines() {
+    {
+      let source = "This is a sample text. This is another sample text. This is also a ";
+      let mut items = word_device_items(&[(72.0, source, 0)]);
+      let PageItem::Text(text) = &mut items[0] else {
+        unreachable!()
+      };
+      text.paragraph_bidi = false;
+      text.style = TextStyle {
+        font_family: Some(Arc::from("DengXian")),
+        complex_font_family: Some(Arc::from("DengXian")),
+        font_size_pt: 11.0,
+        complex_font_size_pt: Some(11.0),
+        wordprocessing_legacy_font_measurement: Some(false),
+        wordprocessingml_font_slots: true,
+        right_to_left: Some(false),
+        resolved_bidi_level: Some(0),
+        ..Default::default()
+      };
+      let mut metrics = TextMetrics::new();
+      let line = LineJustificationContext {
+        item_start: 0,
+        has_character_grid: false,
+        y_pt: 20.0,
+        left_pt: 72.0,
+        right_pt: 523.3,
+        terminal_overhang_pt: 0.0,
+        source_frame_right_pt: None,
+        preserve_foreign_tail: false,
+      };
+      assert_eq!(
+        modern::adjust(&mut items, line, true, true, &mut metrics),
+        Some(true)
+      );
+      let PageItem::Text(text) = &items[0] else {
+        unreachable!()
+      };
+      assert!(text.style.kashida_expansions.is_none());
+      let shaped = metrics.shape_text(source, &text.style).unwrap();
+      let pixels: Vec<_> = shaped
+        .glyphs
+        .iter()
+        .map(|glyph| (glyph.x_advance_em * glyph.font_size_pt / PIXEL_PT).round() as i32)
+        .collect();
+      let expected = [
+        48, 51, 21, 37, 127, 21, 37, 129, 46, 129, 37, 46, 77, 53, 21, 47, 128, 29, 47, 41, 29, 20,
+        128, 48, 51, 21, 37, 128, 21, 37, 128, 46, 51, 53, 29, 51, 47, 31, 127, 37, 46, 77, 53, 21,
+        47, 129, 29, 47, 41, 29, 20, 128, 48, 51, 21, 37, 128, 21, 37, 128, 46, 21, 37, 53, 128,
+        46, 25,
+      ];
+      assert_eq!(pixels, expected);
+    }
+    {
+      let source = "فارسی با جملات خیلی طولانی و متن فارسی با جملات خیلی طولانی.";
+      let mut items = word_device_items(&[(72.0, source, 1)]);
+      let PageItem::Text(text) = &mut items[0] else {
+        unreachable!()
+      };
+      text.paragraph_bidi = true;
+      text.style = TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        complex_font_family: Some(Arc::from("Arial")),
+        font_size_pt: 11.0,
+        complex_font_size_pt: Some(11.0),
+        wordprocessing_legacy_font_measurement: Some(false),
+        wordprocessingml_font_slots: true,
+        right_to_left: Some(true),
+        resolved_bidi_level: Some(1),
+        ..Default::default()
+      };
+      let mut metrics = TextMetrics::new();
+      let line = LineJustificationContext {
+        item_start: 0,
+        has_character_grid: false,
+        y_pt: 20.0,
+        left_pt: 72.0,
+        right_pt: 523.3,
+        terminal_overhang_pt: 0.0,
+        source_frame_right_pt: None,
+        preserve_foreign_tail: false,
+      };
+      assert_eq!(
+        modern::adjust(&mut items, line, true, false, &mut metrics),
+        Some(true)
+      );
+      let PageItem::Text(text) = &items[0] else {
+        unreachable!()
+      };
+      assert!(text.style.kashida_expansions.is_none());
+      let shaped = metrics.shape_text(source, &text.style).unwrap();
+      let pixels: Vec<_> = shaped
+        .glyphs
+        .iter()
+        .map(|glyph| (glyph.x_advance_em * glyph.font_size_pt / PIXEL_PT).round() as i32)
+        .collect();
+      let expected = [
+        26, 54, 22, 50, 40, 54, 26, 54, 19, 22, 49, 26, 66, 55, 36, 49, 26, 21, 22, 26, 54, 49, 45,
+        21, 25, 26, 48, 22, 36, 26, 40, 26, 54, 22, 50, 40, 54, 26, 54, 19, 22, 49, 26, 66, 55, 36,
+        49, 26, 21, 22, 26, 54, 49, 45, 21, 25,
+      ];
+      assert_eq!(pixels, expected);
+    }
+  }
+  #[test]
+  fn modern_kashida_foreign_tail_survives_a_formatting_boundary() {
+    let source = "This is a sample text. This is another sample text. This is also a ";
+    let prefix = source.strip_suffix(' ').unwrap();
+    let mut items = word_device_items(&[(72.0, prefix, 0), (500.0, " ", 0)]);
+    for item in &mut items {
+      let PageItem::Text(text) = item else {
+        unreachable!()
+      };
+      text.paragraph_bidi = false;
+      text.style = TextStyle {
+        font_family: Some(Arc::from("DengXian")),
+        complex_font_family: Some(Arc::from("DengXian")),
+        font_size_pt: 11.0,
+        complex_font_size_pt: Some(11.0),
+        wordprocessing_legacy_font_measurement: Some(false),
+        wordprocessingml_font_slots: true,
+        right_to_left: Some(false),
+        resolved_bidi_level: Some(0),
+        ..Default::default()
+      };
+    }
+    let mut metrics = TextMetrics::new();
+    let line = LineJustificationContext {
+      item_start: 0,
+      has_character_grid: false,
+      y_pt: 20.0,
+      left_pt: 72.0,
+      right_pt: 523.3,
+      terminal_overhang_pt: 0.0,
+      source_frame_right_pt: None,
+      preserve_foreign_tail: false,
+    };
+    // A blank-only formatting portion is outside the printable endpoint,
+    // while its fixed natural advance remains in the printer glyph buffer.
+    assert_eq!(
+      modern::adjust(&mut items, line, true, true, &mut metrics),
+      Some(true)
+    );
+    let mut actual = Vec::new();
+    for item in &items {
+      let PageItem::Text(text) = item else {
+        unreachable!()
+      };
+      let shaped = metrics.shape_text(&text.text, &text.style).unwrap();
+      actual.extend(
+        shaped
+          .glyphs
+          .iter()
+          .map(|glyph| (glyph.x_advance_em * glyph.font_size_pt / PIXEL_PT).round() as i32),
+      );
+    }
+    let expected = [
+      48, 51, 21, 37, 127, 21, 37, 129, 46, 129, 37, 46, 77, 53, 21, 47, 128, 29, 47, 41, 29, 20,
+      128, 48, 51, 21, 37, 128, 21, 37, 128, 46, 51, 53, 29, 51, 47, 31, 127, 37, 46, 77, 53, 21,
+      47, 129, 29, 47, 41, 29, 20, 128, 48, 51, 21, 37, 128, 21, 37, 128, 46, 21, 37, 53, 128, 46,
+      25,
+    ];
+    assert_eq!(actual, expected);
   }
 }

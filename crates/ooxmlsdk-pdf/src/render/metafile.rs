@@ -12,6 +12,7 @@ enum FixedOutputRasterAllocation {
 enum MetafilePlaybackRectangle {
   Canvas,
   PowerPointScreenEndpoints,
+  WordEmfScreenPreview,
   ExcelVmlPicture,
 }
 
@@ -48,7 +49,8 @@ impl MetafileFixedOutputRasterProfile {
   fn playback_size(self, canvas_width: u32, canvas_height: u32) -> (u32, u32) {
     match self.playback_rectangle {
       MetafilePlaybackRectangle::Canvas => (canvas_width, canvas_height),
-      MetafilePlaybackRectangle::PowerPointScreenEndpoints => (
+      MetafilePlaybackRectangle::PowerPointScreenEndpoints
+      | MetafilePlaybackRectangle::WordEmfScreenPreview => (
         canvas_width.saturating_sub(1).max(1),
         canvas_height.saturating_sub(1).max(1),
       ),
@@ -133,7 +135,18 @@ fn fixed_output_raster_profile(
       PdfOptimizeFor::Screen => MetafileFixedOutputRasterProfile {
         raster_dpi: units::CSS_PIXELS_PER_INCH as u32,
         allocation: FixedOutputRasterAllocation::PowerPointScreenEndpoints,
-        playback_rectangle: MetafilePlaybackRectangle::PowerPointScreenEndpoints,
+        // Word's generated EMF preview uses the integer source image frame.
+        // Realize its destination endpoints below, after resolving the
+        // floating source extent. WMF and PowerPoint have separate profiles.
+        playback_rectangle: if matches!(
+          options.images.optimization_policy,
+          PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx)
+        ) && emfsdk::detect_format(&image.data) == Some(emfsdk::Format::Emf)
+        {
+          MetafilePlaybackRectangle::WordEmfScreenPreview
+        } else {
+          MetafilePlaybackRectangle::PowerPointScreenEndpoints
+        },
       },
     },
     PdfImageOptimizationPolicy::Requested if options.images.reduce_resolution => {
@@ -190,6 +203,48 @@ pub(super) fn fixed_output_paint_image<'a>(
   Some(painted)
 }
 
+pub(super) fn floating_vml_raster_frame(
+  image: &ImageItem<'_>,
+  options: &PdfOptions,
+) -> Option<[f32; 4]> {
+  if image.metafile_fixed_output_profile
+    != common::MetafileFixedOutputProfile::WordFloatingVmlPicture
+    || !matches!(
+      options.images.optimization_policy,
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx)
+    )
+    || image.rotation_deg.abs() > f32::EPSILON
+    || image.flip_horizontal
+    || image.flip_vertical
+    || image.crop != ImageCrop::default()
+    || image.metafile_semantic_text_includes_raster_backdrop
+  {
+    return None;
+  }
+  let bounds = ooxmlsdk_layout::render::emf_wmf::metafile_image_bounds(&image.data)?;
+  let mut frame = [0.0; 4];
+  let positions = [image.x_pt, image.y_pt];
+  let extents = [image.width_pt, image.height_pt];
+  for axis in 0..2 {
+    let source_near = bounds.source[axis];
+    let source_extent = bounds.source[axis + 2];
+    let near = source_near.max(bounds.pixels[axis] as f32);
+    let far = (source_near + source_extent)
+      .min(bounds.pixels[axis] as f32 + bounds.pixels[axis + 2] as f32);
+    if far <= near {
+      return None;
+    }
+    // GDI+ keeps fractional GetImageBounds, but the exported bitmap is clipped
+    // to its integer MetafileHeader. Apply the intersection to paint only:
+    // authored layout, the host fill and the replay allocation stay separate.
+    frame[axis] = positions[axis]
+      + units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI / 2.0
+      + (near - source_near) / source_extent * extents[axis];
+    frame[axis + 2] = (far - near) / source_extent * extents[axis];
+  }
+  Some(frame)
+}
+
 pub(super) fn render_options_for_image(
   image: &ImageItem<'_>,
   options: &PdfOptions,
@@ -243,8 +298,33 @@ pub(super) fn render_options_for_image(
         &image.data,
         image.content_type.as_deref(),
       ));
-  let playback_size =
-    target_size.map(|(width, height)| raster_profile.playback_size(width, height));
+  let word_emf_preview =
+    raster_profile.playback_rectangle == MetafilePlaybackRectangle::WordEmfScreenPreview;
+  let preview_bounds = word_emf_preview
+    .then(|| ooxmlsdk_layout::render::emf_wmf::metafile_image_bounds(&image.data))
+    .flatten();
+  let playback_size = target_size.map(|(width, height)| {
+    let fallback = raster_profile.playback_size(width, height);
+    let Some(bounds) = preview_bounds else {
+      return fallback;
+    };
+    // The integer source rectangle and GDI+'s fractional inclusive image
+    // bounds need not have the same extent. Native Office frame sweeps and
+    // GDI+ replay agree on ceil(mapped far edge)-1, independently per axis.
+    // Thus the endpoint may be N or N-1; it is not an unconditional +1.
+    let axis = |pixels: u32, source: f32, header: i32, fallback: u32| {
+      if header <= 0 || !source.is_finite() || source <= 0.0 {
+        return fallback;
+      }
+      (f64::from(pixels) * f64::from(source) / f64::from(header) - 1.0)
+        .ceil()
+        .clamp(1.0, f64::from(u32::MAX)) as u32
+    };
+    (
+      axis(width, bounds.source[2], bounds.pixels[2], fallback.0),
+      axis(height, bounds.source[3], bounds.pixels[3], fallback.1),
+    )
+  });
   let word_inline_vml_screen = options.optimize_for == PdfOptimizeFor::Screen
     && matches!(
       options.images.optimization_policy,
@@ -256,11 +336,15 @@ pub(super) fn render_options_for_image(
   // Word's WMF-imported text is realized against the full raster surface.
   let text_playback_size = if word_inline_vml_screen {
     target_size
+  } else if word_emf_preview {
+    playback_size
   } else {
     target_size.map(|(width, height)| raster_profile.text_playback_size(width, height))
   };
   let monochrome_text_playback_size = if word_inline_vml_screen {
     target_size
+  } else if word_emf_preview {
+    playback_size
   } else {
     target_size.map(|(width, height)| raster_profile.monochrome_text_playback_size(width, height))
   };
@@ -375,6 +459,64 @@ mod tests {
   }
 
   #[test]
+  fn floating_vml_metafile_clips_fractional_source_against_integer_header() {
+    let mut data = vec![0_u8; 108];
+    for (offset, value) in [
+      (0, 1),
+      (4, 108),
+      (40, 0x464d4520),
+      (44, 0x10000),
+      (48, 108),
+      (52, 1),
+      (56, 1),
+      (72, 1920),
+      (76, 1080),
+      (80, 480),
+      (84, 260),
+    ] {
+      data[offset..offset + 4].copy_from_slice(&i32::to_le_bytes(value));
+    }
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    // Native Office pairs vary independent fractional extents and both signs
+    // of source origin. These are frame metadata, not a fitted scale factor.
+    for (source, expected) in [
+      ([0, 0, 2552, 1586], [70.56, 71.31, 77.19, 49.5]),
+      ([0, 0, 2565, 1597], [70.56, 71.308, 77.25, 49.252]),
+      ([0, 0, 2573, 1607], [70.56, 71.31, 77.25, 49.5]),
+      ([-12, -12, 2553, 1585], [70.918, 71.676, 76.892, 49.134]),
+      ([12, 12, 2577, 1609], [70.56, 71.314, 77.19, 48.886]),
+      ([25, 25, 2590, 1622], [70.56, 71.306, 77.25, 49.224]),
+    ] {
+      for (index, value) in source.into_iter().enumerate() {
+        data[24 + index * 4..28 + index * 4].copy_from_slice(&i32::to_le_bytes(value));
+      }
+      let mut image = test_image();
+      image.data = Cow::Borrowed(&data);
+      image.crop = ImageCrop::default();
+      image.x_pt = 70.5;
+      image.y_pt = 71.25;
+      image.width_pt = 77.25;
+      image.height_pt = 49.5;
+      image.metafile_fixed_output_profile =
+        common::MetafileFixedOutputProfile::WordFloatingVmlPicture;
+      for quality in [PdfOptimizeFor::Screen, PdfOptimizeFor::Print] {
+        options.optimize_for = quality;
+        let actual = floating_vml_raster_frame(&image, &options).unwrap();
+        for (a, e) in actual.into_iter().zip(expected) {
+          assert!((a - e).abs() < 0.006, "source={source:?}: {actual:?}");
+        }
+      }
+      image.rotation_deg = 20.0;
+      assert!(floating_vml_raster_frame(&image, &options).is_none());
+      image.rotation_deg = 0.0;
+      image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::Default;
+      assert!(floating_vml_raster_frame(&image, &options).is_none());
+    }
+  }
+
+  #[test]
   fn word_inline_vml_paint_uses_printer_and_twip_edges() {
     let mut image = test_image();
     image.crop = ImageCrop::default();
@@ -449,6 +591,93 @@ mod tests {
     assert_eq!(raster.playback_height_px, Some(50));
     assert_eq!(raster.text_playback_width_px, Some(71));
     assert_eq!(raster.text_playback_height_px, Some(51));
+  }
+
+  #[test]
+  fn word_screen_emf_playback_retains_the_outer_endpoint() {
+    let mut image = test_image();
+    image.crop = ImageCrop::default();
+    let mut data = vec![0_u8; 88];
+    data[..4].copy_from_slice(&1_u32.to_le_bytes());
+    data[4..8].copy_from_slice(&88_u32.to_le_bytes());
+    data[40..44].copy_from_slice(&emfsdk::emf::EMF_SIGNATURE.to_le_bytes());
+    for offset in [32, 36] {
+      data[offset..offset + 4].copy_from_slice(&2002_i32.to_le_bytes());
+    }
+    for offset in [72, 76] {
+      data[offset..offset + 4].copy_from_slice(&76_i32.to_le_bytes());
+    }
+    for offset in [80, 84] {
+      data[offset..offset + 4].copy_from_slice(&20_i32.to_le_bytes());
+    }
+    image.data = Cow::Owned(data);
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    options.optimize_for = PdfOptimizeFor::Screen;
+    // Native Office DrawingML/VML derivatives and independent GDI+ replay:
+    // N color samples, with logical endpoints spanning N device units.
+    for (size, pixels) in [(44.25, 58), (56.8, 75), (80.5, 107)] {
+      image.width_pt = size;
+      image.height_pt = size;
+      let raster = render_options_for_image(&image, &options);
+      assert_eq!(raster.target_width_px, Some(pixels));
+      assert_eq!(raster.target_height_px, Some(pixels));
+      assert_eq!(raster.playback_width_px, Some(pixels));
+      assert_eq!(raster.playback_height_px, Some(pixels));
+    }
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Pptx);
+    let powerpoint = render_options_for_image(&image, &options);
+    assert_eq!(powerpoint.target_width_px, Some(107));
+    assert_eq!(powerpoint.playback_width_px, Some(106));
+  }
+
+  #[test]
+  fn word_screen_emf_maps_fractional_source_to_integer_preview() {
+    let mut image = test_image();
+    image.crop = ImageCrop::default();
+    image.width_pt = 56.8;
+    image.height_pt = 56.8;
+    let mut options = PdfOptions::default();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    options.optimize_for = PdfOptimizeFor::Screen;
+    // Eight native Office variants agree pixel-for-pixel with source-header
+    // GDI+ replay. The two mixed axes prohibit treating N/N-1 as a file flag.
+    for (frame, playback) in [
+      ([7610, 7610], [75, 75]),
+      ([7630, 7630], [75, 75]),
+      ([7649, 7649], [75, 75]),
+      ([7650, 7650], [75, 75]),
+      ([7670, 7670], [74, 74]),
+      ([7690, 7690], [74, 74]),
+      ([7630, 7670], [75, 74]),
+      ([7670, 7630], [74, 75]),
+    ] {
+      let mut data = vec![0_u8; 88];
+      data[..4].copy_from_slice(&1_u32.to_le_bytes());
+      data[4..8].copy_from_slice(&88_u32.to_le_bytes());
+      data[40..44].copy_from_slice(&emfsdk::emf::EMF_SIGNATURE.to_le_bytes());
+      for (axis, extent) in frame.into_iter().enumerate() {
+        data[32 + axis * 4..36 + axis * 4].copy_from_slice(&i32::to_le_bytes(extent));
+      }
+      for offset in [72, 76, 80, 84] {
+        data[offset..offset + 4].copy_from_slice(&1000_i32.to_le_bytes());
+      }
+      image.data = Cow::Owned(data);
+      let raster = render_options_for_image(&image, &options);
+      assert_eq!(
+        (raster.target_width_px, raster.target_height_px),
+        (Some(75), Some(75))
+      );
+      assert_eq!(
+        (raster.playback_width_px, raster.playback_height_px),
+        (Some(playback[0]), Some(playback[1]))
+      );
+      assert_eq!(raster.text_playback_width_px, raster.playback_width_px);
+      assert_eq!(raster.text_playback_height_px, raster.playback_height_px);
+    }
   }
 
   #[test]

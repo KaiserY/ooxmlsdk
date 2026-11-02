@@ -1,16 +1,53 @@
 use super::*;
 
+mod form_text;
+mod references;
+
+#[derive(Default)]
+struct FieldEventCollector {
+  events: Vec<ParagraphFieldEvent>,
+  local_open_fields: usize,
+}
+
+impl FieldEventCollector {
+  fn push(&mut self, event: ParagraphFieldEvent) {
+    match &event {
+      ParagraphFieldEvent::Begin { .. } => self.local_open_fields += 1,
+      ParagraphFieldEvent::End => {
+        self.local_open_fields = self.local_open_fields.saturating_sub(1);
+      }
+      _ => {}
+    }
+    self.events.push(event);
+  }
+}
+
+impl std::ops::Deref for FieldEventCollector {
+  type Target = Vec<ParagraphFieldEvent>;
+
+  fn deref(&self) -> &Self::Target {
+    &self.events
+  }
+}
+
+impl std::ops::DerefMut for FieldEventCollector {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.events
+  }
+}
+
 /// Retain field syntax independently of the visible cached result.  A
 /// WordprocessingML complex field is a document-story construct: its begin,
 /// instruction, separator, and end characters do not have to live in one
 /// paragraph.  In particular, Word writes an outer TOC field whose result is
 /// a sequence of entry paragraphs containing nested PAGEREF fields.
 pub(super) fn paragraph_field_events(paragraph: &w::Paragraph) -> Vec<ParagraphFieldEvent> {
-  let mut events = Vec::new();
+  let mut events = FieldEventCollector::default();
   for choice in &paragraph.paragraph_choice {
     collect_paragraph_choice(choice, &mut events);
   }
-  events
+  events.extend(references::bookmark_text_sources(paragraph));
+  events.events
 }
 
 pub(super) fn body_level_bookmark_names(body: &w::Body) -> HashSet<String> {
@@ -26,7 +63,7 @@ pub(super) fn body_level_bookmark_names(body: &w::Body) -> HashSet<String> {
     .collect()
 }
 
-fn collect_paragraph_choice(choice: &w::ParagraphChoice, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_paragraph_choice(choice: &w::ParagraphChoice, events: &mut FieldEventCollector) {
   match choice {
     w::ParagraphChoice::WRun(run) => collect_run(run, events),
     w::ParagraphChoice::SimpleField(field) => collect_simple_field(field, events),
@@ -46,17 +83,32 @@ fn collect_paragraph_choice(choice: &w::ParagraphChoice, events: &mut Vec<Paragr
   }
 }
 
-fn collect_run(run: &w::Run, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_run(run: &w::Run, events: &mut FieldEventCollector) {
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::FieldChar(field) => match field.field_char_type {
-        w::FieldCharValues::Begin => events.push(ParagraphFieldEvent::Begin {
-          locked: on_off(field.field_lock),
-          dirty: on_off(field.dirty),
-          inserted: false,
-        }),
+        w::FieldCharValues::Begin => {
+          events.push(ParagraphFieldEvent::Begin {
+            locked: on_off(field.field_lock),
+            dirty: on_off(field.dirty),
+            inserted: false,
+          });
+          if let Some(default) = regular_form_text_default(field) {
+            events.push(ParagraphFieldEvent::FormTextDefault(default));
+          }
+        }
         w::FieldCharValues::Separate => events.push(ParagraphFieldEvent::Separate { style: None }),
-        w::FieldCharValues::End => events.push(ParagraphFieldEvent::End),
+        w::FieldCharValues::End => {
+          // Ordinary inline fields keep their existing formatter. Only a
+          // cross-paragraph close needs the end character's source style;
+          // avoid cloning properties for every ordinary REF/TOC field.
+          if events.local_open_fields == 0
+            && let Some(properties) = &run.run_properties
+          {
+            events.push(ParagraphFieldEvent::FieldEndProperties(properties.clone()));
+          }
+          events.push(ParagraphFieldEvent::End);
+        }
       },
       w::RunChoice::FieldCode(code) => {
         if let Some(text) = code.0.xml_content.as_deref() {
@@ -74,7 +126,32 @@ fn collect_run(run: &w::Run, events: &mut Vec<ParagraphFieldEvent>) {
   }
 }
 
-fn collect_simple_field(field: &w::SimpleField, events: &mut Vec<ParagraphFieldEvent>) {
+fn regular_form_text_default(field: &w::FieldChar) -> Option<String> {
+  let w::FieldCharChoice::FormFieldData(data) = field.field_char_choice.as_ref()? else {
+    return None;
+  };
+  data.form_field_data_choice.iter().find_map(|choice| {
+    let w::FormFieldDataChoice::TextInput(input) = choice else {
+      return None;
+    };
+    if input
+      .text_box_form_field_type
+      .as_ref()
+      .is_some_and(|kind| kind.val != w::TextBoxFormFieldValues::Regular)
+      || input.format.is_some()
+    {
+      return None;
+    }
+    Some(
+      input
+        .default_text_box_form_field_string
+        .as_ref()
+        .map_or_else(String::new, |default| default.val.to_string()),
+    )
+  })
+}
+
+fn collect_simple_field(field: &w::SimpleField, events: &mut FieldEventCollector) {
   events.push(ParagraphFieldEvent::Simple {
     instruction: field.instruction.to_string(),
     locked: on_off(field.field_lock),
@@ -98,7 +175,7 @@ fn collect_simple_field(field: &w::SimpleField, events: &mut Vec<ParagraphFieldE
   }
 }
 
-fn collect_hyperlink(hyperlink: &w::Hyperlink, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_hyperlink(hyperlink: &w::Hyperlink, events: &mut FieldEventCollector) {
   for choice in &hyperlink.hyperlink_choice {
     match choice {
       w::HyperlinkChoice::WRun(run) => collect_run(run, events),
@@ -116,7 +193,7 @@ fn collect_hyperlink(hyperlink: &w::Hyperlink, events: &mut Vec<ParagraphFieldEv
   }
 }
 
-fn collect_custom_xml_run(custom_xml: &w::CustomXmlRun, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_custom_xml_run(custom_xml: &w::CustomXmlRun, events: &mut FieldEventCollector) {
   for choice in &custom_xml.custom_xml_run_choice {
     match choice {
       w::CustomXmlRunChoice::WRun(run) => collect_run(run, events),
@@ -136,7 +213,7 @@ fn collect_custom_xml_run(custom_xml: &w::CustomXmlRun, events: &mut Vec<Paragra
   }
 }
 
-fn collect_sdt_run(sdt: &w::SdtRun, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_sdt_run(sdt: &w::SdtRun, events: &mut FieldEventCollector) {
   let Some(content) = sdt.sdt_content_run.as_ref() else {
     return;
   };
@@ -159,7 +236,7 @@ fn collect_sdt_run(sdt: &w::SdtRun, events: &mut Vec<ParagraphFieldEvent>) {
   }
 }
 
-fn collect_inserted_run(inserted: &w::InsertedRun, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_inserted_run(inserted: &w::InsertedRun, events: &mut FieldEventCollector) {
   let event_start = events.len();
   for choice in &inserted.inserted_run_choice {
     match choice {
@@ -194,7 +271,7 @@ fn collect_inserted_run(inserted: &w::InsertedRun, events: &mut Vec<ParagraphFie
   }
 }
 
-fn collect_move_to_run(moved: &w::MoveToRun, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_move_to_run(moved: &w::MoveToRun, events: &mut FieldEventCollector) {
   for choice in &moved.move_to_run_choice {
     match choice {
       w::MoveToRunChoice::WRun(run) => collect_run(run, events),
@@ -242,7 +319,7 @@ pub(super) fn bookmark_page_break_prefix(paragraph: &crate::docx::Paragraph, nam
   count
 }
 
-fn collect_bookmark_start(bookmark: &w::BookmarkStart, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_bookmark_start(bookmark: &w::BookmarkStart, events: &mut FieldEventCollector) {
   if !bookmark.name.is_empty() {
     events.push(ParagraphFieldEvent::BookmarkStart {
       id: bookmark.id.to_string(),
@@ -251,7 +328,7 @@ fn collect_bookmark_start(bookmark: &w::BookmarkStart, events: &mut Vec<Paragrap
   }
 }
 
-fn collect_bookmark_end(bookmark: &w::BookmarkEnd, events: &mut Vec<ParagraphFieldEvent>) {
+fn collect_bookmark_end(bookmark: &w::BookmarkEnd, events: &mut FieldEventCollector) {
   events.push(ParagraphFieldEvent::BookmarkEnd {
     id: bookmark.id.to_string(),
   });
@@ -446,6 +523,11 @@ impl TocSpec {
       .no_page_number_levels
       .is_some_and(|range| range.contains(level))
   }
+
+  fn empty_caption_message(&self, ui_language: Option<&str>) -> Option<&'static str> {
+    self.caption_identifier.as_ref()?;
+    field_localization::localized_empty_table_of_figures_message(ui_language)
+  }
 }
 
 fn field_switch(token: &str) -> Option<&str> {
@@ -543,6 +625,13 @@ struct StoryField {
   inside_toc_result: bool,
   starts_at_paragraph_start: bool,
   ends_at_paragraph_end: bool,
+  form_text_print: Option<Box<FormTextPrint>>,
+}
+
+#[derive(Clone, Debug)]
+struct FormTextPrint {
+  default_text: String,
+  end_properties: Option<Box<w::RunProperties>>,
 }
 
 #[derive(Clone, Debug)]
@@ -577,6 +666,7 @@ struct OpenStoryField {
   inserted: bool,
   separated: bool,
   starts_at_paragraph_start: bool,
+  form_text_print: Option<Box<FormTextPrint>>,
 }
 
 fn scan_main_story(sections: &[ImportedSection]) -> StoryScan {
@@ -697,6 +787,7 @@ fn scan_story_paragraph(
         dirty: *dirty,
         inserted: *inserted,
         separated: false,
+        form_text_print: None,
         starts_at_paragraph_start: !paragraph.field_events[..event_index].iter().any(|event| {
           matches!(
             event,
@@ -704,6 +795,14 @@ fn scan_story_paragraph(
           )
         }),
       }),
+      ParagraphFieldEvent::FormTextDefault(default) if fields.len() == 1 => {
+        if let Some(field) = fields.last_mut() {
+          field.form_text_print = Some(Box::new(FormTextPrint {
+            default_text: default.clone(),
+            end_properties: None,
+          }));
+        }
+      }
       ParagraphFieldEvent::Instruction(text) => {
         if let Some(field) = fields.last_mut()
           && !field.separated
@@ -718,7 +817,14 @@ fn scan_story_paragraph(
         }
       }
       ParagraphFieldEvent::End => {
-        if let Some(field) = fields.pop() {
+        if let Some(mut field) = fields.pop() {
+          if let Some(form) = &mut field.form_text_print
+            && let Some(ParagraphFieldEvent::FieldEndProperties(properties)) = event_index
+              .checked_sub(1)
+              .and_then(|index| paragraph.field_events.get(index))
+          {
+            form.end_properties = Some(properties.clone());
+          }
           scan.fields.push(StoryField {
             start_ordinal: field.start_ordinal,
             end_ordinal: ordinal,
@@ -727,6 +833,7 @@ fn scan_story_paragraph(
             locked: field.locked,
             dirty: field.dirty,
             inserted: field.inserted,
+            form_text_print: field.form_text_print,
             inside_toc_result: fields
               .iter()
               .any(|parent| parent.separated && TocSpec::parse(&parent.instruction).is_some()),
@@ -755,6 +862,7 @@ fn scan_story_paragraph(
         locked: *locked,
         dirty: *dirty,
         inserted: *inserted,
+        form_text_print: None,
         inside_toc_result: fields
           .iter()
           .any(|parent| parent.separated && TocSpec::parse(&parent.instruction).is_some()),
@@ -788,11 +896,16 @@ fn scan_story_paragraph(
         }
       }
       ParagraphFieldEvent::BookmarkReferenceUsesCaret(_)
+      | ParagraphFieldEvent::FormTextDefault(_)
+      | ParagraphFieldEvent::FieldEndProperties(_)
       | ParagraphFieldEvent::SuppressParagraphBreak { .. }
       | ParagraphFieldEvent::SuppressReferenceParagraphBreak { .. }
       | ParagraphFieldEvent::DeferredParagraphBreak { .. }
       | ParagraphFieldEvent::DeferredReferenceParagraphBreak { .. }
+      | ParagraphFieldEvent::GeneratedParagraphBreak { .. }
+      | ParagraphFieldEvent::BookmarkTextSource { .. }
       | ParagraphFieldEvent::ReferenceResultSpan { .. }
+      | ParagraphFieldEvent::FormulaResultSpan { .. }
       | ParagraphFieldEvent::PageReferenceResultStyle { .. } => {}
     }
   }
@@ -893,6 +1006,19 @@ struct TocEntrySource {
   numbering_prefix: Option<TocNumberingPrefix>,
   omit_page_number: bool,
   chapter_prefix: Option<String>,
+  emphasis: Vec<TocEmphasisSpan>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct TocEmphasis {
+  bold: bool,
+  italic: bool,
+}
+
+#[derive(Clone, Debug)]
+struct TocEmphasisSpan {
+  range: std::ops::Range<usize>,
+  emphasis: TocEmphasis,
 }
 
 #[derive(Clone, Debug)]
@@ -947,6 +1073,9 @@ pub(super) fn refresh_tables_of_contents(
   body_level_bookmarks: &HashSet<String>,
 ) -> Option<Box<model::TocPrintCache>> {
   let mut scan = scan_main_story(sections);
+  if form_text::refresh(sections, &scan, styles) {
+    scan = scan_main_story(sections);
+  }
   scan
     .bookmark_names
     .extend(body_level_bookmarks.iter().cloned());
@@ -966,13 +1095,14 @@ pub(super) fn refresh_tables_of_contents(
     .toc_spans
     .iter()
     .any(|span| {
-      !span.locked
+      styles.import_settings.refresh_field_at_print("TOC")
+        && !span.locked
         && !span.inserted
         && matches!(
           toc_span_page_reference_cache(&scan, span),
           TocPageReferenceCache::Absent | TocPageReferenceCache::Missing
         )
-        && collect_toc_entry_sources(sections, &scan, span)
+        && collect_toc_entry_sources(sections, &scan, span, styles)
           .iter()
           .any(|entry| !entry.omit_page_number || has_external_page_references)
     })
@@ -980,7 +1110,7 @@ pub(super) fn refresh_tables_of_contents(
   let resolved_page_references =
     resolve_layout_stable_page_reference_fields(sections, &scan, ui_language);
   let refreshed_body_references =
-    refresh_body_level_reference_fields(sections, &scan, body_level_bookmarks);
+    refresh_body_level_reference_fields(sections, &scan, body_level_bookmarks, styles, ui_language);
   let refreshed_reference_spans = refresh_missing_reference_fields(sections, &scan, ui_language);
   if refreshed_reference_spans {
     // Whole REF-story replacement can change source block addresses. Retain
@@ -1035,6 +1165,10 @@ pub(super) fn refresh_tables_of_contents(
   let mut replacements = Vec::new();
   let mut text_metrics = crate::text_metrics::TextMetrics::new();
   let mut needs_source_pagination = false;
+  // _GoBack is Word's navigation metadata, absent even from Bookmarks with
+  // ShowHidden=true. Native case/range controls retain _goback/_GoBack2 as
+  // real lookup entries, so this special identity is deliberately exact.
+  let has_bookmark_lookup = scan.bookmark_names.iter().any(|name| name != "_GoBack");
 
   for span in &scan.toc_spans {
     normalize_cached_toc_hyperlink_style(sections, &scan, span, styles);
@@ -1048,14 +1182,16 @@ pub(super) fn refresh_tables_of_contents(
     // "NO TABLE OF CONTENTS ENTRIES FOUND." diagnostic even when the field is
     // not marked dirty. The ordinary no-PAGEREF print path below also covers
     // genuinely absent results; the outer lock still preserves either form.
-    if span.locked {
+    if span.locked || !styles.import_settings.refresh_field_at_print("TOC") {
       continue;
     }
     let has_empty_result_placeholder = toc_span_has_empty_result_placeholder(sections, &scan, span);
     // Word updates a cached TOC's page references during fixed-format export.
     // If a cached entry has lost its bookmark and current heading sources
-    // exist, that page-number update rebuilds the outer TOC. Without source
-    // entries, Word retains the cache and prints its PAGEREF errors.
+    // exist, that page-number update rebuilds the outer TOC. Missing lookup
+    // in an existing bookmark table also invalidates an obsolete source list,
+    // even when no eligible entries remain. An absent bookmark table is a
+    // distinct lookup state: its empty-source cache can print PAGEREF errors.
     // Valid PAGEREF caches and references outside the TOC retain their behavior;
     // the enclosing field lock above remains authoritative.
     let page_references = toc_span_page_reference_cache(&scan, span);
@@ -1063,13 +1199,18 @@ pub(super) fn refresh_tables_of_contents(
     let no_page_references = page_references == TocPageReferenceCache::Absent && !span.inserted;
     let mut clean_empty_result = no_page_references;
     let mut entries = (has_missing_page_reference || no_page_references)
-      .then(|| collect_toc_entry_sources(sections, &scan, span));
-    // Missing-reference recovery without current entries preserves its cache
-    // and bookmark errors. An ordinary no-PAGEREF field instead reconstructs
-    // even an empty source list, yielding the ordinary localized diagnostic.
-    let rebuild_print_cache =
-      no_page_references || entries.as_ref().is_some_and(|entries| !entries.is_empty());
-    if !span.dirty
+      .then(|| collect_toc_entry_sources(sections, &scan, span, styles));
+    // Native unrelated/partly-valid/all-valid bookmark controls distinguish
+    // lookup availability from the TOC's own entry count. This applies to
+    // ordinary and caption TOCs; locks and print-off remain above this path.
+    let rebuild_print_cache = no_page_references
+      || (has_missing_page_reference && has_bookmark_lookup)
+      || entries.as_ref().is_some_and(|entries| !entries.is_empty());
+    // A dirty outer TOC with valid cached PAGEREFs still receives only the
+    // print-time page-number update. Native dirty/clean cache controls keep
+    // its title text and paragraph boundaries; a full update is a separate
+    // operation. Missing/absent references retain the reconstruction above.
+    if (!span.dirty || page_references == TocPageReferenceCache::Valid)
       && !update_fields_on_open
       && !has_empty_result_placeholder
       && !rebuild_print_cache
@@ -1080,7 +1221,7 @@ pub(super) fn refresh_tables_of_contents(
       // for which headings now exist.
       let current_entries = entries
         .take()
-        .unwrap_or_else(|| collect_toc_entry_sources(sections, &scan, span));
+        .unwrap_or_else(|| collect_toc_entry_sources(sections, &scan, span, styles));
       if toc_span_has_cached_empty_diagnostic(sections, &scan, span) {
         if !current_entries.is_empty() {
           continue;
@@ -1098,7 +1239,8 @@ pub(super) fn refresh_tables_of_contents(
       entries = Some(current_entries);
     }
 
-    let mut entries = entries.unwrap_or_else(|| collect_toc_entry_sources(sections, &scan, span));
+    let mut entries =
+      entries.unwrap_or_else(|| collect_toc_entry_sources(sections, &scan, span, styles));
     needs_source_pagination |= !span.inserted
       && rebuild_print_cache
       && entries
@@ -1188,6 +1330,7 @@ pub(super) fn refresh_tables_of_contents(
       });
       blocks.push(Block::paragraph(if clean_empty_result || absent_result {
         build_clean_empty_toc_result(
+          &span.spec,
           empty_template,
           styles,
           ui_language,
@@ -1197,6 +1340,16 @@ pub(super) fn refresh_tables_of_contents(
       } else {
         build_empty_toc_result(&span.spec, empty_template, styles, page, ui_language)
       }));
+    } else if span.ends_at_paragraph_end
+      && let Some(ending) = paragraph(sections, &scan, span.end_ordinal)
+    {
+      // Each generated entry ends with its own paragraph mark. The mark
+      // after the outer field end is outside that result and survives the
+      // replacement, whether the cached end shared its last entry or had
+      // a separate paragraph. Native print/TOC.Update controls retain this
+      // mark's original style, direct spacing and font size. Empty-TOC
+      // diagnostics above have no generated entry delimiter.
+      blocks.push(Block::paragraph(toc_ending_paragraph(ending)));
     }
     replacements.push(TocReplacement {
       span: span.clone(),
@@ -1243,8 +1396,10 @@ fn refresh_body_level_reference_fields(
   sections: &mut [ImportedSection],
   scan: &StoryScan,
   body_level_bookmarks: &HashSet<String>,
+  styles: &StylesCatalog,
+  ui_language: Option<&str>,
 ) -> bool {
-  let mut refreshes = Vec::new();
+  let mut refreshes = references::inline_refreshes(sections, scan, styles, ui_language);
   for paragraph_ordinal in 0..scan.paragraphs.len() {
     let Some(cached_paragraph) = paragraph(sections, scan, paragraph_ordinal) else {
       continue;
@@ -1256,6 +1411,7 @@ fn refresh_body_level_reference_fields(
         inline_start,
         inline_end,
         merge_format,
+        ..
       } = event
       else {
         continue;
@@ -1461,6 +1617,7 @@ fn adjust_reference_event_offsets_for_splice(
     match event {
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
       | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | ParagraphFieldEvent::GeneratedParagraphBreak { inline_offset, .. }
       | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
         shift(inline_offset);
       }
@@ -1640,6 +1797,30 @@ fn reference_bookmark_argument(tokens: &[String]) -> Option<&str> {
   None
 }
 
+pub(super) fn reference_copies_bookmark_text(instruction: &str) -> bool {
+  let tokens = field_instruction_tokens(instruction);
+  let mut index = 1;
+  while index < tokens.len() {
+    let Some(switch) = field_switch(&tokens[index]) else {
+      index += 1;
+      continue;
+    };
+    if switch.eq_ignore_ascii_case("h") {
+      index += 1;
+    } else if switch == "*"
+      && next_switch_argument(&tokens, index)
+        .is_some_and(|argument| argument.eq_ignore_ascii_case("MERGEFORMAT"))
+    {
+      index += 2;
+    } else {
+      // Numbering/position and general text transformations have separate
+      // result semantics. Missing targets still produce diagnostics.
+      return false;
+    }
+  }
+  true
+}
+
 fn build_missing_reference_result(
   template: &Paragraph,
   error: MissingReferenceError,
@@ -1748,6 +1929,7 @@ fn collect_toc_entry_sources(
   sections: &[ImportedSection],
   scan: &StoryScan,
   span: &TocSpan,
+  styles: &StylesCatalog,
 ) -> Vec<TocEntrySource> {
   let mut entries = Vec::new();
 
@@ -1789,6 +1971,7 @@ fn collect_toc_entry_sources(
             label_len: label.len(),
           })
         }),
+      emphasis: toc_source_emphasis(paragraph, &text, &span.spec, styles),
       text,
       omit_page_number: span.spec.suppress_page_number(level),
       chapter_prefix: chapter_prefix_for_source(sections, scan, ordinal, &span.spec),
@@ -1830,6 +2013,7 @@ fn collect_toc_entry_sources(
         numbering_prefix: None,
         omit_page_number: tc.omit_page_number || span.spec.suppress_page_number(tc.level),
         chapter_prefix: chapter_prefix_for_source(sections, scan, field.start_ordinal, &span.spec),
+        emphasis: Vec::new(),
       });
     }
   }
@@ -1867,6 +2051,7 @@ fn collect_toc_entry_sources(
         numbering_prefix: None,
         omit_page_number: span.spec.suppress_page_number(1),
         chapter_prefix: chapter_prefix_for_source(sections, scan, field.start_ordinal, &span.spec),
+        emphasis: Vec::new(),
       });
     }
   }
@@ -1883,6 +2068,100 @@ fn collect_toc_entry_sources(
       && left.text == right.text
   });
   entries
+}
+
+/// Word projects positive character emphasis relative to the heading's
+/// paragraph style. Redundant direct toggles, negative toggles and the mark
+/// do not erase the TOC style; title size remains TOC-owned. Native controls
+/// independently cover direct, character-style, mixed and redundant toggles.
+fn toc_source_emphasis(
+  paragraph: &Paragraph,
+  entry_text: &str,
+  spec: &TocSpec,
+  styles: &StylesCatalog,
+) -> Vec<TocEmphasisSpan> {
+  let base = styles.run_style_with_base(
+    paragraph.format.style_id.as_deref(),
+    TextStyle::default(),
+    RunStyleOverrides::default(),
+  );
+  let mut runs = Vec::new();
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::Text(run) => runs.push(run),
+      InlineItem::Ruby(ruby) => runs.extend(&ruby.base),
+      InlineItem::Overstrike(overstrike) => runs.extend(overstrike.operands.iter().flatten()),
+      _ => {}
+    }
+  }
+  let label = paragraph.list_label.as_deref().unwrap_or_default();
+  let Some(body) = entry_text.strip_prefix(label) else {
+    return Vec::new();
+  };
+  let mut normalized = String::new();
+  let mut spans = Vec::<TocEmphasisSpan>::new();
+  let mut pending_space = None;
+  let preserve = spec.preserve_tabs || spec.preserve_newlines;
+  let append =
+    |text: &mut String, spans: &mut Vec<TocEmphasisSpan>, ch: char, emphasis: TocEmphasis| {
+      let start = text.len();
+      text.push(ch);
+      if emphasis == TocEmphasis::default() {
+        return;
+      }
+      if let Some(last) = spans
+        .last_mut()
+        .filter(|span| span.range.end == start && span.emphasis == emphasis)
+      {
+        last.range.end = text.len();
+      } else {
+        spans.push(TocEmphasisSpan {
+          range: start..text.len(),
+          emphasis,
+        });
+      }
+    };
+  for run in runs.into_iter().filter(|run| !run.style.hidden) {
+    let emphasis = TocEmphasis {
+      bold: run.style.bold && !base.bold,
+      italic: run.style.italic && !base.italic,
+    };
+    for ch in run.text.chars() {
+      let ch = match ch {
+        '\t' if !spec.preserve_tabs => ' ',
+        '\r' | '\n' if !spec.preserve_newlines => ' ',
+        ch => ch,
+      };
+      if ch.is_whitespace() {
+        if normalized.is_empty() {
+          continue;
+        }
+        if !preserve {
+          pending_space.get_or_insert(emphasis);
+          continue;
+        }
+      } else if let Some(space) = pending_space.take() {
+        append(&mut normalized, &mut spans, ' ', space);
+      }
+      append(&mut normalized, &mut spans, ch, emphasis);
+    }
+  }
+  normalized.truncate(normalized.trim_end().len());
+  // Source-reference substitutions can differ from the visible inline body.
+  // Do not assign those characters unrelated ranges from their cache.
+  if normalized != body {
+    return Vec::new();
+  }
+  spans.retain_mut(|span| {
+    span.range.end = span.range.end.min(normalized.len());
+    if span.range.is_empty() {
+      return false;
+    }
+    span.range.start += label.len();
+    span.range.end += label.len();
+    true
+  });
+  spans
 }
 
 fn paragraph_toc_level(paragraph: &Paragraph, spec: &TocSpec) -> Option<u8> {
@@ -2204,13 +2483,15 @@ fn cached_toc_templates(
 }
 
 fn toc_level_for_style(styles: &StylesCatalog, style_id: &str) -> Option<u8> {
-  toc_level_from_name(style_id).or_else(|| {
-    styles
-      .styles
-      .get(style_id)
-      .and_then(|entry| entry.name.as_deref())
-      .and_then(toc_level_from_name)
-  })
+  // w:styleId is an internal reference, not the builtin style identity
+  // (ECMA-376 §17.7.4.17). Word recognizes the reserved w:name "toc N"
+  // even under an opaque ID; a custom "Contents N" is not that builtin.
+  let name = styles
+    .styles
+    .get(style_id)
+    .and_then(|entry| entry.name.as_deref())
+    .unwrap_or(style_id);
+  toc_level_from_name(name)
 }
 
 fn toc_level_from_name(name: &str) -> Option<u8> {
@@ -2219,51 +2500,62 @@ fn toc_level_from_name(name: &str) -> Option<u8> {
     .filter(|character| !character.is_whitespace() && *character != '-' && *character != '_')
     .flat_map(char::to_lowercase)
     .collect::<String>();
-  let suffix = normalized
-    .strip_prefix("toc")
-    .or_else(|| normalized.strip_prefix("contents"))?;
+  let suffix = normalized.strip_prefix("toc")?;
   let level = suffix.parse::<u8>().ok()?;
   (1..=9).contains(&level).then_some(level)
 }
 
-fn toc_style_id(styles: &StylesCatalog, level: u8) -> String {
-  for candidate in [format!("TOC{level}"), format!("Contents{level}")] {
-    if styles.styles.contains_key(&candidate) {
-      return candidate;
-    }
+fn toc_style_id(styles: &StylesCatalog, level: u8) -> Option<&str> {
+  let canonical_id = format!("TOC{level}");
+  if let Some((style_id, _)) = styles.styles.get_key_value(&canonical_id)
+    && toc_level_for_style(styles, style_id) == Some(level)
+  {
+    return Some(style_id);
   }
-  let mut candidates = styles
+  styles
     .styles
-    .iter()
-    .filter_map(|(style_id, entry)| {
-      (toc_level_from_name(style_id) == Some(level)
-        || entry.name.as_deref().and_then(toc_level_from_name) == Some(level))
-      .then_some(style_id)
-    })
-    .cloned()
-    .collect::<Vec<_>>();
-  candidates.sort();
-  candidates
-    .into_iter()
-    .next()
-    .unwrap_or_else(|| format!("TOC{level}"))
+    .keys()
+    .filter(|style_id| toc_level_for_style(styles, style_id) == Some(level))
+    .map(String::as_str)
+    .min()
 }
 
 fn empty_toc_paragraph(styles: &StylesCatalog, level: u8) -> Paragraph {
   let style_id = toc_style_id(styles, level);
-  let style_exists = styles.styles.contains_key(&style_id);
-  let mut format = styles.paragraph_format_with_base(Some(&style_id), ParagraphFormat::default());
-  format.style_id = Some(Arc::<str>::from(style_id.as_str()));
-  if !style_exists {
-    // Word's latent TOC styles indent successive levels by 180 twips.
-    format.indent_left_pt = f32::from(level.saturating_sub(1)) * 9.0;
+  // A missing builtin inherits the default paragraph style. Do not invent an
+  // ID that could resolve to an unrelated custom style named e.g. "TOC2".
+  let mut format = styles.paragraph_format_with_base(style_id, ParagraphFormat::default());
+  format.style_id = style_id.map(Arc::from);
+  let mut base_style =
+    styles.run_style_with_base(style_id, TextStyle::default(), RunStyleOverrides::default());
+  if style_id.is_none() {
+    // Native font/level/authoring-language controls: latent TOC indentation
+    // is one Normal em per level, or two for Chinese/Korean authoring defaults.
+    // The Office UI language and a similarly named custom style do not own
+    // these defaults. Western defaults also supply five points of paragraph
+    // space; Chinese, Korean and Japanese leave inherited spacing unchanged.
+    let chinese = styles
+      .locales
+      .default_document_resource_locale()
+      .is_chinese();
+    let korean = styles
+      .locales
+      .default_document_language()
+      .is_some_and(|language| language == "ko" || language.starts_with("ko-"));
+    let japanese = styles
+      .locales
+      .default_document_language()
+      .is_some_and(|language| language == "ja" || language.starts_with("ja-"));
+    let indent_em = if chinese || korean { 2.0 } else { 1.0 };
+    format.indent_left_pt =
+      f32::from(level.saturating_sub(1)) * indent_em * base_style.font_size_pt;
+    format.indent_left_character_units = None;
     format.indent_left_set = true;
+    if !chinese && !korean && !japanese {
+      format.spacing_after_pt = 5.0;
+      format.spacing_after_set = true;
+    }
   }
-  let mut base_style = styles.run_style_with_base(
-    Some(&style_id),
-    TextStyle::default(),
-    RunStyleOverrides::default(),
-  );
   base_style.line_vertical_alignment = format.line_vertical_alignment.unwrap_or_default();
   Paragraph {
     inlines: Vec::new(),
@@ -2275,12 +2567,37 @@ fn empty_toc_paragraph(styles: &StylesCatalog, level: u8) -> Paragraph {
     #[cfg(test)]
     runs: Vec::new(),
     format: Box::new(format),
-    style_ref_keys: styles.style_ref_keys(&style_id),
+    style_ref_keys: style_id.map_or_else(
+      || vec![Arc::from(format!("TOC{level}"))],
+      |style_id| styles.style_ref_keys(style_id),
+    ),
     style_ref_text: None,
     style_ref_numbering_text: None,
     list_label: None,
     list_label_image: None,
     list_label_style: TextStyle::default(),
+    list_label_hyperlink_url: None,
+    list_label_tab_stop_pt: None,
+  }
+}
+
+fn toc_ending_paragraph(source: &Paragraph) -> Paragraph {
+  Paragraph {
+    inlines: Vec::new(),
+    field_events: Vec::new(),
+    footnote_reference_ids: Vec::new(),
+    endnote_reference_ids: Vec::new(),
+    starts_after_last_rendered_page_break: false,
+    base_style: source.base_style.clone(),
+    #[cfg(test)]
+    runs: Vec::new(),
+    format: source.format.clone(),
+    style_ref_keys: source.style_ref_keys.clone(),
+    style_ref_text: None,
+    style_ref_numbering_text: None,
+    list_label: None,
+    list_label_image: None,
+    list_label_style: source.list_label_style.clone(),
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt: None,
   }
@@ -2325,6 +2642,9 @@ fn build_toc_entry_paragraph(
     RunStyleOverrides::default(),
   );
   run_style.line_vertical_alignment = paragraph.base_style.line_vertical_alignment;
+  // These are paragraph layout context, independently of the mark's authored
+  // font/toggles. Rebuilt text must keep the imported Windows metric owner.
+  run_style.use_windows_font_metrics = paragraph.base_style.use_windows_font_metrics;
   let numbering_prefix = toc_numbering_prefix_style(entry, &run_style, styles);
   if layout.rebuild_tabs_from_style {
     let number_style = numbering_prefix
@@ -2347,9 +2667,43 @@ fn build_toc_entry_paragraph(
   } else {
     0
   };
-  if title_start < entry.text.len() {
+  let mut title_cursor = title_start;
+  for span in &entry.emphasis {
+    let start = span.range.start.max(title_cursor);
+    let end = span.range.end.min(entry.text.len());
+    if start >= end {
+      continue;
+    }
+    if title_cursor < start {
+      paragraph.inlines.push(InlineItem::Text(TextRun {
+        text: entry.text[title_cursor..start].to_string(),
+        style: run_style.clone(),
+        hyperlink_url: hyperlink_url.clone(),
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      }));
+    }
+    let mut style = run_style.clone();
+    style.bold |= span.emphasis.bold;
+    style.italic |= span.emphasis.italic;
     paragraph.inlines.push(InlineItem::Text(TextRun {
-      text: entry.text[title_start..].to_string(),
+      text: entry.text[start..end].to_string(),
+      style,
+      hyperlink_url: hyperlink_url.clone(),
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      preserve_text_portion: false,
+    }));
+    title_cursor = end;
+  }
+  if title_cursor < entry.text.len() {
+    paragraph.inlines.push(InlineItem::Text(TextRun {
+      text: entry.text[title_cursor..].to_string(),
       style: run_style.clone(),
       hyperlink_url: hyperlink_url.clone(),
       dynamic_field: None,
@@ -2548,7 +2902,7 @@ fn ensure_toc_page_tab_stop(paragraph: &mut Paragraph, page: PageSetup) {
 }
 
 fn build_empty_toc_result(
-  _spec: &TocSpec,
+  spec: &TocSpec,
   template: Option<&Paragraph>,
   styles: &StylesCatalog,
   _page: PageSetup,
@@ -2563,7 +2917,10 @@ fn build_empty_toc_result(
   paragraph.endnote_reference_ids.clear();
   paragraph.list_label = None;
   paragraph.list_label_hyperlink_url = None;
-  let text = localized_field_message(FieldMessage::EmptyTableOfContents, ui_language);
+  let text = spec.empty_caption_message(ui_language).map_or_else(
+    || localized_field_message(FieldMessage::EmptyTableOfContents, ui_language),
+    str::to_owned,
+  );
   // The paragraph's reference cache must describe the replacement too.
   paragraph.style_ref_text = Some(Arc::<str>::from(text.as_str()));
   paragraph.style_ref_numbering_text = None;
@@ -2587,6 +2944,7 @@ fn build_empty_toc_result(
 }
 
 fn build_clean_empty_toc_result(
+  spec: &TocSpec,
   template: Option<&Paragraph>,
   styles: &StylesCatalog,
   ui_language: Option<&str>,
@@ -2602,7 +2960,10 @@ fn build_clean_empty_toc_result(
   paragraph.endnote_reference_ids.clear();
   paragraph.list_label = None;
   paragraph.list_label_hyperlink_url = None;
-  let text = localized_clean_empty_toc_message(ui_language);
+  let text = spec.empty_caption_message(ui_language).map_or_else(
+    || localized_clean_empty_toc_message(ui_language),
+    str::to_owned,
+  );
   paragraph.style_ref_text = Some(Arc::<str>::from(text.as_str()));
   paragraph.style_ref_numbering_text = None;
   let mut style = separator_style.unwrap_or(&paragraph.base_style).clone();
@@ -2618,6 +2979,7 @@ fn build_clean_empty_toc_result(
   };
   style.complex_bold = Some(style.bold);
   style.wordprocessingml_field_group = false;
+  apply_japanese_diagnostic_font_slots(&mut style, ui_language);
   apply_traditional_chinese_diagnostic_font_slots(&mut style, ui_language);
   field_localization::apply_korean_diagnostic_font_slots(&mut style, ui_language);
   text::apply_wordprocessingml_cjk_text_metrics(&text, &mut style);
@@ -2894,6 +3256,9 @@ mod tests {
   fn test_paragraph(text: &str) -> Paragraph {
     let styles = StylesCatalog::default();
     let mut paragraph = empty_toc_paragraph(&styles, 1);
+    // This helper represents an authored cached TOC paragraph, whereas
+    // empty_toc_paragraph can also synthesize a builtin absent from styles.xml.
+    paragraph.format.style_id = Some(Arc::from("TOC1"));
     paragraph.inlines.push(InlineItem::Text(TextRun {
       text: text.to_string(),
       style: paragraph.base_style.clone(),
@@ -2908,14 +3273,271 @@ mod tests {
     paragraph
   }
 
+  #[test]
+  fn rebuilt_toc_title_projects_emphasis_relative_to_paragraph_style() {
+    let spec = TocSpec::parse(r#"TOC \o "1-3""#).unwrap();
+    for (base_bold, base_italic, bold, italic) in [
+      (false, false, true, false),
+      (false, false, false, true),
+      (true, false, true, false),
+      (false, true, false, true),
+      (false, false, false, false),
+    ] {
+      let styles = StylesCatalog {
+        doc_default_run: TextStyle {
+          bold: base_bold,
+          italic: base_italic,
+          ..TextStyle::default()
+        },
+        ..StylesCatalog::default()
+      };
+      let mut heading = test_paragraph("Heading");
+      // A separately formatted mark never supplies the entry's emphasis.
+      heading.base_style.bold = true;
+      heading.base_style.italic = true;
+      let InlineItem::Text(run) = &mut heading.inlines[0] else {
+        panic!("heading run")
+      };
+      run.style.bold = bold;
+      run.style.italic = italic;
+      run.style.font_size_pt = 18.0;
+      let spans = toc_source_emphasis(&heading, "Heading", &spec, &styles);
+      let expected = TocEmphasis {
+        bold: bold && !base_bold,
+        italic: italic && !base_italic,
+      };
+      if expected == TocEmphasis::default() {
+        assert!(spans.is_empty());
+      } else {
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].range, 0..7);
+        assert_eq!(spans[0].emphasis, expected);
+      }
+    }
+  }
+
+  #[test]
+  fn rebuilt_toc_title_keeps_normalized_unicode_emphasis_spans_and_own_size() {
+    let styles = StylesCatalog::default();
+    let spec = TocSpec::parse(r#"TOC \o "1-3" \h"#).unwrap();
+    let mut heading = test_paragraph("");
+    heading.inlines.clear();
+    for (text, bold, italic) in [("  Ä  ", true, false), ("\tB\nC  ", false, true)] {
+      let mut part = test_paragraph(text);
+      let InlineItem::Text(run) = &mut part.inlines[0] else {
+        panic!("source run")
+      };
+      run.style.bold = bold;
+      run.style.italic = italic;
+      run.style.font_size_pt = 18.0;
+      heading.inlines.push(part.inlines.remove(0));
+    }
+    let text = paragraph_toc_source_text(&heading, &spec).unwrap();
+    assert_eq!(text, "Ä B C");
+    let entry = TocEntrySource {
+      source_ordinal: 0,
+      level: 1,
+      emphasis: toc_source_emphasis(&heading, &text, &spec, &styles),
+      text,
+      numbering_prefix_len: None,
+      numbering_prefix: None,
+      omit_page_number: false,
+      chapter_prefix: None,
+    };
+    let mut metrics = crate::text_metrics::TextMetrics::new();
+    let mut template = test_paragraph("");
+    template.base_style.use_windows_font_metrics = true;
+    template.base_style.bold = true;
+    template.base_style.font_size_pt = 42.0;
+    let paragraph = build_toc_entry_paragraph(
+      &entry,
+      "Target",
+      &spec,
+      Some(&template),
+      &mut TocEntryLayout {
+        styles: &styles,
+        page: PageSetup::default(),
+        rebuild_tabs_from_style: false,
+        default_tab_leader: TabLeader::Dot,
+        text_metrics: &mut metrics,
+      },
+    );
+    let runs = paragraph
+      .inlines
+      .iter()
+      .filter_map(|item| {
+        if let InlineItem::Text(run) = item {
+          Some(run)
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<_>>();
+    assert!(
+      runs
+        .iter()
+        .any(|run| run.text.contains('Ä') && run.style.bold && !run.style.italic)
+    );
+    assert!(runs.iter().any(|run| run.text.contains('B')
+      && run.text.contains('C')
+      && run.style.italic
+      && !run.style.bold));
+    let toc_size = styles
+      .run_style_with_base(
+        paragraph.format.style_id.as_deref(),
+        TextStyle::default(),
+        RunStyleOverrides::default(),
+      )
+      .font_size_pt;
+    assert!(runs.iter().all(|run| run.style.font_size_pt == toc_size));
+    assert!(runs.iter().all(|run| run.style.use_windows_font_metrics));
+    assert!(
+      runs
+        .iter()
+        .filter(|run| run.text == "\t" || run.dynamic_field.is_some())
+        .all(|run| !run.style.bold && !run.style.italic)
+    );
+    heading.style_ref_text = Some(Arc::from("Substituted reference"));
+    assert!(toc_source_emphasis(&heading, "Substituted reference", &spec, &styles).is_empty());
+  }
+
+  fn refresh_single_heading_toc(styles: &StylesCatalog, cached_id: &str, level: u8) -> Paragraph {
+    let mut cached = test_paragraph("Old cache");
+    cached.format =
+      Box::new(styles.paragraph_format_with_base(Some(cached_id), ParagraphFormat::default()));
+    cached.format.style_id = Some(Arc::from(cached_id));
+    cached.field_events = vec![
+      ParagraphFieldEvent::Begin {
+        locked: false,
+        dirty: false,
+        inserted: false,
+      },
+      ParagraphFieldEvent::Instruction(r#"TOC \o "1-3""#.to_string()),
+      ParagraphFieldEvent::Separate { style: None },
+      ParagraphFieldEvent::Content,
+      ParagraphFieldEvent::End,
+    ];
+    let mut heading = test_paragraph("Current heading");
+    heading.format.style_outline_level = Some(level - 1);
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(cached),
+      Block::paragraph(heading),
+    ])];
+    refresh_tables_of_contents(&mut sections, styles, false, styles.locales.ui_language());
+    let Block::Paragraph(entry) = sections[0].blocks.remove(0) else {
+      panic!("generated TOC entry")
+    };
+    *entry
+  }
+
+  #[test]
+  fn rebuilt_toc_recognizes_builtin_name_instead_of_custom_style_id() {
+    for id in ["Contents2", "TOC2", "OpaqueStyleId"] {
+      for name in ["Contents 2", "toc 2"] {
+        for indent in [0.0, 12.0, 36.0] {
+          let styles = StylesCatalog {
+            locales: OfficeLocaleContext::new(Some("fr-CA"), Some("zh-CN"), Some("zh-CN")),
+            doc_default_run: TextStyle {
+              font_size_pt: 12.0,
+              ..TextStyle::default()
+            },
+            styles: HashMap::from([(
+              id.to_string(),
+              StyleEntry {
+                name: Some(name.to_string()),
+                style_type: Some(w::StyleValues::Paragraph),
+                paragraph_format: ParagraphFormat {
+                  indent_left_pt: indent,
+                  indent_left_set: true,
+                  ..ParagraphFormat::default()
+                },
+                ..StyleEntry::default()
+              },
+            )]),
+            ..StylesCatalog::default()
+          };
+          let entry = refresh_single_heading_toc(&styles, id, 2);
+          let builtin = name == "toc 2";
+          assert_eq!(entry.format.style_id.as_deref(), builtin.then_some(id));
+          assert_eq!(
+            entry.format.indent_left_pt,
+            if builtin { indent } else { 24.0 },
+            "id={id}, name={name}, indent={indent}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn latent_toc_style_inherits_normal_and_authoring_defaults() {
+    for ui in ["en-US", "fr-CA"] {
+      for (authoring, indent_em, after) in [
+        ("en-US", 1.0, 5.0),
+        ("fr-FR", 1.0, 5.0),
+        ("de-DE", 1.0, 5.0),
+        ("zh-CN", 2.0, 0.0),
+        ("zh-TW", 2.0, 0.0),
+        ("ko-KR", 2.0, 0.0),
+        ("ja-JP", 1.0, 0.0),
+      ] {
+        for font_size in [8.0, 12.0, 16.0] {
+          for level in [2, 3] {
+            let styles = StylesCatalog {
+              locales: OfficeLocaleContext::new(Some(ui), Some("zh-CN"), Some(authoring)),
+              default_paragraph_style_id: Some("Normal".to_string()),
+              styles: HashMap::from([(
+                "Normal".to_string(),
+                StyleEntry {
+                  run_style: TextStyle {
+                    font_family: Some(Arc::from("Times New Roman")),
+                    ..TextStyle::default()
+                  },
+                  run_overrides: RunStyleOverrides {
+                    font_size_pt: Some(font_size),
+                    ..RunStyleOverrides::default()
+                  },
+                  ..StyleEntry::default()
+                },
+              )]),
+              ..StylesCatalog::default()
+            };
+            let entry = refresh_single_heading_toc(&styles, "CustomContents", level);
+            assert_eq!(entry.base_style.font_size_pt, font_size);
+            assert_eq!(
+              entry.base_style.font_family.as_deref(),
+              Some("Times New Roman")
+            );
+            assert_eq!(
+              entry.format.indent_left_pt,
+              f32::from(level - 1) * indent_em * font_size
+            );
+            assert_eq!(entry.format.spacing_after_pt, after);
+            assert_eq!(entry.format.style_id, None);
+            for inline in &entry.inlines {
+              if let InlineItem::Text(run) = inline {
+                assert_eq!(run.style.font_size_pt, font_size);
+                assert_eq!(run.style.font_family.as_deref(), Some("Times New Roman"));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   fn imported_toc_test_paragraph(xml: &str) -> Paragraph {
+    imported_toc_test_paragraph_with_style(xml, TextStyle::default())
+  }
+
+  fn imported_toc_test_paragraph_with_style(xml: &str, base_style: TextStyle) -> Paragraph {
     let source = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
     let styles = StylesCatalog::default();
     let mut fields = ComplexFieldImportState::default();
     let mut widgets = FormWidgetIdAllocator::default();
     let mut inlines = paragraph_inlines_with_policy(
       &source,
-      TextStyle::default(),
+      base_style.clone(),
       &styles,
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
@@ -2931,9 +3553,298 @@ mod tests {
     let mut events = paragraph_field_events(&source);
     fields.finish_paragraph(&mut inlines, &mut events, &styles);
     let mut result = test_paragraph("");
+    result.base_style = base_style;
     result.inlines = inlines;
     result.field_events = events;
     result
+  }
+
+  #[test]
+  fn inline_reference_diagnostics_replace_only_unlocked_result_spans() {
+    let xml = r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:r><w:t>A[</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText>REF MissingOne \r \h</w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>12</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t>]B[</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText>REF MissingTwo \h</w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>stale</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t>]C[</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin" w:fldLock="1"/></w:r>
+      <w:r><w:instrText>REF MissingLocked</w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>KEEP</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t>]D</w:t></w:r></w:p>"#;
+    let mut sections = vec![default_section(vec![Block::paragraph(
+      imported_toc_test_paragraph(xml),
+    )])];
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("ja-JP"),
+    );
+    let Block::Paragraph(paragraph) = &sections[0].blocks[0] else {
+      panic!()
+    };
+    assert_eq!(
+      paragraph_source_text(paragraph).as_deref(),
+      Some("A[エラー! 参照元が見つかりません。]B[エラー! 参照元が見つかりません。]C[KEEP]D")
+    );
+    assert!(
+      paragraph
+        .inlines
+        .iter()
+        .filter_map(|item| match item {
+          InlineItem::Text(run) if run.text.contains("参照元") => Some(run),
+          _ => None,
+        })
+        .all(|run| run.style.bold && run.style.wordprocessingml_generated_field_diagnostic)
+    );
+  }
+
+  #[test]
+  fn inline_reference_recognizes_bookmarks_in_separate_shape_stories() {
+    let source = wps::WordprocessingShape::from_bytes(br#"
+      <wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1270000" cy="1270000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></wps:spPr>
+        <wps:txbx><w:txbxContent><w:p><w:bookmarkStart w:id="1" w:name="FigureCaption"/>
+          <w:r><w:t>Figure 1</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p></w:txbxContent></wps:txbx>
+        <wps:bodyPr><a:noAutofit/></wps:bodyPr></wps:wsp>"#).unwrap();
+    let shape = wordprocessing_shape_textbox_frame(
+      &source,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        inside_wordprocessing_group: false,
+        wordprocessing_canvas_has_background_paint: false,
+      },
+    )
+    .unwrap();
+    let reference = imported_toc_test_paragraph(
+      r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:r><w:t xml:space="preserve">See </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText>REF figurecaption \h</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>Figure 1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t>.</w:t></w:r></w:p>"#,
+    );
+    let mut drawing = test_paragraph("");
+    drawing.inlines = vec![InlineItem::Shape(shape)];
+    let mut sections = vec![default_section(vec![
+      Block::paragraph(reference),
+      Block::paragraph(drawing),
+    ])];
+    assert!(
+      !scan_main_story(&sections)
+        .bookmark_names
+        .contains("FigureCaption")
+    );
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("en-US"),
+    );
+    let Block::Paragraph(reference) = &sections[0].blocks[0] else {
+      panic!()
+    };
+    assert_eq!(
+      paragraph_source_text(reference).as_deref(),
+      Some("See Figure 1.")
+    );
+    assert!(
+      !scan_main_story(&sections)
+        .bookmark_names
+        .contains("FigureCaption"),
+      "REF existence must not merge separate stories into TOC scopes"
+    );
+  }
+
+  #[test]
+  fn inline_reference_diagnostic_takes_separator_metrics_and_resource_bold() {
+    let paragraph = imported_toc_test_paragraph(
+      r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:r><w:t>before[</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:rPr><w:rFonts w:ascii="Courier New"/><w:sz w:val="36"/></w:rPr><w:instrText>REF Missing</w:instrText></w:r>
+      <w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:b w:val="0"/><w:sz w:val="30"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:rPr><w:rFonts w:ascii="Arial"/><w:sz w:val="18"/></w:rPr><w:t>stale</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t>]after</w:t></w:r></w:p>"#,
+    );
+    let mut sections = vec![default_section(vec![Block::paragraph(paragraph)])];
+    refresh_tables_of_contents(
+      &mut sections,
+      &StylesCatalog::default(),
+      false,
+      Some("ja-JP"),
+    );
+    let Block::Paragraph(paragraph) = &sections[0].blocks[0] else {
+      panic!()
+    };
+    let error = paragraph
+      .inlines
+      .iter()
+      .find_map(|item| match item {
+        InlineItem::Text(run) if run.text.contains("参照元") => Some(run),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(error.style.font_family.as_deref(), Some("Times New Roman"));
+    assert_eq!(error.style.font_size_pt, 15.0);
+    assert_eq!(
+      error.style.east_asia_font_family.as_deref(),
+      Some("MS Mincho")
+    );
+    assert!(error.style.bold);
+    assert_eq!(
+      paragraph_source_text(paragraph).as_deref(),
+      Some("before[エラー! 参照元が見つかりません。]after")
+    );
+  }
+
+  #[test]
+  fn inline_reference_reimports_direct_format_and_reads_sequence_without_consuming_it() {
+    let field = |code: &str, cache: &str, properties: &str| {
+      format!(
+        r#"
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>{code}</w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r>{properties}<w:t>{cache}</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+      )
+    };
+    let wrap = |body: &str| {
+      format!(
+        r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{body}</w:p>"#
+      )
+    };
+    let courier = r#"<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:b/><w:sz w:val="30"/></w:rPr>"#;
+    for direct_source in [false, true] {
+      let first_sequence =
+        imported_toc_test_paragraph(&wrap(&field("SEQ Figure \\* ARABIC", "77", "")));
+      let destination = TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: 11.0,
+        ..TextStyle::default()
+      };
+      let reference = imported_toc_test_paragraph_with_style(
+        &wrap(&format!(
+          "<w:r><w:t>before[</w:t></w:r>{}<w:r><w:t>]between[</w:t></w:r>{}<w:r><w:t>]after</w:t></w:r>",
+          field("REF target \\h", "OLD", courier),
+          field("REF TARGET \\h \\* MERGEFORMAT", "OLD", courier)
+        )),
+        destination,
+      );
+      let authored = if direct_source { courier } else { "" };
+      let source = imported_toc_test_paragraph_with_style(
+        &wrap(&format!(
+          "<w:bookmarkStart w:id=\"1\" w:name=\"Target\"/><w:r>{authored}<w:t>Label</w:t></w:r>{}<w:bookmarkEnd w:id=\"1\"/><w:r><w:t>: outside</w:t></w:r>",
+          field("SEQ Figure \\* ARABIC", "99", authored)
+        )),
+        TextStyle {
+          font_family: Some(Arc::from("Times New Roman")),
+          font_size_pt: 9.0,
+          italic: true,
+          ..TextStyle::default()
+        },
+      );
+      let last_sequence =
+        imported_toc_test_paragraph(&wrap(&field("SEQ Figure \\* ARABIC", "88", "")));
+      let mut sections = vec![default_section(vec![
+        Block::paragraph(first_sequence),
+        Block::paragraph(reference),
+        Block::paragraph(source),
+        Block::paragraph(last_sequence),
+      ])];
+      refresh_tables_of_contents(&mut sections, &StylesCatalog::default(), false, None);
+      let Block::Paragraph(reference) = &sections[0].blocks[1] else {
+        panic!()
+      };
+      assert_eq!(
+        paragraph_source_text(reference).as_deref(),
+        Some("before[Label2]between[Label2]after")
+      );
+      let results = reference
+        .inlines
+        .iter()
+        .filter_map(|item| match item {
+          InlineItem::Text(run) if run.text == "Label" => Some(run),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(results.len(), 2);
+      assert_eq!(
+        results[0].style.font_family.as_deref(),
+        Some(if direct_source {
+          "Courier New"
+        } else {
+          "Arial"
+        })
+      );
+      assert_eq!(
+        results[0].style.font_size_pt,
+        if direct_source { 15.0 } else { 11.0 }
+      );
+      assert_eq!(results[0].style.bold, direct_source);
+      assert!(!results[0].style.italic);
+      assert_eq!(results[1].style.font_family.as_deref(), Some("Courier New"));
+      assert_eq!(results[1].style.font_size_pt, 15.0);
+      assert!(results[1].style.bold);
+      assert!(
+        reference
+          .inlines
+          .iter()
+          .all(|item| !matches!(item, InlineItem::Text(run) if run.dynamic_field.is_some()))
+      );
+      let sequences = sections[0]
+        .blocks
+        .iter()
+        .filter_map(|block| {
+          if let Block::Paragraph(paragraph) = block {
+            Some(paragraph)
+          } else {
+            None
+          }
+        })
+        .flat_map(|paragraph| &paragraph.inlines)
+        .filter_map(|item| match item {
+          InlineItem::Text(run)
+            if matches!(run.dynamic_field, Some(DynamicFieldKind::Sequence { .. })) =>
+          {
+            Some(run.text.as_str())
+          }
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(sequences, ["77", "99", "88"]);
+    }
+  }
+
+  #[test]
+  fn text_reference_modes_do_not_replace_numbering_or_position_results() {
+    for code in [
+      r"REF Target",
+      r"REF Target \h",
+      r"REF Target \* MERGEFORMAT \h",
+    ] {
+      assert!(reference_copies_bookmark_text(code));
+    }
+    for code in [
+      r"REF Target \r",
+      r"REF Target \w",
+      r"REF Target \p",
+      r"REF Target \* Upper",
+      r"REF Target \f",
+    ] {
+      assert!(!reference_copies_bookmark_text(code));
+    }
   }
 
   #[test]
@@ -3098,6 +4009,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -3288,7 +4200,7 @@ mod tests {
             assert_eq!(raw, cache);
           } else if has_sources {
             assert_eq!(text, "Current heading\t1");
-            let Block::Paragraph(source) = &sections[0].blocks[1] else {
+            let Block::Paragraph(source) = &sections[0].blocks[2] else {
               panic!()
             };
             assert!(matches!(
@@ -3298,6 +4210,71 @@ mod tests {
           } else {
             assert_eq!(text, "No table of contents entries found.");
             assert!(!result.base_style.bold);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn empty_caption_toc_keeps_its_type_through_print_reconstruction() {
+    for (instruction, expected) in [
+      (r#"TOC \o "1-3""#, "目次項目が見つかりません。"),
+      (r#"TOC \c "Figure""#, "図表目次項目が見つかりません。"),
+      (r#"TOC \a "Table""#, "図表目次項目が見つかりません。"),
+      (
+        r#"TOC \c "CustomCaption""#,
+        "図表目次項目が見つかりません。",
+      ),
+    ] {
+      for simple in [false, true] {
+        for locked in [false, true] {
+          let mut cached = test_paragraph("Persisted entry");
+          cached.field_events = if simple {
+            vec![
+              ParagraphFieldEvent::Simple {
+                instruction: instruction.into(),
+                locked,
+                dirty: false,
+                inserted: false,
+              },
+              ParagraphFieldEvent::Content,
+            ]
+          } else {
+            vec![
+              ParagraphFieldEvent::Begin {
+                locked,
+                dirty: false,
+                inserted: false,
+              },
+              ParagraphFieldEvent::Instruction(instruction.into()),
+              ParagraphFieldEvent::Separate { style: None },
+              ParagraphFieldEvent::Content,
+              ParagraphFieldEvent::End,
+            ]
+          };
+          let mut sections = vec![default_section(vec![Block::paragraph(cached)])];
+          refresh_tables_of_contents(
+            &mut sections,
+            &StylesCatalog::default(),
+            false,
+            Some("ja-JP"),
+          );
+          let Block::Paragraph(result) = &sections[0].blocks[0] else {
+            panic!("empty caption result paragraph");
+          };
+          assert_eq!(
+            paragraph_source_text(result).as_deref(),
+            Some(if locked { "Persisted entry" } else { expected })
+          );
+          if !locked {
+            let [InlineItem::Text(run)] = result.inlines.as_slice() else {
+              panic!("generated directory message");
+            };
+            assert_eq!(
+              run.style.east_asia_font_family.as_deref(),
+              Some("MS Mincho")
+            );
           }
         }
       }
@@ -3364,11 +4341,15 @@ mod tests {
         panic!("original cached story structure");
       };
       assert_eq!(paragraph_source_text(old).as_deref(), Some("OLD CACHE 9"));
-      let [Block::Paragraph(rebuilt), Block::Paragraph(final_heading)] =
-        sections[0].blocks.as_slice()
+      let [
+        Block::Paragraph(rebuilt),
+        Block::Paragraph(ending),
+        Block::Paragraph(final_heading),
+      ] = sections[0].blocks.as_slice()
       else {
-        panic!("printed result and source heading");
+        panic!("printed result, retained ending mark and source heading");
       };
+      assert!(ending.inlines.is_empty());
       assert_eq!(
         paragraph_source_text(rebuilt).as_deref(),
         Some("CURRENT HEADING\t1")
@@ -3456,6 +4437,155 @@ mod tests {
           paragraph_source_text(result).as_deref(),
           Some("1\tCurrent heading\t1")
         );
+      }
+    }
+  }
+
+  #[test]
+  fn dirty_toc_with_valid_page_references_keeps_its_print_cache_boundaries() {
+    for dirty in [false, true] {
+      let mut cached = test_paragraph("Cached title\t1");
+      cached.field_events = vec![
+        ParagraphFieldEvent::Begin {
+          locked: false,
+          dirty,
+          inserted: false,
+        },
+        ParagraphFieldEvent::Instruction(r#"TOC \o "1-3""#.into()),
+        ParagraphFieldEvent::Separate { style: None },
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::Begin {
+          locked: false,
+          dirty: false,
+          inserted: false,
+        },
+        ParagraphFieldEvent::Instruction("PAGEREF Target".into()),
+        ParagraphFieldEvent::Separate { style: None },
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::End,
+        ParagraphFieldEvent::End,
+      ];
+      let mut heading = test_paragraph("Current heading");
+      heading.format.style_outline_level = Some(0);
+      heading.format.outline_level = Some(0);
+      heading.field_events = vec![
+        ParagraphFieldEvent::BookmarkStart {
+          id: "1".into(),
+          name: "Target".into(),
+        },
+        ParagraphFieldEvent::Content,
+        ParagraphFieldEvent::BookmarkEnd { id: "1".into() },
+      ];
+      let mut sections = vec![default_section(vec![
+        Block::paragraph(cached),
+        Block::paragraph(heading),
+      ])];
+      refresh_tables_of_contents(
+        &mut sections,
+        &StylesCatalog::default(),
+        false,
+        Some("en-US"),
+      );
+      assert_eq!(sections[0].blocks.len(), 2);
+      let Block::Paragraph(cached) = &sections[0].blocks[0] else {
+        panic!("cached TOC")
+      };
+      assert_eq!(
+        paragraph_source_text(cached).as_deref(),
+        Some("Cached title\t1")
+      );
+    }
+  }
+
+  #[test]
+  fn rebuilt_toc_retains_the_ending_paragraph_mark_only_for_nonempty_entries() {
+    for boundary in ["shared", "separate", "simple"] {
+      for locked in [false, true] {
+        for has_heading in [false, true] {
+          let mut cached = test_paragraph("Cached entry\t1");
+          let instruction = r#"TOC \o "1-3""#;
+          cached.field_events = if boundary == "simple" {
+            vec![ParagraphFieldEvent::Simple {
+              instruction: instruction.into(),
+              locked,
+              dirty: false,
+              inserted: false,
+            }]
+          } else {
+            vec![
+              ParagraphFieldEvent::Begin {
+                locked,
+                dirty: false,
+                inserted: false,
+              },
+              ParagraphFieldEvent::Instruction(instruction.into()),
+              ParagraphFieldEvent::Separate { style: None },
+              ParagraphFieldEvent::Content,
+            ]
+          };
+          let mut ending = if boundary == "separate" {
+            test_paragraph("")
+          } else {
+            cached.clone()
+          };
+          ending.base_style.font_size_pt = 20.0;
+          ending.format.paragraph_mark_font_size_set = true;
+          ending.format.spacing_before_pt = 6.0;
+          ending.format.spacing_after_pt = 9.0;
+          if boundary != "simple" {
+            ending.field_events.push(ParagraphFieldEvent::End);
+          }
+          let mut blocks = Vec::new();
+          if boundary == "separate" {
+            blocks.push(Block::paragraph(cached));
+          }
+          blocks.push(Block::paragraph(ending));
+          blocks.push(Block::paragraph(test_paragraph("")));
+          let mut heading = test_paragraph("Current heading");
+          if has_heading {
+            heading.format.style_outline_level = Some(0);
+            heading.format.outline_level = Some(0);
+          }
+          blocks.push(Block::paragraph(heading));
+          let mut sections = vec![default_section(blocks)];
+          refresh_tables_of_contents(
+            &mut sections,
+            &StylesCatalog::default(),
+            false,
+            Some("en-US"),
+          );
+
+          let blocks = &sections[0].blocks;
+          let expected_count = if locked {
+            3 + usize::from(boundary == "separate")
+          } else {
+            3 + usize::from(has_heading)
+          };
+          assert_eq!(
+            blocks.len(),
+            expected_count,
+            "{boundary}, {locked}, {has_heading}"
+          );
+          if !locked && has_heading {
+            let Block::Paragraph(mark) = &blocks[1] else {
+              panic!("expected retained ending paragraph");
+            };
+            assert!(mark.inlines.is_empty());
+            assert!(mark.field_events.is_empty());
+            assert!(mark.style_ref_text.is_none());
+            assert_eq!(mark.base_style.font_size_pt, 20.0);
+            assert!(mark.format.paragraph_mark_font_size_set);
+            assert_eq!(mark.format.spacing_before_pt, 6.0);
+            assert_eq!(mark.format.spacing_after_pt, 9.0);
+          }
+          let Block::Paragraph(last) = blocks.last().unwrap() else {
+            panic!("expected original following paragraph");
+          };
+          assert_eq!(
+            paragraph_source_text(last).as_deref(),
+            Some("Current heading")
+          );
+        }
       }
     }
   }
@@ -3553,6 +4683,97 @@ mod tests {
         &scan,
         &scan.toc_spans[0]
       ));
+    }
+  }
+
+  #[test]
+  fn stale_toc_page_references_distinguish_absent_and_existing_bookmark_tables() {
+    for instruction in [
+      r#"TOC \o "1-3""#,
+      r#"TOC \a "Figure""#,
+      r#"TOC \c "Figure""#,
+    ] {
+      for bookmark_name in [
+        None,
+        Some("_GoBack"),
+        Some("_goback"),
+        Some("_GoBack2"),
+        Some("_ProbeHidden"),
+        Some("UnrelatedProbeBookmark"),
+      ] {
+        for locked in [false, true] {
+          for enabled in [false, true] {
+            let mut cached = test_paragraph("Cached entry");
+            cached.field_events = vec![
+              ParagraphFieldEvent::Begin {
+                locked,
+                dirty: false,
+                inserted: false,
+              },
+              ParagraphFieldEvent::Instruction(instruction.into()),
+              ParagraphFieldEvent::Separate { style: None },
+              ParagraphFieldEvent::Content,
+              ParagraphFieldEvent::Begin {
+                locked: false,
+                dirty: false,
+                inserted: false,
+              },
+              ParagraphFieldEvent::Instruction("PAGEREF MissingTarget".into()),
+              ParagraphFieldEvent::Separate { style: None },
+              ParagraphFieldEvent::Content,
+              ParagraphFieldEvent::End,
+              ParagraphFieldEvent::End,
+            ];
+            let mut tail = test_paragraph("Unrelated lower");
+            if let Some(name) = bookmark_name {
+              tail.field_events = vec![
+                ParagraphFieldEvent::BookmarkStart {
+                  id: "9".into(),
+                  name: name.into(),
+                },
+                ParagraphFieldEvent::Content,
+                ParagraphFieldEvent::BookmarkEnd { id: "9".into() },
+              ];
+            }
+            let mut sections = vec![default_section(vec![
+              Block::paragraph(cached),
+              Block::paragraph(tail),
+            ])];
+            let mut styles = StylesCatalog::default();
+            styles.import_settings.update_fields_at_print = Some(enabled);
+            refresh_tables_of_contents(&mut sections, &styles, false, Some("es-MX"));
+            let Block::Paragraph(result) = &sections[0].blocks[0] else {
+              panic!("TOC result")
+            };
+            let text = paragraph_source_text(result).unwrap();
+            let rebuilds =
+              bookmark_name.is_some_and(|name| name != "_GoBack") && enabled && !locked;
+            if rebuilds {
+              assert_eq!(
+                text,
+                if instruction.contains("\\o") {
+                  "No se encontraron entradas de tabla de contenido."
+                } else {
+                  "No se encuentran elementos de tabla de ilustraciones."
+                }
+              );
+            } else {
+              assert!(
+                text.starts_with("Cached entry"),
+                "{instruction} bookmark={bookmark_name:?} locked={locked} enabled={enabled}: {text}"
+              );
+            }
+            assert_eq!(sections[0].blocks.len(), 2);
+            let Block::Paragraph(tail) = &sections[0].blocks[1] else {
+              panic!("tail retained")
+            };
+            assert_eq!(
+              paragraph_source_text(tail).as_deref(),
+              Some("Unrelated lower")
+            );
+          }
+        }
+      }
     }
   }
 
@@ -3897,7 +5118,9 @@ mod tests {
         .next_label(
           NumberingReference {
             num_id: Some(31),
-            level_index: None,
+            // This control tests level2 TOC formatting. Native Word defaults
+            // an omitted final ilvl to0, independently of lvl/pStyle.
+            level_index: Some(2),
           },
           &mut heading.format,
           &styles,
@@ -4030,6 +5253,7 @@ mod tests {
         numbering_prefix: None,
         omit_page_number: false,
         chapter_prefix: None,
+        emphasis: Vec::new(),
       };
       let mut metrics = crate::text_metrics::TextMetrics::new();
       rebuild_toc_tab_stops(
@@ -4707,7 +5931,7 @@ mod tests {
         Block::paragraph(heading),
       ])];
       refresh_tables_of_contents(&mut sections, &styles, false, Some("en-US"));
-      assert_eq!(sections[0].blocks.len(), 3);
+      assert_eq!(sections[0].blocks.len(), 4);
       let Block::Paragraph(prefix) = &sections[0].blocks[0] else {
         panic!("prefix")
       };
@@ -4766,7 +5990,7 @@ mod tests {
       false,
       Some("en-US"),
     );
-    assert_eq!(sections[0].blocks.len(), 2);
+    assert_eq!(sections[0].blocks.len(), 3);
     let Block::Paragraph(entry) = &sections[0].blocks[0] else {
       panic!("entry")
     };
@@ -4804,7 +6028,7 @@ mod tests {
       Some("en-US"),
     );
 
-    assert_eq!(sections[0].blocks.len(), 2);
+    assert_eq!(sections[0].blocks.len(), 3);
     let Block::Paragraph(entry) = &sections[0].blocks[0] else {
       panic!("expected rebuilt TOC entry");
     };
@@ -4828,7 +6052,7 @@ mod tests {
       matches!(stop.alignment, TabStopAlignment::Right) && matches!(stop.leader, TabLeader::Dot)
     }));
 
-    let Block::Paragraph(source) = &sections[0].blocks[1] else {
+    let Block::Paragraph(source) = &sections[0].blocks[2] else {
       panic!("expected source heading");
     };
     assert!(matches!(
@@ -4929,7 +6153,7 @@ mod tests {
       entry.inlines.first(),
       Some(InlineItem::Text(run)) if run.text == "Table heading"
     ));
-    let Block::Table(table) = &sections[0].blocks[1] else {
+    let Block::Table(table) = &sections[0].blocks[2] else {
       panic!("expected outer table");
     };
     let Block::Table(nested) = &table.rows[0].cells[0].blocks[0] else {
@@ -4975,7 +6199,10 @@ mod tests {
     let Block::Table(table) = &sections[0].blocks[1] else {
       panic!("expected table");
     };
-    assert_eq!(table.rows[0].cells[0].blocks.len(), 1);
+    assert_eq!(table.rows[0].cells[0].blocks.len(), 2);
+    assert!(
+      matches!(&table.rows[0].cells[0].blocks[1], Block::Paragraph(mark) if mark.inlines.is_empty())
+    );
     let Block::Paragraph(entry) = &table.rows[0].cells[0].blocks[0] else {
       panic!("expected rebuilt cell TOC");
     };
@@ -4983,6 +6210,51 @@ mod tests {
       entry.inlines.first(),
       Some(InlineItem::Text(run)) if run.text == "Outer heading"
     ));
+  }
+
+  #[test]
+  fn print_field_update_keeps_disabled_and_locked_toc_caches() {
+    for enabled in [false, true] {
+      for locked in [false, true] {
+        let mut cached = test_paragraph("Cached title");
+        cached.field_events = vec![
+          ParagraphFieldEvent::Begin {
+            locked,
+            dirty: false,
+            inserted: false,
+          },
+          ParagraphFieldEvent::Instruction("TOC".into()),
+          ParagraphFieldEvent::Separate { style: None },
+          ParagraphFieldEvent::End,
+        ];
+        let mut heading = test_paragraph("Current heading");
+        heading.format.style_outline_level = Some(0);
+        heading.format.outline_level = Some(0);
+        let mut sections = vec![default_section(vec![
+          Block::paragraph(cached),
+          Block::paragraph(heading),
+        ])];
+        let mut styles = StylesCatalog::default();
+        styles.import_settings.update_fields_at_print = Some(enabled);
+        refresh_tables_of_contents(&mut sections, &styles, false, Some("en-US"));
+        let text = sections[0]
+          .blocks
+          .iter()
+          .filter_map(|block| {
+            let Block::Paragraph(p) = block else {
+              return None;
+            };
+            paragraph_source_text(p)
+          })
+          .collect::<String>();
+        assert_eq!(
+          text.contains("Cached title"),
+          !enabled || locked,
+          "enabled={enabled}, locked={locked}: {text}"
+        );
+        assert!(text.contains("Current heading"));
+      }
+    }
   }
 
   #[test]

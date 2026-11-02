@@ -1729,8 +1729,19 @@ fn write_prepared_metafile(
   image: &super::paint::ImageItem<'_>,
   writer: &mut PreparedPageWriter<'_>,
 ) -> Result<()> {
+  let floating_frame = super::metafile::floating_vml_raster_frame(image, writer.options);
   if let Some(color) = image.metafile_background_color {
-    write_metafile_host_background(content, image, color)?;
+    if floating_frame.is_some() {
+      let mut host = image.clone();
+      let half_dot = ooxmlsdk_layout::units::POINTS_PER_INCH
+        / ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI
+        / 2.0;
+      host.x_pt += half_dot;
+      host.y_pt += half_dot;
+      write_metafile_host_background(content, &host, color)?;
+    } else {
+      write_metafile_host_background(content, image, color)?;
+    }
   }
 
   let render_options = super::metafile::render_options_for_image(image, writer.options);
@@ -1824,7 +1835,17 @@ fn write_prepared_metafile(
     return write_metafile_vector_scene(content, image, &scene);
   }
 
-  let painted_image = super::metafile::fixed_output_paint_image(image, writer.options);
+  let painted_image = floating_frame
+    .map(|[x, y, width, height]| {
+      let mut painted = image.clone();
+      painted.x_pt = x;
+      painted.y_pt = y;
+      painted.width_pt = width;
+      painted.height_pt = height;
+      painted.metafile_native_size = false;
+      painted
+    })
+    .or_else(|| super::metafile::fixed_output_paint_image(image, writer.options));
   let image = painted_image.as_ref().unwrap_or(image);
   let (paint_width_pt, paint_height_pt) =
     super::metafile::native_paint_size(image).unwrap_or((image.width_pt, image.height_pt));
@@ -2999,19 +3020,22 @@ fn write_prepared_font_run_as_text(
   let baseline_y = device_coordinates
     .map(|device| device.map_point(0.0, portion.baseline_y).1)
     .unwrap_or(portion.baseline_y);
+  let word_fixed_output = matches!(
+    writer.options.images.optimization_policy,
+    PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
+  );
   let synthesis = DirectTextSynthesis {
     // Explicit vector outlines already contain the authored visible stroke.
     // Their separate Office search layer is transparent and must not add an
     // artificial-bold stroke, while synthetic italic still determines glyph
     // placement and selection geometry.
-    bold: kind == PreparedTextRunKind::Ordinary && run.font_face.synthetic_bold,
+    bold: kind == PreparedTextRunKind::Ordinary
+      && run.font_face.synthetic_bold
+      && (!word_fixed_output || writer.fonts.word_synthetic_bold_stroke(handle)),
     italic: run.font_face.synthetic_italic,
     color,
     font_size_pt: run.font_size_pt,
-    word_fixed_output: matches!(
-      writer.options.images.optimization_policy,
-      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
-    ),
+    word_fixed_output,
     baseline_y,
   };
   if kind == PreparedTextRunKind::TransparentSemanticOverlay {
@@ -7291,8 +7315,9 @@ mod tests {
 
   #[test]
   fn direct_writer_selects_opaque_constant_and_variable_gradient_alpha_paths() {
-    let render_gradient = |alphas: [u8; 3]| {
+    let render_gradient = |alphas: [u8; 3], opaque_for_pdf| {
       let gradient = common::GradientFill {
+        opaque_for_pdf,
         stops: vec![
           common::GradientStop {
             position: 0.0,
@@ -7342,17 +7367,17 @@ mod tests {
       String::from_utf8_lossy(&render(&document, &uncompressed_options()).unwrap()).into_owned()
     };
 
-    let opaque = render_gradient([u8::MAX; 3]);
+    let opaque = render_gradient([u8::MAX; 3], false);
     assert_eq!(opaque.matches("/ShadingType 2").count(), 1, "{opaque}");
     assert!(!opaque.contains("/ExtGState"), "{opaque}");
     assert!(!opaque.contains("/SMask"), "{opaque}");
 
-    let constant = render_gradient([128; 3]);
+    let constant = render_gradient([128; 3], false);
     assert_eq!(constant.matches("/ShadingType 2").count(), 1, "{constant}");
     assert!(constant.contains("/ca 0.5019608"), "{constant}");
     assert!(!constant.contains("/SMask"), "{constant}");
 
-    let variable = render_gradient([u8::MAX, 128, 0]);
+    let variable = render_gradient([u8::MAX, 128, 0], false);
     assert_eq!(variable.matches("/ShadingType 2").count(), 2, "{variable}");
     assert_eq!(variable.matches("/FunctionType 3").count(), 2, "{variable}");
     assert_eq!(variable.matches("/FunctionType 2").count(), 4, "{variable}");
@@ -7365,6 +7390,15 @@ mod tests {
     assert!(variable.contains("/BBox[0 0 612 792]"), "{variable}");
     assert!(variable.contains("/ExtGState<</GSM0"), "{variable}");
     assert!(!variable.contains("/ca "), "{variable}");
+
+    // Archival WPS output omits foreground opacity while the layout model
+    // retains authored stop alpha for shadow/effect rasterization.
+    for alphas in [[u8::MAX, 128, 0], [128; 3], [0; 3]] {
+      let archival = render_gradient(alphas, true);
+      assert_eq!(archival.matches("/ShadingType 2").count(), 1, "{archival}");
+      assert!(!archival.contains("/ExtGState"), "{archival}");
+      assert!(!archival.contains("/SMask"), "{archival}");
+    }
   }
 
   #[test]
@@ -8276,6 +8310,67 @@ mod tests {
     assert!(!removed.contains("/StructParent"), "{removed}");
     assert!(!removed.contains("/Type/OBJR"), "{removed}");
     assert!(!removed.contains("/ParentTree"), "{removed}");
+  }
+
+  #[test]
+  fn direct_writer_omits_hidden_text_and_decorations_before_font_preparation() {
+    let style = common::TextStyle {
+      font_family: Some("Liberation Serif".into()),
+      font_size: Pt(12.0),
+      hidden: true,
+      underline: true,
+      strikethrough: true,
+      highlight: Some(color(255, 255, 0, u8::MAX)),
+      color: color(255, 0, 0, u8::MAX),
+      ..Default::default()
+    };
+    let options = uncompressed_options();
+    let blank = render(&blank_document(&[(612.0, 792.0)]), &options).unwrap();
+    for source in ["", "SECRET", "\tSECRET\t"] {
+      let document = text_document(source, style.clone());
+      assert_eq!(render(&document, &options).unwrap(), blank);
+    }
+
+    let hidden = text_document("SECRET", style.clone()).pages.remove(0).items;
+    for flatten_identity in [false, true] {
+      let mut grouped = blank_document(&[(612.0, 792.0)]);
+      grouped.pages[0]
+        .items
+        .push(common::DisplayItem::Group(common::CompositingGroup {
+          mask: None,
+          clip: None,
+          transform: Some(common::Transform {
+            dx: Pt(10.0),
+            dy: Pt(20.0),
+            ..Default::default()
+          }),
+          blend_mode: common::BlendMode::Normal,
+          opacity: 1.0,
+          flatten_identity,
+          inherit_text_line_owner: true,
+          items: hidden.clone(),
+        }));
+      let bytes = render(&grouped, &options).unwrap();
+      let pdf = String::from_utf8_lossy(&bytes);
+      assert!(!pdf.contains("/Subtype/Type0"), "{pdf}");
+      assert!(!pdf.contains("\nBT "), "{pdf}");
+    }
+
+    let visible = text_document(
+      "SECRET",
+      common::TextStyle {
+        hidden: false,
+        ..style
+      },
+    );
+    let bytes = render(&visible, &options).unwrap();
+    let pdf = String::from_utf8_lossy(&bytes);
+    assert!(pdf.contains("/Subtype/Type0"), "{pdf}");
+    assert!(pdf.contains("\nBT "), "{pdf}");
+    assert!(
+      pdf.contains("1 1 0 rg"),
+      "visible highlight must survive: {pdf}"
+    );
   }
 
   #[test]

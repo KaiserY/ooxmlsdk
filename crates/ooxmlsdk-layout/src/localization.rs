@@ -475,6 +475,7 @@ pub(crate) struct OfficeStringCatalog {
   field_reference_source_not_found: &'static str,
   field_bookmark_name_not_specified: &'static str,
   field_empty_table_of_contents: &'static str,
+  field_empty_index: &'static str,
   field_above: &'static str,
   field_below: &'static str,
   missing_linked_image_text: &'static str,
@@ -592,6 +593,10 @@ impl OfficeStringCatalog {
     self.field_empty_table_of_contents
   }
 
+  pub(crate) fn field_empty_index(self) -> &'static str {
+    self.field_empty_index
+  }
+
   pub(crate) fn field_above(self) -> &'static str {
     self.field_above
   }
@@ -664,6 +669,7 @@ const OFFICE_STRINGS_EN: OfficeStringCatalog = OfficeStringCatalog {
   field_reference_source_not_found: "Error! Reference source not found.",
   field_bookmark_name_not_specified: "Error! No bookmark name given.",
   field_empty_table_of_contents: "No table of contents entries found.",
+  field_empty_index: "No index entries found.",
   field_above: "above",
   field_below: "below",
   missing_linked_image_text: "The linked image cannot be displayed. The file may have been moved, renamed, or deleted. Verify that the link points to the correct file and location.",
@@ -696,6 +702,7 @@ const OFFICE_STRINGS_ZH_HANS: OfficeStringCatalog = OfficeStringCatalog {
   field_reference_source_not_found: "错误!未找到引用源。",
   field_bookmark_name_not_specified: "错误!未指定书签。",
   field_empty_table_of_contents: "错误!未找到目录项。",
+  field_empty_index: "未找到索引项。",
   field_above: "上方",
   field_below: "下方",
   missing_linked_image_text: "无法显示链接的图像。该文件可能已被移动、重命名或删除。请验证该链接是否指向正确的文件和位置。",
@@ -729,6 +736,7 @@ const OFFICE_STRINGS_ZH_HANT: OfficeStringCatalog = OfficeStringCatalog {
   field_reference_source_not_found: "錯誤! 找不到參照來源。",
   field_bookmark_name_not_specified: "錯誤! 未提供書籤名稱。",
   field_empty_table_of_contents: "錯誤! 找不到目錄項目。",
+  field_empty_index: "找不到索引項目。",
   field_above: "上面",
   field_below: "下面",
   // No Traditional Chinese Office fixed-output sample establishes this

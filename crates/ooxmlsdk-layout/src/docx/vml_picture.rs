@@ -6,23 +6,158 @@
 
 use std::io::Cursor;
 
+use ooxmlsdk::schemas::{a, v};
+
 use crate::common;
+
+const PICTURE_FRAME_PATH: &str = "m@4@5l@4@11@9@11@9@5xe";
+const PICTURE_FRAME_GUIDES: &[&str] = &[
+  "if lineDrawn pixelLineWidth 0",
+  "sum @0 1 0",
+  "sum 0 0 @1",
+  "prod @2 1 2",
+  "prod @3 21600 pixelWidth",
+  "prod @3 21600 pixelHeight",
+  "sum @0 0 1",
+  "prod @6 1 2",
+  "prod @7 21600 pixelWidth",
+  "sum @8 21600 0",
+  "prod @7 21600 pixelHeight",
+  "sum @10 21600 0",
+];
+
+/// Recognize the Office picture template, rather than its reusable spt alone.
+/// A custom path can retain spt75 but has a different enclosing frame.
+pub(super) fn apply_floating_picture_frame(
+  image: &mut super::InlineImage,
+  frame: &mut super::InlineShape,
+  shape: &v::Shape,
+  shape_type: Option<&v::Shapetype>,
+) {
+  let super::ImagePlacement::Floating(placement) = image.placement else {
+    return;
+  };
+  if image.rotation_deg != 0.0
+    || image.flip_horizontal
+    || image.flip_vertical
+    || frame.effects.is_some()
+    || placement.alignment_extent.is_some()
+    || placement
+      .relative_width_pct
+      .is_some_and(|value| value > 0.0)
+    || placement
+      .relative_height_pct
+      .is_some_and(|value| value > 0.0)
+  {
+    return;
+  }
+  let Some(shape_type) = shape_type else {
+    return;
+  };
+  let number = shape_type.optional_number.or_else(|| {
+    shape
+      .r#type
+      .as_deref()
+      .and_then(super::vml_shape_type_number)
+  });
+  if number != Some(75) {
+    return;
+  }
+  let path = super::vml_shape_path(shape)
+    .and_then(|path| path.value.as_deref())
+    .or(shape.edge_path.as_deref())
+    .or_else(|| super::vml_shapetype_path(shape_type).and_then(|path| path.value.as_deref()))
+    .or(shape_type.edge_path.as_deref());
+  if path != Some(PICTURE_FRAME_PATH)
+    && path.and_then(super::vml_path_tokens) != super::vml_path_tokens(PICTURE_FRAME_PATH)
+  {
+    return;
+  }
+  let size = super::vml_coordinate_pair(
+    shape
+      .coordinate_size
+      .as_deref()
+      .or(shape_type.coordinate_size.as_deref()),
+  );
+  let origin = super::vml_coordinate_pair(
+    shape
+      .coordinate_origin
+      .as_deref()
+      .or(shape_type.coordinate_origin.as_deref()),
+  );
+  if size.unwrap_or((21600.0, 21600.0)) != (21600.0, 21600.0)
+    || origin.unwrap_or((0.0, 0.0)) != (0.0, 0.0)
+  {
+    return;
+  }
+  let Some(formulas) =
+    super::vml_shape_formulas(shape).or_else(|| super::vml_shapetype_formulas(shape_type))
+  else {
+    return;
+  };
+  if formulas.formula.len() != PICTURE_FRAME_GUIDES.len()
+    || !formulas
+      .formula
+      .iter()
+      .zip(PICTURE_FRAME_GUIDES)
+      .all(|(formula, expected)| {
+        formula.equation.as_deref().is_some_and(|equation| {
+          equation
+            .split_ascii_whitespace()
+            .eq(expected.split_ascii_whitespace())
+        })
+      })
+  {
+    return;
+  }
+  let Some(width) = frame
+    .stroke_override
+    .as_deref()
+    .map(|stroke| stroke.width.0)
+    .or_else(|| frame.stroke.map(|stroke| stroke.width_pt))
+    .filter(|width| width.is_finite() && *width >= 0.0)
+  else {
+    return;
+  };
+  let super::InlineShapeGeometry::Path { paths, preset, .. } = &mut frame.geometry else {
+    return;
+  };
+  if paths.len() != 1 || !paths[0].stroke {
+    return;
+  }
+  *preset = Some(a::ShapeTypeValues::Rectangle);
+  // Native pen/axis controls distinguish this screen-device enclosure from
+  // the 600-DPI painted path. Even an enabled zero-width pen reserves one
+  // screen pixel. Existing floating metrics select the joint aligned frame;
+  // absolute offsets keep the bitmap origin, independently of these outsets.
+  const DEVICE_STEP_PT: f32 = 72.0 / 96.0;
+  let outset = (width.max(DEVICE_STEP_PT) / DEVICE_STEP_PT).ceil() * DEVICE_STEP_PT;
+  image.effect_left_pt = outset;
+  image.effect_top_pt = outset;
+  image.effect_right_pt = outset;
+  image.effect_bottom_pt = outset;
+}
 
 pub(super) fn png_goal_twips(data: &[u8]) -> Option<(f64, f64)> {
   let reader = png::Decoder::new(Cursor::new(data)).read_info().ok()?;
   let info = reader.info();
-  let density = info.pixel_dims?;
-  if density.unit != png::Unit::Meter || density.xppu == 0 || density.yppu == 0 {
-    return None;
-  }
-  let axis = |pixels, ppu| {
-    let goal = (f64::from(pixels) * 1440.0 / (f64::from(ppu) * 0.0254)).round();
+  // Word's materialized PICF uses 96 DPI when pHYs is absent, unitless,
+  // or zero. An explicit physical density still keeps its exact conversion:
+  // 3780 pixels/meter is 96.012 DPI, not the default 96 DPI.
+  let density = match info.pixel_dims {
+    Some(density) if density.unit == png::Unit::Meter && density.xppu != 0 && density.yppu != 0 => {
+      (
+        f64::from(density.xppu) * 0.0254,
+        f64::from(density.yppu) * 0.0254,
+      )
+    }
+    _ => (96.0, 96.0),
+  };
+  let axis = |pixels: u32, dpi: f64| {
+    let goal = (f64::from(pixels) * 1440.0 / dpi).round();
     (goal >= 1.0 && goal <= f64::from(i16::MAX)).then_some(goal)
   };
-  Some((
-    axis(info.width, density.xppu)?,
-    axis(info.height, density.yppu)?,
-  ))
+  Some((axis(info.width, density.0)?, axis(info.height, density.1)?))
 }
 
 fn jpeg_goal_twips(data: &[u8]) -> Option<(f64, f64)> {
@@ -114,8 +249,144 @@ pub(super) fn inline_paint_bounds(mut bounds: common::Rect) -> common::Rect {
 }
 
 #[cfg(test)]
+pub(super) fn frame_test_image(weight: f32, changes: &[(&str, &str)]) -> super::InlineImage {
+  use ooxmlsdk::sdk::SdkType;
+  let formulas = PICTURE_FRAME_GUIDES
+    .iter()
+    .map(|value| format!("<v:f eqn=\"{value}\"/>"))
+    .collect::<String>();
+  let mut source = format!(
+    r##"<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    <v:shapetype id="_x0000_t75" o:spt="75" coordsize="21600,21600" filled="f" stroked="f" path="{PICTURE_FRAME_PATH}">
+      <v:formulas>{formulas}</v:formulas><v:stroke joinstyle="miter"/>
+    </v:shapetype>
+    <v:shape type="#_x0000_t75" style="position:absolute;width:117.75pt;height:117.75pt;mso-position-horizontal:left"
+      stroked="t" strokeweight="{weight}pt"><v:stroke dashstyle="dash"/><v:imagedata r:id="rId1"/></v:shape>
+    </w:pict>"##
+  );
+  for (from, to) in changes {
+    source = source.replace(from, to);
+  }
+  let picture = super::w::Picture::from_bytes(source.as_bytes()).unwrap();
+  let mut catalog = super::ImageCatalog::default();
+  catalog.by_relationship_id.insert(
+    "rId1".into(),
+    super::package::ImageResource {
+      data: vec![1, 2, 3].into(),
+      content_type: Some("image/png".into()),
+    },
+  );
+  let shape_types = picture
+    .picture_choice
+    .iter()
+    .filter_map(|item| match item {
+      super::w::PictureChoice::Shapetype(value) => Some(value.as_ref()),
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  let shape = picture
+    .picture_choice
+    .iter()
+    .find_map(|item| match item {
+      super::w::PictureChoice::Shape(value) => Some(value.as_ref()),
+      _ => None,
+    })
+    .unwrap();
+  super::shape_image_with_style_and_shape_types(
+    shape,
+    shape.style.as_deref(),
+    &catalog,
+    &shape_types,
+  )
+  .unwrap()
+}
+
+#[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn vml_picture_template_keeps_screen_enclosure_and_printer_pen_independent() {
+    for (weight, outset, left, right) in [
+      (0.0, 0.75, 0.0, 0.0),
+      (0.25, 0.75, -0.24, 0.12),
+      (0.74, 0.75, -0.48, 0.36),
+      (0.75, 0.75, -0.48, 0.36),
+      (0.76, 1.5, -0.48, 0.36),
+      (1.0, 1.5, -0.60, 0.48),
+      (1.25, 1.5, -0.72, 0.60),
+      (1.5, 1.5, -0.84, 0.72),
+      (3.0, 3.0, -1.56, 1.44),
+    ] {
+      let image = frame_test_image(weight, &[]);
+      assert_eq!((image.width_pt, image.height_pt), (117.75, 117.75));
+      assert_eq!(
+        [
+          image.effect_left_pt,
+          image.effect_top_pt,
+          image.effect_right_pt,
+          image.effect_bottom_pt
+        ],
+        [outset; 4]
+      );
+      let frame = image.picture_frame.as_deref().unwrap();
+      assert_eq!(
+        frame.stroke.unwrap().width_pt,
+        if weight == 0.0 {
+          crate::units::OFFICE_VML_HAIRLINE_WIDTH_PT
+        } else {
+          weight
+        },
+      );
+      let super::super::InlineShapeGeometry::Path { paths, preset, .. } = &frame.geometry else {
+        panic!("picture template path")
+      };
+      assert_eq!(*preset, Some(a::ShapeTypeValues::Rectangle));
+      let [
+        common::PathCommand::MoveTo(a),
+        _,
+        common::PathCommand::LineTo(c),
+        _,
+        common::PathCommand::Close,
+      ] = paths[0].commands.as_slice()
+      else {
+        panic!("four corner template")
+      };
+      assert!((a.x.0 - left).abs() < 0.01);
+      assert!((c.x.0 - 117.75 - right).abs() < 0.01);
+    }
+    for changes in [
+      vec![
+        ("position:absolute;", ""),
+        (";mso-position-horizontal:left", ""),
+      ],
+      vec![("stroked=\"t\"", "stroked=\"f\"")],
+      vec![(PICTURE_FRAME_PATH, "m0,0l0,21600,21600,21600,21600,0xe")],
+      vec![("prod @2 1 2", "prod @2 1 3")],
+      vec![(
+        "mso-position-horizontal:left",
+        "mso-position-horizontal:left;rotation:33",
+      )],
+      vec![(
+        "mso-position-horizontal:left",
+        "mso-position-horizontal:left;mso-width-percent:500",
+      )],
+    ] {
+      let image = frame_test_image(0.75, &changes);
+      assert_eq!(
+        [
+          image.effect_left_pt,
+          image.effect_top_pt,
+          image.effect_right_pt,
+          image.effect_bottom_pt
+        ],
+        [0.0; 4],
+        "{changes:?}"
+      );
+    }
+  }
 
   fn jpeg(unit: u8, horizontal: u16, vertical: u16) -> Vec<u8> {
     let mut bytes = Vec::new();
@@ -254,7 +525,45 @@ mod tests {
   }
 
   #[test]
-  fn vml_picture_inline_import_preserves_floating_and_unknown_density() {
+  fn vml_picture_png_default_density_matches_native_picf() {
+    // Word DOC readback for the same 264x300-pixel PNG, changing only pHYs.
+    // Both 85.5pt and 85.55pt authored widths realize the same PICF scale.
+    for density in [
+      None,
+      Some(png::PixelDimensions {
+        xppu: 5906,
+        yppu: 5906,
+        unit: png::Unit::Unspecified,
+      }),
+      Some(png::PixelDimensions {
+        xppu: 0,
+        yppu: 0,
+        unit: png::Unit::Meter,
+      }),
+    ] {
+      let data = png(264, 300, density);
+      assert_eq!(png_goal_twips(&data), Some((3960.0, 4500.0)));
+      for width in [85.5, 85.55] {
+        assert_eq!(
+          inline_bitmap_size(&data, width, 94.5).unwrap().layout_pt,
+          (85.55, 94.5)
+        );
+      }
+    }
+    let data = png(
+      264,
+      300,
+      Some(png::PixelDimensions {
+        xppu: 3780,
+        yppu: 3780,
+        unit: png::Unit::Meter,
+      }),
+    );
+    assert_eq!(png_goal_twips(&data), Some((3960.0, 4499.0)));
+  }
+
+  #[test]
+  fn vml_picture_png_import_preserves_floating_and_transformed_sizes() {
     use crate::docx::{ImageCatalog, package::ImageResource, v, vml_image_data};
     let mut catalog = ImageCatalog::default();
     for density in [
@@ -282,18 +591,19 @@ mod tests {
           if density.is_some() {
             (143.2, 127.2)
           } else {
-            (143.15, 127.25)
+            (143.05, 127.3)
           },
         ),
         ("position:absolute;", (143.15, 127.25)),
         ("rotation:90;", (143.15, 127.25)),
+        ("flip:x;", (143.15, 127.25)),
       ] {
         let style = format!("{prefix}width:143.15pt;height:127.25pt");
         let image = vml_image_data(&data, Some(&style), true, None, &catalog).unwrap();
         assert_eq!((image.width_pt, image.height_pt), expected);
       }
     }
-    assert!(
+    assert_eq!(
       png_goal_twips(&png(
         1,
         1,
@@ -302,8 +612,8 @@ mod tests {
           yppu: 5905,
           unit: png::Unit::Unspecified,
         })
-      ))
-      .is_none()
+      )),
+      Some((15.0, 15.0))
     );
   }
 

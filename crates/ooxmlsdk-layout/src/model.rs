@@ -36,6 +36,8 @@ pub struct BorderStyle {
 pub enum BorderCompoundPattern {
   #[default]
   Equal,
+  /// Explicit double rule, distinct from the generic compound fallback.
+  Double,
   ThinThickSmallGap,
   ThickThinSmallGap,
   ThinThickMediumGap,
@@ -55,12 +57,14 @@ pub enum BorderDashPattern {
   FineDashed,
   DashDot,
   DashDotDot,
+  /// Groups of five and one diagonal strokes, rather than a dash array.
+  DashDotStroked,
 }
 
 impl BorderDashPattern {
   pub(crate) fn common_dash(self, width_pt: f32) -> Option<Vec<common::Pt>> {
     let multipliers: &[f32] = match self {
-      Self::Solid => return None,
+      Self::Solid | Self::DashDotStroked => return None,
       Self::Dotted => &[1.0, 1.0],
       Self::Dashed => &[3.0, 1.0],
       // Word's fixed-format writer emits a 0.5 pt dashSmallGap border as a
@@ -136,6 +140,7 @@ pub(crate) struct WordprocessingFitText {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   pub embedded_fonts: Option<Arc<crate::fonts::EmbeddedFontSet>>,
+  pub english_hyphenation_dictionary: Option<Arc<crate::hyphenation::EnglishHyphenationDictionary>>,
   /// Effective Word run border. The outer option retains cascade presence;
   /// `Some(None)` explicitly clears an inherited border with `w:val="nil"`.
   pub word_run_border: Option<Option<BorderStyle>>,
@@ -308,6 +313,9 @@ pub struct TextStyle {
   /// This whitespace-only portion owns a source-qualified balanced blank.
   /// Trial shaping boundaries never infer this qualification.
   pub wordprocessingml_balanced_space_portion: bool,
+  /// Import-only OMML boundary for qualifying adjacent ordinary-text blanks.
+  /// This does not change font shaping or add space around a math zone.
+  pub(crate) wordprocessingml_math_run: bool,
   /// Physical font used to measure Word's balanced spaces, independently of
   /// the face that paints the source characters.
   pub wordprocessingml_balance_reference_font_family: Option<Arc<str>>,
@@ -352,15 +360,19 @@ pub struct TextStyle {
   /// advance before repeating a leader; persisted numeric results do not use
   /// that diagnostic boundary policy.
   pub(crate) wordprocessingml_generated_field_diagnostic: bool,
-  /// The INDEX field's empty-result diagnostic owns a distinct paragraph
-  /// top advance from ordinary cached field text.
-  pub(crate) wordprocessingml_index_field_diagnostic: bool,
   /// The run is displayed as part of a Word field result.
   ///
   /// This is layout context rather than authored character formatting.
   /// Writer's `SwTextGuess` excludes every field portion from hanging
   /// punctuation even when `w:overflowPunct` is otherwise enabled.
   pub(crate) wordprocessingml_field_group: bool,
+  /// WordprocessingML `w:noProof` excludes this run from automatic proofing,
+  /// including automatic hyphenation. Authored discretionary breaks remain.
+  pub(crate) wordprocessingml_no_proof: bool,
+  /// Editing-session ownership retained for Word's variable-font bitmap
+  /// portions. Equal identities can coalesce; changing any rsid field splits
+  /// the visible surface and its independently positioned semantic carrier.
+  pub(crate) wordprocessingml_bitmap_revisions: Option<Arc<[Option<u32>; 3]>>,
   /// Blank legacy FORMTEXT results reserve five digit-sized form cells in
   /// Word fixed output, even when their cached XML uses en-space characters.
   /// This is a field layout semantic, not ordinary U+2002 font shaping.
@@ -413,6 +425,7 @@ impl Default for TextStyle {
   fn default() -> Self {
     Self {
       embedded_fonts: None,
+      english_hyphenation_dictionary: None,
       word_run_border: None,
       wordprocessing_emphasis_mark: None,
       font_family: None,
@@ -493,6 +506,7 @@ impl Default for TextStyle {
       wordprocessingml_punctuation_spacing: false,
       wordprocessingml_balance_single_byte_double_byte_width: false,
       wordprocessingml_balanced_space_portion: false,
+      wordprocessingml_math_run: false,
       wordprocessingml_balance_reference_font_family: None,
       wordprocessingml_balance_reference_theme: None,
       pdf_glyph_outlines: false,
@@ -509,8 +523,9 @@ impl Default for TextStyle {
       drawingml_text_static3d: None,
       wordprocessingml_field_bold_override: None,
       wordprocessingml_generated_field_diagnostic: false,
-      wordprocessingml_index_field_diagnostic: false,
       wordprocessingml_field_group: false,
+      wordprocessingml_no_proof: false,
+      wordprocessingml_bitmap_revisions: None,
       wordprocessingml_form_text_blank_cell: false,
       wordprocessingml_mail_merge_placeholder: false,
       bold: false,
@@ -567,6 +582,13 @@ pub struct ImageCrop {
   pub bottom: f32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PageChapterNumbering {
+  /// One-based built-in heading level, from Word's w:pgNumType/@w:chapStyle.
+  pub heading_level: u8,
+  pub separator: char,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PageSetup {
   pub width_pt: f32,
@@ -601,10 +623,14 @@ pub struct PageSetup {
   /// ordinary body paragraphs.
   pub table_cell_doc_grid_line_pitch_pt: Option<f32>,
   pub doc_grid_character_spacing_pt: Option<f32>,
+  /// `snapToChars` centers a Latin block in whole character cells; this is
+  /// distinct from the extra character spacing of `linesAndChars`.
+  pub doc_grid_snap_to_chars: bool,
   pub adjust_table_line_heights_to_grid: bool,
   pub page_number_start: Option<i32>,
   /// Display format from WordprocessingML `w:pgNumType/@w:fmt`.
   pub page_number_format: FieldNumberFormat,
+  pub page_number_chapter: Option<PageChapterNumbering>,
 }
 
 impl Default for PageSetup {
@@ -636,9 +662,11 @@ impl Default for PageSetup {
       doc_grid_line_pitch_pt: None,
       table_cell_doc_grid_line_pitch_pt: None,
       doc_grid_character_spacing_pt: None,
+      doc_grid_snap_to_chars: false,
       adjust_table_line_heights_to_grid: false,
       page_number_start: None,
       page_number_format: FieldNumberFormat::Decimal,
+      page_number_chapter: None,
     }
   }
 }
@@ -961,6 +989,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     wordprocessingml_complex_numbering: style.wordprocessingml_complex_numbering,
     wordprocessingml_no_break_hyphen: style.wordprocessingml_no_break_hyphen,
+    wordprocessingml_bitmap_revisions: style.wordprocessingml_bitmap_revisions.clone(),
     wordprocessingml_han_fallback: style.wordprocessingml_han_fallback,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     wordprocessingml_no_leading: style.wordprocessingml_no_leading,

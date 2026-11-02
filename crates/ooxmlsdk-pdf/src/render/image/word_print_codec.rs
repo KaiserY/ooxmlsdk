@@ -135,7 +135,7 @@ fn bgr_sample(image: &RgbaImage) -> Option<Vec<u8>> {
   Some(sample)
 }
 
-fn estimated_lossless_size(image: &RgbaImage) -> Option<usize> {
+pub(super) fn estimated_lossless_size(image: &RgbaImage) -> Option<usize> {
   let sample = bgr_sample(image)?;
   let size = office_deflate_size::compressed_size_mem7(&sample);
   let raw_bytes = (image.width() as usize)

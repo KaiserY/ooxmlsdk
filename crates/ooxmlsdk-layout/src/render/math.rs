@@ -354,6 +354,13 @@ fn visit_run_characters(run: &m::Run, mut visit: impl FnMut(MathRunCharacter)) {
       for source in content.chars() {
         let rendered = if normal_text {
           source
+        } else if source == '-' {
+          // Word displays a mathematical minus in every math run, including
+          // m:lit and m:sty="p". Only m:nor retains the text hyphen. Resolve
+          // this before the inline/built-up split, while keeping the source
+          // scalar for font-slot selection. Literal affects math spacing,
+          // not this glyph substitution (native inline/script controls).
+          '\u{2212}'
         } else {
           math_variant_character(source, script, style).unwrap_or(source)
         };
@@ -631,6 +638,39 @@ mod tests {
       wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
       Some("rate")
     );
+  }
+
+  #[test]
+  fn office_math_minus_mapping_preserves_normal_text_and_source_characters() {
+    for (properties, expected) in [
+      ("", '−'),
+      (r#"<m:sty m:val="p"/>"#, '−'),
+      ("<m:lit/>", '−'),
+      (r#"<m:lit m:val="0"/>"#, '−'),
+      ("<m:nor/>", '-'),
+      (r#"<m:nor m:val="0"/>"#, '−'),
+    ] {
+      let xml = format!(
+        r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:rPr>{properties}</m:rPr><m:t>-−–</m:t></m:r></m:oMath></w:p>"#
+      );
+      let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+      let choice = &paragraph.paragraph_choice[0];
+      assert_eq!(
+        wordprocessing_math_text(choice).unwrap(),
+        format!("{expected}−–")
+      );
+      let w::ParagraphChoice::OfficeMath(math) = choice else {
+        panic!("expected OfficeMath");
+      };
+      let m::OfficeMathChoice::Run(run) = &math.office_math_choice[0] else {
+        panic!("expected math run");
+      };
+      let characters = math_run_characters(run);
+      assert_eq!(characters[0].source, '-');
+      assert_eq!(characters[0].rendered, expected);
+      assert_eq!(characters[1].rendered, '−');
+      assert_eq!(characters[2].rendered, '–');
+    }
   }
 
   #[test]

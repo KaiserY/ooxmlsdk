@@ -10,15 +10,57 @@ use std::sync::Arc;
 
 const POINTS_PER_PIXEL: f32 = 72.0 / 600.0;
 const IDEAL_UNITS_PER_POINT: f32 = 4096.0;
-use common::wordprocessing_device::{MAX_IDEAL_ADVANCE, balance_advances};
+use common::wordprocessing_device::{
+  MAX_IDEAL_ADVANCE, balance_advances, line_origin as realize_frame_origin,
+};
 
 #[derive(Default)]
 pub(super) struct NaturalMetricsCache {
   bytes: HashMap<FontFaceCacheKey, Arc<[u8]>>,
-  instances: HashMap<(FontFaceCacheKey, u16), Option<GdiNaturalMetrics>>,
+  instances: HashMap<(FontFaceCacheKey, u16), Option<NaturalFontMetrics>>,
   design_units: HashMap<FontFaceCacheKey, Option<u16>>,
+  top_offsets: HashMap<(FontFaceCacheKey, u16, bool), Option<i32>>,
 }
+enum NaturalFontMetrics {
+  Hinted(Box<GdiNaturalMetrics>),
+  // The head table promises that instructions do not change advances. Keep
+  // location-aware variation metrics without running a second interpreter.
+  LinearVariable(HashMap<u32, Option<i32>>),
+}
+
 impl NaturalMetricsCache {
+  fn top_offset(&mut self, face: &FontFaceData, size_pt: f32, ansi: bool) -> Option<i32> {
+    let pixels = (f64::from(size_pt) * 600.0 / 72.0).round();
+    if !pixels.is_finite() || !(1.0..=f64::from(u16::MAX)).contains(&pixels) {
+      return None;
+    }
+    let ppem = pixels as u16;
+    *self
+      .top_offsets
+      .entry((face.cache_key(), ppem, ansi))
+      .or_insert_with(|| {
+        let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).ok()?;
+        let units = font.head().ok()?.units_per_em();
+        if units == 0 {
+          return None;
+        }
+        // VDMX owns actual GDI ascent at this printer em. Falling back to
+        // independently rounded Win metrics matches GetTextMetrics when the
+        // exact device record is absent. Synthetic bold retains these metrics.
+        let hinted = font.table_data(skrifa::Tag::new(b"VDMX")).and_then(|data| {
+          emfsdk::font::vdmx_vertical_device_metrics(data.as_bytes(), ppem, u8::from(!ansi))
+        });
+        let ascent = if let Some(metrics) = hinted {
+          metrics.ascent
+        } else {
+          (f64::from(font.os2().ok()?.us_win_ascent()) * pixels / f64::from(units)).round() as i32
+        };
+        // Native top-aligned font caches keep one device pixel above the
+        // logical anchor and (ascent-1) in their separate glyph displacement.
+        Some(ascent.saturating_sub(1))
+      })
+  }
+
   fn device_advance(
     &mut self,
     face: &FontFaceData,
@@ -51,9 +93,6 @@ impl NaturalMetricsCache {
       .or_insert_with(|| {
         let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).ok()?;
         font.glyf().ok()?;
-        if font.fvar().is_ok() {
-          return None;
-        }
         let units = font.head().ok()?.units_per_em();
         (units != 0).then_some(units)
       });
@@ -108,12 +147,37 @@ impl NaturalMetricsCache {
       .bytes
       .entry(key.clone())
       .or_insert_with(|| Arc::from(face.data.as_slice()));
-    let advance = self
+    let instance = self
       .instances
       .entry((key, pixels as u16))
-      .or_insert_with(|| GdiNaturalMetrics::new(data.clone(), face.index, pixels as u16))
-      .as_mut()?
-      .glyph_advance_px(measured_glyph)?;
+      .or_insert_with(|| {
+        let font = skrifa::FontRef::from_index(data, face.index).ok()?;
+        if font.fvar().is_ok()
+          && !font
+            .head()
+            .ok()?
+            .flags()
+            .contains(skrifa::raw::tables::head::Flags::INSTRUCTIONS_MAY_ALTER_ADVANCE_WIDTH)
+        {
+          Some(NaturalFontMetrics::LinearVariable(HashMap::default()))
+        } else {
+          GdiNaturalMetrics::new(data.clone(), face.index, pixels as u16)
+            .map(|metrics| NaturalFontMetrics::Hinted(Box::new(metrics)))
+        }
+      })
+      .as_mut()?;
+    let advance = match instance {
+      NaturalFontMetrics::Hinted(metrics) => metrics.glyph_advance_px(measured_glyph)?,
+      NaturalFontMetrics::LinearVariable(advances) => {
+        (*advances.entry(measured_glyph).or_insert_with(|| {
+          let font = skrifa::FontRef::from_index(data, face.index).ok()?;
+          font
+            .glyph_metrics(skrifa::instance::Size::new(pixels), face.location())
+            .advance_width(skrifa::GlyphId::new(measured_glyph))
+            .map(|advance| advance.round() as i32)
+        }))?
+      }
+    };
     // Divide the already realized dash width, independently of ideal layout.
     // For example, a 12pt MS Mincho dash is50px; U+2006 is(50+3)/6=8px.
     Some((advance + i32::from(divisor / 2)) / i32::from(divisor))
@@ -138,6 +202,21 @@ enum LineOwner {
 struct LineKey {
   owner: LineOwner,
   clip: Option<[u32; 4]>,
+  variable_numbering: bool,
+}
+
+fn variable_numbering(text: &PaintText<'_>) -> bool {
+  text.item.pdf_text_segmentation == common::PdfTextSegmentation::Line
+    && !text.portions.is_empty()
+    && text.portions.iter().all(|portion| {
+      portion.glyphs.as_ref().is_some_and(|runs| {
+        !runs.is_empty()
+          && runs.iter().all(|run| {
+            skrifa::FontRef::from_index(run.font_face.data.as_slice(), run.font_face.index)
+              .is_ok_and(|font| font.fvar().is_ok())
+          })
+      })
+    })
 }
 
 fn collect_text<'a, 'doc>(
@@ -180,7 +259,11 @@ fn collect_text<'a, 'doc>(
               ]
             });
           lines
-            .entry(LineKey { owner, clip })
+            .entry(LineKey {
+              owner,
+              clip,
+              variable_numbering: variable_numbering(text),
+            })
             .or_default()
             .push(out.len());
         }
@@ -213,54 +296,124 @@ pub(super) fn realize(items: &mut [PaintItem<'_>], cache: &mut NaturalMetricsCac
   // horizontal segmentation. Number portions use Line rather than WordLine;
   // they must not disable native baseline realization for the whole line.
   for (transformed, text) in &mut texts {
-    realize_text_baseline(text, *transformed);
+    realize_text_baseline(text, *transformed, cache);
   }
+  // Word sends the number label and the body as separate Line Services batches.
+  // A variable-font label must not disable the body's device realization.
   for (key, indices) in &mut lines {
     indices.sort_by(|&a, &b| texts[a].1.item.x_pt.total_cmp(&texts[b].1.item.x_pt));
+    if indices
+      .iter()
+      .any(|&i| texts[i].1.item.style.wordprocessing_tab_leader.is_some())
+    {
+      realize_tab_line(&mut texts, indices, cache, key.variable_numbering);
+      continue;
+    }
     // A shared baseline/clip is only a candidate for a detached line. Cells
     // inside the same flattened story can have real gaps or overlap. Confirm
     // uninterrupted logical advances before moving any of their origins.
     // Explicit frame owners retain their independent origin realization even
     // when custom spacing prevents natural-width balancing.
     let measured = if matches!(key.owner, LineOwner::Detached { .. }) {
-      let Some(advances) = measure_line(&texts, indices, cache) else {
+      let Some(advances) = measure_line(&texts, indices, cache, key.variable_numbering) else {
         continue;
       };
       Some(advances)
     } else {
       None
     };
-    let Some(anchor) = realize_line_origin(&mut texts, indices) else {
+    let Some(anchor) = realize_line_origin(&mut texts, indices, key.variable_numbering) else {
       continue;
     };
-    let Some(advances) = measured.or_else(|| measure_line(&texts, indices, cache)) else {
+    let Some(advances) =
+      measured.or_else(|| measure_line(&texts, indices, cache, key.variable_numbering))
+    else {
       continue;
     };
-    let advances = balance_advances(&advances);
-    let mut advances = advances.into_iter();
-    let mut device_x = 0;
-    for &index in indices.iter() {
-      let text = &mut texts[index].1;
-      let start = device_x;
-      for portion in &mut text.portions {
-        portion.x_pt = anchor + device_x as f32 * POINTS_PER_PIXEL;
-        let portion_start = device_x;
-        for run in portion.glyphs.as_mut().expect("measured glyphs") {
-          run.x_offset_pt = (device_x - portion_start) as f32 * POINTS_PER_PIXEL;
-          for glyph in &mut run.glyphs {
-            let advance = advances.next().expect("measured glyph count");
-            glyph.x_advance = advance as f32 * POINTS_PER_PIXEL / run.font_size_pt;
-            device_x += advance;
-          }
-        }
-        portion.width_pt = (device_x - portion_start) as f32 * POINTS_PER_PIXEL;
-      }
-      text.width_pt = (device_x - start) as f32 * POINTS_PER_PIXEL;
-    }
+    apply_line_advances(&mut texts, indices, anchor, &advances);
   }
 }
 
-fn realize_text_baseline(text: &mut PaintText<'_>, transformed: bool) {
+/// Native tab portions separate otherwise contiguous Line Services batches.
+/// An explicit leader must not disable the adjacent ordinary text's cells.
+fn realize_tab_line(
+  texts: &mut [(bool, &mut PaintText<'_>)],
+  indices: &[usize],
+  cache: &mut NaturalMetricsCache,
+  variable_numbering: bool,
+) {
+  let mut span = Vec::new();
+  let mut values = Vec::new();
+  let mut expected = None;
+  for &index in indices {
+    let measured = measure_line(
+      texts,
+      std::slice::from_ref(&index),
+      cache,
+      variable_numbering,
+    );
+    let x = texts[index].1.item.x_pt;
+    let contiguous = expected.is_none_or(|end: f32| {
+      (x - end).abs() <= f32::EPSILON * (values.len() + 8) as f32 * x.abs().max(end.abs()).max(1.0)
+    });
+    if measured.is_none() || !contiguous {
+      if let Some(anchor) = realize_line_origin(texts, &span, variable_numbering) {
+        apply_line_advances(texts, &span, anchor, &values);
+      }
+      span.clear();
+      values.clear();
+      expected = None;
+    }
+    if let Some(measured) = measured {
+      let width = measured
+        .iter()
+        .map(|&(ideal, _)| f64::from(ideal))
+        .sum::<f64>()
+        / 4096.0;
+      expected = Some(x + width as f32);
+      span.push(index);
+      values.extend(measured);
+    }
+  }
+  if let Some(anchor) = realize_line_origin(texts, &span, variable_numbering) {
+    apply_line_advances(texts, &span, anchor, &values);
+  }
+}
+
+fn apply_line_advances(
+  texts: &mut [(bool, &mut PaintText<'_>)],
+  indices: &[usize],
+  anchor: f32,
+  advances: &[(i32, i32)],
+) {
+  let advances = balance_advances(advances);
+  let mut advances = advances.into_iter();
+  let mut device_x = 0;
+  for &index in indices.iter() {
+    let text = &mut texts[index].1;
+    let start = device_x;
+    for portion in &mut text.portions {
+      portion.x_pt = anchor + device_x as f32 * POINTS_PER_PIXEL;
+      let portion_start = device_x;
+      for run in portion.glyphs.as_mut().expect("measured glyphs") {
+        run.x_offset_pt = (device_x - portion_start) as f32 * POINTS_PER_PIXEL;
+        for glyph in &mut run.glyphs {
+          let advance = advances.next().expect("measured glyph count");
+          glyph.x_advance = advance as f32 * POINTS_PER_PIXEL / run.font_size_pt;
+          device_x += advance;
+        }
+      }
+      portion.width_pt = (device_x - portion_start) as f32 * POINTS_PER_PIXEL;
+    }
+    text.width_pt = (device_x - start) as f32 * POINTS_PER_PIXEL;
+  }
+}
+
+fn realize_text_baseline(
+  text: &mut PaintText<'_>,
+  transformed: bool,
+  cache: &mut NaturalMetricsCache,
+) {
   let style = &text.item.style;
   if transformed
     || text.item.paragraph_bidi
@@ -268,7 +421,10 @@ fn realize_text_baseline(text: &mut PaintText<'_>, transformed: bool) {
     || style.semantic_only
     || style.horizontal_scale.unwrap_or(1.0) != 1.0
     || style.pdf_glyph_outline_options.is_some()
-    || style.semantic_character_advances_pt.is_some()
+    // Native tab leaders carry explicit horizontal advances, but still
+    // share the completed Word line's baseline (including blank-only lines).
+    || (style.semantic_character_advances_pt.is_some()
+      && style.wordprocessing_tab_leader.is_none())
   {
     return;
   }
@@ -279,19 +435,67 @@ fn realize_text_baseline(text: &mut PaintText<'_>, transformed: bool) {
   else {
     return;
   };
-  let delta = baseline - style.baseline_shift_pt - text.baseline_y;
+  let top_aligned = style.line_vertical_alignment == common::LineVerticalAlignment::Top;
+  let (offset, shift) = if top_aligned {
+    use ooxmlsdk_fonts::FontCharset;
+    let ansi = matches!(
+      style.font_charset,
+      None | Some(FontCharset::Ansi | FontCharset::Other(0 | 1))
+    );
+    let mut offset = None;
+    for run in text
+      .portions
+      .iter()
+      .filter_map(|portion| portion.glyphs.as_ref())
+      .flatten()
+    {
+      let Some(value) = cache.top_offset(&run.font_face, run.font_size_pt, ansi) else {
+        return;
+      };
+      offset = Some(offset.map_or(value, |current: i32| current.max(value)));
+    }
+    let Some(offset) = offset else { return };
+    (
+      offset as f32 * POINTS_PER_PIXEL,
+      common::wordprocessing_device::source_coordinate(style.baseline_shift_pt) as f32
+        * POINTS_PER_PIXEL,
+    )
+  } else {
+    (0.0, style.baseline_shift_pt)
+  };
+  let delta = baseline + offset - shift - text.baseline_y;
   text.baseline_y += delta;
   for portion in &mut text.portions {
     portion.baseline_y += delta;
+    if top_aligned {
+      if let Some(highlight) = &mut portion.highlight {
+        highlight.y_pt += delta;
+      }
+      for line in [&mut portion.underline, &mut portion.strikethrough]
+        .into_iter()
+        .flatten()
+      {
+        line.y1_pt += delta;
+        line.y2_pt += delta;
+      }
+      if let Some(link) = &mut portion.link {
+        link.y_pt += delta;
+      }
+    }
   }
 }
 
-fn realize_line_origin(texts: &mut [(bool, &mut PaintText<'_>)], indices: &[usize]) -> Option<f32> {
+fn realize_line_origin(
+  texts: &mut [(bool, &mut PaintText<'_>)],
+  indices: &[usize],
+  variable_numbering: bool,
+) -> Option<f32> {
   for &index in indices {
     let (transformed, text) = &texts[index];
     let style = &text.item.style;
     if *transformed
-      || text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
+      || (text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
+        && !variable_numbering)
       || text.item.paragraph_bidi
       || style.rotation_deg != 0.0
       || style.semantic_only
@@ -322,30 +526,12 @@ fn realize_line_origin(texts: &mut [(bool, &mut PaintText<'_>)], indices: &[usiz
   Some(anchor)
 }
 
-fn realize_frame_origin(
-  source: f32,
-  frame_offset: f64,
-  alignment: Option<common::WordprocessingLineAlignment>,
-) -> f32 {
-  // Actual WWLIB line/convert/draw readbacks distinguish the frame's integral
-  // 1/4096pt point from the paragraph-local printer offset. For example,
-  // 56.7pt + 4.25pt prints at 472 + 35 dots, not round(60.95pt / .12).
-  let device = common::wordprocessing_device::source_coordinate_precise;
-  let frame = f64::from(source) + frame_offset;
-  let (local, alignment_offset) = alignment.map_or((-frame_offset, 0), |alignment| {
-    (
-      -frame_offset - alignment.logical_offset_pt,
-      alignment.device_offset_px,
-    )
-  });
-  ((device(frame) + device(local) + i64::from(alignment_offset)) as f64 * 72.0 / 600.0) as f32
-}
-
 /// Each pair is (ideal advance in 1/4096pt, natural device advance in pixels).
 fn measure_line(
   texts: &[(bool, &mut PaintText<'_>)],
   indices: &[usize],
   cache: &mut NaturalMetricsCache,
+  variable_numbering: bool,
 ) -> Option<Vec<(i32, i32)>> {
   let mut values = Vec::new();
   let mut expected_x = texts[*indices.first()?].1.item.x_pt;
@@ -356,13 +542,19 @@ fn measure_line(
     let style = &text.item.style;
     let adjustments = style.wordprocessing_justification_expansion_pt.as_deref();
     if *transformed
-      || text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
+      || (text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
+        && !variable_numbering)
       || text.item.paragraph_bidi
+      || style.wordprocessing_kashida.is_some()
       || style.rotation_deg != 0.0
       || style.semantic_only
       || style.horizontal_scale.unwrap_or(1.0) != 1.0
-      || style.character_spacing_pt != 0.0
-      || text.item.word_spacing_pt != 0.0
+      || !style.character_spacing_pt.is_finite()
+      || (style.character_spacing_pt != 0.0
+        && style.wordprocessing_legacy_font_measurement != Some(false))
+      || !text.item.word_spacing_pt.is_finite()
+      || (text.item.word_spacing_pt != 0.0
+        && (style.character_spacing_pt == 0.0 || text.item.word_spacing_pt < 0.0))
       || style.pdf_glyph_outline_options.is_some()
       || style.semantic_character_advances_pt.is_some()
       || ooxmlsdk_layout::fonts::wordprocessingml_punctuation_affects_advances(
@@ -378,6 +570,10 @@ fn measure_line(
     if (text.item.x_pt - expected_x).abs() > error {
       return None;
     }
+    let tracking_pixels = i32::try_from(common::wordprocessing_device::source_coordinate(
+      style.character_spacing_pt,
+    ))
+    .ok()?;
     let logical_size = style
       .layout_font_sizes
       .map_or(style.font_size_pt, |sizes| sizes.primary.0);
@@ -422,9 +618,17 @@ fn measure_line(
             values[starts.binary_search(&glyph.text_range.start).ok()?]
           } else {
             0.0
+          } + if cluster == " " {
+            // Ordinary positive word expansion shares the source adjustment
+            // owner below. Keep it separate from both the font's positioned
+            // design advance and authored character pitch.
+            text.item.word_spacing_pt
+          } else {
+            0.0
           };
+          let logical_spacing = adjustments.is_some() || style.character_spacing_pt != 0.0;
           let ideal_pt = glyph.x_advance
-            * if adjustments.is_some() {
+            * if logical_spacing {
               run.font_size_pt
             } else {
               logical_size
@@ -434,11 +638,11 @@ fn measure_line(
             return None;
           }
           let kerning_advance_em = style.kerning_enabled().then(|| {
-            if adjustments.is_some() {
+            if logical_spacing {
               // A completed-line correction is normalized by the PDF em.
               // Recover its unadjusted logical design advance; the existing
               // independent device correction below still owns compression.
-              (ideal_pt - adjustment) / logical_size
+              (ideal_pt - adjustment - style.character_spacing_pt) / logical_size
             } else {
               glyph.x_advance
             }
@@ -450,6 +654,11 @@ fn measure_line(
             cluster,
             kerning_advance_em,
           )?;
+          // Word adds authored tracking after realizing the natural font.
+          // Native +/-2-twip controls retain +/-410 ideal units but +/-1
+          // printer dot. Neither the logical em nor the font's rounding owns
+          // this independent source-device contribution.
+          natural = natural.checked_add(tracking_pixels)?;
           if adjustment != 0.0 {
             // Line Services compresses the realized trailing bearing before
             // balancing ideal/device widths; the quarter-em comma keeps its
@@ -462,7 +671,7 @@ fn measure_line(
               // A4.11987pt gap adds34dots to a10.56pt font, not35.
               adjustment
             };
-            natural += (device_adjustment / POINTS_PER_PIXEL).round() as i32;
+            natural = natural.checked_add((device_adjustment / POINTS_PER_PIXEL).round() as i32)?;
           }
           if natural < 0 {
             return None;
@@ -481,6 +690,86 @@ fn measure_line(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn top_aligned_font_offsets_match_native_printer_metrics() {
+    let mut cache = NaturalMetricsCache::default();
+    // Actual Word 600-DPI cache glyph offsets, regular/bold, 11/25pt.
+    // Nyala synthesizes bold; Arial has different regular/bold VDMX records.
+    for (family, bold, expected) in [
+      ("Nyala", false, [81, 185]),
+      ("Nyala", true, [81, 185]),
+      ("Arial", false, [82, 185]),
+      ("Arial", true, [85, 192]),
+      ("Calibri", false, [87, 197]),
+      ("Calibri", true, [87, 197]),
+    ] {
+      let style = super::super::TextStyle {
+        font_family: Some(family.into()),
+        bold,
+        ..Default::default()
+      };
+      let face = ooxmlsdk_layout::fonts::load_text_face(&style).expect("native control font");
+      for (size, expected) in [11.0, 25.0].into_iter().zip(expected) {
+        assert_eq!(
+          cache.top_offset(&face, size, true),
+          Some(expected),
+          "{family} {bold} {size}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn variable_font_metrics_match_native_line_service_inputs() {
+    let style = super::super::TextStyle {
+      font_family: Some("Bahnschrift Light".into()),
+      font_size_pt: 11.04,
+      ..Default::default()
+    };
+    let Some(face) =
+      ooxmlsdk_layout::fonts::load_text_face(&style).filter(|face| face.named_instance.is_some())
+    else {
+      return;
+    };
+    let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).unwrap();
+    let mut cache = NaturalMetricsCache::default();
+    // Actual MSLS input, before line-wide balancing; GPOS f/r widths differ
+    // from their unpositioned GDI character cells.
+    let text = "Default style has roman ";
+    let ideal = [
+      29568, 24156, 13398, 23980, 25058, 13046, 14696, 12100, 23364, 14696, 21758, 13046, 24156,
+      12100, 25168, 23980, 23364, 12100, 18788, 24552, 38588, 23980, 25168, 12100,
+    ];
+    let native = [
+      60, 49, 27, 49, 51, 27, 30, 25, 48, 30, 44, 27, 49, 25, 51, 49, 48, 25, 38, 50, 79, 49, 51,
+      25,
+    ];
+    for (i, ch) in text.chars().enumerate() {
+      let glyph = font.charmap().map(ch).unwrap().to_u32();
+      assert_eq!(
+        cache.device_advance(
+          &face,
+          11.04,
+          glyph,
+          &ch.to_string(),
+          Some(ideal[i] as f32 / (11.0 * IDEAL_UNITS_PER_POINT)),
+        ),
+        Some(native[i]),
+        "{i}: {ch}",
+      );
+    }
+    // Native GGO metrics: head bit4 is clear. J distinguishes linear advance
+    // rounding from a hinted-outline API that reports 47 for this font.
+    for (ch, width) in [('i', 23), ('x', 48), ('J', 46), ('f', 29)] {
+      let glyph = font.charmap().map(ch).unwrap().to_u32();
+      assert_eq!(
+        cache.advance(&face, 11.04, glyph, &ch.to_string()),
+        Some(width),
+      );
+    }
+  }
+
   #[test]
   fn native_fractional_spaces_divide_the_realized_dash() {
     let mut cache = NaturalMetricsCache::default();

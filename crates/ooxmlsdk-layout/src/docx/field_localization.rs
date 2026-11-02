@@ -91,6 +91,12 @@ pub(super) fn localized_field_message(
       ("ja", FieldMessage::UndefinedBookmark) => Some("エラー! ブックマークが定義されていません。"),
       ("ja", FieldMessage::ReferenceSourceNotFound) => Some("エラー! 参照元が見つかりません。"),
       ("ja", FieldMessage::EmptyTableOfContents) => Some("目次項目が見つかりません。"),
+      ("es", FieldMessage::EmptyTableOfContents) => {
+        // Replacing a populated, stale page-reference cache uses this
+        // sentence-case error resource, independently of the uppercase
+        // clean-empty print reconstruction below.
+        Some("No se encontraron entradas de tabla de contenido.")
+      }
       ("ja", FieldMessage::UnknownDocumentProperty) => {
         Some("エラー! プロパティ名に誤りがあります。")
       }
@@ -152,6 +158,15 @@ pub(super) fn localized_field_message(
         "Fehler! Verwenden Sie die Registerkarte 'Start', um {style_name} dem Text zuzuweisen, der hier angezeigt werden soll."
       )
     }
+    FieldMessage::MissingStyle(style_name)
+      if ui_language
+        .and_then(crate::localization::canonical_locale)
+        .is_some_and(|locale| locale.id.language.as_str() == "es") =>
+    {
+      format!(
+        "¡Error! Usa la pestaña Inicio para aplicar {style_name} al texto que quieres que aparezca aquí."
+      )
+    }
     FieldMessage::MissingStyle(style_name) => strings.field_missing_style(style_name),
     FieldMessage::EmptyTableOfContents => {
       if strings.resource_locale() == OfficeResourceLocale::TraditionalChinese {
@@ -179,6 +194,33 @@ pub(super) fn localized_field_message(
   }
 }
 
+pub(super) fn localized_empty_table_of_figures_message(
+  ui_language: Option<&str>,
+) -> Option<&'static str> {
+  let locale = ui_language.and_then(crate::localization::canonical_locale);
+  let language = locale
+    .as_ref()
+    .map(|locale| locale.id.language.as_str())
+    .unwrap_or("en");
+  // Word classifies TOC \a/\c as TablesOfFigures, independently of the
+  // caption identifier or paragraph style (ECMA-376 §17.16.5.68). Paired
+  // native print controls establish a separate no-entry resource. Preserve
+  // the existing result path for UI resources not yet observed.
+  match language {
+    "en" => Some("No table of figures entries found."),
+    "de" => Some("Es konnten keine Einträge für ein Abbildungsverzeichnis gefunden werden."),
+    "es" => Some("No se encuentran elementos de tabla de ilustraciones."),
+    "ja" => Some("図表目次項目が見つかりません。"),
+    "ko" => Some("그림 목차 항목을 찾을 수 없습니다."),
+    "zh" => match OfficeStringCatalog::for_ui_language(ui_language).resource_locale() {
+      OfficeResourceLocale::SimplifiedChinese => Some("未找到图形项目表。"),
+      OfficeResourceLocale::TraditionalChinese => Some("找不到圖表目錄。"),
+      _ => None,
+    },
+    _ => None,
+  }
+}
+
 pub(super) fn localized_clean_empty_toc_message(ui_language: Option<&str>) -> String {
   // A clean TOC with no cached result and no eligible entries is surfaced by
   // Word as ordinary result text. Its en-US resource keeps sentence case,
@@ -190,6 +232,9 @@ pub(super) fn localized_clean_empty_toc_message(ui_language: Option<&str>) -> St
   if let Some(locale) = ui_language.and_then(crate::localization::canonical_locale) {
     match locale.id.language.as_str() {
       "de" => return "Es wurden keine Einträge für das Inhaltsverzeichnis gefunden.".to_string(),
+      // Native es-MX print controls retain the resource's uppercase text
+      // independently of run caps, dirty state and absent/blank caches.
+      "es" => return "NO SE ENCONTRARON ENTRADAS DE TABLA DE CONTENIDO.".to_string(),
       "ko" => return "목차 항목을 찾을 수 없습니다.".to_string(),
       _ => {}
     }
@@ -289,13 +334,27 @@ pub(super) struct NativeBuiltinStyleRef {
   pub heading_level: Option<u8>,
 }
 
+pub(super) fn canonical_builtin_heading_level(
+  canonical_name: &str,
+  style_type: Option<super::w::StyleValues>,
+) -> Option<u8> {
+  if style_type != Some(super::w::StyleValues::Paragraph) {
+    return None;
+  }
+  let (name, level) = canonical_name.rsplit_once(' ')?;
+  if !name.eq_ignore_ascii_case("heading") || !matches!(level.as_bytes(), [b'1'..=b'9']) {
+    return None;
+  }
+  Some(level.as_bytes()[0] - b'0')
+}
+
 pub(super) fn native_builtin_style_ref_name(
   canonical_name: &str,
   style_type: Option<super::w::StyleValues>,
   ui_language: Option<&str>,
 ) -> Option<NativeBuiltinStyleRef> {
   // The styles part stores canonical names, while Word's printed STYLEREF
-  // uses Style.NameLocal. Native en/de controls distinguish the display name
+  // uses Style.NameLocal. Native en/de/zh controls distinguish the display name
   // (including its spaces) from XML ids and from foreign-UI builtin names.
   const NAMES: [(&str, &str, Option<u8>); 11] = [
     ("heading 1", "Überschrift 1", Some(1)),
@@ -325,6 +384,22 @@ pub(super) fn native_builtin_style_ref_name(
   let name = match locale.id.language.as_str() {
     "de" => *german,
     "en" => *english,
+    "zh" => {
+      const SIMPLIFIED: [&str; 9] = [
+        "标题 1", "标题 2", "标题 3", "标题 4", "标题 5", "标题 6", "标题 7", "标题 8", "标题 9",
+      ];
+      const TRADITIONAL: [&str; 9] = [
+        "標題 1", "標題 2", "標題 3", "標題 4", "標題 5", "標題 6", "標題 7", "標題 8", "標題 9",
+      ];
+      let level = usize::from((*heading_level)?);
+      if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
+        == OfficeResourceLocale::TraditionalChinese
+      {
+        TRADITIONAL[level - 1]
+      } else {
+        SIMPLIFIED[level - 1]
+      }
+    }
     _ => return None,
   };
   Some(NativeBuiltinStyleRef {
@@ -392,6 +467,27 @@ pub(super) fn apply_generated_field_message_style(
   message: FieldMessage<'_>,
   ui_language: Option<&str>,
 ) {
+  apply_generated_field_message_style_with_owner(style, message, ui_language, false);
+}
+
+pub(super) fn apply_reference_separator_message_style(
+  style: &mut TextStyle,
+  ui_language: Option<&str>,
+) {
+  apply_generated_field_message_style_with_owner(
+    style,
+    FieldMessage::ReferenceSourceNotFound,
+    ui_language,
+    true,
+  );
+}
+
+fn apply_generated_field_message_style_with_owner(
+  style: &mut TextStyle,
+  message: FieldMessage<'_>,
+  ui_language: Option<&str>,
+  reference_separator: bool,
+) {
   style.wordprocessingml_generated_field_diagnostic = matches!(
     message,
     FieldMessage::UndefinedBookmark
@@ -437,7 +533,10 @@ pub(super) fn apply_generated_field_message_style(
     // Word's generated bookmark diagnostics use a bold application-resource
     // run in every UI locale. An authored field-level w:b=false remains an
     // explicit opt-out.
-    let bold = style.wordprocessingml_field_bold_override != Some(false);
+    // A rebuilt inline REF takes character metrics from its separator, but
+    // the generated diagnostic owns bold. Native code/separator/cache and
+    // literal/theme-font controls distinguish this from cached story errors.
+    let bold = reference_separator || style.wordprocessingml_field_bold_override != Some(false);
     style.bold = bold;
     style.complex_bold = Some(bold);
   }
@@ -451,7 +550,7 @@ pub(super) fn apply_generated_field_message_style(
       | FieldMessage::EmptyTableOfContents
   ) && apply_japanese_diagnostic_font_slots(style, ui_language)
   {
-    if matches!(message, FieldMessage::ReferenceSourceNotFound) {
+    if !reference_separator && matches!(message, FieldMessage::ReferenceSourceNotFound) {
       // The missing-REF resource uses Arial for its ASCII exclamation mark
       // (tdf171299_tableInField.docx). The undefined-bookmark resource keeps
       // the field's Latin face (Calibri in fdo78910.docx).
@@ -575,12 +674,24 @@ pub(super) fn apply_traditional_chinese_diagnostic_font_slots(
   {
     return false;
   }
-  // Word's bookmark and empty-TOC UI resources bind Han text to PMingLiU,
-  // including when the source explicitly requests a different East Asian
-  // face. Keep the authored Latin slots, size and resource-route bold state.
+  apply_chinese_diagnostic_font_slots(style, ui_language)
+}
+
+pub(super) fn apply_chinese_diagnostic_font_slots(
+  style: &mut TextStyle,
+  ui_language: Option<&str>,
+) -> bool {
+  let family = match OfficeStringCatalog::for_ui_language(ui_language).resource_locale() {
+    OfficeResourceLocale::SimplifiedChinese => "SimSun",
+    OfficeResourceLocale::TraditionalChinese => "PMingLiU",
+    OfficeResourceLocale::English => return false,
+  };
+  // Chinese application diagnostics bind Han text to the UI resource face,
+  // including when the source requests another East Asian face or language.
+  // Keep the authored Latin slots, size and resource-route bold state.
   style.wordprocessingml_font_slots = true;
   style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
-  style.east_asia_font_family = Some(Arc::<str>::from("PMingLiU"));
+  style.east_asia_font_family = Some(Arc::<str>::from(family));
   style.east_asia_language = ui_language
     .and_then(crate::localization::canonical_locale)
     .map(|language| Arc::<str>::from(language.to_string()));
@@ -758,6 +869,20 @@ mod tests {
   }
 
   #[test]
+  fn spanish_missing_style_resource_keeps_the_requested_name() {
+    for language in ["es-MX", "ES_mx", "es-ES"] {
+      for name in ["Überschrift 1", "Missing 7"] {
+        assert_eq!(
+          localized_field_message(FieldMessage::MissingStyle(name), Some(language)),
+          format!(
+            "¡Error! Usa la pestaña Inicio para aplicar {name} al texto que quieres que aparezca aquí."
+          )
+        );
+      }
+    }
+  }
+
+  #[test]
   fn french_missing_style_resource_keeps_the_requested_name() {
     for language in ["fr-CA", "FR_ca", "fr-FR", "fr_FR"] {
       for name in ["Überschrift 1", "Missing 7"] {
@@ -901,13 +1026,14 @@ mod tests {
   }
 
   #[test]
-  fn ordinary_empty_toc_uses_native_german_and_korean_print_resources() {
+  fn ordinary_empty_toc_uses_native_print_resources() {
     for (language, expected) in [
       (
         "de-DE",
         "Es wurden keine Einträge für das Inhaltsverzeichnis gefunden.",
       ),
       ("ko-KR", "목차 항목을 찾을 수 없습니다."),
+      ("es-MX", "NO SE ENCONTRARON ENTRADAS DE TABLA DE CONTENIDO."),
     ] {
       assert_eq!(localized_clean_empty_toc_message(Some(language)), expected);
     }
@@ -915,6 +1041,34 @@ mod tests {
     assert_eq!(
       localized_field_message(FieldMessage::EmptyTableOfContents, Some("ko-KR")),
       "No table of contents entries found."
+    );
+  }
+
+  #[test]
+  fn empty_table_of_figures_uses_its_own_native_ui_resources() {
+    for (language, expected) in [
+      ("en-US", "No table of figures entries found."),
+      (
+        "de-DE",
+        "Es konnten keine Einträge für ein Abbildungsverzeichnis gefunden werden.",
+      ),
+      (
+        "es-MX",
+        "No se encuentran elementos de tabla de ilustraciones.",
+      ),
+      ("ja-JP", "図表目次項目が見つかりません。"),
+      ("ko-KR", "그림 목차 항목을 찾을 수 없습니다."),
+      ("zh-CN", "未找到图形项目表。"),
+      ("zh-TW", "找不到圖表目錄。"),
+    ] {
+      assert_eq!(
+        localized_empty_table_of_figures_message(Some(language)),
+        Some(expected)
+      );
+    }
+    assert_eq!(
+      localized_empty_table_of_figures_message(Some("fr-FR")),
+      None
     );
   }
 

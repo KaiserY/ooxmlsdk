@@ -5,10 +5,8 @@ use std::sync::Arc;
 use icu_properties::{CodePointMapData, props::GeneralCategory};
 use rustc_hash::FxHashMap as HashMap;
 use skrifa::{
-  FontRef as SkrifaFontRef, MetadataProvider,
-  instance::{LocationRef as SkrifaLocationRef, Size as SkrifaSize},
-  raw::TableProvider as SkrifaTableProvider,
-  string::StringId as SkrifaStringId,
+  FontRef as SkrifaFontRef, MetadataProvider, instance::Size as SkrifaSize,
+  raw::TableProvider as SkrifaTableProvider, string::StringId as SkrifaStringId,
 };
 use smallvec::SmallVec;
 
@@ -257,6 +255,9 @@ pub(super) struct TextStyle<'doc> {
   wordprocessing_legacy_font_measurement: Option<bool>,
   pub(super) wordprocessing_tab_leader: Option<common::wordprocessing_device::TabLeader>,
   semantic_character_advances_pt: Option<Arc<[f32]>>,
+  // A generated metafile can stretch character origins independently of its
+  // vertical LOGFONT realization; this does not stretch the glyph outlines.
+  metafile_advance_scale: Option<f32>,
   pub(super) office_text_array: bool,
   shaping_context: Option<Arc<common::TextShapingContext>>,
   kashida_expansions: Option<Arc<[common::KashidaExpansion]>>,
@@ -271,6 +272,7 @@ pub(super) struct TextStyle<'doc> {
   wordprocessingml_font_slots: bool,
   wordprocessingml_complex_numbering: bool,
   wordprocessingml_no_break_hyphen: bool,
+  wordprocessingml_bitmap_revisions: Option<Arc<[Option<u32>; 3]>>,
   wordprocessingml_han_fallback: bool,
   wordprocessingml_cjk_line_metrics: bool,
   wordprocessing_emphasis: Option<common::WordprocessingEmphasis>,
@@ -1539,7 +1541,7 @@ fn font_face_diagnostics(face_data: &FontFaceData) -> PdfFontFaceDiagnostics {
       };
     }
   };
-  let metrics = face.metrics(SkrifaSize::new(1.0), SkrifaLocationRef::default());
+  let metrics = face.metrics(SkrifaSize::new(1.0), face_data.location());
   let units_per_em = metrics.units_per_em;
   let mut family_names = Vec::new();
   for name_id in [
@@ -1833,13 +1835,20 @@ impl<'doc> PaintDocument<'doc> {
         // Emphasis is authored text semantics, independent of image policy.
         // Consume final Word cells when available, then precede bitmap fallback.
         emphasis.realize(&mut items, text_metrics, &mut natural_metrics);
-        if word_fixed_output && options.bitmap_missing_fonts {
+        if word_fixed_output
+          && (options.bitmap_missing_fonts
+            || options
+              .standards
+              .iter()
+              .any(|standard| standard.is_archival()))
+        {
           font_bitmaps.realize(
             &mut items,
             options.optimize_for,
             page.setup.size.width.0,
             page.setup.size.height.0,
             text_metrics,
+            options.bitmap_missing_fonts,
           );
         }
         PaintPage {
@@ -1933,20 +1942,12 @@ fn expand_metafile_semantic_text_item<'doc>(
         .as_ref()
         .filter(|properties| properties.state == common::SignatureLineState::Unsigned)
       {
-        let preview_runs =
-          ooxmlsdk_layout::render::emf_wmf::extract_metafile_text_runs_with_options(
-            &image.data,
-            image.content_type.as_deref(),
-            true,
-            extraction_options,
-          );
         let items = word_unsigned_signature_line_items(
           image.x_pt,
           image.y_pt,
           image.width_pt,
           image.height_pt,
           signature_line,
-          &preview_runs,
           ui_language,
         );
         return PageItem::Group {
@@ -2261,30 +2262,32 @@ fn word_unsigned_signature_line_items<'doc>(
   width_pt: f32,
   height_pt: f32,
   properties: &common::SignatureLineProperties<'_>,
-  preview_runs: &[ooxmlsdk_layout::render::emf_wmf::MetafileTextRun],
   ui_language: Option<&str>,
 ) -> Vec<PageItem<'doc>> {
-  // Word does not replay the stored unsigned preview verbatim when producing
-  // fixed output. Office asks the host for a rendered-page EMF, and the
-  // signature provider API separately exposes generated signature-line
-  // images. The normalized positions below are the host-rendered 192 x 96 pt
-  // unsigned Office signature line: a white field, a 0.75 pt rule, a 12 pt X,
-  // and two 9 pt metadata rows. The values scale with the authored VML shape,
-  // rather than with the fallback EMF's pixel LOGFONT.
-  const REFERENCE_WIDTH_PT: f32 = 192.0;
-  const REFERENCE_HEIGHT_PT: f32 = 96.0;
-  const RULE_TOP_PT: f32 = 48.32;
-  const RULE_HEIGHT_PT: f32 = 0.75;
-  const X_OFFSET_PT: f32 = 7.10;
-  const X_BASELINE_PT: f32 = 45.70;
-  const X_FONT_SIZE_PT: f32 = 12.0;
-  const LABEL_OFFSET_PT: f32 = 13.85;
-  const SIGNER_BASELINE_PT: f32 = 61.42;
-  const TITLE_BASELINE_PT: f32 = 76.04;
-  const LABEL_FONT_SIZE_PT: f32 = 9.0;
-
-  let scale_x = width_pt / REFERENCE_WIDTH_PT;
-  let scale_y = height_pt / REFERENCE_HEIGHT_PT;
+  // Word regenerates the provider image instead of replaying its cached EMF.
+  // Native PDF and C# Range.EnhMetaFileBits controls retain a 512x256 logical
+  // canvas across independent shape axes and modified cached font faces/sizes.
+  // The UI font owns its integer GDI cell: Segoe UI(-21) has height30/ascent24;
+  // Microsoft YaHei UI(-24) has height31/ascent25. Metadata reserves three
+  // rows with eight-pixel gaps/padding, even when only two rows are painted.
+  // These are provider-grid measurements, not coordinates fitted to a page.
+  let label_font_family =
+    localized_metafile_ui_font_family(Some("Segoe UI".to_string()), ui_language, true);
+  let (label_em, label_height, label_ascent, label_left, x_left) =
+    if label_font_family.as_deref() == Some("Microsoft YaHei UI") {
+      (24.0, 31.0, 25.0, 37.0, 19.0)
+    } else {
+      (21.0, 30.0, 24.0, 35.0, 18.0)
+    };
+  let signer_top = 256.0 - 8.0 - 3.0 * label_height - 2.0 * 8.0;
+  let rule_top = signer_top - 10.0;
+  let scale_x = width_pt / 512.0;
+  let scale_y = height_pt / 256.0;
+  let advance_scale = if scale_y > f32::EPSILON {
+    scale_x / scale_y
+  } else {
+    1.0
+  };
   let mut items = Vec::with_capacity(5);
   items.push(PageItem::Rect(RectItem {
     x_pt,
@@ -2304,9 +2307,9 @@ fn word_unsigned_signature_line_items<'doc>(
   }));
   items.push(PageItem::Rect(RectItem {
     x_pt,
-    y_pt: y_pt + RULE_TOP_PT * scale_y,
+    y_pt: y_pt + rule_top * scale_y,
     width_pt,
-    height_pt: RULE_HEIGHT_PT * scale_y,
+    height_pt: 2.0 * scale_y,
     fill: Some(RectFill::Solid {
       color: RgbColor { r: 0, g: 0, b: 0 },
       opacity: 1.0,
@@ -2315,31 +2318,13 @@ fn word_unsigned_signature_line_items<'doc>(
     stroke_opacity: 1.0,
   }));
 
-  let x_preview = preview_runs
-    .iter()
-    .find(|run| run.text.trim().eq_ignore_ascii_case("x"))
-    .or_else(|| preview_runs.first());
-  let label_preview = preview_runs
-    .iter()
-    .find(|run| !run.text.trim().eq_ignore_ascii_case("x"));
-  let x_font_family = x_preview
-    .and_then(|run| run.font_family.clone())
-    .or_else(|| Some("Arial".to_string()));
-  let label_font_family = localized_metafile_ui_font_family(
-    label_preview
-      .and_then(|run| run.font_family.clone())
-      .or_else(|| Some("Segoe UI".to_string())),
-    ui_language,
-    true,
-  );
   items.push(word_signature_line_text_item(
-    x_pt + X_OFFSET_PT * scale_x,
-    y_pt + X_BASELINE_PT * scale_y,
-    X_FONT_SIZE_PT * scale_y,
+    x_pt + x_left * scale_x,
+    y_pt + (rule_top - 7.0) * scale_y,
+    32.0 * scale_y,
     "X".to_string(),
-    x_font_family,
-    x_preview.is_some_and(|run| run.bold),
-    x_preview.is_some_and(|run| run.italic),
+    Some("Arial".to_string()),
+    advance_scale,
   ));
   if let Some(signer) = properties
     .suggested_signer
@@ -2347,13 +2332,12 @@ fn word_unsigned_signature_line_items<'doc>(
     .filter(|value| !value.is_empty())
   {
     items.push(word_signature_line_text_item(
-      x_pt + LABEL_OFFSET_PT * scale_x,
-      y_pt + SIGNER_BASELINE_PT * scale_y,
-      LABEL_FONT_SIZE_PT * scale_y,
+      x_pt + label_left * scale_x,
+      y_pt + (signer_top + label_ascent) * scale_y,
+      label_em * scale_y,
       signer.to_string(),
       label_font_family.clone(),
-      label_preview.is_some_and(|run| run.bold),
-      label_preview.is_some_and(|run| run.italic),
+      advance_scale,
     ));
   }
   if let Some(title) = properties
@@ -2362,13 +2346,12 @@ fn word_unsigned_signature_line_items<'doc>(
     .filter(|value| !value.is_empty())
   {
     items.push(word_signature_line_text_item(
-      x_pt + LABEL_OFFSET_PT * scale_x,
-      y_pt + TITLE_BASELINE_PT * scale_y,
-      LABEL_FONT_SIZE_PT * scale_y,
+      x_pt + label_left * scale_x,
+      y_pt + (signer_top + label_height + 8.0 + label_ascent) * scale_y,
+      label_em * scale_y,
       title.to_string(),
       label_font_family,
-      label_preview.is_some_and(|run| run.bold),
-      label_preview.is_some_and(|run| run.italic),
+      advance_scale,
     ));
   }
   items
@@ -2380,8 +2363,7 @@ fn word_signature_line_text_item<'doc>(
   font_size_pt: f32,
   text: String,
   font_family: Option<String>,
-  bold: bool,
-  italic: bool,
+  advance_scale: f32,
 ) -> PageItem<'doc> {
   PageItem::Text(Box::new(TextItem {
     x_pt,
@@ -2396,8 +2378,7 @@ fn word_signature_line_text_item<'doc>(
     style: TextStyle {
       font_family: font_family.map(Cow::Owned),
       font_size_pt,
-      bold,
-      italic,
+      metafile_advance_scale: Some(advance_scale),
       metafile_reference_baseline: true,
       opacity: 1.0,
       ..TextStyle::default()
@@ -2423,7 +2404,15 @@ fn page_item_from_common<'doc>(
   separate_path_fill_and_stroke: bool,
 ) -> Option<PageItem<'doc>> {
   match item {
-    common::DisplayItem::Text(text) => Some(PageItem::Text(Box::new(text_item_from_common(text)))),
+    common::DisplayItem::Text(text) => {
+      if text.style.hidden {
+        // Hidden runs have no printed glyphs, decorations or semantic text.
+        // Omit them before coalescing and font preparation, including inside
+        // groups. Layout retains ownership of their source positions.
+        return None;
+      }
+      Some(PageItem::Text(Box::new(text_item_from_common(text))))
+    }
     common::DisplayItem::Image(image) => Some(image_page_item_from_common(
       image,
       ui_language,
@@ -2911,6 +2900,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     wordprocessingml_complex_numbering: style.wordprocessingml_complex_numbering,
     wordprocessingml_no_break_hyphen: style.wordprocessingml_no_break_hyphen,
+    wordprocessingml_bitmap_revisions: style.wordprocessingml_bitmap_revisions.clone(),
     wordprocessingml_han_fallback: style.wordprocessingml_han_fallback,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     wordprocessing_emphasis: style.wordprocessing_emphasis,
@@ -2959,6 +2949,7 @@ fn text_style_from_common<'doc>(style: &'doc common::TextStyle<'static>) -> Text
     bitmap_semantic_text: false,
     pdf_painted_artifact: style.pdf_painted_artifact,
     metafile_reference_baseline: false,
+    metafile_advance_scale: None,
     rotation_deg: style.rotation_degrees,
     color: rgb(style.color),
     opacity: opacity(style.color),
@@ -3290,6 +3281,8 @@ impl<'doc> PaintText<'doc> {
     let has_logical_spacing = text_ref.pdf_text_segmentation
       == common::PdfTextSegmentation::WordLine
       && (text_ref.word_spacing_pt != 0.0
+        || (text_ref.style.character_spacing_pt != 0.0
+          && text_ref.style.wordprocessing_legacy_font_measurement == Some(false))
         || text_ref
           .style
           .wordprocessing_justification_expansion_pt
@@ -3318,7 +3311,11 @@ impl<'doc> PaintText<'doc> {
     if (has_text_warp || has_logical_spacing)
       && let (Some(paint), Some(layout)) = (glyphs.as_mut(), layout_glyphs.as_ref())
     {
-      retain_layout_glyph_positions(paint, layout);
+      retain_layout_glyph_positions(
+        paint,
+        layout,
+        text_ref.style.wordprocessingml_font_slots && !has_text_warp,
+      );
     }
     let width_pt = glyphs
       .as_ref()
@@ -3387,11 +3384,16 @@ impl<'doc> PaintText<'doc> {
     let text_box_height_pt = vertical_metrics.line_height_pt();
     let highlight_glyphs = text_ref.style.highlight.and(layout_glyphs);
     let highlight = text_ref.style.highlight.map(|color| {
-      let (top_pt, height_pt) = text_highlight_vertical_bounds(
-        baseline_y,
-        vertical_metrics,
-        text_ref.style.use_windows_font_metrics,
-      );
+      let (top_pt, height_pt) = text_ref
+        .wordprocessing_line_metrics
+        .and_then(|line| wordprocessing_highlight_vertical_bounds(text_ref.y_pt, line))
+        .unwrap_or_else(|| {
+          text_highlight_vertical_bounds(
+            baseline_y,
+            vertical_metrics,
+            text_ref.style.use_windows_font_metrics,
+          )
+        });
       PaintRect {
         x_pt: text_ref.x_pt,
         y_pt: top_pt,
@@ -3820,6 +3822,22 @@ fn glyph_runs_visible_width_pt(glyphs: &[PaintGlyphFontRun], horizontal_scale: f
     })
     .sum::<f32>()
     * horizontal_scale
+}
+
+fn wordprocessing_highlight_vertical_bounds(
+  origin_y_pt: f32,
+  line: common::WordprocessingLineMetrics,
+) -> Option<(f32, f32)> {
+  // Word paints run shading/highlighting across the completed line's text
+  // box, including larger unhighlighted runs or a taller number. Extra auto
+  // spacing stays below it; minimum-line leading stays above it. Exact lines
+  // use the authored box. Native mixed-size, mark, numbering and spacing
+  // controls distinguish all four from an individual font's character cell.
+  // Shape/EMF stories without this ordinary Word line owner keep their own
+  // existing font-cell policy.
+  let top = origin_y_pt + line.bottom_offset_pt - line.height_pt + line.spacing_before_pt;
+  let height = line.height_pt - line.spacing_before_pt - line.spacing_after_pt;
+  (top.is_finite() && height.is_finite() && height > 0.0).then_some((top, height))
 }
 
 fn text_highlight_vertical_bounds(
@@ -4268,7 +4286,11 @@ pub(super) fn text_requires_glyph_outlines(style: &TextStyle<'_>) -> bool {
 /// PDF font's advances accumulates a new error
 /// inside every XML run. Office size/run-segmentation controls distinguish the
 /// two owners; the glyph outlines themselves keep their realized font sizes.
-fn retain_layout_glyph_positions(paint: &mut PaintGlyphRun, layout: &PaintGlyphRun) {
+fn retain_layout_glyph_positions(
+  paint: &mut PaintGlyphRun,
+  layout: &PaintGlyphRun,
+  word_printer_offsets: bool,
+) {
   let positions = layout
     .font_runs
     .iter()
@@ -4306,6 +4328,11 @@ fn retain_layout_glyph_positions(paint: &mut PaintGlyphRun, layout: &PaintGlyphR
   }
   let mut positions = positions.into_iter();
   for run in &mut paint.font_runs {
+    let retain_paint_vertical_offsets = word_printer_offsets
+      && run.glyphs.iter().any(|glyph| glyph.y_offset != 0.0)
+      && run.glyphs.iter().all(|glyph| glyph.y_advance == 0.0)
+      && SkrifaFontRef::from_index(run.font_face.data.as_slice(), run.font_face.index)
+        .is_ok_and(|face| face.glyf().is_ok() && face.fvar().is_err());
     for (index, glyph) in run.glyphs.iter_mut().enumerate() {
       let (layout_run, layout_glyph, x) = positions.next().expect("glyph counts were checked");
       if index == 0 {
@@ -4315,7 +4342,11 @@ fn retain_layout_glyph_positions(paint: &mut PaintGlyphRun, layout: &PaintGlyphR
       glyph.x_advance = layout_glyph.x_advance * scale;
       glyph.y_advance = layout_glyph.y_advance * scale;
       glyph.x_offset = layout_glyph.x_offset * scale;
-      glyph.y_offset = layout_glyph.y_offset * scale;
+      // Source advances still own the logical cell. A Word mark's vertical
+      // placement belongs to the realized printer font, independently of it.
+      if !retain_paint_vertical_offsets {
+        glyph.y_offset = layout_glyph.y_offset * scale;
+      }
     }
   }
   paint.width_pt = layout.width_pt;
@@ -4395,7 +4426,8 @@ fn shaped_pdf_glyphs(
       glyph.x_advance_em * glyph.font_size_pt + word_spacing_em * glyph.font_size_pt;
     let advance_pt = semantic_advances
       .and_then(|advances| semantic_advance_for_text_range(text, advances, &glyph.text_range))
-      .unwrap_or(natural_advance_pt);
+      .unwrap_or(natural_advance_pt)
+      * style.metafile_advance_scale.unwrap_or(1.0);
     font_runs
       .last_mut()
       .expect("font run was just pushed")
@@ -4426,21 +4458,41 @@ fn shaped_pdf_glyphs(
     glyph.text_range.end = text.len();
   }
   for run in &mut font_runs {
-    if !run
+    let separate_marks = run
       .glyphs
       .windows(2)
-      .any(|pair| pair[0].text_range == pair[1].text_range)
-    {
+      .any(|pair| pair[0].text_range == pair[1].text_range);
+    let printer_offsets = style.wordprocessingml_font_slots
+      && style.layout_font_sizes.is_some()
+      && run.glyphs.iter().any(|glyph| glyph.y_offset != 0.0)
+      && run.glyphs.iter().all(|glyph| glyph.y_advance == 0.0);
+    if !separate_marks && !printer_offsets {
       continue;
     }
     let Ok(face) = SkrifaFontRef::from_index(run.font_face.data.as_slice(), run.font_face.index)
     else {
       continue;
     };
+    if printer_offsets
+      && face.glyf().is_ok()
+      && face.fvar().is_err()
+      && let Ok(head) = face.head()
+    {
+      for glyph in &mut run.glyphs {
+        glyph.y_offset =
+          word_printer_glyph_vertical_offset(glyph.y_offset, run.font_size_pt, head.units_per_em());
+      }
+    }
+    if !separate_marks {
+      continue;
+    }
     let charmap = face.charmap();
-    split_nominal_nonspacing_mark_clusters(text, &mut run.glyphs, |character| {
-      charmap.map(character).map(|glyph| glyph.to_u32())
-    });
+    split_nominal_nonspacing_mark_clusters(
+      text,
+      &mut run.glyphs,
+      style.wordprocessingml_font_slots,
+      |character| charmap.map(character).map(|glyph| glyph.to_u32()),
+    );
   }
   Some(PaintGlyphRun {
     width_pt: x_offset_pt,
@@ -4448,24 +4500,41 @@ fn shaped_pdf_glyphs(
   })
 }
 
-/// Keep an isolated, separately painted base and mark separately extractable.
-/// HarfBuzz gives both glyphs one source cluster; a single PDF ActualText span
-/// then gives the small mark the base glyph's full text box. A run containing
-/// several combining marks needs its original cluster spans: Poppler can omit
-/// some of the independently mapped zero-advance glyphs in dense Arabic text.
-/// Only split the isolated case when the font cmap identifies the mark glyph.
+/// Word's final 600-DPI font uses natural positioning, then truncates each
+/// vertical glyph displacement to an integer device pixel. Actual DirectWrite
+/// return arrays and PDF origins agree for 220 marks across four faces and
+/// four sizes. This conversion belongs to the realized paint font, not the
+/// ideal measurement font or line baseline. Recover integral design units
+/// first so an f32 round trip cannot move an exact device integer below itself.
+fn word_printer_glyph_vertical_offset(offset_em: f32, font_size_pt: f32, units: u16) -> f32 {
+  if offset_em == 0.0 || units == 0 || !font_size_pt.is_finite() || font_size_pt <= 0.0 {
+    return offset_em;
+  }
+  let ppem = (f64::from(font_size_pt) / 0.12).round();
+  let design = (f64::from(offset_em) * f64::from(units)).round();
+  let pixels = (design * ppem / f64::from(units)).trunc();
+  (pixels * 0.12 / f64::from(font_size_pt)) as f32
+}
+
+/// Keep separately painted base and nominal mark glyphs separately extractable.
+/// Word maps them independently even in text with multiple attached marks.
+/// A shared ActualText span instead gives the mark its base's extraction box.
+/// Keep inseparable/ambiguous clusters intact; other producers retain the
+/// existing isolated-mark policy.
 fn split_nominal_nonspacing_mark_clusters(
   text: &str,
   glyphs: &mut [PaintGlyph],
+  wordprocessing: bool,
   mut nominal_glyph: impl FnMut(char) -> Option<u32>,
 ) {
   let categories = CodePointMapData::<GeneralCategory>::new();
-  if text
-    .chars()
-    .filter(|&character| categories.get(character) == GeneralCategory::NonspacingMark)
-    .take(2)
-    .count()
-    != 1
+  if !wordprocessing
+    && text
+      .chars()
+      .filter(|&character| categories.get(character) == GeneralCategory::NonspacingMark)
+      .take(2)
+      .count()
+      != 1
   {
     return;
   }
@@ -4514,14 +4583,96 @@ fn split_nominal_nonspacing_mark_clusters(
             && pair[1 - mark_index].glyph_id != mark_glyph_id
             && pair[1 - mark_index].x_advance > 1.0e-4
           {
-            pair[mark_index].text_range = mark_range;
-            pair[1 - mark_index].text_range = base_range;
+            if wordprocessing
+              && mark_overlaps_replacement_cluster(text, glyphs, start..end, mark_index, mark)
+            {
+              start = end;
+              continue;
+            }
+            glyphs[start + mark_index].text_range = mark_range;
+            glyphs[start + 1 - mark_index].text_range = base_range;
           }
         }
       }
     }
     start = end;
   }
+}
+
+/// A neighboring inseparable cluster exposes replacement text over its whole
+/// advance. A nominal mark over that rectangle can be mistaken for the same
+/// mark in the replacement (Poppler TextBlock::coalesce removes overlapping
+/// suffixes). Keep this mark with its own base so both source occurrences
+/// remain extractable. Ordinary separated marks need no replacement span.
+/// Only neighboring clusters are examined; no paragraph-wide pair search.
+fn mark_overlaps_replacement_cluster(
+  text: &str,
+  glyphs: &[PaintGlyph],
+  cluster: Range<usize>,
+  mark_index: usize,
+  mark: char,
+) -> bool {
+  let mark_x = glyphs[cluster.start..cluster.start + mark_index]
+    .iter()
+    .map(|glyph| glyph.x_advance)
+    .sum::<f32>()
+    + glyphs[cluster.start + mark_index].x_offset;
+  for before in [true, false] {
+    let neighbor = if before {
+      let Some(last) = cluster.start.checked_sub(1) else {
+        continue;
+      };
+      let range = &glyphs[last].text_range;
+      let start = glyphs[..last]
+        .iter()
+        .rposition(|glyph| glyph.text_range != *range)
+        .map_or(0, |index| index + 1);
+      start..cluster.start
+    } else {
+      let Some(first) = glyphs.get(cluster.end) else {
+        continue;
+      };
+      let count = glyphs[cluster.end..]
+        .iter()
+        .take_while(|glyph| glyph.text_range == first.text_range)
+        .count();
+      cluster.end..cluster.end + count
+    };
+    let Some(source) = text.get(glyphs[neighbor.start].text_range.clone()) else {
+      continue;
+    };
+    // A previously visited pair that still shares its source range was kept
+    // as replacement text, possibly because it overlaps the cluster before
+    // it. Include it so a chain of overlapping marks remains lossless. A
+    // following ordinary pair has not been visited and can still be split.
+    let scalars = source.chars().count();
+    if !source.contains(mark) || scalars < 2 || (!before && scalars == 2 && neighbor.len() == 2) {
+      continue;
+    }
+    let mut pen = if before {
+      -glyphs[neighbor.clone()]
+        .iter()
+        .map(|glyph| glyph.x_advance)
+        .sum::<f32>()
+    } else {
+      glyphs[cluster.clone()]
+        .iter()
+        .map(|glyph| glyph.x_advance)
+        .sum::<f32>()
+    };
+    let mut left = f32::INFINITY;
+    let mut right = f32::NEG_INFINITY;
+    for glyph in &glyphs[neighbor] {
+      let x = pen + glyph.x_offset;
+      left = left.min(x);
+      right = right.max(x + glyph.x_advance);
+      pen += glyph.x_advance;
+    }
+    if left <= mark_x && mark_x <= right {
+      return true;
+    }
+  }
+  false
 }
 
 fn semantic_advance_for_text_range(
@@ -4679,6 +4830,102 @@ mod tests {
       metafile_semantic_text_includes_raster_backdrop: paint_text,
       signature_line: None,
       metafile_native_size: true,
+    }
+  }
+
+  #[test]
+  fn unsigned_signature_uses_ui_provider_metrics_and_independent_shape_axes() {
+    for (ui, family, em, rule, baseline, step, left) in [
+      ("en-US", "Segoe UI", 21.0, 132.0, 166.0, 38.0, 35.0),
+      ("de-DE", "Segoe UI", 21.0, 132.0, 166.0, 38.0, 35.0),
+      ("es-MX", "Segoe UI", 21.0, 132.0, 166.0, 38.0, 35.0),
+      (
+        "zh-CN",
+        "Microsoft YaHei UI",
+        24.0,
+        129.0,
+        164.0,
+        39.0,
+        37.0,
+      ),
+    ] {
+      for (width, height) in [(192.0, 96.0), (288.0, 96.0), (192.0, 144.0)] {
+        // The cached picture has an unrelated Arial label and colored cell.
+        // Word's provider replaces both with the signature setup/UI policy.
+        let mut image = colored_metafile_preview(true);
+        image.width_pt = width;
+        image.height_pt = height;
+        image.signature_line = Some(common::SignatureLineProperties {
+          suggested_signer: Some("Signer".into()),
+          suggested_signer_title: Some("Role".into()),
+          ..Default::default()
+        });
+        let super::PageItem::Group { items, .. } = super::expand_metafile_semantic_text_item(
+          super::PageItem::Image(image),
+          None,
+          Some(ui),
+          None,
+        ) else {
+          panic!("generated signature");
+        };
+        assert_eq!(items.len(), 5);
+        let super::PageItem::Rect(line) = &items[1] else {
+          panic!("signature rule");
+        };
+        assert_eq!(line.y_pt, 20.0 + rule * height / 256.0);
+        assert_eq!(line.height_pt, 2.0 * height / 256.0);
+        assert_eq!(line.width_pt, width);
+        for (index, label) in ["Signer", "Role"].into_iter().enumerate() {
+          let super::PageItem::Text(text) = &items[index + 3] else {
+            panic!("signature label");
+          };
+          assert_eq!(text.text, label);
+          assert_eq!(text.style.font_family.as_deref(), Some(family));
+          assert_eq!(text.style.font_size_pt, em * height / 256.0);
+          assert_eq!(text.x_pt, 10.0 + left * width / 512.0);
+          assert_eq!(
+            text.y_pt,
+            20.0 + (baseline + index as f32 * step) * height / 256.0
+          );
+          assert_eq!(
+            text.style.metafile_advance_scale,
+            Some(width / (2.0 * height))
+          );
+          assert!(!text.style.bold && !text.style.italic);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn metafile_origin_scaling_preserves_realized_glyph_sizes() {
+    let mut metrics = super::TextMetrics::new();
+    let style = super::TextStyle {
+      font_family: Some("Segoe UI".into()),
+      font_size_pt: 7.875,
+      ..Default::default()
+    };
+    let plain = super::shaped_pdf_glyphs("Signer", &style, 0.0, &mut metrics).unwrap();
+    for scale in [2.0 / 3.0, 1.5] {
+      let scaled = super::shaped_pdf_glyphs(
+        "Signer",
+        &super::TextStyle {
+          metafile_advance_scale: Some(scale),
+          ..style.clone()
+        },
+        0.0,
+        &mut metrics,
+      )
+      .unwrap();
+      assert!((scaled.width_pt - plain.width_pt * scale).abs() < 0.001);
+      for (a, b) in plain.font_runs.iter().zip(&scaled.font_runs) {
+        assert_eq!(a.font_size_pt, b.font_size_pt);
+        for (a, b) in a.glyphs.iter().zip(&b.glyphs) {
+          assert_eq!(a.glyph_id, b.glyph_id);
+          assert_eq!(a.bounds_em, b.bounds_em);
+          assert!((b.x_advance - a.x_advance * scale).abs() < 0.0001);
+        }
+      }
     }
   }
 
@@ -4907,6 +5154,79 @@ mod tests {
   }
 
   #[test]
+  fn word_printer_mark_offsets_use_signed_truncation_in_the_realized_font() {
+    // Native Arial/TNR 600-DPI GetGlyphPlacements -> exported PDF origins.
+    // Positive, negative, subpixel and exact integer displacements distinguish
+    // signed truncation from floor, nearest-pixel and whole-baseline rounding.
+    for (design, ppem, expected_pixels) in [
+      (417, 67, 13),
+      (417, 92, 18),
+      (417, 117, 23),
+      (417, 167, 34),
+      (50, 92, 2),
+      (-85, 92, -3),
+      (-102, 117, -5),
+      (-30, 67, 0),
+      (30, 67, 0),
+      (1024, 92, 46),
+      (-1024, 92, -46),
+    ] {
+      let size = ppem as f32 * 0.12;
+      let actual = super::word_printer_glyph_vertical_offset(design as f32 / 2048.0, size, 2048);
+      assert!((actual * size - expected_pixels as f32 * 0.12).abs() < 0.00001);
+    }
+  }
+
+  #[test]
+  fn nominal_marks_overlapping_an_inseparable_cluster_retain_their_source_base() {
+    // RTL: a lam with stacked shadda/fatha is followed visually by an ain
+    // whose fatha crosses the preceding cluster's replacement-text rectangle.
+    let glyph = |glyph_id, text_range, x_advance, x_offset| PaintGlyph {
+      glyph_id,
+      text_range,
+      x_advance,
+      x_offset,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em: None,
+    };
+    let original = [
+      glyph(900, 4..10, 0.0, -0.007),
+      glyph(991, 4..10, 0.207, 0.0),
+      glyph(756, 0..4, 0.0, -0.00488),
+      glyph(972, 0..4, 0.394, 0.0),
+    ];
+    let nominal = |character| (character == '\u{64e}').then_some(756);
+    let mut overlapping = original.clone();
+    split_nominal_nonspacing_mark_clusters("عَلَّ", &mut overlapping, true, nominal);
+    assert_eq!(overlapping[2].text_range, 0..4);
+    assert_eq!(overlapping[3].text_range, 0..4);
+    let mut separate = original.clone();
+    separate[2].x_offset = 0.02;
+    split_nominal_nonspacing_mark_clusters("عَلَّ", &mut separate, true, nominal);
+    assert_eq!(separate[2].text_range, 2..4);
+    assert_eq!(separate[3].text_range, 0..2);
+    let mut different_mark = original;
+    split_nominal_nonspacing_mark_clusters("عَلِّ", &mut different_mark, true, nominal);
+    assert_eq!(different_mark[2].text_range, 2..4);
+
+    // The retained ain/fatha replacement itself overlaps the following lam's
+    // mark. Preserve the complete chain, not just its first pair.
+    let mut chain = [
+      glyph(900, 8..14, 0.0, -0.007),
+      glyph(991, 8..14, 0.207, 0.0),
+      glyph(756, 4..8, 0.0, -0.00488),
+      glyph(972, 4..8, 0.394, 0.0),
+      glyph(756, 0..4, 0.0, -0.00488),
+      glyph(991, 0..4, 0.207, 0.0),
+    ];
+    split_nominal_nonspacing_mark_clusters("لَعَلَّ", &mut chain, true, nominal);
+    assert_eq!(chain[2].text_range, 4..8);
+    assert_eq!(chain[4].text_range, 0..4);
+    assert_eq!(chain[5].text_range, 0..4);
+  }
+
+  #[test]
   fn nominal_zero_advance_mark_keeps_its_own_pdf_text_mapping() {
     let glyph = |glyph_id, text_range, x_advance| PaintGlyph {
       glyph_id,
@@ -4921,7 +5241,7 @@ mod tests {
     // HarfBuzz's visual RTL order is mark then shaped base; Office's PDF
     // exposes the two painted glyphs independently in that same order.
     let mut arabic = [glyph(282, 0..4, 0.0), glyph(47, 0..4, 0.291)];
-    split_nominal_nonspacing_mark_clusters("ا\u{64b}", &mut arabic, |character| {
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}", &mut arabic, false, |character| {
       (character == '\u{64b}').then_some(282)
     });
     assert_eq!(arabic[0].text_range, 2..4);
@@ -4930,14 +5250,14 @@ mod tests {
     assert_eq!(arabic[1].x_advance, 0.291);
 
     let mut latin = [glyph(8, 0..3, 0.5), glyph(9, 0..3, 0.0)];
-    split_nominal_nonspacing_mark_clusters("a\u{301}", &mut latin, |character| {
+    split_nominal_nonspacing_mark_clusters("a\u{301}", &mut latin, false, |character| {
       (character == '\u{301}').then_some(9)
     });
     assert_eq!(latin[0].text_range, 0..1);
     assert_eq!(latin[1].text_range, 1..3);
 
     let mut unsupported = [glyph(282, 0..4, 0.0), glyph(47, 0..4, 0.291)];
-    split_nominal_nonspacing_mark_clusters("ا\u{64b}", &mut unsupported, |_| Some(999));
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}", &mut unsupported, false, |_| Some(999));
     assert!(unsupported.iter().all(|glyph| glyph.text_range == (0..4)));
 
     let mut dense = [
@@ -4946,13 +5266,46 @@ mod tests {
       glyph(282, 4..8, 0.0),
       glyph(47, 4..8, 0.291),
     ];
-    split_nominal_nonspacing_mark_clusters("ا\u{64b}ب\u{64b}", &mut dense, |character| {
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}ب\u{64b}", &mut dense, false, |character| {
       (character == '\u{64b}').then_some(282)
     });
     assert_eq!(dense[0].text_range, 0..4);
     assert_eq!(dense[1].text_range, 0..4);
     assert_eq!(dense[2].text_range, 4..8);
     assert_eq!(dense[3].text_range, 4..8);
+    let original_placement = dense
+      .iter()
+      .map(|glyph| {
+        (
+          glyph.glyph_id,
+          glyph.x_advance,
+          glyph.x_offset,
+          glyph.y_offset,
+        )
+      })
+      .collect::<Vec<_>>();
+    split_nominal_nonspacing_mark_clusters("ا\u{64b}ب\u{64b}", &mut dense, true, |character| {
+      (character == '\u{64b}').then_some(282)
+    });
+    assert_eq!(
+      dense
+        .iter()
+        .map(|glyph| glyph.text_range.clone())
+        .collect::<Vec<_>>(),
+      [2..4, 0..2, 6..8, 4..6]
+    );
+    assert_eq!(
+      dense
+        .iter()
+        .map(|glyph| (
+          glyph.glyph_id,
+          glyph.x_advance,
+          glyph.x_offset,
+          glyph.y_offset
+        ))
+        .collect::<Vec<_>>(),
+      original_placement
+    );
   }
 
   #[test]
@@ -4987,7 +5340,7 @@ mod tests {
               .iter()
               .map(|run| run.font_size_pt)
               .collect::<Vec<_>>();
-            retain_layout_glyph_positions(&mut paint, &layout);
+            retain_layout_glyph_positions(&mut paint, &layout, false);
             assert_eq!(paint.width_pt, layout.width_pt);
             assert_eq!(
               paint
@@ -5038,7 +5391,7 @@ mod tests {
     )
     .unwrap();
     let before = format!("{paint:?}");
-    super::retain_layout_glyph_positions(&mut paint, &layout);
+    super::retain_layout_glyph_positions(&mut paint, &layout, false);
     assert_eq!(format!("{paint:?}"), before);
   }
 
@@ -5074,6 +5427,55 @@ mod tests {
           }
         }
       }
+    }
+  }
+
+  #[test]
+  fn bitmap_revision_owners_survive_writer_coalescing() {
+    let common::DisplayItem::Text(mut template) = text_item(point(60.0, 100.0), None, 0.0) else {
+      unreachable!()
+    };
+    template.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    let mut metrics = super::TextMetrics::new();
+    for (revisions, expected) in [
+      ([None, None, None], 1),
+      ([Some([Some(1), None, None]); 3], 1),
+      (
+        [
+          Some([Some(1), None, None]),
+          Some([Some(2), None, None]),
+          Some([Some(1), None, None]),
+        ],
+        3,
+      ),
+      (
+        [
+          Some([Some(1), None, None]),
+          Some([Some(1), Some(2), None]),
+          Some([Some(1), None, None]),
+        ],
+        3,
+      ),
+    ] {
+      let mut x = template.origin.x.0;
+      let mut runs = Vec::new();
+      for (text, revision) in ["N", "umbering", " by default"].into_iter().zip(revisions) {
+        let mut item = template.clone();
+        item.origin.x.0 = x;
+        item.text = Cow::Borrowed(text);
+        item.style.wordprocessingml_bitmap_revisions = revision.map(std::sync::Arc::new);
+        let paint = super::text_item_from_common(&item);
+        x += metrics.measure_text(text, &paint.style);
+        runs.push(item);
+      }
+      let source = runs.iter().map(|item| {
+        (
+          super::PageItem::Text(Box::new(super::text_item_from_common(item))),
+          None,
+        )
+      });
+      let (items, _) = super::coalesced_writer_text_items(source, &mut metrics);
+      assert_eq!(items.len(), expected, "{revisions:?}");
     }
   }
 
@@ -5485,6 +5887,57 @@ mod tests {
   }
 
   #[test]
+  fn word_highlight_uses_shared_line_geometry_through_portion_splitting() {
+    let common::DisplayItem::Text(mut run) = text_item(point(10.0, 20.0), None, 0.0) else {
+      unreachable!()
+    };
+    run.text = Cow::Borrowed("one-two");
+    run.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    run.style.font_family = Some(Cow::Borrowed("Arial"));
+    run.style.highlight = Some(common::Color {
+      r: 0,
+      g: 255,
+      b: 255,
+      a: 255,
+    });
+    let mut metrics = super::TextMetrics::new();
+    // Native mixed-size controls use one shared line box. Extra Auto leading
+    // lies below, minimum leading above; Exact lines retain their full box.
+    for (height, before, after, expected_top, expected_height) in [
+      (48.0, 0.0, 0.0, 20.0, 48.0),
+      (48.0, 0.0, 24.0, 20.0, 24.0),
+      (48.0, 24.0, 0.0, 44.0, 24.0),
+      (12.0, 0.0, 0.0, 20.0, 12.0),
+    ] {
+      for size in [8.0, 24.0] {
+        run.style.font_size = common::Pt(size);
+        run.wordprocessing_line_metrics = Some(common::WordprocessingLineMetrics {
+          frame_origin_offset_x_pt: 0.0,
+          frame_width_pt: 400.0,
+          alignment: None,
+          bottom_offset_pt: height,
+          height_pt: height,
+          baseline_from_bottom_pt: 4.0 + after,
+          spacing_before_pt: before,
+          spacing_after_pt: after,
+        });
+        let painted = super::PaintText::from_layout_text(
+          super::text_item_from_common(&run),
+          None,
+          None,
+          600.0,
+          &mut metrics,
+        );
+        assert_eq!(painted.portions.len(), 3);
+        for portion in painted.portions {
+          let rect = portion.highlight.expect("highlighted portion");
+          assert_eq!((rect.y_pt, rect.height_pt), (expected_top, expected_height));
+        }
+      }
+    }
+  }
+
+  #[test]
   fn highlight_bounds_keep_windows_and_typographic_metrics_independent() {
     use ooxmlsdk_layout::text_metrics::TextVerticalMetrics;
 
@@ -5701,6 +6154,135 @@ mod tests {
           pair[1].strikethrough.as_ref().unwrap().x1_pt
         );
       }
+    }
+  }
+
+  #[test]
+  fn tracked_word_lines_match_native_font_and_device_advances() {
+    // Independently observed MSLS input/output: regular/bold, kerned/simple,
+    // signed pitch and design-unit measurement. Expected arrays are
+    // native captures, never generated by the renderer under test.
+    type NativeControl<'a> = (&'a str, bool, bool, f32, &'a str, &'a [i32]);
+    let controls: &[NativeControl<'_>] = &[
+      (
+        "Calibri",
+        true,
+        true,
+        -0.1_f32,
+        "N012 SOFTWARE RELATED AV To 01234",
+        &[
+          60, 46, 45, 46, 20, 42, 61, 41, 45, 78, 55, 51, 44, 20, 51, 44, 37, 48, 45, 44, 56, 19,
+          50, 53, 20, 37, 48, 20, 46, 46, 46, 45, 45,
+        ],
+      ),
+      (
+        "Calibri",
+        true,
+        true,
+        0.1_f32,
+        "N044 SOFTWARE RELATED AV To 01234",
+        &[
+          62, 47, 47, 48, 22, 44, 63, 42, 46, 80, 56, 53, 45, 22, 52, 46, 39, 49, 47, 46, 58, 22,
+          52, 55, 21, 39, 50, 21, 47, 48, 47, 47, 47,
+        ],
+      ),
+      (
+        "Arial",
+        false,
+        false,
+        -0.1_f32,
+        "N048 SOFTWARE RELATED AV To 01234",
+        &[
+          65, 50, 50, 50, 25, 60, 71, 55, 55, 86, 60, 65, 60, 25, 66, 60, 50, 61, 55, 60, 65, 25,
+          60, 60, 25, 55, 50, 25, 50, 50, 50, 50, 51,
+        ],
+      ),
+      (
+        "Arial",
+        false,
+        false,
+        0.1_f32,
+        "N080 SOFTWARE RELATED AV To 01234",
+        &[
+          67, 52, 52, 52, 27, 61, 73, 57, 56, 88, 62, 67, 61, 27, 67, 62, 51, 62, 57, 62, 67, 27,
+          62, 61, 27, 57, 51, 27, 52, 52, 52, 51, 51,
+        ],
+      ),
+      (
+        "Times New Roman",
+        false,
+        true,
+        -0.1_f32,
+        "N104 SOFTWARE RELATED AV To 01234",
+        &[
+          65, 45, 45, 45, 22, 50, 65, 50, 55, 76, 66, 60, 55, 22, 60, 55, 56, 55, 56, 55, 65, 17,
+          54, 64, 20, 49, 45, 22, 45, 45, 45, 45, 45,
+        ],
+      ),
+      (
+        "Times New Roman",
+        false,
+        true,
+        0.1_f32,
+        "N136 SOFTWARE RELATED AV To 01234",
+        &[
+          67, 47, 47, 47, 24, 52, 66, 52, 57, 78, 67, 61, 57, 24, 62, 57, 57, 56, 57, 57, 67, 19,
+          55, 66, 22, 50, 47, 24, 46, 47, 47, 46, 46,
+        ],
+      ),
+    ];
+    let mut metrics = super::TextMetrics::new();
+    for &(family, bold, kerning, pitch, source, expected) in controls {
+      let common::DisplayItem::Text(mut run) = text_item(point(72.0, 100.0), None, 0.0) else {
+        unreachable!()
+      };
+      run.text = Cow::Borrowed(source);
+      run.origin_is_baseline = true;
+      run.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+      run.style = common::TextStyle {
+        font_family: Some(Cow::Borrowed(family)),
+        font_size: common::Pt(11.04),
+        layout_font_sizes: Some(common::LayoutFontSizes {
+          primary: common::Pt(11.0),
+          complex: None,
+        }),
+        bold,
+        kerning_minimum_size: Some(common::Pt(if kerning { 1.0 } else { 200.0 })),
+        character_spacing: common::Pt(pitch),
+        use_windows_font_metrics: true,
+        wordprocessingml_font_slots: true,
+        wordprocessing_legacy_font_measurement: Some(false),
+        ..common::TextStyle::default()
+      };
+      let text = super::PaintText::from_layout_text(
+        super::text_item_from_common(&run),
+        None,
+        None,
+        595.32,
+        &mut metrics,
+      );
+      let mut items = vec![super::PaintItem::Text(Box::new(text))];
+      super::word_advances::realize(
+        &mut items,
+        &mut super::word_advances::NaturalMetricsCache::default(),
+      );
+      let super::PaintItem::Text(text) = &items[0] else {
+        unreachable!()
+      };
+      let actual = text
+        .portions
+        .iter()
+        .flat_map(|p| p.glyphs.iter().flatten())
+        .flat_map(|r| {
+          r.glyphs
+            .iter()
+            .map(move |g| (g.x_advance * r.font_size_pt / 0.12).round() as i32)
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(
+        actual, expected,
+        "{family} bold={bold} kern={kerning} pitch={pitch}"
+      );
     }
   }
 

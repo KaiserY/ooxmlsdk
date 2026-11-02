@@ -105,10 +105,20 @@ pub struct FontFaceData {
   pub synthetic_bold: bool,
   pub synthetic_italic: bool,
   pub document_embedded: bool,
+  pub named_instance: Option<Arc<ooxmlsdk_fonts::NamedFontInstance>>,
   id: Arc<str>,
 }
 
 impl FontFaceData {
+  pub fn location(&self) -> skrifa::instance::LocationRef<'_> {
+    self
+      .named_instance
+      .as_ref()
+      .map_or_else(skrifa::instance::LocationRef::default, |instance| {
+        (&instance.location).into()
+      })
+  }
+
   pub fn id(&self) -> &str {
     &self.id
   }
@@ -2073,7 +2083,7 @@ impl FontResolver {
     style: &(impl FontStyleRef + ?Sized),
   ) -> Option<Vec<ShapedRun<'text, 'static>>> {
     font_timing("shape text runs", || {
-      self.shape_text_runs_inner(text, style, &[])
+      self.shape_text_runs_inner(text, style, &[], None)
     })
   }
 
@@ -2084,8 +2094,16 @@ impl FontResolver {
     features: &[FeatureValue<'_>],
   ) -> Option<Vec<ShapedRun<'text, 'static>>> {
     font_timing("shape text runs with features", || {
-      self.shape_text_runs_inner(text, style, features)
+      self.shape_text_runs_inner(text, style, features, None)
     })
+  }
+
+  pub(crate) fn shape_vertical_text_runs<'text>(
+    &mut self,
+    text: &'text str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<Vec<ShapedRun<'text, 'static>>> {
+    self.shape_text_runs_inner(text, style, &[], Some(TextDirection::TopToBottom))
   }
 
   pub fn font_face_data(&self, font_id: &FontId) -> Option<FontFaceData> {
@@ -2382,6 +2400,7 @@ impl FontResolver {
     text: &'text str,
     style: &(impl FontStyleRef + ?Sized),
     additional_features: &[FeatureValue<'_>],
+    direction_override: Option<TextDirection>,
   ) -> Option<Vec<ShapedRun<'text, 'static>>> {
     let base_size = style.font_size_pt();
     let mut script_runs = script_direction_runs_with_options(
@@ -2491,7 +2510,8 @@ impl FontResolver {
             TextDirection::RightToLeft
           }
         });
-      let mut options = ShapeOptions::from_request(&request, direction);
+      let mut options =
+        ShapeOptions::from_request(&request, direction_override.unwrap_or(direction));
       // Completed Word lines add authored pitch on the source device grid,
       // after glyph placement. Keep it separate from the design advance so
       // the device owner rounds the font and the pitch independently.
@@ -2503,6 +2523,7 @@ impl FontResolver {
       options.character_spacing_by_cluster = style.wordprocessingml_font_slots();
       options.wordprocessingml_blank_separators = style.wordprocessingml_font_slots();
       options.wordprocessingml_no_break_hyphen = style.wordprocessingml_no_break_hyphen();
+      options.wordprocessingml_fixed_cjk_metrics = style.wordprocessingml_font_slots();
       options.horizontal_scale = style.horizontal_scale();
       options.preserve_default_ignorables = style.wordprocessing_nominal_control_metrics()
         && !segment_text.is_empty()
@@ -2759,7 +2780,16 @@ fn font_request_for_slot<'a>(
         || (style.wordprocessingml_font_slots() && script == Some(TextScript::Arabic)),
     ),
   }];
-  if let Some(ligatures) = style.ligatures() {
+  // Native Word retains Font.Ligatures but suppresses Latin standard and
+  // contextual substitutions when character pitch is nonzero. The source
+  // typography property and the effective shaping switches are separate.
+  let suppress_ligatures = style.wordprocessingml_font_slots()
+    && style.character_spacing_pt() != 0.0
+    && matches!(script, Some(TextScript::Latin | TextScript::Common));
+  if let Some(ligatures) = style
+    .ligatures()
+    .or_else(|| suppress_ligatures.then(common::OpenTypeLigatures::default))
+  {
     // [MS-DOCX] 2.3.32 maps the four Word ligature categories to the
     // corresponding OpenType feature tags defined by ISO/IEC 14496-22.
     features.extend([
@@ -2771,13 +2801,13 @@ fn font_request_for_slot<'a>(
         // Allah ligature stored in GSUB liga rather than rlig. Keep this
         // script-specific policy out of Latin and non-Word font requests.
         value: u32::from(
-          ligatures.standard
+          (ligatures.standard && !suppress_ligatures)
             || (style.wordprocessingml_font_slots() && script == Some(TextScript::Arabic)),
         ),
       },
       FeatureValue {
         tag: Cow::Borrowed("clig"),
-        value: u32::from(ligatures.contextual),
+        value: u32::from(ligatures.contextual && !suppress_ligatures),
       },
       FeatureValue {
         tag: Cow::Borrowed("hlig"),
@@ -3508,6 +3538,7 @@ fn font_face_data_from_registry_binary(
     document_embedded: registry.sources.iter().any(|source| {
       matches!(source, FontSource::EmbeddedOoxml { id, .. } if id.as_ref() == font_id.0.as_ref())
     }),
+    named_instance: registry.face(font_id)?.named_instance.clone(),
     id: font_id.0.clone(),
   })
 }
@@ -3806,14 +3837,10 @@ fn wordprocessingml_default_charset_metrics(
   let Ok(os2) = face.os2() else {
     return None;
   };
-  // East Asian and symbol faces realize their own concrete charset rather
-  // than retaining the Latin DEFAULT_CHARSET record (for example PMingLiU
-  // realizes BIG5_CHARSET=136). Their existing compatibility path remains
-  // responsible for line metrics.
-  if os2
-    .ul_code_page_range_1()
-    .is_some_and(|bits| bits & 0x801e_0000 != 0)
-  {
+  // East Asian faces realize their concrete charset (for example PMingLiU
+  // realizes BIG5_CHARSET=136). Keep their independent compatibility path.
+  let code_pages = os2.ul_code_page_range_1().unwrap_or_default();
+  if code_pages & 0x001e_0000 != 0 {
     return None;
   }
   let fixed = face.post().is_ok_and(|post| post.is_fixed_pitch() != 0);
@@ -3823,6 +3850,10 @@ fn wordprocessingml_default_charset_metrics(
     ooxmlsdk_fonts::FontPitch::Variable
   };
   let panose = os2.panose_10();
+  let pictorial = panose[0] == 5 && code_pages & 0x8000_0000 != 0;
+  if code_pages & 0x8000_0000 != 0 && !pictorial {
+    return None;
+  }
   let family = if fixed {
     Some(FontFamilyClass::Fixed)
   } else if panose[0] == 2 {
@@ -3834,15 +3865,47 @@ fn wordprocessingml_default_charset_metrics(
   } else {
     None
   };
-  // Auto/absent or mismatched family and pitch cause Word to realize a new
-  // font record, replacing the authored default charset with its ANSI value.
-  if family.is_none() || request.family_class != family || request.pitch != Some(pitch) {
+  // A pictorial face retains DEFAULT_CHARSET with family=auto; requesting
+  // decorative instead normalizes it to ANSI. Native OpenSymbol controls
+  // separately vary charset, family and pitch, in ordinary and numbered text.
+  let family_matches = if pictorial {
+    request.family_class.is_none()
+  } else {
+    family.is_some() && request.family_class == family
+  };
+  if !family_matches || request.pitch != Some(pitch) {
     return None;
+  }
+  let scale = request.size_pt.0 / f32::from(face.head().ok()?.units_per_em().max(1));
+  if pictorial
+    && os2.version() >= 4
+    && os2
+      .fs_selection()
+      .contains(skrifa::raw::tables::os2::SelectionFlags::USE_TYPO_METRICS)
+  {
+    // This logical symbol cell honors typographic opt-in and owns the gap
+    // above its baseline, before DEFAULT_CHARSET side leading is added.
+    // Renamed-font Office controls vary each Typo/Win/hhea field and the
+    // opt-in bit independently: only Typo fields affect the opted-in cell;
+    // clearing the bit restores the raw Windows cell below. The physical
+    // face and its ordinary ANSI/SYMBOL metrics stay unchanged.
+    let ascent =
+      f32::from(os2.s_typo_ascender()) * scale + f32::from(os2.s_typo_line_gap()) * scale;
+    let descent = -f32::from(os2.s_typo_descender()) * scale;
+    return Some(ooxmlsdk_fonts::VerticalMetrics {
+      ascent_pt: ascent,
+      descent_pt: descent,
+      windows_line_height_pt: ascent + descent,
+      baseline_offset_pt: ascent,
+      directwrite_baseline_offset_pt: ascent,
+      line_gap_pt: 0.0,
+      ink_height_pt: ascent + descent,
+      ..resolved.metrics_at_size(request.size_pt).vertical
+    });
   }
   // The retained legacy charset uses the GDI/Windows font box even when
   // the face opts into USE_TYPO_METRICS. Calibri's native charset01 control
   // distinguishes this from simply scaling the typographic line box.
-  let scale = request.size_pt.0 / f32::from(face.head().ok()?.units_per_em().max(1));
   let ascent = f32::from(os2.us_win_ascent()) * scale;
   let descent = f32::from(os2.us_win_descent()) * scale;
   let hhea = face.hhea().ok()?;
@@ -4495,6 +4558,47 @@ mod tests {
     apply_wordprocessingml_single_double_byte_width_balance(&mut run, 0.8, 0.25, false, None);
     assert_eq!(run.glyphs[1].x_advance_pt, 4.25);
     assert_eq!(run.advance_pt, 16.25);
+  }
+
+  #[test]
+  fn word_fixed_cjk_metrics_preserve_cells_without_disabling_latin_kerning() {
+    let mut resolver = super::FontResolver::default();
+    let style = TextStyle {
+      font_family: Some(Arc::from("Yu Mincho")),
+      east_asia_font_family: Some(Arc::from("Yu Mincho")),
+      font_size_pt: 10.5,
+      wordprocessingml_font_slots: true,
+      kerning_minimum_size_pt: Some(1.0),
+      ..Default::default()
+    };
+    let mut width = |text: &str, style: &TextStyle| {
+      resolver
+        .shape_text_runs(text, style)
+        .unwrap()
+        .iter()
+        .map(|run| run.advance_pt)
+        .sum::<f32>()
+    };
+    for text in ["げる", "じっ", "って", "ＡＶ"] {
+      assert!(
+        (width(text, &style) - text.chars().count() as f32 * 10.5).abs() < 0.001,
+        "{text}"
+      );
+    }
+    let generic = TextStyle {
+      wordprocessingml_font_slots: false,
+      ..style.clone()
+    };
+    assert!(width("げる", &generic) < width("げる", &style) - 0.5);
+    let latin = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      ..style.clone()
+    };
+    let unkerned = TextStyle {
+      kerning_minimum_size_pt: Some(100.0),
+      ..latin.clone()
+    };
+    assert!(width("AV", &latin) < width("AV", &unkerned));
   }
 
   #[test]
@@ -6508,6 +6612,54 @@ mod tests {
         .collect::<Vec<_>>()
     };
     assert_eq!(glyph_ids(&style), glyph_ids(&generic));
+  }
+
+  #[test]
+  fn word_tracking_suppresses_requested_latin_ligatures_at_shaping() {
+    // Actual Word glyph IDs for explicit standard/contextual ligatures,
+    // zero and signed character pitch. The requested property stays enabled.
+    const PLAIN: &[u32] = &[
+      381, 296, 296, 349, 272, 286, 3, 258, 296, 296, 349, 374, 286, 3, 296, 367, 349, 336, 346,
+      410, 3, 296, 349, 3, 296, 367, 3, 296, 410, 3, 296, 296, 349, 3, 296, 296, 3, 296, 349, 374,
+    ];
+    const LIGATURES: &[u32] = &[
+      381, 312, 272, 286, 3, 258, 312, 374, 286, 3, 327, 349, 336, 346, 410, 3, 302, 3, 327, 3,
+      332, 3, 312, 3, 299, 3, 302, 374,
+    ];
+    let source = "office affine flight fi fl ft ffi ff fin";
+    for word in [false, true] {
+      for pitch in [-0.1, 0.0, 0.1] {
+        for enabled in [false, true] {
+          let style = TextStyle {
+            font_family: Some(Arc::from("Calibri")),
+            font_size_pt: 11.0,
+            kerning_minimum_size_pt: Some(1.0),
+            character_spacing_pt: pitch,
+            wordprocessingml_font_slots: word,
+            ligatures: Some(OpenTypeLigatures {
+              standard: enabled,
+              contextual: enabled,
+              ..Default::default()
+            }),
+            ..Default::default()
+          };
+          let runs = shape_text_runs(source, &style).expect("native control font");
+          let glyphs = runs
+            .iter()
+            .flat_map(|r| r.glyphs.iter().map(|g| g.glyph_id))
+            .collect::<Vec<_>>();
+          let expected = if enabled && (!word || pitch == 0.0) {
+            LIGATURES
+          } else {
+            PLAIN
+          };
+          assert_eq!(
+            glyphs, expected,
+            "Word={word} pitch={pitch} enabled={enabled}"
+          );
+        }
+      }
+    }
   }
 
   #[test]

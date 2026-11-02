@@ -3,7 +3,13 @@ use ooxmlsdk_layout::common;
 pub(super) fn stops_for_pdf(
   gradient: &common::GradientFill<'static>,
 ) -> Vec<common::GradientStop<'static>> {
-  common::resolve_gradient_stops(gradient)
+  let mut stops = common::resolve_gradient_stops(gradient);
+  if gradient.opaque_for_pdf {
+    for stop in &mut stops {
+      stop.color.a = u8::MAX;
+    }
+  }
+  stops
 }
 
 pub(super) fn linear_line(

@@ -3,10 +3,7 @@ use kurbo::{
   Stroke as KurboStroke, StrokeOpts, Vec2, offset::offset_cubic, stroke as expand_stroke,
 };
 use skrifa::{
-  FontRef, GlyphId, MetadataProvider,
-  instance::{LocationRef, Size},
-  outline::DrawSettings,
-  raw::TableProvider,
+  FontRef, GlyphId, MetadataProvider, instance::Size, outline::DrawSettings, raw::TableProvider,
 };
 
 use super::paint::{PaintGlyph, PaintGlyphFontRun};
@@ -790,7 +787,7 @@ pub(super) fn build_glyph_outline_path(
     let mut raw = SkrifaGlyphOutline::default();
     outline
       .draw(
-        DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+        DrawSettings::unhinted(Size::unscaled(), run.font_face.location()),
         &mut raw,
       )
       .map_err(|error| {

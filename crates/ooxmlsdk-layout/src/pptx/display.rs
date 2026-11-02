@@ -2230,6 +2230,7 @@ fn lower_chart(
           category_minor_gridline: None,
           value_minor_gridline: None,
           category_major_gridline_stroke: None,
+          series_axis_strokes: Vec::new(),
           series_colors,
           series_point_colors,
           series_styles,
@@ -2249,6 +2250,7 @@ fn lower_chart(
           group_decoration_styles,
           series_point_styles,
           surface_band_colors,
+          surface_band_styles: Vec::new(),
           data_label_fill_colors: chart
             .series
             .iter()
@@ -3270,6 +3272,8 @@ fn pptx_chart_gradient_fill_with_placeholder(
     ),
   };
   Some(common::Fill::Gradient(common::GradientFill {
+    transform_as_normal: false,
+    opaque_for_pdf: false,
     stops,
     angle_degrees,
     definition_bounds: None,
@@ -4827,6 +4831,8 @@ fn gradient_fill_for_optional_slide(
     }
   };
   Some(common::Fill::Gradient(common::GradientFill {
+    transform_as_normal: false,
+    opaque_for_pdf: false,
     stops,
     angle_degrees,
     definition_bounds: Some(definition_bounds),
@@ -9562,6 +9568,8 @@ fn shape_gradient_path(
       }
     };
   let fill = common::Fill::Gradient(common::GradientFill {
+    transform_as_normal: false,
+    opaque_for_pdf: false,
     stops,
     angle_degrees,
     definition_bounds: Some(definition_bounds),

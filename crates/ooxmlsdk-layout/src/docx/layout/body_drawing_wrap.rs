@@ -7,7 +7,8 @@ pub(super) use column_balance::constrain_flow;
 pub(super) struct Anchor {
   section: usize,
   block: usize,
-  inline: usize,
+  // Paragraph frames and floating tables own a block rather than a drawing run.
+  inline: Option<usize>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -19,6 +20,7 @@ pub(super) struct Reservation {
   revision: usize,
   restart_block: Option<usize>,
   pending_restart: Option<usize>,
+  terminal_lower_space: bool,
   pub image_x: f32,
   pub image_y: f32,
   pub exclusion: WrapExclusion,
@@ -29,19 +31,69 @@ pub(super) struct Catalog {
   drawings: Vec<Reservation>,
   retired: Vec<(usize, WrapExclusion)>,
   balances: Vec<column_balance::Plan>,
+  terminal_collisions: Vec<TerminalCollision>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TerminalCollision {
+  anchor: Anchor,
+  page: usize,
+  block: usize,
+  exclusion: WrapExclusion,
+  line_top: f32,
 }
 
 impl Catalog {
+  pub(super) fn include_terminal_collisions(
+    &self,
+    flow: FlowContext,
+    page: usize,
+    exclusions: &mut [WrapExclusion],
+  ) {
+    if flow.text_segmentation != TextSegmentation::Body || flow.inside_paragraph_frame {
+      return;
+    }
+    for collision in &self.terminal_collisions {
+      if collision.anchor.section == flow.section_index
+        && Some(collision.block) == flow.body_source_block_index
+        && collision.page == page
+        && let Some(exclusion) = exclusions.iter_mut().find(|e| **e == collision.exclusion)
+      {
+        // Replay only the original terminal line's collision. Extending the
+        // whole paragraph by its after-space would also wrap earlier lines.
+        // The physical table band and its resolved anchor remain unchanged.
+        exclusion.top_pt = collision.line_top;
+      }
+    }
+  }
+
   pub(super) fn reservation(
     &self,
     flow: FlowContext,
     inline_index: usize,
     page_index: usize,
   ) -> Option<Reservation> {
+    self.reservation_for(flow, Some(inline_index), page_index)
+  }
+
+  pub(super) fn block_reservation(
+    &self,
+    flow: FlowContext,
+    page_index: usize,
+  ) -> Option<Reservation> {
+    self.reservation_for(flow, None, page_index)
+  }
+
+  fn reservation_for(
+    &self,
+    flow: FlowContext,
+    inline: Option<usize>,
+    page_index: usize,
+  ) -> Option<Reservation> {
     let anchor = Anchor {
       section: flow.section_index,
       block: flow.body_source_block_index?,
-      inline: inline_index,
+      inline,
     };
     self
       .drawings
@@ -72,12 +124,17 @@ pub(super) fn capture(
   bounds: FrameBounds,
 ) -> Option<Reservation> {
   let vml_square = square_owns_body_wrap(placement, flow);
+  let drawingml_square =
+    placement.wrap == ImageWrapMode::Square && placement.paint_order.is_drawing_ml();
   if flow.text_segmentation != TextSegmentation::Body
     || flow.inside_paragraph_frame
     || (!vml_square
+      && !drawingml_square
       && ((placement.behind_text && placement.paint_order.is_vml())
         || placement.wrap != ImageWrapMode::TopBottom
-        || (!placement.paint_order.is_vml() && flow.columns.count <= 1)))
+        || (!placement.paint_order.is_vml()
+          && !placement.paint_order.is_drawing_ml()
+          && flow.columns.count <= 1)))
     || placement.horizontal_relative_to == HorizontalImageReference::Character
     || placement.vertical_relative_to == VerticalImageReference::Line
     || (placement.vertical_relative_to == VerticalImageReference::Paragraph
@@ -90,8 +147,120 @@ pub(super) fn capture(
   let anchor = Anchor {
     section: flow.section_index,
     block: flow.body_source_block_index?,
-    inline: inline_index,
+    inline: Some(inline_index),
   };
+  // DrawingML square and top/bottom wrapping also affect earlier body
+  // paragraphs on the anchor page. Native page/margin/paragraph controls
+  // preserve the picture's settled position while reforming those lines;
+  // behindDoc selects paint order independently of the wrap rectangle.
+  let exclusion = if vml_square || drawingml_square {
+    WrapExclusion {
+      left_pt: bounds.x_pt - placement.margin_left_pt,
+      right_pt: bounds.x_pt + bounds.width_pt + placement.margin_right_pt,
+      top_pt: bounds.y_pt - placement.margin_top_pt,
+      bottom_pt: bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
+      side: placement.wrap_side,
+      blocks_flow: false,
+      uses_contour: false,
+      contour_band: None,
+      owner: if vml_square {
+        WrapExclusionOwner::VmlBodyDrawing
+      } else {
+        WrapExclusionOwner::Drawing
+      },
+    }
+  } else {
+    vertical_wrap_exclusion(
+      flow,
+      bounds.x_pt - placement.margin_left_pt,
+      bounds.y_pt - placement.margin_top_pt,
+      bounds.x_pt + bounds.width_pt + placement.margin_right_pt,
+      bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
+    )?
+  };
+  register(page, page_index, anchor, bounds, exclusion, vml_square)
+}
+
+pub(super) fn capture_paragraph_frame(
+  page: &mut Page,
+  page_index: usize,
+  flow: FlowContext,
+  placement: FloatingFramePlacement,
+  bounds: FrameBounds,
+  exclusion: WrapExclusion,
+) {
+  if !paragraph_frame_has_fixed_body_position(placement, flow) {
+    return;
+  }
+  let Some(block) = flow.body_source_block_index else {
+    return;
+  };
+  // A fixed text frame wraps earlier paragraphs on its anchor's physical
+  // page, just like a fixed drawing. An explicit text-relative position is
+  // likewise fixed after its first placement: vSpace can push its preceding
+  // line below it without moving the frame itself. Reuse bounded checkpoint
+  // replay and forward-only page migration. Inline text-relative frames
+  // retain local flow (including legacy y=0).
+  register(
+    page,
+    page_index,
+    Anchor {
+      section: flow.section_index,
+      block,
+      inline: None,
+    },
+    bounds,
+    exclusion,
+    false,
+  );
+}
+
+pub(super) fn capture_floating_table(
+  page: &mut Page,
+  page_index: usize,
+  flow: FlowContext,
+  anchor_y: f32,
+  bounds: FrameBounds,
+  exclusion: WrapExclusion,
+) {
+  if flow.text_segmentation != TextSegmentation::Body
+    || flow.inside_paragraph_frame
+    || exclusion.owner != WrapExclusionOwner::FloatingTable
+    || bounds.y_pt < anchor_y - LAYOUT_EPSILON_PT
+    || exclusion.top_pt >= anchor_y - f32::EPSILON
+  {
+    return;
+  }
+  let Some(block) = flow.body_source_block_index else {
+    return;
+  };
+  // topFromText can reach a paragraph preceding the table. Word preserves
+  // the table's original anchor position while reformatting that paragraph.
+  // Negative-position flies have a separate master/follow anchor protocol
+  // (preseed_negative_floating_table_for_split_anchor). Replaying their
+  // preceding line here would incorrectly drag the fly onto its follow.
+  register(
+    page,
+    page_index,
+    Anchor {
+      section: flow.section_index,
+      block,
+      inline: None,
+    },
+    bounds,
+    exclusion,
+    flow.compatibility_mode < 15,
+  );
+}
+
+fn register(
+  page: &mut Page,
+  page_index: usize,
+  anchor: Anchor,
+  bounds: FrameBounds,
+  exclusion: WrapExclusion,
+  terminal_lower_space: bool,
+) -> Option<Reservation> {
   if let Some(reservation) = page.body_drawing_wraps.as_deref().and_then(|catalog| {
     catalog
       .drawings
@@ -105,27 +274,6 @@ pub(super) fn capture(
       return None;
     }
   }
-  let exclusion = if vml_square {
-    WrapExclusion {
-      left_pt: bounds.x_pt - placement.margin_left_pt,
-      right_pt: bounds.x_pt + bounds.width_pt + placement.margin_right_pt,
-      top_pt: bounds.y_pt - placement.margin_top_pt,
-      bottom_pt: bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
-      side: placement.wrap_side,
-      blocks_flow: false,
-      uses_contour: false,
-      contour_band: None,
-      owner: WrapExclusionOwner::VmlBodyDrawing,
-    }
-  } else {
-    vertical_wrap_exclusion(
-      flow,
-      bounds.x_pt - placement.margin_left_pt,
-      bounds.y_pt - placement.margin_top_pt,
-      bounds.x_pt + bounds.width_pt + placement.margin_right_pt,
-      bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
-    )?
-  };
   let reservation = Reservation {
     anchor,
     page: page_index,
@@ -134,6 +282,7 @@ pub(super) fn capture(
     revision: 0,
     restart_block: None,
     pending_restart: None,
+    terminal_lower_space,
     image_x: bounds.x_pt,
     image_y: bounds.y_pt,
     exclusion,
@@ -193,10 +342,10 @@ fn first_intersected_block(drawing: &Reservation, frames: &[LayoutFrame]) -> Opt
             // which line_boxes_for_items could recover them.
             fragment.kind == FrameFragmentKind::ParagraphLine
               && fragment.bounds.is_some_and(|bounds| {
-                if drawing.exclusion.owner == WrapExclusionOwner::VmlBodyDrawing {
+                if drawing.terminal_lower_space {
                   // The terminal line owns its paragraph's lower spacing.
-                  // A later square fly can invalidate that strip even when
-                  // none of the earlier glyphs intersects the fly itself.
+                  // A later square fly or legacy floating table can invalidate
+                  // that strip even when no earlier glyph intersects the fly.
                   overlaps(
                     bounds.x_pt,
                     fragment.flow_top_pt.unwrap_or(bounds.y_pt),
@@ -242,6 +391,41 @@ pub(super) fn terminal_line_clearance(
     line.x_pt + line.width_pt,
     &squares,
   ) + before_pt
+}
+
+pub(super) fn legacy_top_bottom_terminal_clearance(
+  line: FrameBounds,
+  after_pt: f32,
+  flow: FlowContext,
+  exclusions: &[WrapExclusion],
+) -> f32 {
+  if flow.compatibility_mode >= 15
+    || flow.text_segmentation != TextSegmentation::Body
+    || flow.inside_paragraph_frame
+    || after_pt <= LAYOUT_EPSILON_PT
+  {
+    return line.y_pt;
+  }
+  // Word 2007/2010 includes the terminal paragraph line's lower space in
+  // TopBottom collisions. Native empty/visible and one/two/three-line controls
+  // move only that line; Word 2013 ignores the lower space. Writer's
+  // GetLowerMarginForFlyIntersect documents the same compatibility boundary.
+  // Query the completed line without changing the drawing's physical band,
+  // paragraph anchor, line height or the single normal after-space advance.
+  let mut y = line.y_pt;
+  while let Some(exclusion) = exclusions
+    .iter()
+    .filter(|exclusion| {
+      exclusion.owner == WrapExclusionOwner::Drawing
+        && exclusion.blocks_flow
+        && exclusion.overlaps_horizontal_span(line.x_pt, line.x_pt + line.width_pt)
+        && exclusion.overlaps_vertical_span(y, y + line.height_pt + after_pt)
+    })
+    .min_by(|a, b| a.bottom_pt.total_cmp(&b.bottom_pt))
+  {
+    y = exclusion.bottom_pt;
+  }
+  y
 }
 
 pub(super) fn install(page: &mut Page, page_index: usize, section_index: usize) {
@@ -388,8 +572,45 @@ impl RootFrameLayout<'_> {
       })?;
     let restart = *restart;
     let catalog = Arc::make_mut(catalog);
+    catalog.terminal_collisions.retain(|collision| {
+      collision.anchor.section != checkpoint.section_index || collision.anchor.block != block_index
+    });
     for drawing in &mut catalog.drawings {
       if drawing.anchor.section == checkpoint.section_index && drawing.anchor.block == block_index {
+        if drawing.active
+          && drawing.terminal_lower_space
+          && drawing.exclusion.owner == WrapExclusionOwner::FloatingTable
+        {
+          for frame in previous_frames.iter().filter(|frame| {
+            frame.page_index == drawing.page && frame.kind == FollowFrameKind::Paragraph
+          }) {
+            for fragment in &frame.fragments {
+              if fragment.kind != FrameFragmentKind::ParagraphLine {
+                continue;
+              }
+              let (Some(block), Some(bounds)) = (frame.block_index, fragment.bounds) else {
+                continue;
+              };
+              let top = fragment.flow_top_pt.unwrap_or(bounds.y_pt);
+              let bottom = top + fragment.content_advance_pt.unwrap_or(bounds.height_pt);
+              if bottom <= drawing.exclusion.top_pt + LAYOUT_EPSILON_PT
+                && bottom + fragment.paragraph_spacing_after_pt
+                  > drawing.exclusion.top_pt + LAYOUT_EPSILON_PT
+                && drawing
+                  .exclusion
+                  .overlaps_horizontal_span(bounds.x_pt, bounds.x_pt + bounds.width_pt)
+              {
+                catalog.terminal_collisions.push(TerminalCollision {
+                  anchor: drawing.anchor,
+                  page: drawing.page,
+                  block,
+                  exclusion: drawing.exclusion,
+                  line_top: top,
+                });
+              }
+            }
+          }
+        }
         replayed.insert((drawing.anchor, drawing.revision));
         drawing.restart_block = first_intersected_block(drawing, previous_frames);
         drawing.pending_restart = None;
@@ -483,6 +704,7 @@ mod tests {
       },
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -541,11 +763,426 @@ mod tests {
       .expect("source label retained")
   }
 
+  #[test]
+  fn drawingml_body_wrap_replays_earlier_lines_without_moving_the_drawing() {
+    use crate::docx::ImagePlacement;
+
+    fn collect_bounds(
+      items: &[PageItem],
+      page: usize,
+      bounds: &mut Vec<(usize, f32, f32, f32, f32)>,
+    ) {
+      for item in items {
+        match item {
+          PageItem::Image(image) => bounds.push((
+            page,
+            image.x_pt,
+            image.y_pt,
+            image.width_pt,
+            image.height_pt,
+          )),
+          PageItem::Group(items)
+          | PageItem::InlineObjectGroup(items)
+          | PageItem::IndependentTextFrame(items)
+          | PageItem::CompositingGroup { items, .. }
+          | PageItem::FloatingDrawing { items, .. } => collect_bounds(items, page, bounds),
+          _ => {}
+        }
+      }
+    }
+    let image_bounds = |layout: &LayoutDocument| {
+      let mut bounds = Vec::new();
+      for (page, content) in layout.pages.iter().enumerate() {
+        collect_bounds(&content.items, page, &mut bounds);
+      }
+      bounds
+    };
+    for mode in [14, 15] {
+      for behind in [false, true] {
+        for (basis, offset) in [
+          (VerticalImageReference::Page, 72.0),
+          (VerticalImageReference::Margin, 0.0),
+          (VerticalImageReference::Paragraph, -42.0),
+        ] {
+          for wrap in [ImageWrapMode::Square, ImageWrapMode::TopBottom] {
+            for width in [100.0, 451.0] {
+              for manual_break in [false, true] {
+                let mut source = document(2, 792.0, "square");
+                source.compatibility_mode = mode;
+                let Block::Paragraph(anchor) = source.blocks.last_mut().unwrap() else {
+                  unreachable!()
+                };
+                let InlineItem::Image(image) = &mut anchor.inlines[0] else {
+                  unreachable!()
+                };
+                image.width_pt = width;
+                let ImagePlacement::Floating(placement) = &mut image.placement else {
+                  unreachable!()
+                };
+                placement.paint_order = FloatingPaintOrder::drawing_ml_relative_height(0);
+                placement.behind_text = behind;
+                placement.vertical_relative_to = basis;
+                placement.vertical_offset_pt = offset;
+                placement.wrap = ImageWrapMode::None;
+                if manual_break {
+                  anchor.inlines.insert(0, InlineItem::PageBreak);
+                  anchor.inlines.truncate(2);
+                  source.blocks.push(paragraph("TAIL".into()));
+                }
+                let ordinary = layout(&source, &LayoutOptions::default()).unwrap();
+                let Block::Paragraph(anchor) = &mut source.blocks[2] else {
+                  unreachable!()
+                };
+                let InlineItem::Image(image) = &mut anchor.inlines[usize::from(manual_break)]
+                else {
+                  unreachable!()
+                };
+                let ImagePlacement::Floating(placement) = &mut image.placement else {
+                  unreachable!()
+                };
+                placement.wrap = wrap;
+                let wrapped = layout(&source, &LayoutOptions::default()).unwrap();
+                assert_eq!(wrapped.pages.len(), ordinary.pages.len());
+                let original_bounds = image_bounds(&ordinary);
+                assert_eq!(original_bounds.len(), 1);
+                assert_eq!(image_bounds(&wrapped), original_bounds);
+                let expected_shift = if wrap == ImageWrapMode::TopBottom || width > 400.0 {
+                  80.0
+                } else {
+                  0.0
+                };
+                assert!(
+                  (text_y(&wrapped, "TITLE").1 - text_y(&ordinary, "TITLE").1 - expected_shift)
+                    .abs()
+                    < 0.001,
+                  "mode={mode} behind={behind} basis={basis:?} wrap={wrap:?} width={width} manual_break={manual_break}",
+                );
+                if manual_break {
+                  assert_eq!(text_y(&wrapped, "TAIL"), text_y(&ordinary, "TAIL"));
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Native sub-twip offsets distinguish signed truncation from nearest
+    // rounding, and an independently rounded paragraph origin from their sum.
+    for (basis, offset, wrap, expected_y) in [
+      (VerticalImageReference::Page, 70.47, "square", 70.45),
+      (VerticalImageReference::Paragraph, -28.45, "square", 72.05),
+      (VerticalImageReference::Paragraph, -28.44, "square", 72.1),
+      (VerticalImageReference::Paragraph, -28.45, "none", 72.040_76),
+    ] {
+      let mut source = document(0, 792.0, wrap);
+      let Block::Paragraph(first) = &mut source.blocks[0] else {
+        unreachable!()
+      };
+      first.format.line_height_pt = Some(14.490_76);
+      let Block::Paragraph(anchor) = &mut source.blocks[2] else {
+        unreachable!()
+      };
+      let InlineItem::Image(image) = &mut anchor.inlines[0] else {
+        unreachable!()
+      };
+      let ImagePlacement::Floating(placement) = &mut image.placement else {
+        unreachable!()
+      };
+      placement.paint_order = FloatingPaintOrder::drawing_ml_relative_height(0);
+      placement.vertical_relative_to = basis;
+      placement.vertical_offset_pt = offset;
+      let result = layout(&source, &LayoutOptions::default()).unwrap();
+      let bounds = image_bounds(&result);
+      assert_eq!(bounds.len(), 1);
+      assert!((bounds[0].2 - expected_y).abs() < 0.0001, "{bounds:?}");
+    }
+  }
+
+  #[test]
+  fn fixed_not_beside_frame_keeps_body_above_its_reserved_band() {
+    for vertical_anchor in [FrameVerticalAnchor::Page, FrameVerticalAnchor::Margin] {
+      let mut source = document(0, 284.0, "none");
+      source.blocks = vec![
+        Block::Frame(FloatingFrame {
+          blocks: vec![paragraph("FRAME".into())],
+          drop_cap: false,
+          page_break_before: false,
+          width_pt: Some(200.0),
+          height_pt: Some(32.0),
+          height_rule: FrameHeightRule::Exact,
+          vertical_text_flow: None,
+          placement: FloatingFramePlacement {
+            vertical_anchor,
+            horizontal_anchor: FrameHorizontalAnchor::Margin,
+            vertical_offset_pt: if vertical_anchor == FrameVerticalAnchor::Page {
+              180.0
+            } else {
+              108.0
+            },
+            vertical_offset_explicit: true,
+            wrap: FrameWrapMode::NotBeside,
+            ..Default::default()
+          },
+          suppress_overlap: false,
+          outer_fill_color: None,
+          outer_borders: Default::default(),
+        }),
+        paragraph("BODY".into()),
+      ];
+      let mut ordinary = source.clone();
+      ordinary.blocks.remove(0);
+      let ordinary = layout(&ordinary, &LayoutOptions::default()).unwrap();
+      let result = layout(&source, &LayoutOptions::default()).unwrap();
+      assert_eq!(result.pages.len(), 1);
+      assert_eq!(text_y(&result, "BODY"), text_y(&ordinary, "BODY"));
+      let (frame_page, frame_text_y) = text_y(&result, "FRAME");
+      assert_eq!(frame_page, 0);
+      assert!((180.0..194.0).contains(&frame_text_y));
+    }
+  }
+
+  #[test]
+  fn positioned_text_frames_replay_the_preceding_line_without_moving_the_frame() {
+    // Native tdf105035 controls vary the preceding blank line's font/exact height:
+    // it moves below each positioned frame, and the next frame starts after
+    // that same line. Zero vSpace permits the two frames to overlap instead.
+    for lead_height in [4.0, 14.0, 24.0] {
+      for mode in [14, 15] {
+        for (explicit, offset) in [(false, 0.0), (true, 0.0), (true, 0.05)] {
+          for padding in [0.0, 6.0] {
+            let mut source = document(0, 792.0, "none");
+            source.compatibility_mode = mode;
+            let mut lead = paragraph(String::new());
+            let Block::Paragraph(p) = &mut lead else {
+              unreachable!()
+            };
+            p.format.line_height_pt = Some(lead_height);
+            let frame = |label: &str, width| {
+              Block::Frame(FloatingFrame {
+                blocks: vec![paragraph(label.into())],
+                drop_cap: false,
+                page_break_before: false,
+                width_pt: Some(width),
+                height_pt: None,
+                height_rule: FrameHeightRule::Auto,
+                vertical_text_flow: None,
+                placement: FloatingFramePlacement {
+                  vertical_anchor: FrameVerticalAnchor::Text,
+                  horizontal_anchor: FrameHorizontalAnchor::Margin,
+                  vertical_offset_pt: offset,
+                  vertical_offset_explicit: explicit,
+                  margin_top_pt: padding,
+                  margin_bottom_pt: padding,
+                  wrap: FrameWrapMode::NotBeside,
+                  ..Default::default()
+                },
+                suppress_overlap: false,
+                outer_fill_color: None,
+                outer_borders: Default::default(),
+              })
+            };
+            source.blocks = vec![
+              lead,
+              frame("FRAME-A", 200.0),
+              frame("FRAME-B", 210.0),
+              paragraph("BODY".into()),
+            ];
+            let result = layout(&source, &LayoutOptions::default()).unwrap();
+            assert_eq!(result.pages.len(), 1);
+            let first = text_y(&result, "FRAME-A").1;
+            let second = text_y(&result, "FRAME-B").1;
+            let positioned = explicit && (mode >= 15 || offset != 0.0);
+            let expected_gap = if positioned {
+              if padding == 0.0 {
+                0.0
+              } else {
+                lead_height + 14.0 + padding + offset
+              }
+            } else {
+              14.0 + padding
+            };
+            assert!(
+              (second - first - expected_gap).abs() < 0.001,
+              "lead={lead_height}, mode={mode}, explicit={explicit}, offset={offset}, padding={padding}: {first}/{second}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn fixed_paragraph_frame_wrap_is_independent_of_source_order() {
+    for wrap in [
+      FrameWrapMode::Auto,
+      FrameWrapMode::Around,
+      FrameWrapMode::Tight,
+      FrameWrapMode::Through,
+      FrameWrapMode::None,
+    ] {
+      for padding in [0.0, 9.0, 18.0] {
+        let frame = Block::Frame(FloatingFrame {
+          blocks: vec![paragraph("FRAME".into())],
+          drop_cap: false,
+          page_break_before: false,
+          width_pt: Some(200.0),
+          height_pt: Some(70.0),
+          height_rule: FrameHeightRule::Exact,
+          vertical_text_flow: None,
+          placement: FloatingFramePlacement {
+            vertical_anchor: FrameVerticalAnchor::Margin,
+            horizontal_anchor: FrameHorizontalAnchor::Margin,
+            wrap,
+            margin_left_pt: padding,
+            margin_right_pt: padding,
+            ..Default::default()
+          },
+          suppress_overlap: false,
+          outer_fill_color: None,
+          outer_borders: Default::default(),
+        });
+        let mut origins = Vec::new();
+        for anchor_index in [0, 1, 2] {
+          let mut source = document(0, 792.0, "none");
+          source.blocks = vec![paragraph("BEFORE".into()), paragraph("AFTER".into())];
+          source.blocks.insert(anchor_index, frame.clone());
+          let rendered = layout(&source, &LayoutOptions::default()).unwrap();
+          assert_eq!(rendered.pages.len(), 1);
+          let positions = rendered.pages[0]
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) if text.text == "BEFORE" || text.text == "AFTER" => {
+                Some((text.text.clone(), text.x_pt, text.y_pt))
+              }
+              _ => None,
+            })
+            .collect::<Vec<_>>();
+          assert_eq!(positions.len(), 2);
+          let expected_x = if wrap == FrameWrapMode::None {
+            72.0
+          } else {
+            272.0 + padding
+          };
+          assert!(positions.iter().all(|p| (p.1 - expected_x).abs() < 0.001));
+          origins.push(positions);
+        }
+        assert_eq!(origins[0], origins[1]);
+        assert_eq!(origins[0], origins[2]);
+      }
+    }
+  }
+
+  #[test]
+  fn legacy_top_bottom_lower_space_moves_only_the_terminal_physical_line() {
+    let setup = PageSetup::default();
+    let mut metrics = TextMetrics::new();
+    for text in ["", "FIRST", "FIRST\nLAST", "FIRST\nMIDDLE\nLAST"] {
+      let Block::Paragraph(paragraph) = paragraph(text.into()) else {
+        unreachable!()
+      };
+      for mode in [12, 14, 15] {
+        let mut flow = flow_context(
+          setup,
+          0,
+          SectionColumns::default(),
+          0,
+          0,
+          DEFAULT_TAB_STOP_PT,
+        );
+        flow.compatibility_mode = mode;
+        for after in [0.0, 7.95, 8.0, 20.0] {
+          let mut reference = empty_page(setup, 0);
+          let (_, reference_bottom) = layout_paragraph(
+            &paragraph,
+            flow,
+            ParagraphLayoutTarget {
+              current: &mut reference,
+              pages: &mut Vec::new(),
+              anchor_pages: None,
+              text_metrics: &mut metrics,
+            },
+            flow.content_top_pt,
+            flow.content_top_pt,
+            after,
+          );
+          let lines = |page: &Page| {
+            page
+              .frame_fragments
+              .iter()
+              .filter(|fragment| fragment.kind == FrameFragmentKind::ParagraphLine)
+              .map(|fragment| fragment.bounds.unwrap())
+              .collect::<Vec<_>>()
+          };
+          let reference_lines = lines(&reference);
+          assert_eq!(reference_lines.len(), text.split('\n').count());
+          let terminal = *reference_lines.last().unwrap();
+          // Exact-line painted bounds include the font's baseline offset;
+          // collision uses the logical flow strip, also for an empty mark.
+          let terminal_flow_top = reference_bottom - after - terminal.height_pt;
+          for blocks_flow in [false, true] {
+            let mut page = empty_page(setup, 0);
+            let band = WrapExclusion {
+              left_pt: flow.content_left_pt + 10.0,
+              right_pt: flow.content_left_pt + 80.0,
+              top_pt: terminal_flow_top + terminal.height_pt + 7.95,
+              bottom_pt: terminal_flow_top + terminal.height_pt + 65.0,
+              side: ImageWrapSide::BothSides,
+              blocks_flow,
+              uses_contour: false,
+              contour_band: None,
+              owner: WrapExclusionOwner::Drawing,
+            };
+            page.wrap_exclusions.push(band);
+            let mut pages = Vec::new();
+            let (_, bottom) = layout_paragraph(
+              &paragraph,
+              flow,
+              ParagraphLayoutTarget {
+                current: &mut page,
+                pages: &mut pages,
+                anchor_pages: None,
+                text_metrics: &mut metrics,
+              },
+              flow.content_top_pt,
+              flow.content_top_pt,
+              after,
+            );
+            assert!(pages.is_empty());
+            let actual = lines(&page);
+            assert_eq!(actual.len(), reference_lines.len());
+            let shift = if mode < 15 && blocks_flow && after > 7.95 {
+              band.bottom_pt - terminal_flow_top
+            } else {
+              0.0
+            };
+            for (index, (line, reference)) in actual.iter().zip(&reference_lines).enumerate() {
+              let expected = if index + 1 == actual.len() {
+                shift
+              } else {
+                0.0
+              };
+              assert!(
+                (line.y_pt - reference.y_pt - expected).abs() < 0.001,
+                "mode={mode} after={after} blocks={blocks_flow} text={text:?}: {actual:?}"
+              );
+              assert_eq!(line.height_pt, reference.height_pt);
+            }
+            assert!((bottom - reference_bottom - shift).abs() < 0.001);
+            assert_eq!(page.wrap_exclusions[0], band);
+          }
+        }
+      }
+    }
+  }
+
   fn in_two_columns(mut source: DocxDocument, balance: bool) -> DocxDocument {
     source.page.width_pt = 841.85;
     source.sections.push(crate::docx::ImportedSection {
+      note_reference_order: Default::default(),
       break_kind: SectionBreakKind::NextPage,
-      discarded_carrier_spacing_after_pt: None,
+      discarded_carrier: None,
       section_properties: None,
       page: source.page,
       columns: SectionColumns {
@@ -570,8 +1207,9 @@ mod tests {
   fn in_continuous_sections(mut source: DocxDocument) -> DocxDocument {
     let mut blocks = std::mem::take(&mut source.blocks);
     let prefix = crate::docx::ImportedSection {
+      note_reference_order: Default::default(),
       break_kind: SectionBreakKind::NextPage,
-      discarded_carrier_spacing_after_pt: None,
+      discarded_carrier: None,
       section_properties: None,
       page: source.page,
       columns: SectionColumns::default(),
@@ -674,6 +1312,93 @@ mod tests {
         assert_eq!(after, expected);
       } else {
         expected = Some(after);
+      }
+    }
+  }
+
+  #[test]
+  fn body_run_break_spacing_distinguishes_physical_top_and_continuous_columns() {
+    // Native mode14/15 opposites keep before-space at a continuous section's
+    // column origin, but modern physical page-top follows suppress it. The
+    // effective legacy flag also applies to column breaks and numbered text.
+    for mode in [14, 15] {
+      for page_break in [false, true] {
+        for continuous in [false, true] {
+          for numbered in [false, true] {
+            if continuous && numbered {
+              // The continuous-section native controls use plain paragraphs;
+              // numbering opposites independently cover physical-top follows.
+              continue;
+            }
+            for suppress in [false, true] {
+              if mode >= 15 && suppress {
+                // Word discards this legacy property in modern mode.
+                continue;
+              }
+              let mut positions = Vec::new();
+              let mut label_positions = Vec::new();
+              for before in [0.0, 14.0, 28.0] {
+                let mut source = document(0, 841.9, "none");
+                source.compatibility_mode = mode;
+                let mut follow = paragraph("FOLLOW".into());
+                let Block::Paragraph(p) = &mut follow else {
+                  unreachable!()
+                };
+                p.format.spacing_before_pt = before;
+                p.format.suppress_spacing_before_after_page_break = suppress;
+                p.inlines.insert(
+                  0,
+                  if page_break {
+                    InlineItem::PageBreak
+                  } else {
+                    InlineItem::ColumnBreak
+                  },
+                );
+                if numbered {
+                  p.list_label = Some("1.".into());
+                  p.list_label_style = p.base_style.clone();
+                }
+                source.blocks = vec![paragraph("FIRST".into()), follow];
+                if continuous {
+                  source.blocks.insert(0, paragraph("TOP".into()));
+                  source = in_continuous_sections(source);
+                  source.sections[1].columns.count = 2;
+                  let mut after = source.sections[1].clone();
+                  after.columns.count = 1;
+                  after.blocks = vec![paragraph("AFTER".into())];
+                  source.sections.push(after);
+                } else {
+                  source.blocks.push(paragraph("AFTER".into()));
+                  source = in_two_columns(source, false);
+                }
+                let result = layout(&source, &LayoutOptions::default()).unwrap();
+                assert_eq!(result.pages.len(), if page_break { 2 } else { 1 });
+                let follow = text_y(&result, "FOLLOW");
+                if numbered {
+                  let label = text_y(&result, "1.");
+                  assert_eq!(label.0, follow.0);
+                  label_positions.push(label.1);
+                }
+                positions.push(follow);
+              }
+              for (i, before) in [0.0, 14.0, 28.0].into_iter().enumerate() {
+                let expected = if (continuous && !page_break) || (!suppress && mode < 15) {
+                  before
+                } else {
+                  0.0
+                };
+                let follow = positions[i];
+                if numbered {
+                  assert!((label_positions[i] - label_positions[0] - expected).abs() < 0.01);
+                }
+                assert!(
+                  (follow.1 - positions[0].1 - expected).abs() < 0.01,
+                  "mode{mode} page{page_break} continuous{continuous} numbered{numbered} suppress{suppress} before{before}: {positions:?}",
+                );
+              }
+            }
+          }
+        }
       }
     }
   }

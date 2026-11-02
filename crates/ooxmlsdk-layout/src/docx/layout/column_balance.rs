@@ -650,13 +650,14 @@ mod tests {
       })
     };
     let section = |count, break_kind, blocks| crate::docx::ImportedSection {
+      note_reference_order: Default::default(),
       page,
       columns: SectionColumns {
         count,
         ..Default::default()
       },
       break_kind,
-      discarded_carrier_spacing_after_pt: None,
+      discarded_carrier: None,
       section_properties: None,
       title_page: false,
       header_blocks: Vec::new(),
@@ -684,6 +685,7 @@ mod tests {
         page,
         page_background_pattern: None,
         page_background_texture: None,
+        page_background_gradient: None,
         line_number_style: TextStyle::default(),
         note_separator_style: TextStyle::default(),
         footnote_separator_stories: Default::default(),

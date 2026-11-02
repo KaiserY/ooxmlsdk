@@ -16,6 +16,9 @@ pub(crate) struct KashidaOpportunity {
   pub byte_index: usize,
   pub minimum_width_pt: f32,
   pub glyph_width_pt: f32,
+  pub priority: u8,
+  pub modern_secondary: bool,
+  pub secondary_priority: u8,
 }
 
 /// Word's completed Arabic runs use whole device advances, including GPOS,
@@ -34,6 +37,22 @@ pub(super) fn realize_device(
     || (scale - f32::from(device.font_width_percent) / 100.0).abs() > 0.00001
   {
     return None;
+  }
+  if !device.glyph_advances.is_empty() {
+    if device.glyph_advances.len() != shaped.glyphs.len() {
+      return None;
+    }
+    let mut width = 0.0;
+    for (glyph, &pixels) in shaped.glyphs.iter_mut().zip(&device.glyph_advances) {
+      if pixels < 0 || glyph.font_size_pt <= 0.0 {
+        return None;
+      }
+      let advance = pixels as f32 * DEVICE_PIXEL_PT;
+      glyph.x_advance_em = advance / glyph.font_size_pt;
+      width += advance;
+    }
+    shaped.width_pt = width;
+    return Some(shaped);
   }
   let pitch_pixels = wordprocessing_device::source_coordinate(character_spacing_pt) as f64;
   let mut width = 0.0;
@@ -149,12 +168,29 @@ pub(super) fn opportunities(
   shaped: &ShapedText,
   style: &(impl FontStyleRef + ?Sized),
 ) -> Vec<KashidaOpportunity> {
+  connection_opportunities(text, shaped, style, false)
+}
+
+pub(super) fn modern_opportunities(
+  text: &str,
+  shaped: &ShapedText,
+  style: &(impl FontStyleRef + ?Sized),
+) -> Vec<KashidaOpportunity> {
+  connection_opportunities(text, shaped, style, true)
+}
+
+fn connection_opportunities(
+  text: &str,
+  shaped: &ShapedText,
+  style: &(impl FontStyleRef + ?Sized),
+  all_connections: bool,
+) -> Vec<KashidaOpportunity> {
   let joining = CodePointMapData::<JoiningType>::new();
   let groups = CodePointMapData::<JoiningGroup>::new();
   let scripts = CodePointMapData::<Script>::new();
   let mut result = Vec::new();
   let mut word_start = 0;
-  let word_device = style.wordprocessing_kashida().is_some();
+  let word_device = all_connections || style.wordprocessing_kashida().is_some();
   for word in text.split_inclusive(|ch: char| {
     // Native Word selects one connection across these embedded punctuation
     // marks (e.g. قطاع/موضوع). Spaces, hyphens and zero-width spaces still
@@ -172,116 +208,160 @@ pub(super) fn opportunities(
       && !matches!(ch, '\u{0640}' | '\u{200c}' | '\u{200d}')
   }) {
     let end = word_start + word.len();
-    let selected = shaped
-      .glyphs
-      .iter()
-      .filter_map(|glyph| {
-        let byte_index = glyph.text_range.start;
-        if !glyph.safe_to_insert_tatweel || byte_index <= word_start || byte_index >= end {
-          return None;
-        }
-        let previous = text
-          .get(word_start..byte_index)?
-          .chars()
-          .rev()
-          .find(|&ch| joining.get(ch) != JoiningType::Transparent)?;
-        if scripts.get(previous) != Script::Arabic && previous != '\u{0640}' {
-          return None;
-        }
-        let cluster = text.get(glyph.text_range.clone())?;
-        let mut cluster_characters = cluster
-          .char_indices()
-          .filter(|&(_, ch)| joining.get(ch) != JoiningType::Transparent);
-        let (first_offset, first) = cluster_characters.next()?;
-        // Word's glyph properties describe the character at the join's
-        // entry, including a medial Yeh in a Yeh+Noon ligature. Its final
-        // source character does not describe that entry shape. Native Word
-        // controls give both Beh/Reh and Teh/Reh font ligatures the BA class.
-        // Retain their entry character's priority: promoting the compound to
-        // standalone Reh's priority outranks a later Yeh/Noon BA connection.
-        let (current, next_start) = if word_device {
-          (first, byte_index + first_offset + first.len_utf8())
-        } else {
+    let positions = shaped.glyphs.iter().filter_map(|glyph| {
+      let byte_index = glyph.text_range.start;
+      if !glyph.safe_to_insert_tatweel || byte_index <= word_start || byte_index >= end {
+        return None;
+      }
+      let previous = text
+        .get(word_start..byte_index)?
+        .chars()
+        .rev()
+        .find(|&ch| joining.get(ch) != JoiningType::Transparent)?;
+      if scripts.get(previous) != Script::Arabic && previous != '\u{0640}' {
+        return None;
+      }
+      let cluster = text.get(glyph.text_range.clone())?;
+      let mut cluster_characters = cluster
+        .char_indices()
+        .filter(|&(_, ch)| joining.get(ch) != JoiningType::Transparent);
+      let (first_offset, first) = cluster_characters.next()?;
+      // Word's glyph properties describe the character at the join's
+      // entry, including a medial Yeh in a Yeh+Noon ligature. Its final
+      // source character does not describe that entry shape. Native Word
+      // controls give both Beh/Reh and Teh/Reh font ligatures the BA class.
+      // Retain their entry character's priority: promoting the compound to
+      // standalone Reh's priority outranks a later Yeh/Noon BA connection.
+      let (current, next_start) = if word_device {
+        (first, byte_index + first_offset + first.len_utf8())
+      } else {
+        (
+          cluster
+            .chars()
+            .rev()
+            .find(|&ch| joining.get(ch) != JoiningType::Transparent)?,
+          glyph.text_range.end,
+        )
+      };
+      let next = text
+        .get(next_start..end)?
+        .chars()
+        .find(|&ch| joining.get(ch) != JoiningType::Transparent);
+      let connects_next = matches!(
+        joining.get(current),
+        JoiningType::DualJoining | JoiningType::JoinCausing
+      ) && next.is_some_and(|ch| {
+        matches!(
+          joining.get(ch),
+          JoiningType::DualJoining | JoiningType::RightJoining | JoiningType::JoinCausing
+        )
+      });
+      // Uniscribe marks medial U+0649 (alef maksura) as
+      // SCRIPT_JUSTIFY_NONE, even though its shaped glyph is otherwise a
+      // safe HarfBuzz insertion boundary. Word instead extends another
+      // join in words such as "ولىس"; final U+0649 remains eligible.
+      if current == '\u{0649}' && connects_next {
+        return None;
+      }
+      let current_seen =
+        connects_next && matches!(groups.get(current), JoiningGroup::Seen | JoiningGroup::Sad);
+      let previous_seen = matches!(groups.get(previous), JoiningGroup::Seen | JoiningGroup::Sad);
+      // Initial/medial Seen owns expansion after itself. Modern LS does
+      // not additionally classify its entering connection as Normal.
+      if all_connections && current_seen && !previous_seen {
+        return None;
+      }
+      // Native Word's connection priorities. These are priorities of
+      // eligible shaped joins, not permission to split arbitrary letters.
+      // Seen/Sad extend after the letter; the remaining classes extend
+      // before the selected final/medial shape. Equal priority prefers the
+      // last logical position in the word.
+      let priority = if previous == '\u{0640}' {
+        8
+      } else if previous_seen {
+        7
+      } else {
+        match (groups.get(current), connects_next) {
+          (JoiningGroup::Heh | JoiningGroup::TehMarbuta | JoiningGroup::Dal, false) => 6,
           (
-            cluster
-              .chars()
-              .rev()
-              .find(|&ch| joining.get(ch) != JoiningType::Transparent)?,
-            glyph.text_range.end,
-          )
-        };
-        let next = text
-          .get(next_start..end)?
-          .chars()
-          .find(|&ch| joining.get(ch) != JoiningType::Transparent);
-        let connects_next = matches!(
-          joining.get(current),
-          JoiningType::DualJoining | JoiningType::JoinCausing
-        ) && next.is_some_and(|ch| {
-          matches!(
-            joining.get(ch),
-            JoiningType::DualJoining | JoiningType::RightJoining | JoiningType::JoinCausing
-          )
-        });
-        // Uniscribe marks medial U+0649 (alef maksura) as
-        // SCRIPT_JUSTIFY_NONE, even though its shaped glyph is otherwise a
-        // safe HarfBuzz insertion boundary. Word instead extends another
-        // join in words such as "ولىس"; final U+0649 remains eligible.
-        if current == '\u{0649}' && connects_next {
-          return None;
+            JoiningGroup::Alef
+            | JoiningGroup::Beh
+            | JoiningGroup::Kaf
+            | JoiningGroup::Gaf
+            | JoiningGroup::Lam,
+            false,
+          ) => 5,
+          (
+            JoiningGroup::Waw | JoiningGroup::Ain | JoiningGroup::Feh | JoiningGroup::Qaf,
+            false,
+          ) => 4,
+          (JoiningGroup::Reh | JoiningGroup::Yeh | JoiningGroup::FarsiYeh, false) => 3,
+          (
+            JoiningGroup::Beh | JoiningGroup::Noon | JoiningGroup::Yeh | JoiningGroup::FarsiYeh,
+            true,
+          ) => 2,
+          _ => 1,
         }
-        // Native Word's connection priorities. These are priorities of
-        // eligible shaped joins, not permission to split arbitrary letters.
-        // Seen/Sad extend after the letter; the remaining classes extend
-        // before the selected final/medial shape. Equal priority prefers the
-        // last logical position in the word.
-        let priority = if previous == '\u{0640}' {
-          8
-        } else if matches!(groups.get(previous), JoiningGroup::Seen | JoiningGroup::Sad) {
-          7
-        } else {
-          match (groups.get(current), connects_next) {
-            (JoiningGroup::Heh | JoiningGroup::TehMarbuta | JoiningGroup::Dal, false) => 6,
-            (
-              JoiningGroup::Alef
-              | JoiningGroup::Beh
-              | JoiningGroup::Kaf
-              | JoiningGroup::Gaf
-              | JoiningGroup::Lam,
-              false,
-            ) => 5,
-            (
-              JoiningGroup::Waw | JoiningGroup::Ain | JoiningGroup::Feh | JoiningGroup::Qaf,
-              false,
-            ) => 4,
-            (JoiningGroup::Reh | JoiningGroup::Yeh | JoiningGroup::FarsiYeh, false) => 3,
-            (
-              JoiningGroup::Beh | JoiningGroup::Noon | JoiningGroup::Yeh | JoiningGroup::FarsiYeh,
-              true,
-            ) => 2,
-            _ => 1,
-          }
-        };
-        let width =
-          extender(shaped, glyph, style.horizontal_scale())?.x_advance_em * glyph.font_size_pt;
-        let (minimum_width_pt, glyph_width_pt) =
-          if let Some(device) = style.wordprocessing_kashida() {
-            device_extender_widths(shaped, glyph, device.font_width_percent)?
-          } else {
-            (width, width)
-          };
-        if minimum_width_pt <= 0.0 || glyph_width_pt <= 0.0 {
-          return None;
-        }
-        Some((priority, byte_index, minimum_width_pt, glyph_width_pt))
-      })
-      .max_by_key(|&(priority, byte_index, _, _)| (priority, byte_index));
-    if let Some((_, byte_index, minimum_width_pt, glyph_width_pt)) = selected {
-      result.push(KashidaOpportunity {
+      };
+      let width =
+        extender(shaped, glyph, style.horizontal_scale())?.x_advance_em * glyph.font_size_pt;
+      let (minimum_width_pt, glyph_width_pt) = if let Some(device) = style.wordprocessing_kashida()
+      {
+        device_extender_widths(shaped, glyph, device.font_width_percent)?
+      } else {
+        (width, width)
+      };
+      if minimum_width_pt <= 0.0 || glyph_width_pt <= 0.0 {
+        return None;
+      }
+      Some((
+        priority,
         byte_index,
         minimum_width_pt,
         glyph_width_pt,
-      });
+        !current_seen,
+        if !connects_next
+          && matches!(
+            groups.get(current),
+            JoiningGroup::Alef
+              | JoiningGroup::Beh
+              | JoiningGroup::Kaf
+              | JoiningGroup::Gaf
+              | JoiningGroup::Lam
+              | JoiningGroup::Heh
+              | JoiningGroup::TehMarbuta
+              | JoiningGroup::Dal
+          )
+        {
+          2
+        } else {
+          3
+        },
+      ))
+    });
+    let opportunity = |(
+      priority,
+      byte_index,
+      minimum_width_pt,
+      glyph_width_pt,
+      modern_secondary,
+      secondary_priority,
+    )| {
+      KashidaOpportunity {
+        byte_index,
+        minimum_width_pt,
+        glyph_width_pt,
+        priority,
+        modern_secondary,
+        secondary_priority,
+      }
+    };
+    if all_connections {
+      result.extend(positions.map(opportunity));
+    } else if let Some(selected) =
+      positions.max_by_key(|&(priority, byte_index, _, _, _, _)| (priority, byte_index))
+    {
+      result.push(opportunity(selected));
     }
     word_start = end;
   }
@@ -333,6 +413,11 @@ pub(super) fn expand(mut shaped: ShapedText, style: &(impl FontStyleRef + ?Sized
     });
     let width_em = native_width.unwrap_or(extension.x_advance_em);
     let total_em = advance.0 / glyph.font_size_pt;
+    let modern_rtl = native_width.is_some()
+      && style.right_to_left()
+      && style
+        .wordprocessing_kashida()
+        .is_some_and(|device| !device.glyph_advances.is_empty());
     let step_em = if native_width.is_some() {
       width_em
     } else if *glyph_count > 1 {
@@ -341,12 +426,22 @@ pub(super) fn expand(mut shaped: ShapedText, style: &(impl FontStyleRef + ?Sized
       total_em
     };
     for copy in 0..*glyph_count {
-      extension.x_advance_em = if copy + 1 == *glyph_count {
+      // Native RTL GetJustifiedGlyphs returns zero-advance extenders with
+      // offsets -max(nominal, extra-copy*nominal) in logical order. Reversing
+      // their painted origins puts the partial interval first. A subnominal
+      // extender starts at the join's left edge and overlaps the next base.
+      extension.x_advance_em = if modern_rtl && copy == 0 {
+        total_em - width_em * (*glyph_count - 1) as f32
+      } else if modern_rtl {
+        width_em
+      } else if copy + 1 == *glyph_count {
         total_em - step_em * copy as f32
       } else {
         step_em
       };
-      extension.x_offset_em = if native_width.is_some() && copy + 1 == *glyph_count {
+      extension.x_offset_em = if modern_rtl {
+        0.0
+      } else if native_width.is_some() && copy + 1 == *glyph_count {
         (total_em - width_em * *glyph_count as f32).min(0.0)
       } else if *glyph_count == 1 {
         (total_em - width_em).min(0.0)
@@ -382,6 +477,73 @@ mod tests {
   }
 
   #[test]
+  fn modern_word_kashida_uses_native_ligature_and_final_form_priorities() {
+    let mut metrics = TextMetrics::new();
+    let style = arabic_style();
+    // Actual native glyph properties: Lam-Alef is Normal, while final
+    // Beh/Kaf/Lam and Alef/Ha belong to the earlier expansion priority.
+    for (text, expected) in [
+      ("با", vec![2]),
+      ("بلا", vec![3]),
+      ("به", vec![2]),
+      ("بب", vec![2]),
+      ("بن", vec![3]),
+      ("بی", vec![3]),
+      ("بک", vec![2]),
+      ("بعل", vec![3, 2]),
+    ] {
+      let shaped = metrics.shape_text(text, &style).unwrap();
+      let mut positions = super::modern_opportunities(text, &shaped, &style);
+      positions.sort_by_key(|position| position.byte_index);
+      assert_eq!(
+        positions
+          .iter()
+          .map(|position| position.secondary_priority)
+          .collect::<Vec<_>>(),
+        expected,
+        "{text}",
+      );
+    }
+  }
+
+  #[test]
+  fn modern_word_kashida_counts_all_finite_connection_priorities() {
+    let mut metrics = TextMetrics::new();
+    let mut style = arabic_style();
+    style.font_size = Pt(11.0);
+    style.complex_font_size = Some(Pt(11.0));
+    style.wordprocessingml_font_slots = true;
+    style.wordprocessing_legacy_font_measurement = Some(false);
+    // Independent Word mode15 controls expose the complete five-priority
+    // arrays. Initial/medial Seen extends after itself; before-Seen is not
+    // an additional Normal opportunity. Legacy mode14 selects one per word.
+    for (text, bytes, ideal_capacity) in [
+      ("سین", vec![2, 4], 75108),
+      ("تسلط", vec![4, 6], 75108),
+      ("بعل", vec![2, 4], 37554),
+      ("سلام", vec![2], 56331),
+    ] {
+      let shaped = metrics.shape_text(text, &style).unwrap();
+      let mut actual = super::modern_opportunities(text, &shaped, &style)
+        .iter()
+        .map(|position| position.byte_index)
+        .collect::<Vec<_>>();
+      actual.sort_unstable();
+      assert_eq!(actual, bytes, "{text}");
+      assert_eq!(super::opportunities(text, &shaped, &style).len(), 1);
+      assert_eq!(
+        (metrics.modern_kashida_expansion_capacity(text, &style) * 4096.0).round() as i32,
+        ideal_capacity,
+        "{text}"
+      );
+    }
+    assert_eq!(
+      metrics.modern_kashida_expansion_capacity("Latin text", &style),
+      0.0
+    );
+  }
+
+  #[test]
   fn word_device_character_spacing_matches_native_numeric_and_mark_advances() {
     let mut metrics = TextMetrics::new();
     let mut style = arabic_style();
@@ -393,6 +555,7 @@ mod tests {
     style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
       retain_trailing_blank: false,
       unshaped_blanks: false,
+      glyph_advances: Vec::new(),
       font_width_percent: 100,
       space_expansions: Vec::new(),
     }));
@@ -434,6 +597,62 @@ mod tests {
   }
 
   #[test]
+  fn modern_kashida_reverses_native_extender_offsets_into_visual_origins() {
+    let mut metrics = TextMetrics::new();
+    let mut style = arabic_style();
+    style.font_size = Pt(11.0);
+    style.complex_font_size = Some(Pt(11.0));
+    style.wordprocessing_legacy_font_measurement = Some(false);
+    style.wordprocessingml_font_slots = true;
+    style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
+      font_width_percent: 100,
+      glyph_advances: Vec::new(),
+      space_expansions: Vec::new(),
+      retain_trailing_blank: false,
+      unshaped_blanks: false,
+    }));
+    let text = "متن";
+    let source = metrics.shape_text(text, &style).unwrap();
+    let opportunity = metrics.modern_kashida_opportunities(text, &style).remove(0);
+    Arc::make_mut(style.wordprocessing_kashida.as_mut().unwrap()).glyph_advances = source
+      .glyphs
+      .iter()
+      .map(|glyph| {
+        (glyph.x_advance_em * glyph.font_size_pt / super::DEVICE_PIXEL_PT).round() as i32
+      })
+      .collect();
+    // Complete native Arial em92 arrays: nominal Tatweel424/2048*92,
+    // zero-advance logical offsets reversed into physical painting order.
+    for (pixels, origins) in [
+      (5.0, vec![0.0]),
+      (38.0, vec![0.0, 18.953125]),
+      (81.0, vec![0.0, 4.8125, 23.859375, 42.90625, 61.953125]),
+    ] {
+      style.kashida_expansions = Some(Arc::from([KashidaExpansion {
+        byte_index: opportunity.byte_index,
+        advance: Pt(pixels * super::DEVICE_PIXEL_PT),
+        glyph_count: origins.len(),
+      }]));
+      let expanded = metrics.shape_text(text, &style).unwrap();
+      let extenders = expanded
+        .glyphs
+        .iter()
+        .filter(|glyph| glyph.glyph_id == 752)
+        .collect::<Vec<_>>();
+      assert_eq!(extenders.len(), origins.len());
+      let mut cursor = 0.0;
+      for (glyph, expected) in extenders.iter().zip(origins) {
+        let origin = cursor + glyph.x_offset_em * 11.0 / super::DEVICE_PIXEL_PT;
+        assert!((origin - expected).abs() < 0.0002, "{origin} != {expected}");
+        cursor += glyph.x_advance_em * 11.0 / super::DEVICE_PIXEL_PT;
+        assert_eq!(glyph.text_range.start, opportunity.byte_index);
+      }
+      assert!((cursor - pixels).abs() < 0.0002);
+      assert!((expanded.width_pt - source.width_pt - pixels * 0.12).abs() < 0.00001);
+    }
+  }
+
+  #[test]
   fn word_device_kashida_uses_nominal_steps_and_overlaps_the_last_copy() {
     let mut metrics = TextMetrics::new();
     let mut style = arabic_style();
@@ -450,6 +669,7 @@ mod tests {
     style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
       retain_trailing_blank: false,
       unshaped_blanks: false,
+      glyph_advances: Vec::new(),
       font_width_percent: 103,
       space_expansions: Vec::new(),
     }));
@@ -499,6 +719,7 @@ mod tests {
     style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
       retain_trailing_blank: false,
       unshaped_blanks: false,
+      glyph_advances: Vec::new(),
       font_width_percent: 103,
       space_expansions: Vec::new(),
     }));
@@ -680,6 +901,7 @@ mod tests {
       style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
         retain_trailing_blank: false,
         unshaped_blanks: false,
+        glyph_advances: Vec::new(),
         font_width_percent: 103,
         space_expansions: Vec::new(),
       }));

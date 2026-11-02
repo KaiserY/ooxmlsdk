@@ -41,13 +41,23 @@ impl Axis {
     }
   }
 
-  fn map_source(self, source_dots: f32) -> f32 {
+  fn output_dots(self, source_dots: f32) -> f64 {
     let mapped = source_dots * self.scale;
     // GDI first rounds to POINTFIX (28.4), then rounds that fixed point to a
     // device integer. Keep this order, including negative coordinate ties.
     let fixed = (f64::from(mapped) * 16.0).round();
-    let output_dots = ((fixed + 8.0) / 16.0).floor();
-    (output_dots * 72.0 / OUTPUT_DPI) as f32
+    ((fixed + 8.0) / 16.0).floor()
+  }
+
+  fn map_source(self, source_dots: f32) -> f32 {
+    (self.output_dots(source_dots) * 72.0 / OUTPUT_DPI) as f32
+  }
+
+  fn bitmap_point(self, source_dots: i64) -> f32 {
+    // Native bitmap replay divides the device coordinate by its DPI before
+    // multiplying by 72, both in FLOAT. Widening or replacing the division
+    // with a precomputed scale can change the eventual bitmap allocation.
+    self.output_dots(source_dots as f32) as f32 / OUTPUT_DPI as f32 * 72.0
   }
 
   fn map_points(self, points: f32) -> f32 {
@@ -121,11 +131,35 @@ impl PageCoordinates {
     let bottom = self.y.map_source((y + height) as f32);
     (left, top, right - left, bottom - top)
   }
+
+  /// Preserve the FLOAT endpoint conversion used to allocate a replayed bitmap.
+  /// This is distinct from the point conversion for vector paint.
+  pub fn map_device_bitmap_rectangle(&self, rect: (i64, i64, i64, i64)) -> (f32, f32, f32, f32) {
+    let (x, y, width, height) = rect;
+    let left = self.x.bitmap_point(x);
+    let top = self.y.bitmap_point(y);
+    let right = self.x.bitmap_point(x + width);
+    let bottom = self.y.bitmap_point(y + height);
+    (left, top, right - left, bottom - top)
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn word_bitmap_replay_preserves_native_float_endpoint_subtraction() {
+    let device = PageCoordinates::for_standard_size(612.0, 792.0).unwrap();
+    // Native Word's 600-DPI corner is replayed at (3291,4336)..(3416,4461)
+    // in the 3000-DPI output DC. MSO's observed FLOAT endpoints, before PDF
+    // decimal serialization, leave both extents just below three points.
+    let (left, top, width, height) = device.map_device_bitmap_rectangle((658, 867, 25, 25));
+    assert_eq!(left, 3291.0_f32 / 3000.0 * 72.0);
+    assert_eq!(top, 4336.0_f32 / 3000.0 * 72.0);
+    assert_eq!(width.to_bits(), 0x403f_ffe0);
+    assert_eq!(height.to_bits(), 0x403f_ffe0);
+  }
 
   #[test]
   fn word_text_device_matches_native_emf_run_origins() {

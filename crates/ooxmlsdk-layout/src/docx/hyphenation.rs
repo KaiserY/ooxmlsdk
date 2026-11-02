@@ -151,7 +151,17 @@ fn automatic_candidates(
     if do_not_hyphenate_caps && is_all_capitals(word) {
       continue;
     }
-    for offset in HypherProvider::candidate_offsets(word, language) {
+    let dictionary_offsets = (language == hypher::Lang::English)
+      .then(|| {
+        style
+          .english_hyphenation_dictionary
+          .as_ref()?
+          .candidate_offsets(word)
+      })
+      .flatten();
+    for offset in
+      dictionary_offsets.unwrap_or_else(|| HypherProvider::candidate_offsets(word, language))
+    {
       output.push(Candidate {
         break_before: start + offset,
         resume_at: start + offset,

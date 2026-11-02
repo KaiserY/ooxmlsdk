@@ -138,6 +138,7 @@ pub(super) fn resolve(inlines: &mut Vec<InlineItem>, field_events: &mut [Paragra
     match event {
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
       | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | ParagraphFieldEvent::GeneratedParagraphBreak { inline_offset, .. }
       | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
         *inline_offset = offsets[*inline_offset];
       }
@@ -234,6 +235,7 @@ mod tests {
         unreachable!()
       };
       inlines.push(InlineItem::Ruby(super::super::RubyInline {
+        container_font_size_pt: base.style.font_size_pt,
         fit_text: Some(WordprocessingFitText {
           id: 1,
           width_pt: 84.0,

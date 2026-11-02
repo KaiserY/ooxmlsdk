@@ -240,6 +240,8 @@ pub enum MetafileFixedOutputProfile {
   ExcelVmlPicture,
   /// Word inline VML pictures, including embedded-object replacement graphics.
   WordInlineVmlPicture,
+  /// Word floating VML pictures, including embedded-object replacement graphics.
+  WordFloatingVmlPicture,
   /// Word VML EMF pictures whose classic text is independent of later
   /// graphics. Preserve the picture's affine font transform in fixed output.
   WordVmlEmfPicture,
@@ -646,6 +648,9 @@ pub struct KashidaExpansion {
 #[derive(Clone, Debug, PartialEq)]
 pub struct WordprocessingKashida {
   pub font_width_percent: u16,
+  /// Modern complex-script line balancing, in the shaped glyph order. Ink
+  /// extenders remain separate; spaces already include their final glue.
+  pub glyph_advances: Vec<i32>,
   /// UTF-8 space positions and their extra whole 600-DPI pixels. Native Word
   /// spends the remaining glue on logical leading spaces first.
   pub space_expansions: Vec<(usize, i32)>,
@@ -758,6 +763,10 @@ pub struct TextStyle<'doc> {
   /// OOXML `w:noBreakHyphen`: retain U+2011 for line breaking, but use
   /// the U+002D font slot and glyph. Literal U+2011 text remains distinct.
   pub wordprocessingml_no_break_hyphen: bool,
+  /// Effective editing-session identities for Word variable-font bitmap
+  /// portions. Equal identities may coalesce; distinct owners must survive
+  /// lowering to the fixed-format writer.
+  pub wordprocessingml_bitmap_revisions: Option<Arc<[Option<u32>; 3]>>,
   /// Word's missing-Han fallback, independently of the shared font-slot table.
   pub wordprocessingml_han_fallback: bool,
   /// Enable CJK-capable font line metrics for WordprocessingML documents

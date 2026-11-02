@@ -237,6 +237,53 @@ pub(super) fn bind(
   placement: Placement,
   text_metrics: &mut TextMetrics,
 ) {
+  bind_line(items, paragraph, flow, placement, text_metrics);
+  side_ruby::materialize(items, flow, text_metrics);
+}
+
+fn bind_line(
+  items: &mut [PageItem],
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  placement: Placement,
+  text_metrics: &mut TextMetrics,
+) {
+  if paragraph.format.wordprocessing_shape_mixed_vertical_text
+    && paragraph.format.line_height_rule != LineHeightRule::Exact
+  {
+    // Mixed vertical WPS stories rotate only after horizontal formatting.
+    // Retain the logical line top and common baseline across that boundary;
+    // TextItem's provisional y may already contain external font leading.
+    // The column transform consumes and clears this geometry before paint.
+    let extents = placement.text_extents;
+    if !extents.has_text {
+      return;
+    }
+    let natural_height = extents.height_pt();
+    let leading = if paragraph.format.line_height_rule == LineHeightRule::AtLeast {
+      // Minimum-height native columns put the complete excess before the
+      // font cell in either column direction. Auto multiples advance the
+      // next column without displacing this one. Exact keeps its independent
+      // fixed-line baseline path.
+      (placement.height - natural_height).max(0.0)
+    } else {
+      0.0
+    };
+    let baseline = extents.ascent_pt.max(extents.effect_ascent_pt);
+    bind_text_metrics(
+      items,
+      flow,
+      &placement,
+      placement.y + leading + natural_height,
+      LineBox {
+        height: natural_height,
+        below: natural_height - baseline,
+        before: 0.0,
+        after: 0.0,
+      },
+    );
+    return;
+  }
   wordprocessing_auto_gap::materialize(items, &paragraph.format, flow, text_metrics);
   // Native Line Services receives the complete line box for natural,
   // minimum-height and ordinary fixed-height text, including text numbers.
@@ -266,21 +313,35 @@ pub(super) fn bind(
     });
   // Ordinary body numbers share the completed text line's baseline. Their
   // ascent reserve is independent of proportional spacing; their descent
-  // never replaces the body's. CJK gap, recovered and cell-cursor contracts
-  // remain separate from these native Latin body controls.
-  let numbered_body = matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
-    && flow.text_segmentation == TextSegmentation::Body
+  // never replaces the body's. Native cell controls retain that same ascent
+  // reserve, but their cursor already includes the provisional body ascent.
+  // CJK gap and recovered numbering keep their separate contracts.
+  let centered_picture = placement
+    .text_extents
+    .numbering
+    .filter(|numbering| numbering.centered_picture_height_pt.is_some());
+  let grid_numbering = placement.text_extents.numbering.is_some()
+    && (grid_numbering_uses_body_descent(paragraph, flow)
+      || (centered_picture.is_some()
+        && document_grid_line_metrics(
+          placement.height,
+          paragraph,
+          flow.setup,
+          flow.text_segmentation,
+        )
+        .is_some()));
+  let numbered_text = matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && (flow.text_segmentation == TextSegmentation::Body
+      || (resolved_cell
+        && placement
+          .text_extents
+          .numbering
+          .is_some_and(|numbering| !numbering.centered_font_gap)))
     && paragraph.list_label.is_some()
-    && !paragraph.format.office_recovered_line_height
+    && (!paragraph.format.office_recovered_line_height || grid_numbering)
     && paragraph.format.vertical_text_flow.is_none()
     && placement.text_extents.has_text
-    && !paragraph.inlines.iter().any(|inline| {
-      matches!(inline, InlineItem::Text(run) if run.text.chars().any(|character| {
-        matches!(character.script(),
-          Script::Han | Script::Hiragana | Script::Katakana | Script::Hangul
-          | Script::Bopomofo | Script::Yi)
-      }))
-    });
+    && !numbering_body_has_cjk_text(paragraph);
   // Picture numbering uses the body font's baseline, including recovered
   // Auto spacing. A larger bitmap reserves ascent; proportional leading is
   // below that union. Native independent run/mark/font controls establish
@@ -323,7 +384,7 @@ pub(super) fn bind(
       }
       _ => true,
     });
-  let text_owned = if minimum || numbered_body || picture_body || exact_line {
+  let text_owned = if minimum || numbered_text || picture_body || exact_line {
     (paragraph.list_label_image.is_none() || picture_body)
       && paragraph
         .inlines
@@ -345,13 +406,13 @@ pub(super) fn bind(
     // items. Their host paragraph must not replace that story's baseline.
     || !text_owned
     || paragraph_has_mixed_office_math(paragraph)
-    || document_grid_line_metrics(
+    || (!grid_numbering && document_grid_line_metrics(
       placement.height,
       paragraph,
       flow.setup,
       flow.text_segmentation,
     )
-    .is_some()
+    .is_some())
     || items
       .iter()
       .any(|item| inline_alignment_image(item).is_some())
@@ -393,7 +454,17 @@ pub(super) fn bind(
     }
     return;
   }
-  let metrics = if flat_effect_line {
+  let top_aligned_text = items.iter().any(|item| matches!(item, PageItem::Text(_)))
+    && items.iter().all(|item| match item {
+      PageItem::Text(text) => {
+        text.style.wordprocessingml_font_slots
+          && text.style.line_vertical_alignment == common::LineVerticalAlignment::Top
+          && text.style.automatic_escapement_font_size_pt.is_none()
+          && !text.origin_is_baseline
+      }
+      _ => false,
+    });
+  let metrics = if flat_effect_line || top_aligned_text {
     Some(WordprocessingLineMetrics {
       ascent_pt: placement
         .text_extents
@@ -405,7 +476,7 @@ pub(super) fn bind(
         .max(placement.text_extents.effect_descent_pt),
       top_aligned: false,
     })
-  } else if numbered_body || picture_body {
+  } else if numbered_text || picture_body || placement.text_extents.has_blank_line_metrics {
     Some(WordprocessingLineMetrics {
       ascent_pt: placement.text_extents.font_ascent_pt,
       descent_pt: placement.text_extents.font_descent_pt,
@@ -431,9 +502,13 @@ pub(super) fn bind(
   if natural <= 0.0 || !natural.is_finite() {
     return;
   }
-  let line_units = wordprocessing_auto_line_spacing_units(paragraph)
-    .unwrap_or(240)
-    .min(240);
+  let line_units = if grid_numbering {
+    240
+  } else {
+    wordprocessing_auto_line_spacing_units(paragraph)
+      .unwrap_or(240)
+      .min(240)
+  };
   let scaled = |pt| {
     let ideal = word_fixed_output_reference_units(pt).unwrap_or(0);
     word_fixed_output_positive_mul_div_round(ideal, i64::from(line_units), 240) as f32 / 4096.0
@@ -445,14 +520,20 @@ pub(super) fn bind(
         .any(|item| picture_numbering_image(item, &label.image).is_some());
       if has_marker {
         let image = numbering_image_metrics(label, flow.content_width, &paragraph.list_label_style);
-        (inline_image_ascent(image) - metrics.ascent_pt).max(0.0)
+        let ascent = if let Some(numbering) = centered_picture {
+          numbering.ascent_for(&placement.text_extents)
+        } else {
+          inline_image_ascent(image)
+        };
+        (ascent - metrics.ascent_pt).max(0.0)
       } else {
         0.0
       }
     })
-  } else if numbered_body {
+  } else if numbered_text {
     placement.text_extents.numbering.map_or(0.0, |numbering| {
-      (numbering.ascent_pt - placement.text_extents.font_ascent_pt).max(0.0)
+      (numbering.ascent_for(&placement.text_extents) - placement.text_extents.font_ascent_pt)
+        .max(0.0)
     })
   } else {
     0.0
@@ -478,8 +559,16 @@ pub(super) fn bind(
   let extra = (placement.height - natural).max(0.0);
   // Word's minimum-line controls retain the natural descent and place all
   // excess above the font box. Auto multiples instead place it below.
-  let leading_above = if minimum { extra } else { 0.0 };
-  let leading_below = if minimum { 0.0 } else { extra };
+  // A snapped grid centers the completed ascent/body-descent union; it does
+  // not center each font independently or apply proportional leading again.
+  let leading_above = if grid_numbering {
+    extra / 2.0
+  } else if minimum {
+    extra
+  } else {
+    0.0
+  };
+  let leading_below = extra - leading_above;
   let ascent = if compressed_legacy_reference {
     natural - scaled(metrics.descent_pt)
   } else {
@@ -510,7 +599,16 @@ pub(super) fn bind(
         // Its common paint ascent is resolved above from the complete line.
         // Keep this correction in paint geometry: native NEXT/AFTER controls
         // establish that line advance and row height were already correct.
-        placement.cell_baseline_reference_pt.unwrap_or(ascent)
+        placement.cell_baseline_reference_pt.unwrap_or({
+          if numbered_text {
+            // The first cell cursor contains the body font's ascent, not
+            // the number's reserve. Subtracting the enlarged common ascent
+            // would cancel exactly the adjustment that paint must retain.
+            metrics.ascent_pt
+          } else {
+            ascent
+          }
+        })
       }
     } else {
       0.0
@@ -537,12 +635,18 @@ pub(super) fn bind(
       common::wordprocessing_device::line_baseline(text.wordprocessing_line_metrics?, text.y_pt)
     })
   {
+    let picture_baseline = if let Some(numbering) = centered_picture {
+      let image = numbering_image_metrics(label, flow.content_width, &paragraph.list_label_style);
+      baseline + inline_image_ascent(image) - numbering.ascent_for(&placement.text_extents)
+    } else {
+      baseline
+    };
     for item in items {
       realize_picture_numbering(
         item,
         &label.image,
         f64::from(flow.content_left_pt),
-        baseline,
+        picture_baseline,
       );
     }
   }
@@ -645,6 +749,110 @@ pub(super) fn align(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn numbered_cell_paints_reserved_ascent_without_changing_following_flow() {
+    // Word 36-control matrix: Calibri 10/18pt body, bold Times New Roman
+    // 8/16/24pt numbers, automatic 120/257/360. Large labels add the same
+    // first-line ascent independently of spacing; following lines keep their
+    // already-correct advance. Exercise both terminal and wrapped completion.
+    fn render(body_size: f32, label_size: f32, units: f32, multiline: bool) -> (Vec<f32>, f32) {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Calibri")),
+        high_ansi_font_family: Some(Arc::from("Calibri")),
+        font_size_pt: body_size,
+        use_windows_font_metrics: true,
+        ..TextStyle::default()
+      };
+      let Block::Paragraph(mut paragraph) = crate::docx::simple_text_block(
+        if multiline { "FIRST\nNEXT" } else { "FIRST" }.into(),
+        style,
+      ) else {
+        unreachable!()
+      };
+      paragraph.format.line_height_pt = Some(units / 240.0);
+      paragraph.format.line_height_set = true;
+      paragraph.format.numbering_level_font_size_set = true;
+      paragraph.list_label = Some("A.\t".into());
+      paragraph.list_label_style = TextStyle {
+        font_family: Some(Arc::from("Times New Roman")),
+        high_ansi_font_family: Some(Arc::from("Times New Roman")),
+        font_size_pt: label_size,
+        bold: true,
+        use_windows_font_metrics: true,
+        ..TextStyle::default()
+      };
+      let mut flow = flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        36.0,
+      );
+      flow.text_segmentation = TextSegmentation::TableCell;
+      flow.horizontal_table_cell = true;
+      flow.layout_cell_bounds = Some(FrameBounds {
+        x_pt: 36.0,
+        y_pt: 36.0,
+        width_pt: 400.0,
+        height_pt: 600.0,
+      });
+      let mut page = empty_page(flow.setup, 0);
+      let mut pages = Vec::new();
+      let mut metrics = TextMetrics::new();
+      let (_, next_y) = layout_paragraph(
+        &paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut page,
+          pages: &mut pages,
+          anchor_pages: None,
+          text_metrics: &mut metrics,
+        },
+        100.0,
+        100.0,
+        0.0,
+      );
+      assert!(pages.is_empty());
+      let baselines = page
+        .items
+        .iter()
+        .filter_map(|item| {
+          let PageItem::Text(text) = item else {
+            return None;
+          };
+          Some(text.wordprocessing_line_metrics.map_or(text.y_pt, |line| {
+            text.y_pt + line.bottom_offset_pt - line.baseline_from_bottom_pt
+          }))
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(baselines.len(), if multiline { 3 } else { 2 });
+      assert!((baselines[0] - baselines[1]).abs() < 0.001);
+      (baselines, next_y)
+    }
+    for multiline in [false, true] {
+      for units in [120.0, 257.0, 360.0] {
+        for (body_size, label_size, native_extra) in [
+          (10.0, 16.0, 5.4),
+          (10.0, 24.0, 12.84),
+          (18.0, 16.0, 0.0),
+          (18.0, 24.0, 5.28),
+        ] {
+          let (small, small_end) = render(body_size, 8.0, units, multiline);
+          let (large, large_end) = render(body_size, label_size, units, multiline);
+          assert!(
+            (large[1] - small[1] - native_extra).abs() < 0.12,
+            "body={body_size}, label={label_size}, units={units}: {small:?} -> {large:?}"
+          );
+          assert!((large_end - small_end - native_extra).abs() < 0.12);
+          if multiline {
+            assert!((large[2] - small[2] - native_extra).abs() < 0.12);
+          }
+        }
+      }
+    }
+  }
 
   #[test]
   fn exact_line_box_preserves_native_independent_components() {

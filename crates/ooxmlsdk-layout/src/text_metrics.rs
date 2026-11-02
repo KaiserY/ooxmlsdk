@@ -31,6 +31,43 @@ impl<S: FontStyleRef + ?Sized> FontStyleRef for AutomaticEscapementMetricsStyle<
     self.style.font_family()
   }
 
+  fn font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.style.font_charset()
+  }
+  fn font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.style.font_pitch()
+  }
+  fn high_ansi_font_family(&self) -> Option<&str> {
+    self.style.high_ansi_font_family()
+  }
+  fn high_ansi_font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.style.high_ansi_font_family_class()
+  }
+  fn high_ansi_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.style.high_ansi_font_charset()
+  }
+  fn high_ansi_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.style.high_ansi_font_pitch()
+  }
+  fn east_asia_font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.style.east_asia_font_family_class()
+  }
+  fn wordprocessingml_east_asia_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.style.wordprocessingml_east_asia_font_charset()
+  }
+  fn east_asia_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.style.east_asia_font_pitch()
+  }
+  fn complex_font_family_class(&self) -> Option<ooxmlsdk_fonts::FontFamilyClass> {
+    self.style.complex_font_family_class()
+  }
+  fn complex_font_charset(&self) -> Option<ooxmlsdk_fonts::FontCharset> {
+    self.style.complex_font_charset()
+  }
+  fn complex_font_pitch(&self) -> Option<ooxmlsdk_fonts::FontPitch> {
+    self.style.complex_font_pitch()
+  }
+
   fn fallback_font_family(&self) -> Option<&str> {
     self.style.fallback_font_family()
   }
@@ -739,9 +776,35 @@ impl std::fmt::Debug for GdiHintingInstanceCache {
 #[derive(Default)]
 struct WordNaturalMetricCache {
   instances: HashMap<(FontFaceCacheKey, u16), Option<emfsdk::render::GdiNaturalMetrics>>,
+  design_units: HashMap<FontFaceCacheKey, Option<u16>>,
 }
 
 impl WordNaturalMetricCache {
+  fn positioned_advance(
+    &mut self,
+    face: &FontFaceData,
+    pixels: u16,
+    advance_em: f32,
+  ) -> Option<i32> {
+    let units = *self
+      .design_units
+      .entry(face.cache_key())
+      .or_insert_with(|| {
+        let font = FontRef::from_index(face.data.as_slice(), face.index).ok()?;
+        font.glyf().ok()?;
+        let units = font.head().ok()?.units_per_em();
+        (units != 0).then_some(units)
+      });
+    let units = f64::from(units?);
+    // The enabled w:kern branch uses rounded positioned design advances,
+    // not the unkerned GDI Natural width. This is the same native Line
+    // Services contract used by the PDF writer before line balancing.
+    let design = (f64::from(advance_em) * units).round();
+    let advance = (design * f64::from(pixels) / units + 0.5).trunc();
+    (advance.is_finite() && advance >= 0.0 && advance <= f64::from(i32::MAX))
+      .then_some(advance as i32)
+  }
+
   fn advance(&mut self, face: &FontFaceData, pixels: u16, glyph: u32) -> Option<i32> {
     self
       .instances
@@ -768,12 +831,13 @@ impl TextMetrics {
     Self::default()
   }
 
-  /// Word dot leaders repeat an integer GDI Natural device advance. RTL
+  /// Word leaders repeat an integer GDI Natural device advance. RTL
   /// fixed output normalizes that advance to integral hundredths of an em
   /// before converting it back to points. Source counting retains the device
   /// advance. Native ExtTextOut/PDF captures cover 288 independent rows.
-  pub(crate) fn word_dot_leader_advances(
+  pub(crate) fn word_tab_leader_advances(
     &mut self,
+    fill: char,
     style: &crate::model::TextStyle,
     bidi: bool,
   ) -> Option<(f32, f32)> {
@@ -783,7 +847,8 @@ impl TextMetrics {
     {
       return None;
     }
-    let shaped = self.shape_text(".", style)?;
+    let mut encoded = [0; 4];
+    let shaped = self.shape_text(fill.encode_utf8(&mut encoded), style)?;
     let glyph = shaped.glyphs.first()?;
     let face = shaped.font_faces.get(glyph.font_index)?;
     let ratio =
@@ -951,6 +1016,70 @@ impl TextMetrics {
     Some(kashida::expand(shaped, style))
   }
 
+  /// GDI's upright CJK origin relative to the rotated horizontal baseline.
+  /// HarfRust owns vmtx/VORG and variation/GSUB positioning. OS/2 defines the
+  /// ideographic em-box bottom through sTypoDescender; Wine's vertical GDI
+  /// compute_metrics uses that separate outline metric for the cross axis.
+  pub(crate) fn word_upright_glyph_offset(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Option<(f32, f32)> {
+    let runs = self.fonts.shape_vertical_text_runs(text, style)?;
+    let run = runs.first()?;
+    let glyph = run.glyphs.first()?;
+    let face = self.fonts.font_face_data(&run.font_id)?;
+    let font = FontRef::from_index(face.data.as_slice(), face.index).ok()?;
+    let units = f64::from(font.head().ok()?.units_per_em());
+    if units == 0.0 || run.font_size_pt.0 <= 0.0 {
+      return None;
+    }
+    let coords = face.location().coords();
+    let mut descent = f64::from(font.os2().ok()?.s_typo_descender());
+    if let Ok(mvar) = font.mvar() {
+      descent += f64::from(mvar.metric_delta(Tag::new(b"hdsc"), coords).ok()?.to_f32());
+    }
+    let pixels = (f64::from(run.font_size_pt.0) * 600.0 / 72.0).round();
+    let cross = (descent * pixels / units).round();
+    let inline = (-f64::from(glyph.y_offset_pt) / f64::from(run.font_size_pt.0) * pixels).round();
+    Some((
+      (cross * 72.0 / 600.0) as f32,
+      (inline * 72.0 / 600.0) as f32,
+    ))
+  }
+
+  /// Lower a vertically upright Word font to its physical paint axes.
+  /// Native rightVertical ruby EMFs retain the horizontal LOGFONT width;
+  /// its glyph origin is upright, so that width scales page Y. The PDF font
+  /// height is rounded on the printer grid and X uses the inverse serialized
+  /// ratio. Keep this separate from the column's logical advance/line box.
+  pub(crate) fn word_upright_paint_style(
+    &mut self,
+    text: &str,
+    style: &crate::model::TextStyle,
+  ) -> Option<crate::model::TextStyle> {
+    let shaped = self.shape_text(text, style)?;
+    let glyph = shaped.glyphs.first()?;
+    let face = shaped.font_faces.get(glyph.font_index)?;
+    let percent = style.wordprocessing_font_width_percent.unwrap_or(100);
+    let ratio =
+      crate::common::wordprocessing_device::font_width_ratio(face, glyph.font_size_pt, percent)?
+        * f64::from(style.horizontal_scale.unwrap_or(1.0))
+        / (f64::from(percent) / 100.0);
+    if !ratio.is_finite() || ratio <= 0.0 {
+      return None;
+    }
+    let pixels = (f64::from(glyph.font_size_pt) * 600.0 / 72.0).round();
+    let size = ((pixels * ratio).round().max(1.0) * 72.0 / 600.0) as f32;
+    let mut paint = style.clone();
+    paint.font_size_pt = size;
+    paint.complex_font_size_pt = Some(size);
+    paint.horizontal_scale =
+      Some(crate::common::wordprocessing_device::serialize_font_width_ratio(ratio.recip()));
+    paint.wordprocessing_font_width_percent = None;
+    Some(paint)
+  }
+
   pub(crate) fn kashida_opportunities(
     &mut self,
     text: &str,
@@ -960,6 +1089,55 @@ impl TextMetrics {
       .shape_text(text, style)
       .map_or_else(Vec::new, |shaped| {
         kashida::opportunities(text, &shaped, style)
+      })
+  }
+
+  /// Modern Word's finite, non-emergency connection expansion capacity.
+  /// Native LS ideal arrays use three natural spaces for Seen's first
+  /// priority and half that amount for each eligible secondary connection.
+  /// Ordinary spaces are counted separately by the line-fitting owner.
+  pub(crate) fn modern_kashida_expansion_capacity(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> f32 {
+    if text.is_ascii() || text.contains('\u{0640}') {
+      return 0.0;
+    }
+    let Some(shaped) = self.shape_text(text, style) else {
+      return 0.0;
+    };
+    let positions = kashida::modern_opportunities(text, &shaped, style);
+    if positions.is_empty() {
+      return 0.0;
+    }
+    let space = (f64::from(self.measure_text(" ", style)) * 4096.0).round() as i64;
+    let reference = 3 * space;
+    let secondary = (reference + 1) / 2;
+    positions
+      .iter()
+      .map(|position| {
+        let secondary = if position.modern_secondary {
+          secondary
+        } else {
+          0
+        };
+        let primary = if position.priority == 7 { reference } else { 0 };
+        secondary + primary
+      })
+      .sum::<i64>() as f32
+      / 4096.0
+  }
+
+  pub(crate) fn modern_kashida_opportunities(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> Vec<kashida::KashidaOpportunity> {
+    self
+      .shape_text(text, style)
+      .map_or_else(Vec::new, |shaped| {
+        kashida::modern_opportunities(text, &shaped, style)
       })
   }
 
@@ -1063,7 +1241,6 @@ impl TextMetrics {
     if text.is_empty()
       || style.character_spacing_pt().abs() > f32::EPSILON
       || (style.horizontal_scale() - 1.0).abs() > f32::EPSILON
-      || style.kerning_enabled()
     {
       return None;
     }
@@ -1096,9 +1273,15 @@ impl TextMetrics {
       if !(1.0..=f32::from(u16::MAX)).contains(&pixels) {
         return None;
       }
-      let natural = self
-        .word_natural_instances
-        .advance(face, pixels as u16, glyph.glyph_id)?;
+      let natural = if style.kerning_enabled() {
+        self
+          .word_natural_instances
+          .positioned_advance(face, pixels as u16, glyph.x_advance_em)?
+      } else {
+        self
+          .word_natural_instances
+          .advance(face, pixels as u16, glyph.glyph_id)?
+      };
       if natural < 0 {
         return None;
       }
@@ -1618,6 +1801,25 @@ impl TextMetrics {
     &mut self,
     style: &(impl FontStyleRef + ?Sized),
   ) -> TextVerticalMetrics {
+    self.line_vertical_metrics_with_cell_rotation(style, false)
+  }
+
+  pub(crate) fn rotated_cell_line_vertical_metrics(
+    &mut self,
+    text: Option<&str>,
+    style: &(impl FontStyleRef + ?Sized),
+  ) -> TextVerticalMetrics {
+    match text {
+      Some(text) => self.line_vertical_metrics_for_text_with_cell_rotation(text, style, true),
+      None => self.line_vertical_metrics_with_cell_rotation(style, true),
+    }
+  }
+
+  fn line_vertical_metrics_with_cell_rotation(
+    &mut self,
+    style: &(impl FontStyleRef + ?Sized),
+    rotated: bool,
+  ) -> TextVerticalMetrics {
     let metrics = if let Some((font_size_pt, complex_font_size_pt)) =
       style.automatic_escapement_font_sizes_pt()
     {
@@ -1629,7 +1831,10 @@ impl TextMetrics {
     } else {
       self.vertical_metrics(style)
     };
-    wordprocessingml_line_vertical_metrics(style, metrics)
+    wordprocessingml_line_vertical_metrics(
+      style,
+      rotated_cell_font_metrics(style, metrics, rotated),
+    )
   }
 
   pub(crate) fn wordprocessingml_paragraph_mark_line_metrics(
@@ -1658,7 +1863,9 @@ impl TextMetrics {
       // cell. Native empty/visible DengXian, SimSun and Batang controls use
       // the same CJK side leading. Keep physical font geometry and automatic
       // escapement separate from this paragraph-mark layout API.
-      return Some(combine_wordprocessingml_line_metric_runs(style, &runs));
+      return Some(combine_wordprocessingml_line_metric_runs(
+        style, &runs, false,
+      ));
     }
     None
   }
@@ -1668,7 +1875,16 @@ impl TextMetrics {
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
   ) -> TextVerticalMetrics {
-    let metrics = self.unemphasized_line_vertical_metrics_for_text(text, style);
+    self.line_vertical_metrics_for_text_with_cell_rotation(text, style, false)
+  }
+
+  fn line_vertical_metrics_for_text_with_cell_rotation(
+    &mut self,
+    text: &str,
+    style: &(impl FontStyleRef + ?Sized),
+    rotated: bool,
+  ) -> TextVerticalMetrics {
+    let metrics = self.unemphasized_line_vertical_metrics_for_text(text, style, rotated);
     if !style.wordprocessingml_font_slots() {
       return metrics;
     }
@@ -1685,6 +1901,7 @@ impl TextMetrics {
     &mut self,
     text: &str,
     style: &(impl FontStyleRef + ?Sized),
+    rotated: bool,
   ) -> TextVerticalMetrics {
     if style.automatic_escapement_font_sizes_pt().is_none() {
       if let Some(logical) = self
@@ -1693,7 +1910,11 @@ impl TextMetrics {
       {
         return wordprocessingml_no_leading_metrics(
           style,
-          text_vertical_metrics_from_font_metrics(logical),
+          rotated_cell_font_metrics(
+            style,
+            text_vertical_metrics_from_font_metrics(logical),
+            rotated,
+          ),
         );
       }
       if style.wordprocessingml_cjk_line_metrics()
@@ -1707,20 +1928,34 @@ impl TextMetrics {
         // gap first fabricates a taller font, then adds CJK leading to that
         // synthetic box. The resulting Korean mixed-script line is about
         // 1.7 pt too tall at 11 pt despite neither face needing that height.
-        return combine_wordprocessingml_line_metric_runs(style, &runs);
+        return combine_wordprocessingml_line_metric_runs(style, &runs, rotated);
       }
     }
     let metrics = if let Some((font_size_pt, complex_font_size_pt)) =
       style.automatic_escapement_font_sizes_pt()
     {
-      self.vertical_metrics_for_text(
-        text,
-        &AutomaticEscapementMetricsStyle {
+      let original = AutomaticEscapementMetricsStyle {
+        style,
+        font_size_pt,
+        complex_font_size_pt,
+      };
+      // Automatic scripts keep the original logical font cell, including a
+      // retained DEFAULT_CHARSET record's side leading. The reduced paint
+      // size must neither shrink this cell nor discard its charset metadata.
+      if let Some(logical) = self
+        .fonts
+        .wordprocessingml_default_charset_line_metrics(&original, text)
+      {
+        return wordprocessingml_no_leading_metrics(
           style,
-          font_size_pt,
-          complex_font_size_pt,
-        },
-      )
+          rotated_cell_font_metrics(
+            style,
+            text_vertical_metrics_from_font_metrics(logical),
+            rotated,
+          ),
+        );
+      }
+      self.vertical_metrics_for_text(text, &original)
     } else {
       self.vertical_metrics_for_text(text, style)
     };
@@ -1735,9 +1970,12 @@ impl TextMetrics {
       // text. Adjust each realized face before combining a mixed line. Keep
       // automatic escapement and the generic no-text metric API on their
       // established physical-metric paths.
-      return combine_wordprocessingml_line_metric_runs(style, &runs);
+      return combine_wordprocessingml_line_metric_runs(style, &runs, rotated);
     }
-    wordprocessingml_line_vertical_metrics(style, metrics)
+    wordprocessingml_line_vertical_metrics(
+      style,
+      rotated_cell_font_metrics(style, metrics, rotated),
+    )
   }
 
   fn line_text_height(&mut self, text: &str, style: &(impl FontStyleRef + ?Sized)) -> f32 {
@@ -1745,6 +1983,31 @@ impl TextMetrics {
       .line_vertical_metrics_for_text(text, style)
       .line_height_pt()
   }
+}
+
+fn rotated_cell_font_metrics(
+  style: &(impl FontStyleRef + ?Sized),
+  mut metrics: TextVerticalMetrics,
+  rotated: bool,
+) -> TextVerticalMetrics {
+  if rotated {
+    // Native GetTextMetrics at 2048 ppem reports +32 units of ascent and
+    // descent for rotated TrueType fonts, with unchanged external leading.
+    // Word's rotated-cell controls apply this 1/64-em reserve before CJK
+    // side leading and proportional spacing. Keep it outside the cached
+    // physical metrics: shape stories and PDF glyph paint retain their own
+    // coordinate owners.
+    let font_size = style
+      .automatic_escapement_font_sizes_pt()
+      .map_or_else(|| style.font_size_pt(), |sizes| sizes.0);
+    let padding = font_size / 64.0;
+    metrics.ascent_pt += padding;
+    metrics.descent_pt += padding;
+    metrics.windows_line_height_pt += padding * 2.0;
+    metrics.baseline_offset_pt += padding;
+    metrics.directwrite_baseline_offset_pt += padding;
+  }
+  metrics
 }
 
 fn wordprocessing_emphasis_line_metrics(
@@ -1790,13 +2053,18 @@ fn wordprocessingml_line_vertical_metrics(
 fn combine_wordprocessingml_line_metric_runs(
   style: &(impl FontStyleRef + ?Sized),
   runs: &[ooxmlsdk_fonts::VerticalMetrics],
+  rotated: bool,
 ) -> TextVerticalMetrics {
   let adjusted = runs
     .iter()
     .map(|metrics| {
       wordprocessingml_text_line_vertical_metrics(
         style,
-        text_vertical_metrics_from_font_metrics(*metrics),
+        rotated_cell_font_metrics(
+          style,
+          text_vertical_metrics_from_font_metrics(*metrics),
+          rotated,
+        ),
       )
     })
     .collect::<Vec<_>>();
@@ -2087,7 +2355,7 @@ fn baseline_offset_in_line_from_metrics(
   extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt()
 }
 
-fn baseline_offset_in_line_with_windows_metrics_from_metrics(
+pub(crate) fn baseline_offset_in_line_with_windows_metrics_from_metrics(
   metrics: TextVerticalMetrics,
   style: &(impl FontStyleRef + ?Sized),
   line_height_pt: f32,
@@ -2301,6 +2569,60 @@ mod tests {
   use super::*;
 
   #[test]
+  fn rotated_cell_font_metrics_expand_before_cjk_side_leading() {
+    // Independent native GetTextMetrics at one 2048-pixel em: Arial,
+    // Calibri and Times New Roman, horizontal and 90/270-degree fonts.
+    let style = crate::model::TextStyle {
+      font_size_pt: 2048.0,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    for (ascent, descent, gap, expected_height) in [
+      (1854.0, 434.0, 67.0, 2419.0),
+      (1950.0, 550.0, 0.0, 2564.0),
+      (1825.0, 443.0, 87.0, 2419.0),
+    ] {
+      let metrics = TextVerticalMetrics {
+        font_design_unit_pt: 1.0,
+        ascent_pt: ascent,
+        descent_pt: descent,
+        windows_line_height_pt: ascent + descent,
+        line_gap_pt: gap,
+        baseline_offset_pt: ascent,
+        directwrite_baseline_offset_pt: ascent + gap,
+        wordprocessingml_cjk_line_metrics: false,
+      };
+      assert_eq!(
+        rotated_cell_font_metrics(&style, metrics, false).line_height_pt(),
+        ascent + descent + gap
+      );
+      let rotated = rotated_cell_font_metrics(&style, metrics, true);
+      assert_eq!(rotated.line_height_pt(), expected_height);
+      assert_eq!(rotated.baseline_offset_pt, ascent + 32.0);
+      assert_eq!(rotated.line_gap_pt, gap);
+    }
+    // MS Gothic's 256-UPEM font first gains 8 units, then its existing
+    // rounded 15% leading uses 264 (40 per side), not 256 (38 per side).
+    // Native Word 11pt single-spacing is 14.7832pt before PDF grid residuals.
+    let cjk = TextVerticalMetrics {
+      font_design_unit_pt: 8.0,
+      ascent_pt: 1760.0,
+      descent_pt: 288.0,
+      windows_line_height_pt: 2048.0,
+      line_gap_pt: 0.0,
+      baseline_offset_pt: 1760.0,
+      directwrite_baseline_offset_pt: 1760.0,
+      wordprocessingml_cjk_line_metrics: true,
+    };
+    let rotated = wordprocessingml_text_line_vertical_metrics(
+      &style,
+      rotated_cell_font_metrics(&style, cjk, true),
+    );
+    assert_eq!(rotated.line_height_pt(), 2752.0);
+    assert_eq!(rotated.line_height_pt() * 11.0 / 2048.0, 14.78125);
+  }
+
+  #[test]
   fn no_break_hyphen_control_has_distinct_warm_font_and_measurement_context() {
     let mut style = TextStyle {
       font_family: Some("Arial".into()),
@@ -2489,6 +2811,7 @@ mod tests {
         style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
           retain_trailing_blank: false,
           unshaped_blanks: false,
+          glyph_advances: Vec::new(),
           font_width_percent: 103,
           space_expansions: Vec::new(),
         }));
@@ -2556,6 +2879,7 @@ mod tests {
           style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
             retain_trailing_blank: false,
             unshaped_blanks: false,
+            glyph_advances: Vec::new(),
             font_width_percent: percent,
             space_expansions: Vec::new(),
           }));
@@ -2613,6 +2937,7 @@ mod tests {
             style.wordprocessing_kashida = Some(Arc::new(crate::common::WordprocessingKashida {
               retain_trailing_blank: false,
               unshaped_blanks: false,
+              glyph_advances: Vec::new(),
               font_width_percent: percent,
               space_expansions: Vec::new(),
             }));
@@ -2655,6 +2980,7 @@ mod tests {
                 Arc::new(crate::common::WordprocessingKashida {
                   retain_trailing_blank: false,
                   unshaped_blanks: false,
+                  glyph_advances: Vec::new(),
                   font_width_percent: percent,
                   space_expansions: Vec::new(),
                 })
@@ -3064,6 +3390,74 @@ mod tests {
   }
 
   #[test]
+  fn upright_word_font_width_acts_on_the_vertical_paint_axis() {
+    let mut metrics = TextMetrics::new();
+    // Native rightVertical ruby PDF/EMF pairs: PMingLiU at29/58 device
+    // pixels. Quantize the logical-width product, then invert its original
+    // ratio; inverse of the rounded font-height ratio is a different matrix.
+    for (size, percent, height, width_ratio) in [
+      (3.5, 50, 1.68, 2.1429),
+      (3.5, 75, 2.52, 1.3636),
+      (3.5, 100, 3.48, 1.0),
+      (7.0, 50, 3.36, 2.0714),
+      (7.0, 75, 5.04, 1.3810),
+      (7.0, 100, 6.96, 1.0),
+    ] {
+      let style = crate::model::TextStyle {
+        font_family: Some(Arc::from("PMingLiU")),
+        font_size_pt: size,
+        horizontal_scale: Some(f32::from(percent) / 100.0),
+        wordprocessing_font_width_percent: Some(percent),
+        ..Default::default()
+      };
+      let paint = metrics.word_upright_paint_style("ㄓ", &style).unwrap();
+      assert!(
+        (paint.font_size_pt - height).abs() < 0.0001,
+        "{size}/{percent}"
+      );
+      assert!(
+        (paint.horizontal_scale.unwrap() - width_ratio).abs() < 0.0001,
+        "{size}/{percent}"
+      );
+      assert!(paint.wordprocessing_font_width_percent.is_none());
+      assert_eq!(style.font_size_pt, size);
+    }
+  }
+
+  #[test]
+  fn upright_vertical_glyph_origins_match_word_font_controls() {
+    let mut metrics = TextMetrics::new();
+    // Actual Office lrTb/tbRl controls: three faces, two sizes. Fullwidth A
+    // has a different vmtx origin from Han in Yu Mincho, so an em-wide box
+    // or a single font ascent cannot replace per-glyph vertical positioning.
+    for (family, size, text, cross, inline) in [
+      ("Yu Mincho", 10.5, "彼", -1.32, 9.24),
+      ("Yu Mincho", 18.0, "彼", -2.16, 15.84),
+      ("Yu Mincho", 10.5, "Ａ", -1.32, 9.36),
+      ("Yu Mincho", 18.0, "Ａ", -2.16, 15.96),
+      ("MS Mincho", 10.5, "彼", -1.44, 9.12),
+      ("MS Mincho", 18.0, "彼", -2.52, 15.48),
+      ("MS Gothic", 10.5, "彼", -1.44, 9.12),
+      ("MS Gothic", 18.0, "彼", -2.52, 15.48),
+    ] {
+      let style = crate::model::TextStyle {
+        font_family: Some(Arc::from(family)),
+        font_size_pt: size,
+        ..Default::default()
+      };
+      let actual = metrics.word_upright_glyph_offset(text, &style).unwrap();
+      assert!(
+        (actual.0 - cross).abs() < 0.0001,
+        "{family} {size} {text}: {actual:?}"
+      );
+      assert!(
+        (actual.1 - inline).abs() < 0.0001,
+        "{family} {size} {text}: {actual:?}"
+      );
+    }
+  }
+
+  #[test]
   fn word_pathing_character_metrics_match_native_line_service_cells() {
     let style = crate::model::TextStyle {
       font_family: Some(Arc::from("DejaVu Sans")),
@@ -3097,6 +3491,42 @@ mod tests {
         "{text}"
       );
     }
+    assert_eq!(metrics.word_natural_instances.instances.len(), 1);
+  }
+
+  #[test]
+  fn word_positioned_character_metrics_keep_the_native_kerning_branch() {
+    let mut metrics = TextMetrics::new();
+    let style = crate::model::TextStyle {
+      font_family: Some(Arc::from("Times New Roman")),
+      font_size_pt: 14.0,
+      kerning_minimum_size_pt: Some(1.0),
+      ..Default::default()
+    };
+    // Independent MSLS70 inputs from the enabled/disabled 3-font matrix;
+    // the PDF consumer checks the same native contract after font realization.
+    let text = "Universal PROBE minimum WHITE 01234";
+    let positioned = metrics
+      .word_printer_character_metrics(text, &style)
+      .unwrap();
+    assert_eq!(
+      positioned.iter().map(|pair| pair.1).collect::<Vec<_>>(),
+      [
+        84, 59, 33, 59, 52, 39, 46, 52, 33, 29, 65, 78, 84, 78, 71, 29, 91, 33, 59, 33, 91, 59, 91,
+        27, 110, 84, 39, 71, 71, 29, 59, 59, 59, 59, 59
+      ],
+    );
+    let unkerned = metrics
+      .word_printer_character_metrics(
+        text,
+        &crate::model::TextStyle {
+          kerning_minimum_size_pt: Some(f32::INFINITY),
+          ..style
+        },
+      )
+      .unwrap();
+    assert_eq!(unkerned[0].1, 85);
+    assert_eq!(metrics.word_natural_instances.design_units.len(), 1);
     assert_eq!(metrics.word_natural_instances.instances.len(), 1);
   }
 
@@ -3317,6 +3747,48 @@ mod tests {
   }
 
   #[test]
+  fn automatic_script_lines_preserve_retained_charset_and_original_font_size() {
+    use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
+    let mut metrics = TextMetrics::new();
+    for (family, class) in [
+      ("Liberation Serif", FontFamilyClass::Serif),
+      ("Calibri", FontFamilyClass::SansSerif),
+      ("Arial", FontFamilyClass::SansSerif),
+    ] {
+      for charset in [FontCharset::Ansi, FontCharset::Other(1)] {
+        let original = crate::model::TextStyle {
+          font_family: Some(family.into()),
+          font_family_class: Some(class),
+          font_charset: Some(charset),
+          font_pitch: Some(FontPitch::Variable),
+          font_size_pt: 36.0,
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        };
+        let automatic = crate::model::TextStyle {
+          font_size_pt: 23.5,
+          automatic_escapement_font_size_pt: Some(36.0),
+          baseline_shift_pt: 16.5,
+          ..original.clone()
+        };
+        assert_eq!(
+          metrics.line_vertical_metrics_for_text("i", &automatic),
+          metrics.line_vertical_metrics_for_text("i", &original),
+          "{family}/{charset:?}: Native ordinary and superscript lines share the original cell"
+        );
+        assert!(
+          metrics
+            .vertical_metrics_for_text("i", &automatic)
+            .line_height_pt()
+            < metrics
+              .line_vertical_metrics_for_text("i", &automatic)
+              .line_height_pt()
+        );
+      }
+    }
+  }
+
+  #[test]
   fn word_default_charset_line_leading_matches_native_font_records() {
     use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
     let mut metrics = TextMetrics::new();
@@ -3406,6 +3878,71 @@ mod tests {
         physical
       );
     }
+  }
+
+  #[test]
+  fn word_pictorial_default_charset_uses_its_typographic_logical_cell() {
+    use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
+    let mut metrics = TextMetrics::new();
+    let style = TextStyle {
+      font_family: Some("OpenSymbol".into()),
+      font_charset: Some(FontCharset::Other(1)),
+      font_pitch: Some(FontPitch::Variable),
+      font_size: Pt(10.0),
+      wordprocessingml_font_slots: true,
+      ..TextStyle::default()
+    };
+    let logical = metrics.line_vertical_metrics_for_text("◦", &style);
+    // Actual native inline controls advance 13.75pt and put the baseline
+    // 10.1pt below the line top, rounded independently on the export device.
+    assert!(
+      (logical.line_height_pt() - 13.75).abs() < 0.13,
+      "{logical:?}"
+    );
+    assert!((logical.directwrite_baseline_offset_pt - 10.1).abs() < 0.13);
+    assert_eq!(
+      metrics.wordprocessingml_paragraph_mark_line_metrics(&style),
+      Some(logical)
+    );
+    let physical = metrics.vertical_metrics(&style);
+    for opposite in [
+      TextStyle {
+        font_charset: Some(FontCharset::Ansi),
+        ..style.clone()
+      },
+      TextStyle {
+        font_charset: Some(FontCharset::Symbol),
+        ..style.clone()
+      },
+      TextStyle {
+        font_charset: None,
+        ..style.clone()
+      },
+      TextStyle {
+        font_family_class: Some(FontFamilyClass::Decorative),
+        ..style.clone()
+      },
+      TextStyle {
+        font_pitch: None,
+        ..style.clone()
+      },
+      TextStyle {
+        wordprocessingml_font_slots: false,
+        ..style.clone()
+      },
+    ] {
+      assert_eq!(
+        metrics.line_vertical_metrics_for_text("◦", &opposite),
+        physical
+      );
+    }
+    let larger = TextStyle {
+      font_size: Pt(12.0),
+      ..style
+    };
+    let larger = metrics.line_vertical_metrics_for_text("◦", &larger);
+    // Independent 12pt number-label controls expose the same ascent owner.
+    assert!((larger.directwrite_baseline_offset_pt - 12.02).abs() < 0.05);
   }
 
   #[test]

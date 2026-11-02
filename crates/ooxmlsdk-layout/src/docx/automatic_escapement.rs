@@ -16,6 +16,8 @@ use super::{
   InlineItem, ParagraphFieldEvent, TextRun, WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT, properties,
 };
 
+const RETAINED_DEFAULT_CHARSET: u8 = 4;
+
 // Import is sequential; only this document's style-catalog clones share the
 // cache. Ordinary styles return before borrowing or loading fonts. The resolver
 // caches physical faces and their already parsed OS/2 metrics, including
@@ -31,6 +33,20 @@ struct Cache {
 }
 
 impl Fonts {
+  pub(super) fn is_variable_face(&self, style: &TextStyle) -> bool {
+    // Reuse the document-owned import resolver and its face cache. No global
+    // scan or new synchronization is needed for revision-owned bitmap runs.
+    self
+      .0
+      .borrow_mut()
+      .fonts
+      .with_cached_text_face(style, |face| {
+        skrifa::FontRef::from_index(face.data.as_slice(), face.index)
+          .is_ok_and(|font| font.fvar().is_ok())
+      })
+      .unwrap_or(false)
+  }
+
   pub(super) fn has_exact_ascii_face(&self, style: &TextStyle) -> bool {
     // Generated field resources also query the document's Normal font. Reuse
     // the import-owned resolver rather than loading a fresh font registry or
@@ -61,29 +77,23 @@ impl Fonts {
     let mut selection = style.clone();
     selection.complex_script = Some(false);
     selection.right_to_left = Some(false);
-    let primary_percent = height_percent(
-      cache.fonts.script_metrics(&selection),
+    let legacy = style.wordprocessingml_legacy_escapement_rounding;
+    style.font_size_pt = cache.glyph_size(
+      &selection,
+      original_size,
       style.automatic_escapement_is_subscript,
+      legacy,
     );
-    let primary_ties_up = primary_percent == 50 && cache.chinese_script_font(&selection);
-    let complex_percent = style.automatic_escapement_complex_font_size_pt.map(|_| {
+    style.complex_font_size_pt = style.automatic_escapement_complex_font_size_pt.map(|size| {
       selection.complex_script = Some(true);
       selection.right_to_left = Some(true);
-      height_percent(
-        cache.fonts.script_metrics(&selection),
+      cache.glyph_size(
+        &selection,
+        size,
         style.automatic_escapement_is_subscript,
+        legacy,
       )
     });
-    let legacy = style.wordprocessingml_legacy_escapement_rounding;
-    style.font_size_pt = properties::automatic_escapement_glyph_size(
-      original_size,
-      primary_percent,
-      legacy || primary_ties_up,
-    );
-    style.complex_font_size_pt = style
-      .automatic_escapement_complex_font_size_pt
-      .zip(complex_percent)
-      .map(|(size, percent)| properties::automatic_escapement_glyph_size(size, percent, legacy));
     let complex = style.complex_script == Some(true) || style.right_to_left == Some(true);
     selection.complex_script = Some(complex);
     selection.right_to_left = Some(complex);
@@ -138,6 +148,7 @@ impl Fonts {
       match event {
         ParagraphFieldEvent::DeferredParagraphBreak { inline_offset }
         | ParagraphFieldEvent::DeferredReferenceParagraphBreak { inline_offset, .. }
+        | ParagraphFieldEvent::GeneratedParagraphBreak { inline_offset, .. }
         | ParagraphFieldEvent::PageReferenceResultStyle { inline_offset, .. } => {
           *inline_offset = offsets[*inline_offset];
         }
@@ -233,12 +244,30 @@ impl Cache {
       .as_mut()
   }
 
-  fn chinese_script_font(&mut self, style: &TextStyle) -> bool {
-    self
-      .fonts
-      .cached_text_face(style)
-      .and_then(|face| self.script_face(&face).map(|face| face.chinese_charset))
-      .unwrap_or(false)
+  fn glyph_size(&mut self, style: &TextStyle, original: f32, subscript: bool, legacy: bool) -> f32 {
+    let Self { fonts, faces } = self;
+    if let Some(size) = fonts
+      .with_cached_text_face(style, |face| {
+        faces
+          .entry((
+            face.cache_key(),
+            0,
+            face.synthetic_bold,
+            face.synthetic_italic,
+          ))
+          .or_insert_with(|| DeviceFace::new(face, 0))
+          .as_ref()?
+          .glyph_size(original, subscript, legacy)
+      })
+      .flatten()
+    {
+      return size;
+    }
+    properties::automatic_escapement_glyph_size(
+      original,
+      height_percent(fonts.script_metrics(style), subscript),
+      legacy,
+    )
   }
 
   fn chinese_glyph_size(
@@ -255,19 +284,11 @@ impl Cache {
       // Chinese font rule from the shared CJK capability flag.
       return None;
     }
-    let percent = if subscript {
-      face.sub_height_percent
-    } else {
-      face.super_height_percent
-    };
+    let percent = face.height_percent(subscript);
     if percent != 50 {
       return None;
     }
-    Some(properties::automatic_escapement_glyph_size(
-      original,
-      percent,
-      legacy || percent == 50,
-    ))
+    face.glyph_size(original, subscript, legacy)
   }
 
   fn baseline(
@@ -284,8 +305,22 @@ impl Cache {
     } else {
       style.font_charset
     } {
+      Some(FontCharset::Other(1))
+        if self
+          .fonts
+          .wordprocessingml_default_charset_line_metrics(style, "A")
+          .is_some() =>
+      {
+        RETAINED_DEFAULT_CHARSET
+      }
       None | Some(FontCharset::Ansi | FontCharset::Other(1)) => 0,
       Some(FontCharset::Symbol) => 2,
+      Some(
+        FontCharset::ShiftJis
+        | FontCharset::Hangul
+        | FontCharset::Gb2312
+        | FontCharset::ChineseBig5,
+      ) => 3,
       Some(_) => 1,
     };
     let Self { fonts, faces } = self;
@@ -314,17 +349,48 @@ struct DeviceMetrics {
   leading: i64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ScriptParameters {
+  super_size: i64,
+  sub_size: i64,
+  super_offset: i64,
+  sub_offset: i64,
+}
+
+impl ScriptParameters {
+  fn valid(self, original: i64) -> bool {
+    // Word validates all four recommendations together, after conversion to
+    // half points. Native font-cache captures and independent embedded-font
+    // controls establish these integer bounds; OS/2 values are recommendations,
+    // not unconditional placement instructions.
+    let minimum_size = original / 3 + 1;
+    let half = original / 2;
+    let quarter = half / 2;
+    (minimum_size..=original).contains(&self.super_size)
+      && (minimum_size..=original).contains(&self.sub_size)
+      && (0..=half).contains(&self.sub_offset)
+      && (quarter..=quarter + half).contains(&self.super_offset)
+  }
+
+  fn fallback(original: i64) -> Self {
+    Self {
+      super_size: ((original * 6 + 5) / 10).max(2),
+      sub_size: ((original * 6 + 5) / 10).max(2),
+      super_offset: ((original * 4 + 5) / 10).max(1),
+      sub_offset: ((original * 2 + 5) / 10).max(1),
+    }
+  }
+}
+
 #[derive(Debug)]
 struct DeviceFace {
   units_per_em: i64,
   ascent: i64,
   descent: i64,
   leading: i64,
-  super_offset: i64,
-  sub_offset: i64,
+  cjk_line_metrics: bool,
+  script: ScriptParameters,
   chinese_charset: bool,
-  super_height_percent: u32,
-  sub_height_percent: u32,
   charset: u8,
   vdmx: Option<Vec<u8>>,
   metrics: FxHashMap<u16, DeviceMetrics>,
@@ -357,24 +423,90 @@ impl DeviceFace {
       ascent,
       descent,
       leading,
-      super_offset: i64::from(os2.y_superscript_y_offset()),
-      sub_offset: i64::from(os2.y_subscript_y_offset()),
+      // Installed faces supply their CJK classification. For private embedded
+      // faces Word additionally requires a CJK font-table charset; native
+      // identical-font controls distinguish absent/ANSI from Shift-JIS.
+      // OS/2 code-page bits17..20 match the ordinary Word line metric policy.
+      // A retained DEFAULT_CHARSET record uses this same side-leading cell.
+      // Native Liberation Serif 12/36pt captures distinguish it from ANSI;
+      // reuse the ordinary line-metric eligibility policy above so normalized
+      // Arial/Times and mismatched font-table metadata remain on their path.
+      cjk_line_metrics: charset == RETAINED_DEFAULT_CHARSET
+        || ((!data.document_embedded || charset == 3)
+          && os2
+            .ul_code_page_range_1()
+            .is_some_and(|range| range & 0x001e_0000 != 0)),
+      script: ScriptParameters {
+        super_size: i64::from(os2.y_superscript_y_size()),
+        sub_size: i64::from(os2.y_subscript_y_size()),
+        super_offset: i64::from(os2.y_superscript_y_offset()),
+        sub_offset: i64::from(os2.y_subscript_y_offset()),
+      },
       chinese_charset: os2
         .ul_code_page_range_1()
         .is_some_and(|range| range & (1 << 18) != 0),
-      super_height_percent: scale_height_percent(Some(
-        f32::from(os2.y_superscript_y_size()) / units_per_em as f32,
-      )),
-      sub_height_percent: scale_height_percent(Some(
-        f32::from(os2.y_subscript_y_size()) / units_per_em as f32,
-      )),
-      charset,
+      charset: match charset {
+        3 => 1,
+        RETAINED_DEFAULT_CHARSET => 0,
+        _ => charset,
+      },
       vdmx: face
         .table_data(skrifa::Tag::new(b"VDMX"))
         .map(|table| table.as_bytes().to_vec()),
       metrics: FxHashMap::default(),
       baselines: FxHashMap::default(),
     })
+  }
+
+  fn height_percent(&self, subscript: bool) -> u32 {
+    let size = if subscript {
+      self.script.sub_size
+    } else {
+      self.script.super_size
+    };
+    rounded_ratio(size * 100, self.units_per_em).max(0) as u32
+  }
+
+  fn script_parameters(&self, original: f32) -> Option<(ScriptParameters, bool)> {
+    let original = (f64::from(original) * 2.0).round();
+    if !(1.0..=f64::from(u16::MAX)).contains(&original) {
+      return None;
+    }
+    let original = original as i64;
+    let scale = |value| rounded_ratio(original * value, self.units_per_em);
+    let parameters = ScriptParameters {
+      super_size: scale(self.script.super_size),
+      sub_size: scale(self.script.sub_size),
+      super_offset: scale(self.script.super_offset),
+      sub_offset: scale(self.script.sub_offset),
+    };
+    let recommended = parameters.valid(original);
+    Some((
+      if recommended {
+        parameters
+      } else {
+        ScriptParameters::fallback(original)
+      },
+      recommended,
+    ))
+  }
+
+  fn glyph_size(&self, original: f32, subscript: bool, legacy: bool) -> Option<f32> {
+    let (parameters, recommended) = self.script_parameters(original)?;
+    if !recommended {
+      let half_points = if subscript {
+        parameters.sub_size
+      } else {
+        parameters.super_size
+      };
+      return Some(half_points as f32 * 0.5);
+    }
+    let percent = self.height_percent(subscript);
+    Some(properties::automatic_escapement_glyph_size(
+      original,
+      percent,
+      legacy || (percent == 50 && self.chinese_charset),
+    ))
   }
 
   fn metrics(&mut self, size: f32) -> Option<DeviceMetrics> {
@@ -391,14 +523,25 @@ impl DeviceFace {
       .as_deref()
       .and_then(|table| emfsdk::font::vdmx_vertical_device_metrics(table, ppem, self.charset));
     let scaled = |value| rounded_ratio(value * i64::from(ppem), self.units_per_em);
-    let (ascent, descent) = hinted.map_or_else(
+    let (ascent, mut descent) = hinted.map_or_else(
       || (scaled(self.ascent), scaled(self.descent)),
       |metrics| (i64::from(metrics.ascent), i64::from(metrics.descent)),
     );
+    let leading = if self.cjk_line_metrics {
+      // This printer cache rounds side leading after realizing ascent and
+      // descent, unlike the ordinary layout design-grid calculation. MS
+      // Gothic6pt distinguishes them (8 printer units, not7). Keep physical
+      // ascent; put one side below and one above, replacing hhea leading.
+      let side = rounded_ratio((ascent + descent) * 15, 100);
+      descent += side;
+      side
+    } else {
+      scaled(self.leading)
+    };
     let metrics = DeviceMetrics {
       ascent,
       descent,
-      leading: scaled(self.leading),
+      leading,
     };
     self.metrics.insert(ppem, metrics);
     Some(metrics)
@@ -414,23 +557,18 @@ impl DeviceFace {
     let to_grid = |value| rounded_ratio(value * 144, 600);
     let ascent = to_grid(original_metrics.ascent + original_metrics.leading);
     let descent = to_grid(original_metrics.descent);
-    let recommendation = if subscript {
-      -self.sub_offset
+    let (parameters, recommended) = self.script_parameters(original)?;
+    let initial = if subscript {
+      -parameters.sub_offset
     } else {
-      self.super_offset
+      parameters.super_offset
     };
-    let initial =
-      (f64::from(original) * 2.0 * recommendation as f64 / self.units_per_em as f64).round() as i64;
     // Word's native font cache keeps the original external leading, rounds
     // each printer metric independently to 144 DPI, then limits the font's
     // recommendation. A superscript rises at least one third of the original
     // ascent within that limit; a subscript cannot lower the line's descent.
-    let chinese_half_size = self.chinese_charset
-      && if subscript {
-        self.sub_height_percent == 50
-      } else {
-        self.super_height_percent == 50
-      };
+    let chinese_half_size =
+      recommended && self.chinese_charset && self.height_percent(subscript) == 50;
     let shift = if chinese_half_size {
       // Native SimSun/SimHei/KaiTi controls use the face's recommendation
       // directly on the half-point grid, including 12pt subscript: -1pt,
@@ -480,6 +618,279 @@ fn scale_height_percent(scale: Option<f32>) -> u32 {
 mod tests {
   use super::*;
   use crate::docx::w;
+
+  #[test]
+  fn script_recommendations_validate_coupled_half_point_bounds() {
+    let parameters = ScriptParameters {
+      super_size: 18,
+      sub_size: 18,
+      super_offset: 10,
+      sub_offset: 4,
+    };
+    // Actual 12pt embedded-font controls straddle each native boundary. A
+    // valid superscript cannot hide an invalid subscript recommendation.
+    for size in [9, 24] {
+      assert!(
+        ScriptParameters {
+          super_size: size,
+          ..parameters
+        }
+        .valid(24)
+      );
+      assert!(
+        ScriptParameters {
+          sub_size: size,
+          ..parameters
+        }
+        .valid(24)
+      );
+    }
+    for size in [0, 8, 25] {
+      assert!(
+        !ScriptParameters {
+          super_size: size,
+          ..parameters
+        }
+        .valid(24)
+      );
+      assert!(
+        !ScriptParameters {
+          sub_size: size,
+          ..parameters
+        }
+        .valid(24)
+      );
+    }
+    for offset in [6, 18] {
+      assert!(
+        ScriptParameters {
+          super_offset: offset,
+          ..parameters
+        }
+        .valid(24)
+      );
+    }
+    for offset in [0, 5, 19] {
+      assert!(
+        !ScriptParameters {
+          super_offset: offset,
+          ..parameters
+        }
+        .valid(24)
+      );
+    }
+    for offset in [0, 12] {
+      assert!(
+        ScriptParameters {
+          sub_offset: offset,
+          ..parameters
+        }
+        .valid(24)
+      );
+    }
+    for offset in [-1, 13] {
+      assert!(
+        !ScriptParameters {
+          sub_offset: offset,
+          ..parameters
+        }
+        .valid(24)
+      );
+    }
+    assert_eq!(
+      ScriptParameters::fallback(24),
+      ScriptParameters {
+        super_size: 14,
+        sub_size: 14,
+        super_offset: 10,
+        sub_offset: 5,
+      }
+    );
+    assert_eq!(
+      ScriptParameters::fallback(1),
+      ScriptParameters {
+        super_size: 2,
+        sub_size: 2,
+        super_offset: 1,
+        sub_offset: 1,
+      }
+    );
+    // The accepted interval changes with the authored size, rather than
+    // using fixed percentage cutoffs before half-point quantization.
+    assert!(
+      !ScriptParameters {
+        super_offset: 5,
+        ..parameters
+      }
+      .valid(24)
+    );
+    assert!(
+      ScriptParameters {
+        super_offset: 5,
+        ..parameters
+      }
+      .valid(20)
+    );
+  }
+
+  #[test]
+  fn invalid_font_script_metrics_fall_back_without_a_family_or_charset_switch() {
+    let fonts = Fonts::default();
+    for (family, reduced, superscript, subscript) in [
+      ("BIZ UDGothic", 7.0, 5.0, -1.0),
+      ("MS Gothic", 7.0, 5.0, -1.5),
+      ("Yu Gothic", 7.0, 5.0, -2.5),
+      ("Meiryo", 8.0, 5.5, -1.5),
+    ] {
+      for (alignment, shift) in [
+        (w::VerticalPositionValues::Superscript, superscript),
+        (w::VerticalPositionValues::Subscript, subscript),
+      ] {
+        let mut style = TextStyle {
+          font_family: Some(family.into()),
+          high_ansi_font_family: Some(family.into()),
+          complex_font_family: Some(family.into()),
+          font_size_pt: 12.0,
+          complex_font_size_pt: Some(12.0),
+          wordprocessingml_font_slots: true,
+          wordprocessingml_position_pt: Some(2.0),
+          baseline_shift_pt: 2.0,
+          ..Default::default()
+        };
+        properties::apply_vertical_text_alignment(&mut style, alignment);
+        for _ in 0..2 {
+          fonts.resolve(&mut style);
+          assert_eq!(style.font_size_pt, reduced, "{family}/{alignment:?}");
+          assert_eq!(style.complex_font_size_pt, Some(reduced));
+          assert_eq!(
+            style.baseline_shift_pt,
+            shift + 2.0,
+            "{family}/{alignment:?}"
+          );
+        }
+        properties::apply_vertical_text_alignment(&mut style, w::VerticalPositionValues::Baseline);
+        assert_eq!(style.font_size_pt, 12.0);
+        assert_eq!(style.baseline_shift_pt, 2.0);
+      }
+    }
+  }
+
+  #[test]
+  fn private_script_faces_require_cjk_charset_for_native_side_leading() {
+    let mut fonts = FontResolver::default();
+    for (family, plain_super, plain_sub, cjk_super, cjk_sub) in [
+      ("BIZ UDGothic", 4.5, -0.5, 5.0, -1.0),
+      ("MS Gothic", 4.5, -0.5, 5.0, -1.5),
+      ("Meiryo", 4.0, -1.5, 5.5, -1.5),
+    ] {
+      let style = TextStyle {
+        font_family: Some(family.into()),
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      };
+      let mut data = fonts.cached_text_face(&style).expect("native control face");
+      for embedded in [false, true] {
+        data.document_embedded = embedded;
+        for charset in [0, 3] {
+          let mut face = DeviceFace::new(&data, charset).unwrap();
+          let cjk = !embedded || charset == 3;
+          for (subscript, expected) in [
+            (false, if cjk { cjk_super } else { plain_super }),
+            (true, if cjk { cjk_sub } else { plain_sub }),
+          ] {
+            let size = face.glyph_size(12.0, subscript, false).unwrap();
+            assert_eq!(
+              face.baseline(12.0, size, subscript),
+              Some(expected),
+              "{family}/{embedded}/{charset}/{subscript}"
+            );
+          }
+        }
+      }
+    }
+    let style = TextStyle {
+      font_family: Some("MS Gothic".into()),
+      ..Default::default()
+    };
+    let data = fonts.cached_text_face(&style).unwrap();
+    let mut face = DeviceFace::new(&data, 3).unwrap();
+    let reduced = face.metrics(6.0).unwrap();
+    assert_eq!(
+      (reduced.ascent, reduced.descent, reduced.leading),
+      (43, 15, 8)
+    );
+    assert_eq!(face.baseline(10.0, 6.0, true), Some(-1.0));
+  }
+
+  #[test]
+  fn retained_default_charset_scripts_keep_the_logical_printer_cell() {
+    use ooxmlsdk_fonts::{FontFamilyClass, FontPitch};
+    let fonts = Fonts::default();
+    // Independent Word charset00/01 controls, 12/24/36pt, both script kinds.
+    // Arial normalizes the default charset and is the negative control.
+    for (family, class, pitch, plain, retained) in [
+      (
+        "Liberation Serif",
+        FontFamilyClass::Serif,
+        FontPitch::Variable,
+        [(4.0, -1.0), (8.5, -1.5), (12.5, -3.0)],
+        [(5.5, -1.5), (11.0, -3.0), (16.5, -5.0)],
+      ),
+      (
+        "Calibri",
+        FontFamilyClass::SansSerif,
+        FontPitch::Variable,
+        [(4.0, -1.0), (8.0, -2.5), (12.0, -3.0)],
+        [(5.5, -1.5), (11.5, -3.5), (17.0, -5.0)],
+      ),
+      (
+        "Arial",
+        FontFamilyClass::SansSerif,
+        FontPitch::Variable,
+        [(4.0, -0.5), (8.5, -2.0), (13.0, -2.5)],
+        [(4.0, -0.5), (8.5, -2.0), (13.0, -2.5)],
+      ),
+      (
+        "Courier New",
+        FontFamilyClass::Fixed,
+        FontPitch::Fixed,
+        [(3.0, -1.0), (6.5, -2.5), (11.0, -4.5)],
+        [(5.0, -1.5), (10.0, -3.5), (15.0, -5.0)],
+      ),
+    ] {
+      for (charset, shifts) in [
+        (FontCharset::Ansi, plain),
+        (FontCharset::Other(1), retained),
+      ] {
+        for (index, size) in [12.0, 24.0, 36.0].into_iter().enumerate() {
+          for (align, shift) in [
+            (w::VerticalPositionValues::Superscript, shifts[index].0),
+            (w::VerticalPositionValues::Subscript, shifts[index].1),
+          ] {
+            let mut style = TextStyle {
+              font_family: Some(family.into()),
+              font_family_class: Some(class),
+              font_pitch: Some(pitch),
+              font_charset: Some(charset),
+              font_size_pt: size,
+              wordprocessingml_font_slots: true,
+              wordprocessingml_legacy_escapement_rounding: true,
+              ..Default::default()
+            };
+            properties::apply_vertical_text_alignment(&mut style, align);
+            fonts.resolve(&mut style);
+            assert_eq!(style.font_size_pt, [8.0, 15.5, 23.5][index]);
+            assert_eq!(
+              style.baseline_shift_pt, shift,
+              "{family}/{charset:?}/{size}/{align:?}"
+            );
+            fonts.resolve(&mut style);
+            assert_eq!(style.baseline_shift_pt, shift, "cached resolution");
+          }
+        }
+      }
+    }
+  }
 
   #[test]
   fn physical_script_sizes_keep_authored_line_sizes_and_baseline_cancellation() {
@@ -686,6 +1097,8 @@ mod tests {
           inline_start: 0,
           inline_end: 2,
           merge_format: true,
+          copy_text: true,
+          separator_style: None,
         },
       ];
       fonts.resolve_inlines(&mut inlines, &mut events);

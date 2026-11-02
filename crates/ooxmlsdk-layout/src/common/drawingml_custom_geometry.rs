@@ -8,8 +8,16 @@ use crate::common::PathCommand;
 use crate::common::{DrawingPath, DrawingPathFillMode};
 
 use super::drawingml_geometry::{
-  append_transformed_arc, append_transformed_quadrant_arc, bez_path_commands,
+  append_transformed_arc, append_transformed_quadrant_arc, append_transformed_word_shape_arc,
+  bez_path_commands,
 };
+
+#[derive(Clone, Copy)]
+enum ArcSubdivision {
+  Adaptive,
+  EqualQuadrants,
+  WordShape,
+}
 
 /// ECMA-376 Part 1 §20.1.9.22: the text rectangle uses the shape's EMU
 /// coordinate system, independently of any individual path's viewport.
@@ -42,7 +50,7 @@ pub(crate) fn paths(
   width: f32,
   height: f32,
 ) -> Option<Vec<DrawingPath>> {
-  paths_with_arc_subdivision(geometry, left, top, width, height, false)
+  paths_with_arc_subdivision(geometry, left, top, width, height, ArcSubdivision::Adaptive)
 }
 
 /// Word's text centerlines use quadrant cubics, not a page-space tolerance.
@@ -53,7 +61,32 @@ pub(crate) fn paths_with_quadrant_arcs(
   width: f32,
   height: f32,
 ) -> Option<Vec<DrawingPath>> {
-  paths_with_arc_subdivision(geometry, left, top, width, height, true)
+  paths_with_arc_subdivision(
+    geometry,
+    left,
+    top,
+    width,
+    height,
+    ArcSubdivision::EqualQuadrants,
+  )
+}
+
+/// WPS path arcs use complete quarter turns followed by a final partial arc.
+pub(crate) fn paths_with_word_shape_arcs(
+  geometry: &a::CustomGeometry,
+  left: f32,
+  top: f32,
+  width: f32,
+  height: f32,
+) -> Option<Vec<DrawingPath>> {
+  paths_with_arc_subdivision(
+    geometry,
+    left,
+    top,
+    width,
+    height,
+    ArcSubdivision::WordShape,
+  )
 }
 
 fn paths_with_arc_subdivision(
@@ -62,7 +95,7 @@ fn paths_with_arc_subdivision(
   top: f32,
   width: f32,
   height: f32,
-  quadrant_arcs: bool,
+  arc_subdivision: ArcSubdivision,
 ) -> Option<Vec<DrawingPath>> {
   let mut paths = Vec::with_capacity(geometry.path_list.path.len());
   for path in &geometry.path_list.path {
@@ -187,10 +220,14 @@ fn paths_with_arc_subdivision(
           }
           let arc = drawingml_arc(start, radius_x, radius_y, start_angle, sweep_angle)?;
           let end = arc.eval(1.0);
-          if quadrant_arcs {
-            append_transformed_quadrant_arc(&mut output, arc, map_coordinates);
-          } else {
-            append_transformed_arc(&mut output, arc, map_coordinates);
+          match arc_subdivision {
+            ArcSubdivision::Adaptive => append_transformed_arc(&mut output, arc, map_coordinates),
+            ArcSubdivision::EqualQuadrants => {
+              append_transformed_quadrant_arc(&mut output, arc, map_coordinates);
+            }
+            ArcSubdivision::WordShape => {
+              append_transformed_word_shape_arc(&mut output, arc, map_coordinates);
+            }
           }
           current = Some((end.x, end.y));
         }

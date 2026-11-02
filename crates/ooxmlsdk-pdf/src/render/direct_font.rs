@@ -105,13 +105,32 @@ struct DirectFontFace {
 
 impl DirectFontFace {
   fn from_layout(face: &FontFaceData) -> Self {
+    let variations = face
+      .named_instance
+      .as_ref()
+      .and_then(|instance| {
+        let font = FontRef::from_index(face.data.as_slice(), face.index).ok()?;
+        let named = font.named_instances().get(instance.index as usize)?;
+        Some(
+          font
+            .axes()
+            .iter()
+            .zip(named.user_coords())
+            .map(|(axis, value)| DirectFontVariation {
+              tag: axis.tag().to_be_bytes(),
+              value,
+            })
+            .collect::<Vec<_>>(),
+        )
+      })
+      .unwrap_or_default();
     Self {
       word_alias: None,
       word_names: false,
       data: face.data.clone(),
       index: face.index,
       id: Arc::from(face.id()),
-      variations: Arc::from([]),
+      variations: variations.into(),
     }
   }
 
@@ -197,6 +216,7 @@ struct FontMetadata {
   stem_v: f32,
   serif: bool,
   monospaced: bool,
+  word_synthetic_bold_stroke: bool,
 }
 
 #[derive(Debug, Default)]
@@ -560,6 +580,13 @@ impl DirectFontSet {
     Ok((&font.resource_name, font.objects.type0))
   }
 
+  pub(super) fn word_synthetic_bold_stroke(&self, handle: FontHandle) -> bool {
+    self
+      .fonts
+      .get(handle.0)
+      .is_some_and(|font| font.metadata.word_synthetic_bold_stroke)
+  }
+
   pub(super) fn write_objects(&self, pdf: &mut Pdf) -> Result<()> {
     for font in &self.fonts {
       font.write(pdf)?;
@@ -836,8 +863,24 @@ impl FontMetadata {
       italic_angle: metrics.italic_angle,
       stem_v: 10.0 + 0.244 * (weight - 50.0),
       monospaced: metrics.is_monospace,
+      // Native Word controls isolate OS/2 weight with identical outlines:
+      // 100/200/299/300/301/399/400/401/450/499/500/501/550/600/700.
+      // Only regular weights 300 and 400 acquire a PDF synthetic stroke.
+      // Word's EMF requests natural_weight+300 for all these bold runs, and
+      // GDI can still synthesize their metrics. Keep this PDF paint decision
+      // separate from layout synthesis and cache it with the physical face.
+      // CFF controls with the same outlines at 299/300/301/399/400/401/500/600
+      // confirm the same rule; e.g. a medium CFF face must not acquire a stroke.
+      word_synthetic_bold_stroke: (!is_glyf && !is_cff)
+        || face.os2().map_or(true, |os2| {
+          word_synthetic_bold_weight(os2.us_weight_class())
+        }),
     })
   }
+}
+
+fn word_synthetic_bold_weight(weight: u16) -> bool {
+  matches!(weight, 300 | 400)
 }
 
 fn word_truetype_font_name<'a>(face: &FontRef<'_>, postscript_name: &'a str) -> &'a str {
@@ -1046,6 +1089,36 @@ mod tests {
       stem_v: 0.0,
       serif: false,
       monospaced: false,
+      word_synthetic_bold_stroke: true,
+    }
+  }
+
+  #[test]
+  fn word_synthetic_stroke_matches_native_weight_boundary_controls() {
+    // Office PDF observations with identical outlines and varied OS/2 weight;
+    // adjacent values distinguish discrete classes from a numeric threshold.
+    for (weight, stroke) in [
+      (100, false),
+      (200, false),
+      (299, false),
+      (300, true),
+      (301, false),
+      (399, false),
+      (400, true),
+      (401, false),
+      (450, false),
+      (499, false),
+      (500, false),
+      (501, false),
+      (550, false),
+      (600, false),
+      (700, false),
+    ] {
+      assert_eq!(
+        super::word_synthetic_bold_weight(weight),
+        stroke,
+        "weight={weight}"
+      );
     }
   }
 

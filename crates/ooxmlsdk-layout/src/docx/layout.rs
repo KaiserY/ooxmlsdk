@@ -2,23 +2,31 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io::Cursor;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 use std::sync::Arc;
 
 mod body_drawing_wrap;
+mod cell_line_picture_wrap;
 mod cell_text_measure;
+mod chapter_page_numbers;
 mod collapsed_table_coordinates;
 mod column_balance;
 mod decimal_tabs;
 mod footnote_columns;
 mod footnote_follow;
+mod legacy_picture_nonoverlap;
 mod legacy_square_wrap;
-mod page_border_3d;
 mod page_border_art;
+mod page_border_bands;
 mod page_border_shadow;
 mod separate_table_coordinates;
+mod side_ruby;
+mod stroked_border;
+mod table_small_gap;
 mod vertical_cell_flow;
 mod vertical_merge_follow;
+mod vml_glyph_bounds;
 mod wordprocessing_3d_window;
 mod wordprocessing_auto_gap;
 mod wordprocessing_backdrop;
@@ -27,6 +35,7 @@ mod wordprocessing_kashida;
 mod wordprocessing_line_geometry;
 mod wordprocessing_note_justification;
 mod wordprocessing_tab_text;
+mod wordprocessing_url;
 mod wordprocessing_warp_shadow;
 use crate::common::wordprocessing_device as wordprocessing_table_device;
 use cell_text_measure::TableCellMeasureContext;
@@ -34,7 +43,10 @@ use footnote_follow::{FootnotePage, FootnotePlan};
 use vertical_merge_follow::{VerticalMergeFollows, VerticalMergeFragment};
 
 use bytes::Bytes;
-use icu_properties::{CodePointMapData, props::VerticalOrientation};
+use icu_properties::{
+  CodePointMapData,
+  props::{LineBreak, VerticalOrientation},
+};
 use icu_segmenter::{
   GraphemeClusterSegmenter, LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions,
 };
@@ -53,16 +65,17 @@ use unicode_script::{Script, UnicodeScript};
 use crate::common;
 use crate::common::drawingml_shape_raster::office_shape_shadow_bitmap_sample_bounds as wordprocessing_shape_shadow_bitmap_sample_bounds;
 use crate::docx::{
-  Block, BorderCompoundPattern, BorderDashPattern, BorderStyle, DocxDocument, DynamicFieldKind,
-  EXPLICIT_DEFAULT_WORD_TEXT_TAB, FieldNumberFormat, FloatingFrame, FloatingFramePlacement,
-  FloatingImagePlacement, FloatingPaintOrder, FrameHeightRule, FrameHorizontalAlignment,
-  FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode,
-  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineChart, InlineChartUserShapeAnchor, InlineDrawingGroup, InlineHorizontalRuleAlignment,
-  InlineHorizontalRuleWidth, InlineItem, InlineShape, InlineShapeGeometry, InlineShapeImageFill,
-  InlineShapeImageFillMode, LegacyTextRelief, LineBreakClear, LineHeightRule, LineNumbering,
-  NoteNumberingSpec, NoteSeparatorMark, PRESERVED_WORD_TEXT_TAB, PageBorderArt, PageBorderDisplay,
-  PageBottomHyphenation, PageSetup, ParagraphAlignment, PositionalTab, PositionalTabBase, RgbColor,
+  Block, BorderCompoundPattern, BorderDashPattern, BorderStyle, DiscardedSectionCarrier,
+  DocxDocument, DynamicFieldKind, EXPLICIT_DEFAULT_WORD_TEXT_TAB, FieldNumberFormat, FloatingFrame,
+  FloatingFramePlacement, FloatingImagePlacement, FloatingPaintOrder, FrameHeightRule,
+  FrameHorizontalAlignment, FrameHorizontalAnchor, FrameVerticalAlignment, FrameVerticalAnchor,
+  FrameWrapMode, HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode,
+  ImageWrapSide, InlineChart, InlineChartUserShapeAnchor, InlineDrawingGroup,
+  InlineHorizontalRuleAlignment, InlineHorizontalRuleWidth, InlineItem, InlineShape,
+  InlineShapeGeometry, InlineShapeImageFill, InlineShapeImageFillMode, LegacyTextRelief,
+  LineBreakClear, LineHeightRule, LineNumbering, NoteNumberingSpec, NoteSeparatorMark,
+  PRESERVED_WORD_TEXT_TAB, PageBorderArt, PageBorderDisplay, PageBottomHyphenation, PageSetup,
+  ParagraphAlignment, ParagraphBordersModel, PositionalTab, PositionalTabBase, RgbColor,
   RubyAlignment, RubyInline, SectionBreakKind, SectionColumns, ShadingPaint, TabLeader, TabStop,
   TabStopAlignment, Table, TableAlignment, TableBordersModel, TableCell, TableCellSpacing,
   TableCellVerticalAlignment, TableLayoutMode, TableRow, TextBoxVerticalAlignment,
@@ -223,6 +236,8 @@ const WORD_SHAPE_STORY_BITMAP_CONTENT_TYPE: &str =
 // surface while preserving the table text as PDF text.
 const WORD_SHAPE_STORY_PAINT_BITMAP_CONTENT_TYPE: &str =
   "application/vnd.ooxmlsdk.wordprocessing-shape-story-paint+png";
+const WORD_SHAPE_SOFT_EDGE_BITMAP_CONTENT_TYPE: &str =
+  "application/vnd.ooxmlsdk.wordprocessing-shape-soft-edge+png";
 // Internal transport tag for a Word WPG backdrop whose RGB samples are
 // already associated with a black matte. The PDF writer uses the tag to keep
 // the exact color and alpha planes and install `/Matte [0 0 0]` on the SMask.
@@ -307,14 +322,29 @@ struct WordLineTextExtents {
   has_explicit_line_break: bool,
   has_spacing_excluded_portion: bool,
   has_text: bool,
+  has_blank_line_metrics: bool,
   has_intrinsic_leading_above: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct NumberingLineMetrics {
   ascent_pt: f32,
+  centered_picture_height_pt: Option<f32>,
   text_line_spacing_multiple: f32,
   centered_font_gap: bool,
+}
+
+impl NumberingLineMetrics {
+  fn ascent_for(self, text: &WordLineTextExtents) -> f32 {
+    self
+      .centered_picture_height_pt
+      .map_or(self.ascent_pt, |height| {
+        // Picture numbers aligned to the character centre own ascent only;
+        // ordinary text retains its descent. Recompute from the completed
+        // line so a later larger run can absorb the number's reserve.
+        (height + text.centered_font_ascent_pt - text.font_descent_pt) / 2.0
+      })
+  }
 }
 
 #[derive(Clone, Copy)]
@@ -347,6 +377,27 @@ impl<'a> TextPortion<'a> {
 }
 
 impl WordLineTextExtents {
+  fn include_mixed_vertical(
+    &mut self,
+    portion: TextPortion<'_>,
+    compatibility_mode: u16,
+    text_metrics: &mut TextMetrics,
+  ) {
+    for segment in shape_text_column_segments(portion.text, portion.style, true, text_metrics) {
+      self.include(
+        TextPortion {
+          text: &portion.text[segment.byte_start..segment.byte_end],
+          ..portion
+        },
+        true,
+        false,
+        segment.orientation == VerticalGraphemeOrientation::Rotated,
+        compatibility_mode,
+        text_metrics,
+      );
+    }
+  }
+
   fn include_overstrike(&mut self, metrics: CompoundTextMetrics) {
     let Some(other) = metrics.overstrike_extents else {
       return;
@@ -388,6 +439,7 @@ impl WordLineTextExtents {
     portion: TextPortion<'_>,
     script_sensitive_line_height: bool,
     use_vertical_non_grid_line_spacing: bool,
+    rotated_cell: bool,
     compatibility_mode: u16,
     text_metrics: &mut TextMetrics,
   ) {
@@ -395,7 +447,10 @@ impl WordLineTextExtents {
     let emphasis = style.wordprocessingml_font_slots
       && style.resolved_wordprocessing_emphasis().is_some()
       && text.chars().any(|character| !character.is_whitespace());
-    let metrics = if script_sensitive_line_height || emphasis {
+    let script_sensitive = script_sensitive_line_height || emphasis;
+    let metrics = if rotated_cell {
+      text_metrics.rotated_cell_line_vertical_metrics(script_sensitive.then_some(text), style)
+    } else if script_sensitive {
       text_metrics.line_vertical_metrics_for_text(text, style)
     } else {
       text_metrics.line_vertical_metrics(style)
@@ -418,7 +473,16 @@ impl WordLineTextExtents {
     // complete ascent + descent + gap height. A signed w:position therefore
     // redistributes that natural box above and below the common baseline; it
     // does not independently append abs(position) to every run's height.
-    let default_baseline_pt = if style.use_windows_font_metrics {
+    let default_baseline_pt = if style.wordprocessingml_font_slots
+      && style.line_vertical_alignment == common::LineVerticalAlignment::Top
+    {
+      // Word's top-aligned font cache retains one design unit above the
+      // logical anchor, plus external leading. The glyph origin is separate.
+      // Native Nyala/Arial/Calibri controls distinguish this from ordinary
+      // ascent: lowering a run can extend descent past the line's top anchor.
+      (metrics.directwrite_baseline_offset_pt - metrics.baseline_offset_pt).max(0.0)
+        + metrics.font_design_unit_pt
+    } else if style.use_windows_font_metrics {
       metrics.directwrite_baseline_offset_pt
     } else {
       metrics.leading_above_pt() + metrics.ascent_pt
@@ -540,6 +604,31 @@ impl WordLineTextExtents {
   fn uses_typographic_gap_below_baseline(self) -> bool {
     self.has_text && !self.has_intrinsic_leading_above
   }
+}
+
+fn uses_rotated_cell_font_metrics(style: &TextStyle, text_segmentation: TextSegmentation) -> bool {
+  text_segmentation == TextSegmentation::TableCell && style.rotation_deg.abs() == 90.0
+}
+
+fn rotated_cell_single_line_height(
+  paragraph: &crate::docx::Paragraph,
+  style: &TextStyle,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let portion = paragraph.inlines.iter().find_map(|inline| match inline {
+    InlineItem::Text(run) if text_run_owns_line_height(run) => {
+      Some((&run.style, run.text.as_str()))
+    }
+    _ => None,
+  });
+  let (style, text) = portion.map_or((style, None), |(style, text)| (style, Some(text)));
+  let metrics = text_metrics.rotated_cell_line_vertical_metrics(text, style);
+  let shift = if style.automatic_escapement_font_size_pt.is_some() {
+    0.0
+  } else {
+    style.baseline_shift_pt.abs()
+  };
+  (metrics.line_height_pt() + shift).max(style.line_height_override_pt.unwrap_or_default())
 }
 
 fn word_vertical_frame_single_line_height(font_size_pt: f32, windows_line_height_pt: f32) -> f32 {
@@ -667,7 +756,13 @@ fn paragraph_line_height_for_setup(
         text_segmentation,
         text_metrics,
       )
-      .unwrap_or_else(|| paragraph_single_line_height(paragraph, base_line_style, text_metrics));
+      .unwrap_or_else(|| {
+        if uses_rotated_cell_font_metrics(base_line_style, text_segmentation) {
+          rotated_cell_single_line_height(paragraph, base_line_style, text_metrics)
+        } else {
+          paragraph_single_line_height(paragraph, base_line_style, text_metrics)
+        }
+      });
       let line_height = paragraph
         .format
         .line_height_pt
@@ -682,7 +777,13 @@ fn paragraph_line_height_for_setup(
       .map_or(line_height, |heights| heights.first_line_pt)
     }
     LineHeightRule::AtLeast => {
-      let natural_line_height = inline_text_height(base_line_style, text_metrics);
+      let natural_line_height = if paragraph.format.wordprocessing_shape_mixed_vertical_text {
+        paragraph_single_line_height(paragraph, base_line_style, text_metrics)
+      } else if uses_rotated_cell_font_metrics(base_line_style, text_segmentation) {
+        rotated_cell_single_line_height(paragraph, base_line_style, text_metrics)
+      } else {
+        inline_text_height(base_line_style, text_metrics)
+      };
       document_grid_line_metrics(natural_line_height, paragraph, setup, text_segmentation)
         .map_or_else(
           || {
@@ -862,6 +963,23 @@ fn paragraph_single_line_height(
   base_line_style: &TextStyle,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  if paragraph.format.wordprocessing_shape_mixed_vertical_text {
+    let (style, text) = paragraph
+      .inlines
+      .iter()
+      .find_map(|inline| match inline {
+        InlineItem::Text(run) if text_run_owns_line_height(run) => {
+          Some((&run.style, run.text.as_str()))
+        }
+        _ => None,
+      })
+      .unwrap_or((base_line_style, "M"));
+    let mut extents = WordLineTextExtents::default();
+    // This ordinary font portion always defines spacing, so the reference
+    // compatibility branch for note portions does not affect the font box.
+    extents.include_mixed_vertical(TextPortion::new(style, text), 0, text_metrics);
+    return extents.height_pt();
+  }
   let visible_text_height =
     paragraph
       .inlines
@@ -1159,8 +1277,10 @@ fn word_east_asian_paragraph_mark_single_line_height(
     // alignment does not add an implicit Han-font strut to an Arial line.
     // Native controls keep the following paragraph fixed when the mark's
     // face/size or the floating frame changes; enlarging visible text does
-    // advance it. Empty marks, bidi/forms and the explicit numbering mark
-    // retain their independently established owners.
+    // advance it. An ordinary empty body mark also owns its realized font:
+    // native start/left and four East Asian-face controls retain the same
+    // Latin charset-dependent height. Bidi/forms and the explicit numbering
+    // mark retain their independently established owners.
     || (compatibility_mode >= 15
       && text_segmentation == TextSegmentation::Body
       && !paragraph.format.bidi
@@ -1169,12 +1289,13 @@ fn word_east_asian_paragraph_mark_single_line_height(
       && paragraph.format.frame.is_none()
       && !paragraph_has_form_widget(paragraph)
       && !paragraph.format.numbered_paragraph_mark_background
-      && paragraph.inlines.iter().any(|inline| {
-        matches!(inline, InlineItem::Text(run)
-          if !run.style.hidden
-            && !run.style.semantic_only
-            && text_run_affects_line_height(&run.text))
-      }))
+      && (paragraph_is_effectively_empty(paragraph)
+        || paragraph.inlines.iter().any(|inline| {
+          matches!(inline, InlineItem::Text(run)
+            if !run.style.hidden
+              && !run.style.semantic_only
+              && text_run_affects_line_height(&run.text))
+        })))
     || !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
     || paragraph.format.line_height_set
     || (paragraph.format.line_height_pt.is_some() && !paragraph.format.office_recovered_line_height)
@@ -1241,7 +1362,9 @@ fn paragraph_uses_only_paragraph_mark_baseline_shift(paragraph: &crate::docx::Pa
   // into its line height. Native drop-cap and ordinary-frame controls keep
   // w:position effective here; their automatic-spacing counterparts instead
   // retain the shared line-box normalization below.
-  if matches!(paragraph.format.line_height_rule, LineHeightRule::Exact) {
+  if matches!(paragraph.format.line_height_rule, LineHeightRule::Exact)
+    || paragraph.base_style.line_vertical_alignment == common::LineVerticalAlignment::Top
+  {
     return false;
   }
   let paragraph_shift = paragraph.base_style.baseline_shift_pt;
@@ -1252,7 +1375,9 @@ fn paragraph_uses_only_paragraph_mark_baseline_shift(paragraph: &crate::docx::Pa
   for inline in &paragraph.inlines {
     match inline {
       InlineItem::Text(run) if text_run_affects_line_height(&run.text) => {
-        if (run.style.baseline_shift_pt - paragraph_shift).abs() > LAYOUT_EPSILON_PT {
+        if run.style.line_vertical_alignment == common::LineVerticalAlignment::Top
+          || (run.style.baseline_shift_pt - paragraph_shift).abs() > LAYOUT_EPSILON_PT
+        {
           return false;
         }
         saw_text = true;
@@ -1347,14 +1472,16 @@ fn doc_grid_line_pitch_for_segment(
     return setup.doc_grid_line_pitch_pt;
   }
   match text_segmentation {
-    TextSegmentation::Body => setup.doc_grid_line_pitch_pt,
+    // Footnote and endnote paragraphs share the section's line grid. Their
+    // own snapToGrid property still opts out in document_grid_line_metrics;
+    // repeating stories and ordinary text frames keep separate contracts.
+    TextSegmentation::Body | TextSegmentation::Notes => setup.doc_grid_line_pitch_pt,
     TextSegmentation::TableCell if setup.adjust_table_line_heights_to_grid => setup
       .table_cell_doc_grid_line_pitch_pt
       .or(setup.doc_grid_line_pitch_pt),
     TextSegmentation::DrawingLayer
     | TextSegmentation::RepeatingSlot
     | TextSegmentation::FooterSlot
-    | TextSegmentation::Notes
     | TextSegmentation::TableCell => None,
   }
 }
@@ -1491,18 +1618,26 @@ fn include_text_height(
   portion: TextPortion<'_>,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  line_text_extents.include(
-    portion,
-    text_frame.script_sensitive_line_height,
-    uses_vertical_non_grid_line_spacing(
-      paragraph,
-      flow.setup,
-      flow.text_segmentation,
-      flow.inside_paragraph_frame,
-    ),
-    flow.compatibility_mode,
-    text_metrics,
-  );
+  if paragraph.format.wordprocessing_shape_mixed_vertical_text
+    && paragraph.format.line_height_rule != LineHeightRule::Exact
+  {
+    line_text_extents.include_mixed_vertical(portion, flow.compatibility_mode, text_metrics);
+  } else {
+    line_text_extents.include(
+      portion,
+      text_frame.script_sensitive_line_height,
+      uses_vertical_non_grid_line_spacing(
+        paragraph,
+        flow.setup,
+        flow.text_segmentation,
+        flow.inside_paragraph_frame,
+      ),
+      paragraph.format.line_height_rule != LineHeightRule::Exact
+        && uses_rotated_cell_font_metrics(portion.style, flow.text_segmentation),
+      flow.compatibility_mode,
+      text_metrics,
+    );
+  }
   let text_height = line_text_extents.height_pt();
   if let Some(numbering) = line_text_extents.numbering {
     // A number portion can raise the common ascent, but does not replace
@@ -1514,8 +1649,12 @@ fn include_text_height(
     } else {
       line_text_extents.font_ascent_pt
     };
-    return line_text_extents.height_with_line_spacing(numbering.text_line_spacing_multiple)
-      + (numbering.ascent_pt - font_ascent).max(0.0);
+    let height = line_text_extents.height_with_line_spacing(numbering.text_line_spacing_multiple)
+      + (numbering.ascent_for(line_text_extents) - font_ascent).max(0.0);
+    return document_grid_line_metrics(height, paragraph, flow.setup, flow.text_segmentation)
+      .map_or(height, |grid| {
+        grid.height_pt.max(text_frame.base_line_height)
+      });
   }
   let text_height =
     document_grid_line_metrics(text_height, paragraph, flow.setup, flow.text_segmentation)
@@ -1655,19 +1794,44 @@ fn include_text_content_height(
   if !at_least_uses_separate_content_height(paragraph, flow) {
     return content_height;
   }
-  line_text_extents.include(
-    portion,
-    text_frame.script_sensitive_line_height,
-    uses_vertical_non_grid_line_spacing(
-      paragraph,
-      flow.setup,
-      flow.text_segmentation,
-      flow.inside_paragraph_frame,
-    ),
-    flow.compatibility_mode,
-    text_metrics,
-  );
+  if paragraph.format.wordprocessing_shape_mixed_vertical_text {
+    line_text_extents.include_mixed_vertical(portion, flow.compatibility_mode, text_metrics);
+  } else {
+    line_text_extents.include(
+      portion,
+      text_frame.script_sensitive_line_height,
+      uses_vertical_non_grid_line_spacing(
+        paragraph,
+        flow.setup,
+        flow.text_segmentation,
+        flow.inside_paragraph_frame,
+      ),
+      paragraph.format.line_height_rule != LineHeightRule::Exact
+        && uses_rotated_cell_font_metrics(portion.style, flow.text_segmentation),
+      flow.compatibility_mode,
+      text_metrics,
+    );
+  }
   content_height.max(line_text_extents.height_pt())
+}
+
+fn numbering_body_has_cjk_text(paragraph: &crate::docx::Paragraph) -> bool {
+  paragraph.inlines.iter().any(|inline| {
+    matches!(inline, InlineItem::Text(run) if run.text.chars().any(|character| {
+      matches!(character.script(),
+        Script::Han | Script::Hiragana | Script::Katakana | Script::Hangul
+        | Script::Bopomofo | Script::Yi)
+    }))
+  })
+}
+
+fn grid_numbering_uses_body_descent(paragraph: &crate::docx::Paragraph, flow: FlowContext) -> bool {
+  // Native grid controls over 11/18/24/36pt numbers retain the Latin body's
+  // descent, including when its font is CJK-capable. Actual CJK text and
+  // table/story cursors have separate baseline contracts.
+  flow.text_segmentation == TextSegmentation::Body
+    && document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_some()
+    && !numbering_body_has_cjk_text(paragraph)
 }
 
 fn include_numbering_label_height(
@@ -1696,11 +1860,13 @@ fn include_numbering_label_height(
     return line_height;
   }
 
+  let grid_numbering = grid_numbering_uses_body_descent(paragraph, flow);
   if matches!(text_frame.line_height_rule, LineHeightRule::Auto)
-    && !paragraph.format.office_recovered_line_height
+    && (!paragraph.format.office_recovered_line_height || grid_numbering)
     && paragraph.format.vertical_text_flow.is_none()
     && paragraph.list_label_image.is_none()
-    && document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_none()
+    && (grid_numbering
+      || document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_none())
     && paragraph
       .inlines
       .iter()
@@ -1758,10 +1924,27 @@ fn include_numbering_label_height(
     // 24pt label must not contribute its descent to a 12pt body line.
     line_text_extents.numbering = Some(NumberingLineMetrics {
       ascent_pt: label_ascent,
-      text_line_spacing_multiple: text_frame.base_line_height / body_height.max(LAYOUT_EPSILON_PT),
+      centered_picture_height_pt: None,
+      text_line_spacing_multiple: if grid_numbering {
+        1.0
+      } else {
+        text_frame.base_line_height / body_height.max(LAYOUT_EPSILON_PT)
+      },
       centered_font_gap,
     });
-    return line_height + (label_ascent - body_ascent).max(0.0);
+    let ascent_reserve = (label_ascent - body_ascent).max(0.0);
+    if grid_numbering {
+      // Snap the ascent/body-descent union, not the full number font box.
+      // The ordinary body frame still supplies the minimum first-line box.
+      return document_grid_line_metrics(
+        body_metrics.line_height_pt() + ascent_reserve,
+        paragraph,
+        flow.setup,
+        flow.text_segmentation,
+      )
+      .map_or(line_height, |grid| grid.height_pt.max(line_height));
+    }
+    return line_height + ascent_reserve;
   }
 
   // Writer creates numbering as a SwNumberPortion with its own font.
@@ -2496,7 +2679,7 @@ fn inline_image_line_height(
       text_metrics,
     );
   }
-  if metrics.content_bottom_gap_pt >= 0.0 {
+  if metrics.content_bottom_gap_pt >= 0.0 || metrics.drawingml_character_picture {
     return inline_drawing_line_height(
       metrics.frame_height_pt,
       paragraph,
@@ -2638,7 +2821,7 @@ fn inline_image_portion_line_height(
       text_metrics,
     );
   }
-  if metrics.content_bottom_gap_pt >= 0.0 {
+  if metrics.content_bottom_gap_pt >= 0.0 || metrics.drawingml_character_picture {
     return inline_drawing_portion_line_height(
       metrics.frame_height_pt,
       paragraph,
@@ -2903,6 +3086,11 @@ fn final_table_picture_line_height(
 }
 
 fn inline_image_ascent(metrics: InlineImageMetrics) -> f32 {
+  if metrics.drawingml_character_picture {
+    // The rotated paint rectangle can extend below the character frame; that
+    // signed paint gap is not a script descent or a smaller line ascent.
+    return metrics.frame_height_pt;
+  }
   if metrics.line_box == crate::docx::InlineImageLineBox::EmbeddedObjectRunPosition {
     return metrics.frame_height_pt;
   }
@@ -2972,6 +3160,59 @@ fn numbering_image_metrics(
   metrics.content_height_pt = scaled(metrics.content_height_pt);
   metrics.content_bottom_gap_pt = scaled(metrics.content_bottom_gap_pt);
   metrics
+}
+
+fn centered_picture_numbering_metrics(
+  image: InlineImageMetrics,
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  frame: TextFrame,
+  text_metrics: &mut TextMetrics,
+) -> Option<(NumberingLineMetrics, f32)> {
+  if paragraph.format.line_vertical_alignment != Some(common::LineVerticalAlignment::Center)
+    || !matches!(frame.line_height_rule, LineHeightRule::Auto)
+    || flow.text_segmentation != TextSegmentation::Body
+    || flow.inside_paragraph_frame
+    || paragraph.format.wordprocessing_shape_story
+    || paragraph.format.word_text_frame_story
+    || paragraph.format.vertical_text_flow.is_some()
+    || !paragraph
+      .inlines
+      .iter()
+      .all(InlineItem::leaves_host_line_metrics_text_owned)
+  {
+    return None;
+  }
+  let run = paragraph.inlines.iter().find_map(|inline| match inline {
+    InlineItem::Text(run) if text_run_affects_line_height(&run.text) => Some(run),
+    _ => None,
+  })?;
+  let mut body = WordLineTextExtents::default();
+  body.include(
+    TextPortion::new(&run.style, &run.text),
+    frame.script_sensitive_line_height,
+    false,
+    false,
+    flow.compatibility_mode,
+    text_metrics,
+  );
+  let body_style = paragraph_base_line_style(paragraph);
+  let multiple =
+    if document_grid_line_metrics(1.0, paragraph, flow.setup, flow.text_segmentation).is_some() {
+      1.0
+    } else {
+      frame.base_line_height
+        / paragraph_single_line_height(paragraph, &body_style, text_metrics).max(LAYOUT_EPSILON_PT)
+    };
+  let numbering = NumberingLineMetrics {
+    ascent_pt: 0.0,
+    centered_picture_height_pt: Some(image.frame_height_pt),
+    text_line_spacing_multiple: multiple,
+    centered_font_gap: false,
+  };
+  let height = body.height_with_line_spacing(multiple)
+    + (numbering.ascent_for(&body) - body.font_ascent_pt).max(0.0);
+  Some((numbering, height))
 }
 
 fn inline_drawing_top(
@@ -3370,13 +3611,42 @@ fn table_cell_picture_only_paragraph(paragraph: &crate::docx::Paragraph) -> bool
     })
 }
 
-fn cell_owned_drawingml_picture(placement: FloatingImagePlacement, flow: FlowContext) -> bool {
+fn cell_owned_drawingml_object(placement: FloatingImagePlacement, flow: FlowContext) -> bool {
   flow.text_segmentation == TextSegmentation::TableCell
     && flow.horizontal_table_cell
     && !flow.inside_paragraph_frame
     && !placement.behind_text
     && placement.paint_order.is_drawing_ml()
     && effective_layout_in_cell(placement, flow)
+}
+
+fn cell_square_picture_wrap_exclusion(
+  mut exclusion: WrapExclusion,
+  placement: FloatingImagePlacement,
+  flow: FlowContext,
+  line_left: f32,
+  line_right: f32,
+) -> WrapExclusion {
+  if !cell_owned_drawingml_object(placement, flow)
+    || placement.wrap != ImageWrapMode::Square
+    || placement.wrap_side != ImageWrapSide::BothSides
+    || !exclusion.overlaps_horizontal_span(line_left, line_right)
+  {
+    return exclusion;
+  }
+  // Word's cell Square controls reject a side gap of18pt and admit18.05pt.
+  // Empty/visible and mode14/15 controls retain the same clearance owner.
+  // Close only those side lanes;
+  // retain the physical vertical edges and the existing line-clear owner.
+  // Writer's WORD_TEXT_MIN independently identifies the quarter-inch gap.
+  let unusable = |gap: f32| (gap * units::TWIPS_PER_POINT).round() <= 360.0;
+  if unusable(exclusion.left_pt - line_left) {
+    exclusion.left_pt = exclusion.left_pt.min(line_left);
+  }
+  if unusable(line_right - exclusion.right_pt) {
+    exclusion.right_pt = exclusion.right_pt.max(line_right);
+  }
+  exclusion
 }
 
 fn single_body_picture_minimum(
@@ -3526,21 +3796,7 @@ fn ruby_inline_metrics(ruby: &RubyInline, text_metrics: &mut TextMetrics) -> Com
   let base_width_pt = text_runs_width(&ruby.base, text_metrics);
   let base_height_pt = text_runs_height(&ruby.base, text_metrics);
   if ruby.alignment == RubyAlignment::RightVertical {
-    let mut guide_width_pt = 0.0_f32;
-    let mut guide_height_pt = 0.0_f32;
-    for run in &ruby.guide {
-      for ch in run.text.chars() {
-        let mut encoded = [0; 4];
-        let text = ch.encode_utf8(&mut encoded);
-        guide_width_pt = guide_width_pt.max(text_metrics.measure_text(text, &run.style));
-        guide_height_pt += inline_text_height_for_text(&run.style, text, text_metrics);
-      }
-    }
-    return CompoundTextMetrics {
-      width_pt: base_width_pt + guide_width_pt,
-      height_pt: base_height_pt.max(guide_height_pt),
-      overstrike_extents: None,
-    };
+    return side_ruby::metrics(ruby, base_width_pt, base_height_pt, text_metrics);
   }
 
   let guide_width_pt = text_runs_width(&ruby.guide, text_metrics);
@@ -3555,6 +3811,7 @@ fn ruby_inline_metrics(ruby: &RubyInline, text_metrics: &mut TextMetrics) -> Com
       TextPortion::new(&run.style, &run.text),
       true,
       false,
+      false,
       15,
       text_metrics,
     );
@@ -3565,6 +3822,7 @@ fn ruby_inline_metrics(ruby: &RubyInline, text_metrics: &mut TextMetrics) -> Com
     extents.include(
       TextPortion::new(&style, &run.text),
       true,
+      false,
       false,
       15,
       text_metrics,
@@ -3592,6 +3850,7 @@ fn compound_text_inline_metrics(
           extents.include(
             TextPortion::new(&run.style, &run.text),
             true,
+            false,
             false,
             15,
             text_metrics,
@@ -4110,6 +4369,12 @@ struct PendingFloatingTableFollow {
   pending_floating_table_follows: Vec<PendingFloatingTableFollow>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BodyDrawingVerticalAlignment {
+  bounds: FrameBounds,
+  anchor_y_pt: f32,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum PageItem {
   Text(Box<TextItem>),
@@ -4131,6 +4396,7 @@ pub(crate) enum PageItem {
     paint_order: FloatingPaintOrder,
     behind_text: bool,
     table_wrap: Option<TableCellPictureWrap>,
+    body_vertical_alignment: Option<BodyDrawingVerticalAlignment>,
   },
   Rect(RectItem),
   Fill(FillItem),
@@ -4144,6 +4410,8 @@ pub(crate) struct LegacyFormCheckBoxItem {
   x_pt: f32,
   y_pt: f32,
   line_height_pt: f32,
+  /// Recover the line top when `y_pt` is a resolved table-cell baseline.
+  line_top_offset_pt: f32,
   size_pt: f32,
   portion_ascent_pt: f32,
   table_cell_resolved_baseline: bool,
@@ -4174,6 +4442,8 @@ pub(crate) struct TextItem {
   wordprocessing_auto_line_spacing_units: Option<i32>,
   pub wordprocessing_line_metrics: Option<common::WordprocessingLineMetrics>,
   pub line_metrics_participant: bool,
+  /// Resolve a side annotation only after its base's enclosing line is complete.
+  side_ruby: Option<side_ruby::GuidePlacement>,
   /// Physical cell clipping is independent of layout and shape effects.
   pub paint_clip: Option<common::Rect>,
   // An owning table can intersect the page while a complete run in one of
@@ -4488,6 +4758,8 @@ struct FlowContext {
   repeating_slots: RepeatingSlotState,
   text_segmentation: TextSegmentation,
   horizontal_table_cell: bool,
+  // Cell typography is independent of the containing header/footer story.
+  table_cell_in_header_footer: bool,
   // Physical row fragments own the complete first-line fit check.
   table_cell_complete_first_line_fit: bool,
   // Legacy Word nested-row continuations retain the complete glyph line but
@@ -4512,16 +4784,23 @@ struct FlowContext {
   // Keep the physical owner so an already-consumed anchor cannot wrap again.
   table_cell_replay: Option<TableCellReplay>,
   paragraph_spacing_context: ParagraphSpacingContext,
+  // A discarded sectPr carrier owns section-boundary lower spacing even
+  // when the preceding visible block is a table rather than a paragraph.
+  section_carrier_lower_pt: Option<f32>,
+  section_carrier_style_matches: Option<bool>,
   preserve_horizontal_on_advance: bool,
   script_sensitive_line_height: bool,
   word_floating_table_cell: bool,
   floating_table_cell_follow_top_inset_pt: f32,
   floating_table_cell_follow_bottom_inset_pt: f32,
   note_continuation_top_inset_pt: f32,
+  note_continuation_bottom_inset_pt: f32,
   inside_paragraph_frame: bool,
   // Translation from the original body cursor to a legacy paragraph frame.
   // Local frame measurement uses a zero-origin translation.
   paragraph_frame_translation_y_pt: Option<f32>,
+  // Numeric frame coordinates have already supplied their preceding twip.
+  paragraph_frame_numeric_offset_decoded: (bool, bool),
   fixed_output_raster_dpi: f32,
 }
 
@@ -4563,6 +4842,8 @@ fn note_story_flow(flow: FlowContext) -> FlowContext {
     text_segmentation: TextSegmentation::Notes,
     footnote_lower_space: None,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     ..flow
   }
 }
@@ -4661,6 +4942,7 @@ struct WrapExclusion {
 pub(crate) struct TableCellPictureWrap {
   bounds: FrameBounds,
   side: ImageWrapSide,
+  blocks_flow: bool,
 }
 
 impl TableCellPictureWrap {
@@ -4676,7 +4958,7 @@ impl TableCellPictureWrap {
       top_pt: self.bounds.y_pt,
       bottom_pt: self.bounds.y_pt + self.bounds.height_pt,
       side: self.side,
-      blocks_flow: false,
+      blocks_flow: self.blocks_flow,
       uses_contour: false,
       contour_band: None,
       owner: WrapExclusionOwner::Drawing,
@@ -4757,6 +5039,7 @@ struct PreseededBackwardWrap {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WrapExclusionOwner {
   Drawing,
+  RepeatingPageOwnedCellDrawing,
   VmlBodyDrawing,
   DisplacedHeaderDrawing,
   ParagraphTextFrame,
@@ -4772,6 +5055,7 @@ impl WrapExclusionOwner {
     matches!(
       self,
       Self::Drawing
+        | Self::RepeatingPageOwnedCellDrawing
         | Self::VmlBodyDrawing
         | Self::DisplacedHeaderDrawing
         | Self::ParagraphTextFrame
@@ -5601,7 +5885,28 @@ fn into_common_legacy_form_check_box(item: LegacyFormCheckBoxItem) -> common::Di
   let rectangle_left_pt = item.x_pt + rectangle_inset_pt;
   let rectangle_top_pt = box_top_pt + rectangle_inset_pt;
   let color = common_rgb(item.style.color, item.style.opacity);
-  let mut items = Vec::with_capacity(if item.checked { 4 } else { 2 });
+  let mut items = Vec::with_capacity(
+    (if item.checked { 4 } else { 2 }) + usize::from(item.style.highlight.is_some()),
+  );
+
+  if !item.style.hidden
+    && let Some(highlight) = item.style.highlight
+    && item.size_pt > LAYOUT_EPSILON_PT
+    && item.line_height_pt > LAYOUT_EPSILON_PT
+  {
+    // Native body/cell controls highlight the inline field's complete
+    // advance and line box. Its square paint inset has a separate owner.
+    items.push(common::DisplayItem::Rect(common::RectItem {
+      bounds: common_rect(
+        item.x_pt,
+        item.y_pt + item.line_top_offset_pt,
+        item.size_pt,
+        item.line_height_pt,
+      ),
+      fill: common::Fill::Solid(common_rgb(highlight, item.style.opacity)),
+      stroke: None,
+    }));
+  }
 
   if !item.style.hidden && rectangle_size_pt > LAYOUT_EPSILON_PT {
     items.push(common::DisplayItem::Rect(common::RectItem {
@@ -5896,6 +6201,7 @@ fn push_docx_picture_image(
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: run.text,
         style,
@@ -5955,6 +6261,7 @@ fn push_docx_picture_image(
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: run.text,
         style,
@@ -6188,7 +6495,11 @@ fn push_docx_picture_frame_layers(
         placement.bounds,
       );
     }
-    InlineShapeGeometry::Path { paths, outline, .. } => {
+    InlineShapeGeometry::Path {
+      paths,
+      outline,
+      preset,
+    } => {
       let scale_x = if frame.width_pt.abs() > f32::EPSILON {
         placement.width_pt / frame.width_pt
       } else {
@@ -6203,10 +6514,33 @@ fn push_docx_picture_frame_layers(
         * Affine::scale_non_uniform(f64::from(scale_x), f64::from(scale_y))
           .then_translate((f64::from(placement.x_pt), f64::from(placement.y_pt)).into());
       for path in paths {
-        let commands = common::drawingml_geometry::transform_commands(
+        let mut commands = common::drawingml_geometry::transform_commands(
           path.commands.iter().copied(),
           path_transform,
         );
+        if !placement.picture_clips_image
+          && *preset == Some(crate::docx::a::ShapeTypeValues::Rectangle)
+          && frame.rotation_deg == 0.0
+          && matches!(frame.placement, crate::docx::ImagePlacement::Floating(p) if p.paint_order.is_vml())
+          && let [
+            common::PathCommand::MoveTo(a),
+            common::PathCommand::LineTo(b),
+            common::PathCommand::LineTo(c),
+            common::PathCommand::LineTo(d),
+            common::PathCommand::Close,
+          ] = commands.as_slice()
+        {
+          // The recognized VML picture rectangle uses Word's bottom-left
+          // primitive origin. Rotate the existing contour in place; its
+          // fill, source bounds and physical pen are unchanged.
+          let (a, b, c, d) = (*a, *b, *c, *d);
+          commands[..4].copy_from_slice(&[
+            common::PathCommand::MoveTo(b),
+            common::PathCommand::LineTo(c),
+            common::PathCommand::LineTo(d),
+            common::PathCommand::LineTo(a),
+          ]);
+        }
         let closed = commands
           .iter()
           .any(|command| matches!(command, common::PathCommand::Close));
@@ -6215,15 +6549,34 @@ fn push_docx_picture_frame_layers(
           placement.picture_clips_image && path.stroke,
         )
         .and_then(|outset| {
-          expanded_picture_rectangle_path(
-            &path.commands,
-            frame.width_pt,
-            frame.height_pt,
-            outset / scale_x.abs().max(LAYOUT_EPSILON_PT),
-            outset / scale_y.abs().max(LAYOUT_EPSILON_PT),
-          )
-        })
-        .map(|commands| common::drawingml_geometry::transform_commands(commands, path_transform));
+          let outset_x = outset / scale_x.abs().max(LAYOUT_EPSILON_PT);
+          let outset_y = outset / scale_y.abs().max(LAYOUT_EPSILON_PT);
+          if is_preset_rectangle_path(frame, path) {
+            // Pictures share Word's primitive/oblique rectangle painter, but
+            // their outline centerline encloses the bitmap by half a pen.
+            // Normalize that expanded stroke without changing image/clip/fill
+            // geometry or treating the picture as a WPS text/effect host.
+            Some(wordprocessing_rectangle_paint_path_commands(
+              frame.rotation_deg,
+              (
+                frame.width_pt + 2.0 * outset_x,
+                frame.height_pt + 2.0 * outset_y,
+              ),
+              path_transform * Affine::translate((-f64::from(outset_x), -f64::from(outset_y))),
+            ))
+          } else {
+            expanded_picture_rectangle_path(
+              &path.commands,
+              frame.width_pt,
+              frame.height_pt,
+              outset_x,
+              outset_y,
+            )
+            .map(|commands| {
+              common::drawingml_geometry::transform_commands(commands, path_transform)
+            })
+          }
+        });
         push_docx_picture_frame_path_layers(
           background,
           foreground,
@@ -7456,6 +7809,52 @@ fn collect_shape_shadow_silhouettes(
   Some(())
 }
 
+/// Word retains an inner shadow's fill/mask/outline layers when it also has
+/// glow or reflection. ECMA-376 §20.1.8.26 places this completed foreground
+/// before those spatial effects. Native subset controls retain identical
+/// visible glow and inner-shadow images, while reflection includes the shadow.
+fn wordprocessing_inner_shadow_spatial_list(
+  effects: &common::drawingml_image_effects::ImageEffectContainer,
+) -> Option<(
+  common::drawingml_image_effects::ImageEffectContainer,
+  common::drawingml_image_effects::ImageEffectContainer,
+)> {
+  use common::drawingml_image_effects::{
+    ImageEffect, ImageEffectContainer, ImageEffectContainerKind,
+  };
+  if effects.kind != ImageEffectContainerKind::Sibling {
+    return None;
+  }
+  let (foreground, backdrop) = effects.effects.split_last()?;
+  let ImageEffect::Container(main) = foreground else {
+    return None;
+  };
+  if main.kind != ImageEffectContainerKind::Tree
+    || !matches!(main.effects.as_slice(), [ImageEffect::InnerShadow { .. }])
+    || backdrop.is_empty()
+    || !backdrop.iter().all(|effect| {
+      matches!(
+        effect,
+        ImageEffect::Glow { .. } | ImageEffect::Reflection(_)
+      )
+    })
+  {
+    return None;
+  }
+  let mut spatial = backdrop.to_vec();
+  spatial.push(ImageEffect::Identity);
+  Some((
+    ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: vec![foreground.clone()],
+    },
+    ImageEffectContainer {
+      kind: ImageEffectContainerKind::Sibling,
+      effects: spatial,
+    },
+  ))
+}
+
 fn finish_docx_drawing_effects(
   items: &mut Vec<PageItem>,
   content_start: usize,
@@ -7464,14 +7863,49 @@ fn finish_docx_drawing_effects(
 ) {
   let picture_host =
     !host.wordprocessing_diagram_host && matches!(&items[content_start..], [PageItem::Image(_)]);
-  let ordered = if (host.wordprocessing_shape_host || picture_host) && host.static3d.is_none() {
+  let inner_shadow_list = if host.wordprocessing_shape_host
+    && host.static3d.is_none()
+    && !items[content_start..].is_empty()
+    && items[content_start..]
+      .iter()
+      .all(|item| matches!(item, PageItem::Path(_)))
+  {
     match host.effects {
       Some(common::DrawingEffectSource::List {
         resolved: Some(effects),
         ..
-      }) => common::drawingml_image_effects::word_shape_spatial_effect_list(effects),
+      }) => wordprocessing_inner_shadow_spatial_list(effects),
       _ => None,
     }
+  } else {
+    None
+  };
+  let completed_foreground = inner_shadow_list.as_ref().map(|(foreground, _)| {
+    let mut foreground_items = items[content_start..].to_vec();
+    finish_docx_drawing_effect_pass(
+      &mut foreground_items,
+      0,
+      host,
+      content_bounds,
+      Some(foreground),
+    );
+    foreground_items
+  });
+  let ordered = if (host.wordprocessing_shape_host || picture_host) && host.static3d.is_none() {
+    let effects = inner_shadow_list
+      .as_ref()
+      .map(|(_, spatial)| spatial)
+      .or(match host.effects {
+        Some(common::DrawingEffectSource::List {
+          resolved: Some(effects),
+          ..
+        }) => Some(effects),
+        _ => None,
+      });
+    effects.and_then(|effects| {
+      common::drawingml_image_effects::word_shape_spatial_effect_list(effects)
+        .or_else(|| completed_foreground.as_ref().map(|_| effects.clone()))
+    })
   } else {
     None
   };
@@ -7495,25 +7929,41 @@ fn finish_docx_drawing_effects(
           common::drawingml_image_effects::ImageEffect::Identity,
         ],
       };
-      let mut stage = source.to_vec();
+      // The visible glow keeps its original silhouette. Reflection consumes
+      // the completed fill/inner-shadow/outline paint, including its color.
+      let branch_source = if common::drawingml_image_effects::contains_reflection(&branch) {
+        completed_foreground.as_deref().unwrap_or(source)
+      } else {
+        source
+      };
+      let mut stage = branch_source.to_vec();
       finish_docx_drawing_effect_pass(&mut stage, 0, host, content_bounds, Some(&branch));
       let [PageItem::Group(group)] = stage.as_mut_slice() else {
         complete = false;
         break;
       };
-      if group.len() != source.len() + 1 || !matches!(group.first(), Some(PageItem::Image(_))) {
+      if group.len() != branch_source.len() + 1
+        || !matches!(group.first(), Some(PageItem::Image(_)))
+      {
         complete = false;
         break;
       }
       layers.push(group.remove(0));
     }
     if complete {
-      layers.extend(items.drain(content_start..));
+      if let Some(foreground) = completed_foreground {
+        items.truncate(content_start);
+        layers.extend(foreground);
+      } else {
+        layers.extend(items.drain(content_start..));
+      }
       items.push(PageItem::Group(layers));
       return;
     }
   }
-  finish_docx_drawing_effect_pass(items, content_start, host, content_bounds, ordered.as_ref());
+  // A failed staged realization must retain the entire original graph.
+  let fallback = ordered.as_ref().filter(|_| completed_foreground.is_none());
+  finish_docx_drawing_effect_pass(items, content_start, host, content_bounds, fallback);
 }
 
 #[derive(Clone, Copy)]
@@ -7545,9 +7995,12 @@ fn is_wordprocessing_preset_rectangle_path(
   shape: &InlineShape,
   path: &common::DrawingPath,
 ) -> bool {
+  shape.wordprocessing_shape_host && is_preset_rectangle_path(shape, path)
+}
+
+fn is_preset_rectangle_path(shape: &InlineShape, path: &common::DrawingPath) -> bool {
   let (w, h) = (shape.width_pt, shape.height_pt);
-  shape.wordprocessing_shape_host
-    && shape.static3d.is_none()
+  shape.static3d.is_none()
     && shape.rotation_deg.is_finite()
     && matches!(
       &shape.geometry,
@@ -7828,6 +8281,18 @@ fn finish_docx_drawing_effect_pass(
     .wordprocessing_shape_host
     .then(|| backdrop_effects.as_ref().and_then(simple_glow_radius_pt))
     .flatten();
+  if simple_wordprocessing_shape_glow_radius_pt.is_some()
+    && let [PageItem::Path(path)] = &items[content_start..]
+    && path.closed
+    && let Some(bounds) = drawing_path_bounds(&path.commands)
+  {
+    // A primitive's glow consumes its transformed geometry, not the rotated
+    // layout rectangle. The latter includes empty corners for a moon or an
+    // ellipse and changes both the effect frame and its source sample grid.
+    // Native 0/45/90-degree WPS controls retain the path-owned range. Widened
+    // strokes are included below; preserve the independent marker range too.
+    content_bounds = drawing_effect_content_bounds_with_markers(&items[content_start..], bounds);
+  }
   let simple_wordprocessing_shape_shadow_blur_radius_pt = (host.wordprocessing_shape_host
     || host.wordprocessing_diagram_host)
     .then(|| {
@@ -7878,6 +8343,12 @@ fn finish_docx_drawing_effect_pass(
     .cloned()
     .map(into_common_page_item)
     .collect::<Vec<_>>();
+  let word_shape_soft_edge_radius = (host.wordprocessing_shape_host
+    && host.static3d.is_none()
+    && matches!(host.effects, Some(common::DrawingEffectSource::List { .. })))
+  .then(|| standalone_soft_edge_radius(&effects))
+  .flatten();
+  let word_shape_soft_edge = word_shape_soft_edge_radius.is_some();
   let painted_shape_geometry = (host.wordprocessing_shape_host
     && host
       .static3d
@@ -7894,15 +8365,16 @@ fn finish_docx_drawing_effect_pass(
     // Keep the unchanged page-space paint for the independent material map.
     content_bounds = union_common_rect(content_bounds, *bounds);
   }
-  if backdrop_effects.is_some()
+  if (backdrop_effects.is_some() || word_shape_soft_edge)
     && let Some(stroke_bounds) =
       common::drawingml_stroke::display_items_stroke_bounds(&display_items)
   {
     // Direct2D shadows and glows consume the alpha of the fully painted
     // primitive.  Their logical source therefore uses widened stroke bounds;
     // blur pre-scaling changes only bitmap density, never this page-space
-    // range.  Foreground-modifying effects keep their host geometry boundary,
-    // which is independently exercised by inner-shadow counterexamples.
+    // range. Soft edges likewise consume the complete fill-plus-line paint
+    // (ECMA-376 20.1.8.26), not the unstroked host rectangle. Inner shadows
+    // retain their independently established fill-only source boundary.
     content_bounds = union_common_rect(content_bounds, stroke_bounds);
   }
   if backdrop_effects.is_some()
@@ -8349,6 +8821,9 @@ fn finish_docx_drawing_effect_pass(
   } else {
     common::drawingml_shape_raster::fixed_output_effect_raster_grid
   };
+  let soft_edge_bounds = word_shape_soft_edge
+    .then(|| wordprocessing_shape_soft_edge_bitmap_bounds(content_bounds))
+    .filter(|bounds| effect_raster_grid(*bounds, max_pixels_per_point).1 == max_pixels_per_point);
   let wordprocessing_shape_reflection_surface = wordprocessing_shape_reflection_blur_radius_pt
     .zip(backdrop_output_bounds)
     .and_then(|(radius, output)| {
@@ -8401,20 +8876,21 @@ fn finish_docx_drawing_effect_pass(
       max_pixels_per_point,
     )
   });
-  let (aligned_raster_bounds, pixels_per_point) =
-    if let Some((_, working)) = wordprocessing_shape_reflection_surface {
-      (working, max_pixels_per_point)
-    } else if let Some(surface) = compound_shadow_surface {
-      (surface.working_bounds, max_pixels_per_point)
-    } else if let Some(surface_bounds) = wordprocessing_shape_effect_raster_bounds {
-      let (_, bounded_pixels_per_point) = effect_raster_grid(surface_bounds, max_pixels_per_point);
-      (surface_bounds, bounded_pixels_per_point)
-    } else {
-      effect_raster_grid(
-        physical_3d_working_bounds.unwrap_or(raw_raster_bounds),
-        max_pixels_per_point,
-      )
-    };
+  let (aligned_raster_bounds, pixels_per_point) = if let Some(bounds) = soft_edge_bounds {
+    (bounds, max_pixels_per_point)
+  } else if let Some((_, working)) = wordprocessing_shape_reflection_surface {
+    (working, max_pixels_per_point)
+  } else if let Some(surface) = compound_shadow_surface {
+    (surface.working_bounds, max_pixels_per_point)
+  } else if let Some(surface_bounds) = wordprocessing_shape_effect_raster_bounds {
+    let (_, bounded_pixels_per_point) = effect_raster_grid(surface_bounds, max_pixels_per_point);
+    (surface_bounds, bounded_pixels_per_point)
+  } else {
+    effect_raster_grid(
+      physical_3d_working_bounds.unwrap_or(raw_raster_bounds),
+      max_pixels_per_point,
+    )
+  };
   let physical_3d_target = physical_3d_target.filter(|_| pixels_per_point == max_pixels_per_point);
   let shape_3d_target = shape_3d_target.filter(|_| pixels_per_point == max_pixels_per_point);
   // Static-3D Word output preserves the floating GetImageLocalBounds origin:
@@ -8453,6 +8929,41 @@ fn finish_docx_drawing_effect_pass(
       },
     )
   });
+  let physical_shape_pen = host
+    .wordprocessing_shape_effect_pen
+    .filter(|_| host.visual_rotation_degrees.abs() <= f32::EPSILON)
+    .and_then(|source| {
+      let display = wordprocessing_shape_effect_display_bounds.or(soft_edge_bounds)?;
+      let dimensions = if soft_edge_bounds.is_some() {
+        [
+          (display.size.width.0 * pixels_per_point).round().max(1.0) as u32,
+          (display.size.height.0 * pixels_per_point).round().max(1.0) as u32,
+        ]
+      } else if let Some(surface) = wordprocessing_shape_shadow_work_surface {
+        [surface.crop_width_px, surface.crop_height_px]
+      } else {
+        [
+          raster_allocation_bounds.size.width.0,
+          raster_allocation_bounds.size.height.0,
+        ]
+        .map(|extent| {
+          common::drawingml_shape_raster::inclusive_far_edge_raster_pixel_extent(
+            extent,
+            pixels_per_point,
+          )
+        })
+      };
+      let source = wordprocessing_shape_page_basis_pen(source)?;
+      let width = wordprocessing_shape_physical_effect_pen_width(
+        &source,
+        [
+          f64::from(display.size.width.0),
+          f64::from(display.size.height.0),
+        ],
+        dimensions,
+      )?;
+      Some((width, source))
+    });
   let effect_pen_width = host
     .wordprocessing_shape_effect_pen
     .filter(|_| host.wordprocessing_rectangle_effect_source.is_some())
@@ -8506,20 +9017,101 @@ fn finish_docx_drawing_effect_pass(
         None
       }
     });
-  if let Some(width) = effect_pen_width {
+  if let Some(width) = physical_shape_pen
+    .as_ref()
+    .map(|(width, _)| *width)
+    .or(effect_pen_width)
+  {
     for item in &mut display_items {
       if let common::DisplayItem::Path(path) = item
         && path.closed
         && let Some(stroke) = &mut path.stroke
-        && (stroke.preset_dash.is_some() || stroke.dash.is_some())
+        && (physical_shape_pen.is_some() || stroke.preset_dash.is_some() || stroke.dash.is_some())
       {
         // Bounds and foreground were resolved from the original pen. Only
         // this independent effect caster consumes its realized width.
         stroke.width = common::Pt(width);
+        if let Some((_, source)) = &physical_shape_pen {
+          // Native solid ellipse/rectangle controls call the same width
+          // helper on the completed bitmap-to-physical frame. Mark the
+          // realized pen so the shadow fallback cannot apply a second,
+          // nominal-density minimum after this physical minimum/rounding.
+          stroke.drawingml_device = Some(Box::new(common::DrawingMlDeviceStroke {
+            realized_width_emu: Some(f64::from(width) * 12_700.0),
+            ..source.clone()
+          }));
+        }
       }
     }
   }
-  let raster = if let Some(target) = screen_target {
+  let physical_source_mapping = (host.wordprocessing_shape_host
+    && host.static3d.is_none()
+    && host.visual_rotation_degrees.abs() <= f32::EPSILON
+    && !host.wordprocessing_canvas_has_background_paint
+    && matches!(host.placement, crate::docx::ImagePlacement::Floating(_))
+    && display_items
+      .iter()
+      .all(|item| matches!(item, common::DisplayItem::Path(path) if path.closed))
+    && common::drawingml_image_effects::source_requirements(raster_effects)
+      == common::drawingml_image_effects::ImageEffectSourceRequirements::default())
+  .then(|| {
+    let display = wordprocessing_shape_shadow_display_bounds.or(soft_edge_bounds)?;
+    let (working, target) = if let Some(surface) = wordprocessing_shape_shadow_work_surface {
+      (
+        [surface.work_width_px, surface.work_height_px],
+        common::drawingml_image_effects::EffectBitmapTarget {
+          left_px: surface.crop_left_px,
+          top_px: surface.crop_top_px,
+          width_px: surface.crop_width_px,
+          height_px: surface.crop_height_px,
+        },
+      )
+    } else {
+      let width_px = (display.size.width.0 * pixels_per_point).round().max(1.0) as u32;
+      let height_px = (display.size.height.0 * pixels_per_point).round().max(1.0) as u32;
+      (
+        [width_px, height_px],
+        common::drawingml_image_effects::EffectBitmapTarget {
+          left_px: 0,
+          top_px: 0,
+          width_px,
+          height_px,
+        },
+      )
+    };
+    wordprocessing_shape_physical_effect_mapping(display, working, target)
+  })
+  .flatten();
+  let mut soft_edge_source = None;
+  let raster = if let Some(mapping) = physical_source_mapping {
+    // Native pen callbacks expose this same completed physical matrix for
+    // the primitive itself. Rasterizing at nominal base DPI and resampling
+    // afterwards broadens shadow edges and changes soft-edge coverage.
+    let paint = common::drawingml_shape_raster::rasterize_vector_items_at_mapping(
+      &display_items,
+      mapping,
+      common::drawingml_shape_raster::RasterPrimitiveAntialiasing::PerPrimitive,
+    );
+    paint.and_then(|image| {
+      if word_shape_soft_edge {
+        soft_edge_source = Some(
+          common::drawingml_shape_raster::rasterize_vector_items_at_mapping(
+            &display_items,
+            mapping,
+            common::drawingml_shape_raster::RasterPrimitiveAntialiasing::ExactAliasedFill,
+          )?,
+        );
+      }
+      Some(common::drawingml_shape_raster::DrawingRaster {
+        image,
+        fill_image: None,
+        line_image: None,
+        fill_line_image: None,
+        children_image: None,
+        pixels_per_point,
+      })
+    })
+  } else if let Some(target) = screen_target {
     common::drawingml_shape_raster::rasterize_vector_items_for_effects_with_mapping(
       &display_items,
       raster_effects,
@@ -8559,6 +9151,14 @@ fn finish_docx_drawing_effect_pass(
         ),
         target_pixels_per_point: pixels_per_point,
       },
+    )
+  } else if soft_edge_bounds.is_some() {
+    common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point_with_extent(
+      &display_items,
+      raster_allocation_bounds,
+      raster_effects,
+      pixels_per_point,
+      common::drawingml_shape_raster::RasterSourceExtent::Round,
     )
   } else if compound_shadow_surface.is_some() {
     // The complete graph keeps its existing primitive profile and DPI. Only
@@ -9145,6 +9745,18 @@ fn finish_docx_drawing_effect_pass(
   if let Some(mut backdrop) = projected_backdrop {
     common::drawingml_image_effects::composite_source_over(&mut backdrop, &raster.image);
     raster.image = backdrop;
+  } else if let Some((source, radius)) = soft_edge_source.as_ref().zip(word_shape_soft_edge_radius)
+  {
+    if common::drawingml_image_effects::apply_word_shape_soft_edge_on_raster(
+      &mut raster.image,
+      source,
+      radius * raster.pixels_per_point / (96.0 / 72.0),
+      common::drawingml_image_effects::EffectRasterScale::default(),
+    )
+    .is_none()
+    {
+      return;
+    }
   } else if !raster_effects.effects.is_empty() {
     let mut scaled_effects = raster_effects.clone();
     common::drawingml_image_effects::scale_container_pixel_lengths(
@@ -9357,6 +9969,7 @@ fn finish_docx_drawing_effect_pass(
   let effect_item_bounds = wordprocessing_shape_effect_display_bounds
     .or(compound_shadow_display_bounds)
     .or(wordprocessing_shape_reflection_display_bounds)
+    .or(soft_edge_bounds)
     .unwrap_or_else(|| {
       backdrop_output_bounds
         .and_then(|output| {
@@ -9466,6 +10079,8 @@ fn finish_docx_drawing_effect_pass(
         WORD_SHAPE_GLOW_BITMAP_CONTENT_TYPE
       } else if preassociated_wordprocessing_shape_shadow {
         WORD_SHAPE_SHADOW_BITMAP_CONTENT_TYPE
+      } else if word_shape_soft_edge {
+        WORD_SHAPE_SOFT_EDGE_BITMAP_CONTENT_TYPE
       } else {
         "image/png"
       }
@@ -10227,6 +10842,38 @@ fn simple_glow_radius_pt(
   Some(*radius_px * units::POINTS_PER_INCH / units::CSS_PIXELS_PER_INCH)
 }
 
+fn standalone_soft_edge_radius(
+  effects: &common::drawingml_image_effects::ImageEffectContainer,
+) -> Option<f32> {
+  use common::drawingml_image_effects::{ImageEffect, ImageEffectContainerKind};
+  let [ImageEffect::Container(main)] = effects.effects.as_slice() else {
+    return None;
+  };
+  if effects.kind != ImageEffectContainerKind::Sibling
+    || main.kind != ImageEffectContainerKind::Tree
+  {
+    return None;
+  }
+  match main.effects.as_slice() {
+    [ImageEffect::SoftEdge(radius)] if *radius > 0.0 => Some(*radius),
+    _ => None,
+  }
+}
+
+fn wordprocessing_shape_soft_edge_bitmap_bounds(paint: common::Rect) -> common::Rect {
+  // Native ellipse/rectangle, 0/2/4pt outline and 5/10pt inset controls
+  // retain one printer dot around the complete painted source. The effect
+  // shrinks alpha, not its output frame. Screen/Print phase controls round
+  // this physical extent to the nearest output pixel independently.
+  let mut bounds = wordprocessing_spatial_text_effect_bitmap_display_bounds(paint);
+  let guard = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+  bounds.origin.x.0 -= guard;
+  bounds.origin.y.0 -= guard;
+  bounds.size.width.0 += 2.0 * guard;
+  bounds.size.height.0 += 2.0 * guard;
+  bounds
+}
+
 fn simple_outer_shadow_blur_radius_pt(
   effects: &common::drawingml_image_effects::ImageEffectContainer,
 ) -> Option<f32> {
@@ -10586,6 +11233,35 @@ struct WordprocessingShapeShadowWorkSurface {
   crop_top_px: u32,
   crop_width_px: u32,
   crop_height_px: u32,
+}
+
+fn wordprocessing_shape_physical_effect_mapping(
+  display: common::Rect,
+  working: [u32; 2],
+  target: common::drawingml_image_effects::EffectBitmapTarget,
+) -> Option<common::drawingml_shape_raster::PageToRasterMapping> {
+  if target.width_px == 0
+    || target.height_px == 0
+    || target.left_px.checked_add(target.width_px)? > working[0]
+    || target.top_px.checked_add(target.height_px)? > working[1]
+    || !common::drawingml_shape_raster::fixed_output_effect_raster_size_fits(working[0], working[1])
+  {
+    return None;
+  }
+  let scale_x = target.width_px as f32 / display.size.width.0;
+  let scale_y = target.height_px as f32 / display.size.height.0;
+  if !scale_x.is_finite() || !scale_y.is_finite() || scale_x <= 0.0 || scale_y <= 0.0 {
+    return None;
+  }
+  Some(common::drawingml_shape_raster::PageToRasterMapping {
+    width_px: working[0],
+    height_px: working[1],
+    scale_x,
+    scale_y,
+    translate_x: -display.origin.x.0 * scale_x + target.left_px as f32,
+    translate_y: -display.origin.y.0 * scale_y + target.top_px as f32,
+    text_hinting: None,
+  })
 }
 
 fn wordprocessing_shape_shadow_work_surface(
@@ -10993,20 +11669,31 @@ fn inline_shape_paint_path_commands(
   path: &common::DrawingPath,
   transform: Affine,
 ) -> Vec<common::PathCommand> {
-  let (w, h) = (shape.width_pt, shape.height_pt);
   if !is_wordprocessing_preset_rectangle_path(shape, path) {
     return common::drawingml_geometry::transform_commands(
       path.commands.iter().copied(),
       transform,
     );
   }
+  wordprocessing_rectangle_paint_path_commands(
+    shape.rotation_deg,
+    (shape.width_pt, shape.height_pt),
+    transform,
+  )
+}
+
+fn wordprocessing_rectangle_paint_path_commands(
+  rotation_degrees: f32,
+  (w, h): (f32, f32),
+  transform: Affine,
+) -> Vec<common::PathCommand> {
   // Native angle/flip/size controls distinguish Word's rectangle primitive
   // from its oblique path. The primitive always starts at page bottom-left;
   // the oblique path retains the preset's authored top-left and winding.
   // The near-half-turn primitive boundary is 2050 DrawingML angle units,
   // exclusive, independent of tested shape widths. Its mapped origin keeps
   // the small rotation while its two extents use only the diagonal scale.
-  let paint = wordprocessing_rectangle_paint(shape.rotation_deg);
+  let paint = wordprocessing_rectangle_paint(rotation_degrees);
   if !matches!(paint, WordprocessingRectanglePaint::Oblique) {
     let origin = transform * kurbo::Point::ZERO;
     let diagonal = if matches!(paint, WordprocessingRectanglePaint::HalfTurnPrimitive) {
@@ -12067,9 +12754,9 @@ fn reused_page_setup(
 ) -> PageSetup {
   if break_kind == SectionBreakKind::Continuous && current_page_has_body_progress {
     // A continuous section starts a new body frame on the existing physical
-    // page. Its bounds use the new section properties, but the page descriptor
-    // (including header/footer distances) remains the one which created that
-    // page. The next physical page is created from the new section setup.
+    // page. The physical page descriptor, including its lower body limit and
+    // header/footer distances, remains the one which created that page. The
+    // next physical page is created from the new section setup.
     current
   } else {
     next
@@ -12440,7 +13127,7 @@ impl<'a> RootFrameLayout<'a> {
       &section.blocks,
       flow,
       previous_section_block,
-      previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
+      previous_section.and_then(|section| section.discarded_carrier.as_ref()),
     );
     if section.columns.count > 1
       && (section.columns.unbalanced || end_flow.columns.authored_column_break_on_page)
@@ -12494,7 +13181,7 @@ impl<'a> RootFrameLayout<'a> {
           &section.blocks,
           balanced_flow,
           previous_section_block,
-          previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
+          previous_section.and_then(|section| section.discarded_carrier.as_ref()),
         );
         if self.pages.len() == balance_heights.page_index
           && document
@@ -12604,27 +13291,41 @@ impl<'a> RootFrameLayout<'a> {
       rotation_deg,
     } = transform;
     if self.pages.len() == start.pages_len {
-      materialize_shape_text_rotation(
+      materialize_section_body_text(
         &mut self.current.items[start.current_items_len..],
         pivot_x,
         pivot_y,
         rotation_deg,
+        &mut self.text_metrics,
       );
       return;
     }
 
     if let Some(first_page) = self.pages.get_mut(start.pages_len) {
-      materialize_shape_text_rotation(
+      materialize_section_body_text(
         &mut first_page.items[start.current_items_len..],
         pivot_x,
         pivot_y,
         rotation_deg,
+        &mut self.text_metrics,
       );
     }
     for page in &mut self.pages[start.pages_len + 1..] {
-      materialize_shape_text_rotation(&mut page.items, pivot_x, pivot_y, rotation_deg);
+      materialize_section_body_text(
+        &mut page.items,
+        pivot_x,
+        pivot_y,
+        rotation_deg,
+        &mut self.text_metrics,
+      );
     }
-    materialize_shape_text_rotation(&mut self.current.items, pivot_x, pivot_y, rotation_deg);
+    materialize_section_body_text(
+      &mut self.current.items,
+      pivot_x,
+      pivot_y,
+      rotation_deg,
+      &mut self.text_metrics,
+    );
   }
 
   fn body_flow(&mut self, frame: BodyFrame) -> FlowContext {
@@ -12636,7 +13337,7 @@ impl<'a> RootFrameLayout<'a> {
       0,
       self.document.default_tab_stop_pt,
     );
-    body_flow_for_page(
+    body_flow_for_page_setup(
       FlowContext {
         repeating_slots: repeating_slot_state(
           self.document,
@@ -12653,6 +13354,7 @@ impl<'a> RootFrameLayout<'a> {
         ..flow
       },
       self.pages.len() + 1,
+      self.current.setup,
     )
   }
 
@@ -12931,15 +13633,9 @@ impl<'a> RootFrameLayout<'a> {
     blocks: &[Block],
     flow: FlowContext,
     previous_block: Option<&Block>,
-    discarded_carrier_spacing_after_pt: Option<f32>,
+    discarded_carrier: Option<&DiscardedSectionCarrier>,
   ) -> FlowContext {
-    self.format_block_range(
-      blocks,
-      0,
-      flow,
-      previous_block,
-      discarded_carrier_spacing_after_pt,
-    )
+    self.format_block_range(blocks, 0, flow, previous_block, discarded_carrier)
   }
 
   fn format_block_range(
@@ -12948,21 +13644,19 @@ impl<'a> RootFrameLayout<'a> {
     start_index: usize,
     mut flow: FlowContext,
     previous_block: Option<&Block>,
-    discarded_carrier_spacing_after_pt: Option<f32>,
+    discarded_carrier: Option<&DiscardedSectionCarrier>,
   ) -> FlowContext {
     let document = self.document;
-    let mut section_boundary_previous = previous_block.cloned();
-    if let Some(spacing_after_pt) = discarded_carrier_spacing_after_pt
-      && let Some(Block::Paragraph(previous)) = section_boundary_previous.as_mut()
-    {
-      // An empty sectPr carrier owns the lower spacing at the section
-      // boundary, even though it is not a layout paragraph. Independent Word
-      // next-page and continuous controls vary both this lower and the last
-      // visible paragraph's lower: only the carrier consolidates with the next
-      // upper. Any lower already consumed on a continuous page stays there.
-      // This also retains testTdf170119_bottomSpacing's explicit-break case.
-      previous.format.spacing_after_pt = spacing_after_pt;
-    }
+    // Keep this owner separate from the previous visible block. Native
+    // table/paragraph and upper/lower controls apply the same consolidation;
+    // borrowing the predecessor also avoids cloning an entire table here.
+    flow.section_carrier_lower_pt = discarded_carrier.map(|carrier| carrier.spacing_after_pt);
+    flow.section_carrier_style_matches = discarded_carrier.and_then(|carrier| {
+      let Block::Paragraph(first) = blocks.first()? else {
+        return None;
+      };
+      Some(carrier.style_id == first.format.style_id)
+    });
     let mut index = start_index;
     let mut replayed_keep_chains = HashSet::default();
     let mut replayed_body_drawings = HashSet::default();
@@ -12978,7 +13672,7 @@ impl<'a> RootFrameLayout<'a> {
       let block = &blocks[index];
       let next_section_block = || {
         let section = document.sections.get(flow.section_index)?;
-        if section.discarded_carrier_spacing_after_pt.is_some() {
+        if section.discarded_carrier.is_some() {
           return None;
         }
         // An attached continuous section break does not insert a paragraph
@@ -12991,7 +13685,7 @@ impl<'a> RootFrameLayout<'a> {
           .and_then(|section| section.blocks.first())
       };
       let neighbors = BlockNeighbors::for_index(blocks, index)
-        .with_boundaries(section_boundary_previous.as_ref(), next_section_block());
+        .with_boundaries(previous_block, next_section_block());
       if index == 0 && previous_block.is_some() {
         flow.paragraph_spacing_context = ParagraphSpacingContext::SectionStart;
       }
@@ -13278,7 +13972,7 @@ impl<'a> RootFrameLayout<'a> {
         let height = existing
           + measurement.fitting_height_pt()
           + if existing <= LAYOUT_EPSILON_PT {
-            footnote_separator_layout_height(self.document, page_flow, &mut self.text_metrics)
+            footnote_area_overhead_height(self.document, page_flow, &mut self.text_metrics)
           } else {
             0.0
           };
@@ -13380,7 +14074,7 @@ impl<'a> RootFrameLayout<'a> {
           )
           .fitting_height_pt()
           + if existing <= LAYOUT_EPSILON_PT {
-            footnote_separator_layout_height(self.document, page_flow, &mut self.text_metrics)
+            footnote_area_overhead_height(self.document, page_flow, &mut self.text_metrics)
           } else {
             0.0
           };
@@ -13436,7 +14130,7 @@ impl<'a> RootFrameLayout<'a> {
             + measure_note_stories(&stories, preceding, page_flow, &mut self.text_metrics)
               .first_lines_height_pt
             + if existing <= LAYOUT_EPSILON_PT {
-              footnote_separator_layout_height(self.document, page_flow, &mut self.text_metrics)
+              footnote_area_overhead_height(self.document, page_flow, &mut self.text_metrics)
             } else {
               0.0
             }
@@ -13755,7 +14449,7 @@ impl<'a> RootFrameLayout<'a> {
     let height = measure_note_stories(&stories, preceding_block, flow, &mut self.text_metrics)
       .fitting_height_pt()
       + if needs_separator {
-        footnote_separator_layout_height(self.document, flow, &mut self.text_metrics)
+        footnote_area_overhead_height(self.document, flow, &mut self.text_metrics)
       } else {
         0.0
       };
@@ -14365,6 +15059,38 @@ impl<'a> RootFrameLayout<'a> {
       self.y = self
         .y
         .max(body_bottom + self.current.footnote_reserved_height_pt);
+    } else if footnote_position == w::FootnotePositionValues::PageBottom {
+      // The endnote story shares this physical page with the already placed
+      // footnote container. Its first page must fit above the complete note
+      // area; the next physical page obtains its own body limits.
+      note_flow.content_bottom = note_flow
+        .content_bottom
+        .min(note_flow.body_content_bottom_pt - self.current.footnote_reserved_height_pt);
+    }
+
+    let separator_height = note_separator_story_height(
+      &self.document.endnote_separator_stories.separator,
+      note_flow,
+      &self.document.note_separator_style,
+      &mut self.text_metrics,
+    );
+    let first_note_height = ids
+      .first()
+      .and_then(|id| self.document.endnotes.get(id))
+      .and_then(|blocks| blocks.first())
+      .map_or(0.0, |block| match block {
+        Block::Paragraph(paragraph) => {
+          estimated_paragraph_keep_start_height(paragraph, note_flow, &mut self.text_metrics)
+        }
+        Block::Table(_) | Block::Frame(_) => 0.0,
+      });
+    if self.y + separator_height + first_note_height > note_flow.content_bottom
+      && page_has_body_region_items(&self.current, note_flow)
+    {
+      // Keep the initial separator with the first legal note prefix. This
+      // transition precedes continuation state: an as-yet unstarted story
+      // gets its initial separator once, not an additional continuation gap.
+      (note_flow, self.y) = advance_section_flow(note_flow, &mut self.current, &mut self.pages);
     }
 
     #[cfg(debug_assertions)]
@@ -14395,7 +15121,7 @@ impl<'a> RootFrameLayout<'a> {
       }
       self.emitted_endnote_order.push(id);
       if let Some(blocks) = self.document.endnotes.get(&id) {
-        self.format_blocks_in_flow(blocks, note_flow);
+        note_flow = self.format_blocks_in_flow(blocks, note_flow);
       }
     }
     #[cfg(debug_assertions)]
@@ -14435,7 +15161,7 @@ impl<'a> RootFrameLayout<'a> {
         &self.document.note_separator_style,
       )
     } else {
-      layout_note_story_blocks(
+      layout_note_separator_story_blocks(
         &self.document.endnote_separator_stories.separator,
         flow,
         &mut self.current,
@@ -14480,7 +15206,7 @@ impl<'a> RootFrameLayout<'a> {
     self.format_blocks_in_flow(blocks, flow);
   }
 
-  fn format_blocks_in_flow(&mut self, blocks: &[Block], flow: FlowContext) {
+  fn format_blocks_in_flow(&mut self, blocks: &[Block], mut flow: FlowContext) -> FlowContext {
     for (index, block) in blocks.iter().enumerate() {
       // Paragraphs and floating frames remain part of the note story, but an
       // inline table keeps its table-frame paint contract inside that story.
@@ -14501,7 +15227,7 @@ impl<'a> RootFrameLayout<'a> {
         Some(index),
         &mut self.text_metrics,
       );
-      let (_, y) = layout_document_block(
+      let (next_flow, y) = layout_document_block(
         BlockNeighbors::for_index(blocks, index),
         block,
         flow,
@@ -14523,8 +15249,19 @@ impl<'a> RootFrameLayout<'a> {
         None,
         &frame_influences,
       );
-      self.record_follow_transition(transition, flow, kind, FollowReason::Overflow, Some(index));
+      self.record_follow_transition(
+        transition,
+        next_flow,
+        kind,
+        FollowReason::Overflow,
+        Some(index),
+      );
+      // A preceding note can have advanced to another physical page. Later
+      // notes must retain that page's limits, not the first page's footnote
+      // reservation, section-page number or continuation origin.
+      flow = next_flow;
     }
+    flow
   }
 
   fn apply_checkpoint_rerun(&mut self, backward_moves: &[BackwardMove]) -> Option<LayoutRerun> {
@@ -14638,7 +15375,7 @@ impl<'a> RootFrameLayout<'a> {
           checkpoint.block_index,
           checkpoint_flow,
           previous_block,
-          previous_section.and_then(|section| section.discarded_carrier_spacing_after_pt),
+          previous_section.and_then(|section| section.discarded_carrier.as_ref()),
         ));
         if document.endnote_position == w::EndnotePositionValues::SectionEnd {
           let mut ids = Vec::new();
@@ -14998,6 +15735,7 @@ fn materialize_legacy_wordprocessing_text_effects_in_items(
         paint_order,
         behind_text,
         table_wrap,
+        body_vertical_alignment,
       } => {
         materialize_legacy_wordprocessing_text_effects_in_items(&mut nested, text_metrics);
         items.push(PageItem::FloatingDrawing {
@@ -15005,6 +15743,7 @@ fn materialize_legacy_wordprocessing_text_effects_in_items(
           paint_order,
           behind_text,
           table_wrap,
+          body_vertical_alignment,
         });
         continue;
       }
@@ -20536,6 +21275,7 @@ fn add_line_numbers_to_page(
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text,
         style,
@@ -22709,15 +23449,20 @@ fn flow_context(
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::Body,
     horizontal_table_cell: false,
+    table_cell_in_header_footer: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
     word_floating_table_cell: false,
     floating_table_cell_follow_top_inset_pt: 0.0,
     floating_table_cell_follow_bottom_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     table_cell_complete_first_line_fit: false,
     table_cell_legacy_nested_row_follow: false,
@@ -22762,6 +23507,7 @@ fn flow_with_page_column(flow: FlowContext, column_index: usize, page: &Page) ->
 
 #[derive(Clone, Debug)]
 struct ColumnGeometry {
+  // All arrays use logical flow order, including for RTL sections.
   lefts: Vec<f32>,
   widths: Vec<f32>,
   gaps: Vec<f32>,
@@ -22846,7 +23592,12 @@ fn column_geometry(setup: PageSetup, columns: SectionColumns, page_index: usize)
   } else {
     let gap_total = columns.gap_pt * count.saturating_sub(1) as f32;
     let column_width = if count > 1 && body_width > gap_total {
-      (body_width - gap_total) / count as f32
+      // Word's equal columns divide an integral twip budget. The remainder
+      // does not become a fractional twip in every column (native TextColumns
+      // readbacks: 2–5 columns, eight consecutive authored page widths).
+      let available_twips = (f64::from(body_width) * 20.0).round()
+        - (f64::from(columns.gap_pt) * 20.0).round() * (count - 1) as f64;
+      ((available_twips / count as f64).floor() / 20.0) as f32
     } else {
       body_width
     };
@@ -22857,12 +23608,26 @@ fn column_geometry(setup: PageSetup, columns: SectionColumns, page_index: usize)
   };
 
   let mut lefts = Vec::with_capacity(widths.len());
-  let mut x = margin_left_pt;
+  // ECMA-376 §17.6.1: section bidi changes column flow, not text bidi.
+  // Native equal/unequal controls retain each logical width and following
+  // gap, starting at the right print edge. A single explicit narrow column
+  // stays left-anchored; an underfilled multicolumn section is right-anchored.
+  let right_to_left = columns.right_to_left && count > 1;
+  let mut x = if right_to_left {
+    setup.width_pt - margin_right_pt
+  } else {
+    margin_left_pt
+  };
   for (index, width) in widths.iter().enumerate() {
+    if right_to_left {
+      x -= *width;
+    }
     lefts.push(x);
-    x += *width;
+    if !right_to_left {
+      x += *width;
+    }
     if let Some(gap) = gaps.get(index) {
-      x += *gap;
+      x += if right_to_left { -*gap } else { *gap };
     }
   }
 
@@ -22999,6 +23764,8 @@ fn advance_section_flow(
       );
     }
     next_flow.content_top_pt += flow.note_continuation_top_inset_pt;
+    next_flow.content_bottom -= flow.note_continuation_bottom_inset_pt;
+    next_flow.body_content_bottom_pt -= flow.note_continuation_bottom_inset_pt;
     body_drawing_wrap::constrain_flow(current, pages.len(), &mut next_flow);
     (next_flow, next_flow.content_top_pt)
   }
@@ -23184,6 +23951,8 @@ fn keep_group_height(
         next,
         FlowContext {
           paragraph_spacing_context: ParagraphSpacingContext::Normal,
+          section_carrier_lower_pt: None,
+          section_carrier_style_matches: None,
           ..flow
         },
       )
@@ -23382,6 +24151,8 @@ struct EstimatedParagraphContentExtents {
   floating_bottom: f32,
   paragraph_floating_bottom: f32,
   cell_print_floating_bottom: f32,
+  paragraph_alignment_floating_bottom: f32,
+  cell_print_alignment_floating_bottom: f32,
   leading_line_heights_pt: [f32; DEFAULT_ORPHAN_LINES],
   first_line_page_fit_height_pt: f32,
   line_count: usize,
@@ -23466,6 +24237,7 @@ fn estimated_paragraph_content_extents(
     table_cell_baseline_offset_pt: None,
     table_cell_line_baseline_reference_pt: None,
     drawing_wrap_baseline_offset_pt: 0.0,
+    following_table_wrap_baseline_offset_pt: 0.0,
     single_body_picture_minimum_pt: single_body_picture_minimum(paragraph, flow, text_metrics),
     picture_only_cell: flow.text_segmentation == TextSegmentation::TableCell
       && flow.horizontal_table_cell
@@ -23491,6 +24263,8 @@ fn estimated_paragraph_content_extents(
   let mut floating_bottom: f32 = 0.0;
   let mut paragraph_floating_bottom: f32 = 0.0;
   let mut cell_print_floating_bottom: f32 = 0.0;
+  let mut paragraph_alignment_floating_bottom: f32 = 0.0;
+  let mut cell_print_alignment_floating_bottom: f32 = 0.0;
   let mut leading_line_heights_pt = [0.0; DEFAULT_ORPHAN_LINES];
   let mut first_line_page_fit_height_pt = 0.0;
   let mut has_flow_content = paragraph.list_label.is_some()
@@ -23969,12 +24743,15 @@ fn estimated_paragraph_content_extents(
           x = 0.0;
         }
         x += width;
-        if !matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
-          let source_line_height = inline_text_height(&mark.style, text_metrics);
-          line_height = line_height.max(
-            inline_object_line_metrics_for_flow(source_line_height, paragraph, flow).height_pt,
-          );
-        }
+        line_height = include_note_separator_height(
+          line_height,
+          paragraph,
+          flow,
+          text_frame,
+          &mut line_text_extents,
+          mark,
+          text_metrics,
+        );
       }
       InlineItem::ClearLineBreak(_) => {
         finish_line(
@@ -24106,8 +24883,7 @@ fn estimated_paragraph_content_extents(
           {
             continue;
           }
-          if cell_owned_drawingml_picture(placement, flow) && placement.wrap == ImageWrapMode::None
-          {
+          if cell_owned_drawingml_object(placement, flow) && placement.wrap == ImageWrapMode::None {
             // Native cell controls and Writer lcl_CalcMinCellHeight ignore
             // wrap-through anchors when measuring cell growth. layoutInCell
             // owns their position, not an additional inline height.
@@ -24140,7 +24916,7 @@ fn estimated_paragraph_content_extents(
           } else {
             paragraph_floating_bottom = paragraph_floating_bottom.max(bottom);
           }
-          let clears_anchor_line = cell_owned_drawingml_picture(placement, flow)
+          let clears_anchor_line = cell_owned_drawingml_object(placement, flow)
             && image_y - placement.margin_top_pt < content_height + line_height
             && bottom > content_height
             && (placement.wrap == ImageWrapMode::TopBottom
@@ -24150,20 +24926,26 @@ fn estimated_paragraph_content_extents(
                   flow.content_left_pt + indent_left_pt + fit_content_right(content_height),
                   content_height,
                   line_height,
-                  &[WrapExclusion {
-                    left_pt: frame_x + metrics.content_offset_x_pt - placement.margin_left_pt,
-                    right_pt: frame_x
-                      + metrics.content_offset_x_pt
-                      + metrics.content_width_pt
-                      + placement.margin_right_pt,
-                    top_pt: image_y - placement.margin_top_pt,
-                    bottom_pt: bottom,
-                    side: placement.wrap_side,
-                    blocks_flow: false,
-                    uses_contour: false,
-                    contour_band: None,
-                    owner: WrapExclusionOwner::Drawing,
-                  }],
+                  &[cell_square_picture_wrap_exclusion(
+                    WrapExclusion {
+                      left_pt: frame_x + metrics.content_offset_x_pt - placement.margin_left_pt,
+                      right_pt: frame_x
+                        + metrics.content_offset_x_pt
+                        + metrics.content_width_pt
+                        + placement.margin_right_pt,
+                      top_pt: image_y - placement.margin_top_pt,
+                      bottom_pt: bottom,
+                      side: placement.wrap_side,
+                      blocks_flow: false,
+                      uses_contour: false,
+                      contour_band: None,
+                      owner: WrapExclusionOwner::Drawing,
+                    },
+                    placement,
+                    flow,
+                    flow.content_left_pt + indent_left_pt + fit_content_left(content_height),
+                    flow.content_left_pt + indent_left_pt + fit_content_right(content_height),
+                  )],
                 )
                 .is_none()));
           if clears_anchor_line {
@@ -24358,7 +25140,7 @@ fn estimated_paragraph_content_extents(
             metrics.frame_width_pt,
             metrics.frame_height_pt,
           );
-          let shape_y = if metrics.uses_relative_effect_frame_y {
+          let shape_y = if metrics.uses_effect_frame_y {
             frame_y + metrics.content_offset_y_pt + shape.offset_y_pt * metrics.group_scale_y
           } else {
             adjusted_floating_shape_y(
@@ -24368,6 +25150,25 @@ fn estimated_paragraph_content_extents(
             )
           };
           let bottom = shape_y + metrics.content_height_pt + placement.margin_bottom_pt;
+          if cell_owned_drawingml_object(placement, flow) && placement.wrap == ImageWrapMode::None {
+            // Native WPS controls keep row growth independent of no-wrap
+            // geometry. Vertical alignment still includes the floating bounds
+            // (ISO 29500 doNotVertAlignCellWithSp, default behavior). Retain
+            // those bounds separately, without advancing the paragraph flow.
+            if matches!(
+              placement.vertical_relative_to,
+              VerticalImageReference::Page | VerticalImageReference::Margin
+            ) {
+              let print_top = flow
+                .layout_cell_print_bounds
+                .map_or(0.0, |bounds| bounds.y_pt);
+              cell_print_alignment_floating_bottom =
+                cell_print_alignment_floating_bottom.max(bottom - print_top);
+            } else {
+              paragraph_alignment_floating_bottom = paragraph_alignment_floating_bottom.max(bottom);
+            }
+            continue;
+          }
           floating_bottom = floating_bottom.max(bottom);
           if flow.text_segmentation == TextSegmentation::TableCell
             && effective_layout_in_cell(placement, flow)
@@ -24477,6 +25278,8 @@ fn estimated_paragraph_content_extents(
     floating_bottom,
     paragraph_floating_bottom,
     cell_print_floating_bottom,
+    paragraph_alignment_floating_bottom,
+    cell_print_alignment_floating_bottom,
     leading_line_heights_pt,
     first_line_page_fit_height_pt,
     line_count: line_index,
@@ -24739,10 +25542,18 @@ fn paragraph_spacing_before(
   // continuation (ECMA-376 §17.3.3.13). Word keeps the first cell paragraph's
   // authored upper space with or without that marker. Actual split follows
   // suppress their master's spacing in the table fragment formatter.
-  if flow.paragraph_spacing_context == ParagraphSpacingContext::SectionStart
-    && let Some(Block::Paragraph(previous)) = previous
-  {
-    return section_start_spacing_before(previous, paragraph, flow.setup.doc_grid_line_pitch_pt);
+  if flow.paragraph_spacing_context == ParagraphSpacingContext::SectionStart {
+    let previous = match previous {
+      Some(Block::Paragraph(previous)) => Some(previous.as_ref()),
+      _ => None,
+    };
+    return section_start_spacing_before(
+      previous,
+      paragraph,
+      flow.setup.doc_grid_line_pitch_pt,
+      flow.section_carrier_lower_pt,
+      flow.section_carrier_style_matches,
+    );
   }
   if let Some(Block::Paragraph(previous)) = previous {
     return paragraph_spacing_before_after_previous(
@@ -24812,8 +25623,9 @@ fn paragraph_spacing_before_after_previous(
   let same_numbering = paragraphs_share_numbering(previous, paragraph);
   // LibreOffice DomainMapper_Impl::finishParagraph removes automatic bottom
   // and top spacing between adjacent paragraphs using the same numbering
-  // rules. Explicit ordinary spacing and distinct numbering instances remain
-  // part of the normal max(before, after) collapse (tdf#95031).
+  // definition, including distinct concrete instances and levels. Native
+  // Word restart/level-override controls retain this identity; a separate
+  // abstract definition and explicit spacing keep the normal collapse rules.
   let lower = if same_numbering && previous.format.spacing_after_auto == Some(true) {
     0.0
   } else {
@@ -24867,22 +25679,33 @@ fn paragraph_spacing_before_after_previous(
 }
 
 fn section_start_spacing_before(
-  previous: &crate::docx::Paragraph,
+  previous: Option<&crate::docx::Paragraph>,
   paragraph: &crate::docx::Paragraph,
   grid_line_pitch_pt: Option<f32>,
+  carrier_lower_pt: Option<f32>,
+  carrier_style_matches: Option<bool>,
 ) -> f32 {
-  if paragraph.format.contextual_spacing && paragraph_styles_identical(previous, paragraph) {
+  if paragraph.format.contextual_spacing
+    && carrier_style_matches.unwrap_or_else(|| {
+      previous.is_some_and(|previous| paragraph_styles_identical(previous, paragraph))
+    })
+  {
     return 0.0;
   }
-  if previous.format.additive_paragraph_spacing || paragraph.format.additive_paragraph_spacing {
+  if previous.is_some_and(|previous| previous.format.additive_paragraph_spacing)
+    || paragraph.format.additive_paragraph_spacing
+  {
     // The continuous/next-page section boundary does not cancel
     // doNotUseHTMLParagraphAutoSpacing. Native upper/lower opposites retain
     // the whole upper contribution; the previous paragraph owns its lower.
     return paragraph_upper_space(paragraph, grid_line_pitch_pt);
   }
-  (paragraph_upper_space(paragraph, grid_line_pitch_pt)
-    - paragraph_lower_space(previous, grid_line_pitch_pt))
-  .max(0.0)
+  let lower = carrier_lower_pt.unwrap_or_else(|| {
+    previous.map_or(0.0, |previous| {
+      paragraph_lower_space(previous, grid_line_pitch_pt)
+    })
+  });
+  (paragraph_upper_space(paragraph, grid_line_pitch_pt) - lower).max(0.0)
 }
 
 fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Paragraph) -> bool {
@@ -24932,9 +25755,9 @@ fn word_line_height_ignored_character(ch: char) -> bool {
 fn word_line_height_ignored_blank(ch: char) -> bool {
   // Word's tabs-and-blanks compatibility path excludes exactly these space
   // portions from line-height maxima. LibreOffice mirrors the same closed set
-  // in SwLineLayout::CalcLine/lcl_HasOnlyBlanks (tdf#153136). A line made only
-  // from these characters still owns the paragraph-mark line box, so callers
-  // must fall back to Paragraph::base_style rather than the blank run style.
+  // in SwLineLayout::CalcLine/lcl_HasOnlyBlanks (tdf#153136). A final line made
+  // only from these characters uses the paragraph mark; an intermediate blank
+  // line has its own last-portion font, resolved when that line completes.
   matches!(ch, ' ' | '\u{2002}' | '\u{2003}' | '\u{2005}' | '\u{3000}')
 }
 
@@ -24999,6 +25822,9 @@ fn paragraphs_share_numbering(
 ) -> bool {
   matches!(
     (first.format.numbering_id, second.format.numbering_id),
+    (Some(first), Some(second)) if first == second
+  ) || matches!(
+    (first.format.numbering_abstract_id, second.format.numbering_abstract_id),
     (Some(first), Some(second)) if first == second
   )
 }
@@ -25072,8 +25898,10 @@ impl ParagraphShadingContext {
       let (neighbor_left, neighbor_right, _) = resolved_paragraph_indents(neighbor, text_metrics);
       (left, right) == (neighbor_left, neighbor_right)
     };
-    let joins_previous = block_paragraph(previous).is_some_and(&mut shares_shading_span);
-    let joins_next = block_paragraph(next).is_some_and(shares_shading_span);
+    let joins_previous = !paragraph_starts_with_flow_break(paragraph)
+      && block_paragraph(previous).is_some_and(&mut shares_shading_span);
+    let joins_next = block_paragraph(next)
+      .is_some_and(|next| !paragraph_starts_with_flow_break(next) && shares_shading_span(next));
     Self {
       joins_previous,
       joins_next,
@@ -25092,9 +25920,11 @@ impl ParagraphBorderContext {
       return Self::default();
     }
     Self {
-      joins_previous: block_paragraph(previous)
-        .is_some_and(|previous| previous.format.borders == borders),
-      joins_next: block_paragraph(next).is_some_and(|next| next.format.borders == borders),
+      joins_previous: !paragraph_starts_with_flow_break(paragraph)
+        && block_paragraph(previous).is_some_and(|previous| previous.format.borders == borders),
+      joins_next: block_paragraph(next).is_some_and(|next| {
+        !paragraph_starts_with_flow_break(next) && next.format.borders == borders
+      }),
     }
   }
 
@@ -25115,6 +25945,24 @@ impl ParagraphBorderContext {
       paragraph.format.borders.bottom
     }
   }
+}
+
+fn paragraph_starts_with_flow_break(paragraph: &crate::docx::Paragraph) -> bool {
+  // A leading run break leaves an empty master before the paragraph's first
+  // content frame. Native border/group controls close the previous group at
+  // that boundary, even when the complete authored border sets match.
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::Text(run) if run.text.is_empty() && run.dynamic_field.is_none() => {}
+      InlineItem::BookmarkStart(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak => {}
+      InlineItem::PageBreak | InlineItem::ColumnBreak => return true,
+      _ => return false,
+    }
+  }
+  false
 }
 
 fn block_paragraph(block: Option<&Block>) -> Option<&crate::docx::Paragraph> {
@@ -25347,7 +26195,27 @@ fn layout_document_block(
           decoration_outer_bottom_pt: target.paragraph_decoration_outer_bottom_pt,
         },
       );
-      let y = y + paragraph_border_layout_extent(border_context.bottom(paragraph));
+      let bottom_border = border_context.bottom(paragraph);
+      let bottom_stays_on_master = bottom_border.is_some()
+        && paragraph_flow.text_segmentation == TextSegmentation::Body
+        && !paragraph_flow.inside_paragraph_frame
+        && !paragraph_flow.split_page_break_and_paragraph_mark
+        && paragraph
+          .inlines
+          .iter()
+          .rposition(|inline| matches!(inline, InlineItem::PageBreak))
+          .is_some_and(|index| {
+            explicit_break_follow_content(&paragraph.inlines, index + 1).is_none()
+          });
+      // A terminal run break with no follow mark ends its border on the
+      // master. Its empty target must not charge that strip to the next
+      // paragraph (native bordered/plain TAIL controls differ by zero).
+      let y = y
+        + if bottom_stays_on_master {
+          0.0
+        } else {
+          paragraph_border_layout_extent(bottom_border)
+        };
       (restore_block_flow_width(flow, paragraph_flow), y)
     }
     Block::Table(table) => {
@@ -25644,7 +26512,15 @@ fn table_cell_soft_break_next_line(
       {
         0.0
       } else {
-        following.font_size_pt - first.font_size_pt
+        // Automatic script shrinks paint, not the nominal source font cell.
+        // Using its reduced size adds a spurious carry after a soft break
+        // and can move the final line beyond the already measured row.
+        following
+          .automatic_escapement_font_size_pt
+          .unwrap_or(following.font_size_pt)
+          - first
+            .automatic_escapement_font_size_pt
+            .unwrap_or(first.font_size_pt)
       },
       // The paragraph-height helper deliberately selects its first visible
       // run. A continuation needs this run's box instead, using the same
@@ -25767,7 +26643,7 @@ fn layout_floating_frame(
   frame: &FloatingFrame,
   flow: FlowContext,
   current: &mut Page,
-  _pages: &mut Vec<Page>,
+  pages: &mut [Page],
   text_metrics: &mut TextMetrics,
   y: f32,
 ) -> (FlowContext, f32) {
@@ -25788,8 +26664,15 @@ fn layout_floating_frame(
     // their separate placement contract.
     placement.vertical_offset_pt = 0.0;
   }
-  let (x, requested_frame_y) = paragraph_frame_position(placement, flow, y, width, height);
-  let frame_y = if frame.suppress_overlap {
+  let reserved = current
+    .body_drawing_wraps
+    .as_deref()
+    .and_then(|catalog| catalog.block_reservation(flow, pages.len()));
+  let (x, requested_frame_y) = reserved.map_or_else(
+    || paragraph_frame_position(placement, flow, y, width, height),
+    |reservation| (reservation.image_x, reservation.image_y),
+  );
+  let frame_y = if frame.suppress_overlap && reserved.is_none() {
     paragraph_frame_nonoverlap_y(
       &current.wrap_exclusions,
       FrameBounds {
@@ -25818,6 +26701,7 @@ fn layout_floating_frame(
     content_width: width,
     inside_paragraph_frame: true,
     paragraph_frame_translation_y_pt: frame.vertical_text_flow.is_none().then_some(frame_y - y),
+    paragraph_frame_numeric_offset_decoded: paragraph_frame_numeric_offset_axes(placement),
     ..flow
   };
   let writing_transform = frame.vertical_text_flow.map(|direction| {
@@ -25841,9 +26725,20 @@ fn layout_floating_frame(
   let mut block_y = frame_flow.content_top_pt;
   for (index, block) in frame.blocks.iter().enumerate() {
     let paragraph_decoration_outer_bottom_pt = (index + 1 == frame.blocks.len()
-      && matches!(block, Block::Paragraph(_))
-      && matches!(frame.height_rule, FrameHeightRule::Exact))
-    .then_some(frame_flow.content_bottom);
+      && matches!(block, Block::Paragraph(_)))
+    .then(|| match frame.height_rule {
+      FrameHeightRule::Exact => Some(frame_flow.content_bottom),
+      // Word's last paragraph border closes the physical frame, including
+      // an unused minimum-height remainder. Keep the content flow unbounded:
+      // AtLeast must still grow when the paragraphs exceed that minimum.
+      FrameHeightRule::AtLeast if writing_transform.is_none() => {
+        frame.height_pt.map(|minimum| frame_y + minimum)
+      }
+      // Vertical writing maps physical height to logical line width, so its
+      // paragraph bottom must retain the independent transformed owner.
+      FrameHeightRule::AtLeast | FrameHeightRule::Auto => None,
+    })
+    .flatten();
     let unshaded_block = match (uniform_paragraph_shading, block) {
       (Some(_), Block::Paragraph(paragraph)) => {
         let mut paragraph = paragraph.as_ref().clone();
@@ -25941,24 +26836,35 @@ fn layout_floating_frame(
   } else {
     current.items.extend(visible_items);
   }
-  append_paragraph_frame_wrap_exclusion(
-    current,
+  let bounds = FrameBounds {
+    x_pt: x,
+    y_pt: frame_y,
+    width_pt: width,
+    height_pt: rendered_height,
+  };
+  if let Some(exclusion) = paragraph_frame_wrap_exclusion(
+    flow,
     frame.placement,
-    FrameBounds {
-      x_pt: x,
-      y_pt: frame_y,
-      width_pt: width,
-      height_pt: rendered_height,
-    },
+    bounds,
     paragraph_frame_horizontal_decoration_outsets(frame, frame_stroke),
     if table_cell_frame_baseline_paragraph(frame, flow).is_some() {
       WrapExclusionOwner::CellParagraphFrame
     } else {
       WrapExclusionOwner::ParagraphFrame
     },
-  );
+  ) {
+    body_drawing_wrap::capture_paragraph_frame(
+      current,
+      pages.len(),
+      flow,
+      frame.placement,
+      bounds,
+      exclusion,
+    );
+    extend_wrap_exclusions_unique(&mut current.wrap_exclusions, &[exclusion]);
+  }
   let occupied_bottom = frame_y + rendered_height + frame.placement.margin_bottom_pt;
-  if floating_frame_blocks_flow(frame) {
+  if floating_frame_blocks_flow(frame, flow) {
     (flow, y.max(occupied_bottom))
   } else {
     (flow, y)
@@ -26048,7 +26954,15 @@ fn floating_frame_width(
   let content_width = frame
     .blocks
     .iter()
-    .map(|block| block_content_width_range(block, available_width, text_metrics).maximum_pt)
+    .map(|block| {
+      let width = block_content_width_range(block, available_width, text_metrics).maximum_pt;
+      match block {
+        Block::Table(table) => {
+          paragraph_frame_table_content_width(table, width, flow.compatibility_mode)
+        }
+        Block::Paragraph(_) | Block::Frame(_) => width,
+      }
+    })
     .fold(0.0_f32, f32::max);
   let preserves_minimum_width = frame.blocks.iter().any(|block| {
     matches!(block, Block::Paragraph(paragraph) if paragraph.format.alignment == ParagraphAlignment::Right)
@@ -26057,6 +26971,39 @@ fn floating_frame_width(
     DEFAULT_FONT_SIZE_PT.min(available_width)
   } else {
     content_width.min(available_width)
+  }
+}
+
+fn paragraph_frame_table_content_width(
+  table: &Table,
+  grid_width: f32,
+  compatibility_mode: u16,
+) -> f32 {
+  let Some(row) = table
+    .rows
+    .first()
+    .filter(|row| table.placement.is_none() && !row_has_separate_borders(table, row))
+  else {
+    return grid_width;
+  };
+  let (Some(first), Some(last)) = (row.cells.first(), row.cells.last()) else {
+    return grid_width;
+  };
+  let leading = vertical_border(table, row, 0, true).map_or(0.0, |border| border.width_pt / 2.0);
+  let trailing = vertical_border(table, row, row.cells.len() - 1, false)
+    .map_or(0.0, |border| border.width_pt / 2.0);
+  // An automatic paragraph frame encloses the table's containing extent,
+  // not its grid. Native tdf104394 controls vary padding, border width and
+  // compatibility independently: legacy frames align outer cell edit edges,
+  // while mode 15 includes both outside border halves. This is the inverse
+  // of the containing-width allowance in table_autofit_content_limit().
+  // Explicit frame widths bypass this intrinsic measurement entirely.
+  if compatibility_mode >= 15 {
+    grid_width + leading + trailing
+  } else if table.align_leading_cell_content {
+    (grid_width - first.margins.left_pt.max(leading) - last.margins.right_pt.max(trailing)).max(0.0)
+  } else {
+    grid_width
   }
 }
 
@@ -26114,7 +27061,15 @@ fn frame_content_height(
       + paragraph_border_layout_extent(border_context.bottom(paragraph))
       + paragraph_spacing_after(paragraph, neighbors.spacing_next, flow);
   }
-  flow_height.max(floating_bottom).max(DEFAULT_LINE_HEIGHT_PT)
+  let height = flow_height.max(floating_bottom);
+  // A real line owns the automatic frame height, even below the generic
+  // empty-frame fallback. Word's small-font controls retain that height;
+  // imposing a14pt floor also makes surrounding text clear a larger box.
+  if height > LAYOUT_EPSILON_PT {
+    height
+  } else {
+    DEFAULT_LINE_HEIGHT_PT
+  }
 }
 
 fn estimated_frame_height(
@@ -26142,16 +27097,22 @@ fn frame_height_for_width(
       // page follows. Measure with the same owner used by the renderer.
       inside_paragraph_frame: true,
       paragraph_frame_translation_y_pt: frame.vertical_text_flow.is_none().then_some(0.0),
+      paragraph_frame_numeric_offset_decoded: (false, false),
       ..flow
     },
     text_metrics,
   );
   match frame.height_rule {
-    FrameHeightRule::Auto => frame.height_pt.unwrap_or(measured_height),
+    // ECMA-376 §17.3.1.11: an explicit auto ignores h. Word's COM/PDF
+    // controls distinguish this from omitted hRule with a nonzero height,
+    // which is already imported as AtLeast.
+    FrameHeightRule::Auto => measured_height,
     FrameHeightRule::AtLeast => frame.height_pt.unwrap_or(0.0).max(measured_height),
     FrameHeightRule::Exact => frame.height_pt.unwrap_or(measured_height),
   }
-  .max(DEFAULT_LINE_HEIGHT_PT)
+  // ECMA-376 §17.3.1.11's exact height does not acquire an implicit minimum.
+  // Native1/6/14pt controls expose the authored edge through text clearance.
+  .max(0.0)
 }
 
 fn block_area(flow: FlowContext) -> BlockArea {
@@ -26215,15 +27176,20 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     repeating_slots: area.repeating_slots,
     text_segmentation: TextSegmentation::Body,
     horizontal_table_cell: false,
+    table_cell_in_header_footer: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
     word_floating_table_cell: false,
     floating_table_cell_follow_top_inset_pt: 0.0,
     floating_table_cell_follow_bottom_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     table_cell_complete_first_line_fit: false,
     table_cell_legacy_nested_row_follow: false,
@@ -26397,9 +27363,42 @@ fn footnote_separator_layout_height(
   measured_note_stories_height(
     &[document.footnote_separator_stories.separator.as_slice()],
     None,
-    flow,
+    note_separator_story_flow(flow),
     text_metrics,
   )
+}
+
+fn footnote_continuation_notice_height(
+  document: &DocxDocument,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  let blocks = &document.footnote_separator_stories.continuation_notice;
+  if blocks.is_empty() {
+    return 0.0;
+  }
+  // ECMA-376 Annex L.1.12.4: continuationNotice is a separate trailing story.
+  // Native Word reserves its formatted height even on the terminal note page,
+  // where the notice itself is not painted. Empty and literal notices of equal
+  // font/paragraph properties reserve the same space; an absent or unreferenced
+  // notice reserves none. This is not a fixed extra line or a translation.
+  measure_note_stories_with_context(
+    &[blocks],
+    None,
+    flow,
+    ParagraphSpacingContext::Normal,
+    text_metrics,
+  )
+  .height_pt
+}
+
+fn footnote_area_overhead_height(
+  document: &DocxDocument,
+  flow: FlowContext,
+  text_metrics: &mut TextMetrics,
+) -> f32 {
+  footnote_separator_layout_height(document, flow, text_metrics)
+    + footnote_continuation_notice_height(document, flow, text_metrics)
 }
 
 fn note_separator_story_height(
@@ -26414,7 +27413,7 @@ fn note_separator_story_height(
     measure_note_stories_with_context(
       &[blocks],
       None,
-      flow,
+      note_separator_story_flow(flow),
       ParagraphSpacingContext::Normal,
       text_metrics,
     )
@@ -26451,31 +27450,78 @@ fn note_separator_mark_width(mark: &NoteSeparatorMark, x_pt: f32, line_right_pt:
   }
 }
 
+// A separator is a special character in its run, with a fixed width rather
+// than glyph ink. Its logical font cell still participates in line layout.
+const NOTE_SEPARATOR_METRIC_TEXT: &str = "\u{3}";
+
+fn include_note_separator_height(
+  line_height: f32,
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  frame: TextFrame,
+  extents: &mut WordLineTextExtents,
+  mark: &NoteSeparatorMark,
+  metrics: &mut TextMetrics,
+) -> f32 {
+  let height = include_text_height(
+    line_height,
+    paragraph,
+    flow,
+    frame,
+    extents,
+    TextPortion::new(&mark.style, NOTE_SEPARATOR_METRIC_TEXT),
+    metrics,
+  );
+  if frame.line_height_rule == LineHeightRule::Exact {
+    return height;
+  }
+  // Native separator/literal pairs distinguish an otherwise empty special
+  // story from a visible text line. The former retains its paragraph mark,
+  // including DEFAULT_CHARSET side leading; the latter is run-owned.
+  if paragraph.inlines.iter().all(|item| match item {
+    InlineItem::NoteSeparatorMark(_)
+    | InlineItem::BookmarkStart(_)
+    | InlineItem::LastRenderedPageBreak => true,
+    InlineItem::Text(run) => !text_run_affects_line_height(&run.text),
+    _ => false,
+  }) {
+    let style = &paragraph.base_style;
+    let mark_height = metrics
+      .line_vertical_metrics_for_text("\r", style)
+      .line_height_pt()
+      .max(style.line_height_override_pt.unwrap_or_default());
+    let mark_height = inline_object_line_metrics_for_flow(mark_height, paragraph, flow).height_pt;
+    let mark_height = proportional_auto_text_line_spacing_multiple(paragraph, flow)
+      .map_or(mark_height, |multiple| mark_height * multiple);
+    height.max(mark_height)
+  } else {
+    height
+  }
+}
+
+#[derive(Clone, Debug)]
+struct PendingNoteSeparatorMark {
+  mark: NoteSeparatorMark,
+  x_pt: f32,
+  width_pt: f32,
+}
+
 fn push_note_separator_mark(
   current: &mut Page,
   mark: &NoteSeparatorMark,
   x_pt: f32,
-  line_top_pt: f32,
+  baseline_pt: f32,
   width_pt: f32,
-  natural_line_height_pt: f32,
   text_metrics: &mut TextMetrics,
 ) {
-  // ECMA-376 Part 1 §§17.11.1 and 17.11.23 define these as run-level
-  // separator marks inside their complete special-note stories. Word's fixed
-  // output paints the rule on the story line's default-font baseline zone;
-  // the surrounding paragraph still owns its authored line height and
-  // spacing, so the mark must not be substituted with an out-of-story gap.
-  let y_pt = line_top_pt + natural_line_height_pt * 0.6;
-  // Native Word controls across Arial, Times New Roman, Calibri, Courier
-  // New and Arial Black use OS/2 yStrikeoutSize, rounded to the print grid.
-  // This is run formatting: a fixed stroke loses font/size/color changes.
-  // Paint only the area; FilledRect lines also stroke their perimeter.
-  let thickness = units::quantize_points_to_office_print_grid(
-    text_metrics
-      .text_decoration_metrics(&mark.style)
-      .strikethrough_width_pt,
-  )
-  .max(units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI);
+  // ECMA-376 §17.11.23: run-level separator. Paired native literal/mark
+  // controls place its top at the shared baseline minus OS/2 yStrikeoutPosition;
+  // yStrikeoutSize independently owns its filled thickness (600dpi grid).
+  let decoration = text_metrics.text_decoration_metrics(&mark.style);
+  let y_pt = units::quantize_points_to_office_print_grid(baseline_pt)
+    - units::quantize_points_to_office_print_grid(decoration.strikethrough_offset_pt);
+  let thickness = units::quantize_points_to_office_print_grid(decoration.strikethrough_width_pt)
+    .max(units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI);
   current.items.push(PageItem::Rect(RectItem {
     x_pt,
     y_pt,
@@ -26581,7 +27627,7 @@ fn referenced_footnote_area_measurement(
 ) -> NoteStoryMeasurement {
   let ids = pending_block_footnote_ids(block, document, emitted_footnotes);
   let separator_height = if include_separator && !ids.is_empty() {
-    footnote_separator_layout_height(document, flow, text_metrics)
+    footnote_area_overhead_height(document, flow, text_metrics)
   } else {
     0.0
   };
@@ -26602,8 +27648,7 @@ fn pending_block_footnote_ids(
   let mut ids = Vec::new();
   collect_block_footnote_ids(block, &mut ids);
   ids.retain(|id| !emitted_footnotes.contains(id) && document.footnotes.contains_key(id));
-  ids.sort_unstable();
-  ids.dedup();
+  super::retain_first_note_references(&mut ids);
   ids
 }
 
@@ -26816,7 +27861,16 @@ fn measure_note_stories_with_context<'a>(
   }
 }
 
-fn layout_note_story_blocks(
+fn note_separator_story_flow(mut flow: FlowContext) -> FlowContext {
+  // Word applies the section line grid to ordinary footnote/endnote text,
+  // but separator and continuation-separator stories keep their natural
+  // font cells, even with explicit snapToGrid. Use the same story context
+  // for reservation and painting; preserve its paragraph-spacing policy.
+  flow.setup.doc_grid_line_pitch_pt = None;
+  flow
+}
+
+fn layout_note_separator_story_blocks(
   blocks: &[Block],
   flow: FlowContext,
   current: &mut Page,
@@ -26824,6 +27878,7 @@ fn layout_note_story_blocks(
   text_metrics: &mut TextMetrics,
   mut y: f32,
 ) -> f32 {
+  let flow = note_separator_story_flow(flow);
   for (index, block) in blocks.iter().enumerate() {
     let (_, next_y) = layout_document_block(
       BlockNeighbors::for_index(blocks, index),
@@ -26905,14 +27960,16 @@ fn footnote_boss_format_ids(
     .map(|id| document.footnotes[id].as_slice())
     .collect::<Vec<_>>();
   let measurement = measure_note_stories(&stories, preceding_block, flow, target.text_metrics);
+  let notice_height = footnote_continuation_notice_height(document, flow, target.text_metrics);
   let new_height = measurement.height_pt
     + if needs_separator {
-      footnote_separator_layout_height(document, flow, target.text_metrics)
+      footnote_separator_layout_height(document, flow, target.text_metrics) + notice_height
     } else {
       0.0
     };
   shift_existing_page_footnotes(target.current, -new_height);
-  let mut y = flow.body_content_bottom_pt - new_height;
+  let mut y =
+    flow.body_content_bottom_pt - new_height - if needs_separator { 0.0 } else { notice_height };
   if needs_separator {
     target.current.footnote_area_top_pt = Some(y);
   }
@@ -26930,8 +27987,9 @@ fn footnote_boss_format_ids(
     // FindBodyCont(), while SwTextFrame::GetFootnoteFrameHeight_() limits text
     // to the footnote container's GetPrtBottom(). Preserve the footer-reduced
     // boundary already resolved by body_content_limits_for_page().
-    content_bottom: flow.body_content_bottom_pt,
-    body_content_bottom_pt: flow.body_content_bottom_pt,
+    content_bottom: flow.body_content_bottom_pt - notice_height,
+    body_content_bottom_pt: flow.body_content_bottom_pt - notice_height,
+    note_continuation_bottom_inset_pt: notice_height,
     columns: SectionColumns::default(),
     column_index: 0,
     ..flow
@@ -26946,7 +28004,7 @@ fn footnote_boss_format_ids(
         footnote_flow.content_bottom,
       )
     } else {
-      layout_note_story_blocks(
+      layout_note_separator_story_blocks(
         &document.footnote_separator_stories.separator,
         footnote_flow,
         target.current,
@@ -26988,7 +28046,7 @@ fn footnote_boss_format_ids(
     }
   }
   if target.pages.len() == start_pages_len {
-    target.current.footnote_flow_bottom_pt = Some(y);
+    target.current.footnote_flow_bottom_pt = Some(y + notice_height);
   }
   record_page_footnote_items(
     target.current,
@@ -27171,10 +28229,17 @@ fn shift_page_item_y(item: &mut PageItem, dy_pt: f32) {
       }
     }
     PageItem::FloatingDrawing {
-      items, table_wrap, ..
+      items,
+      table_wrap,
+      body_vertical_alignment,
+      ..
     } => {
       if let Some(wrap) = table_wrap {
         wrap.translate(0.0, dy_pt);
+      }
+      if let Some(alignment) = body_vertical_alignment {
+        alignment.bounds.y_pt += dy_pt;
+        alignment.anchor_y_pt += dy_pt;
       }
       for item in items {
         shift_page_item_y(item, dy_pt);
@@ -27269,17 +28334,36 @@ fn align_page_body_vertically(
         .then_some(index)
       })
       .collect::<Vec<_>>();
+    let (content_top, margin_bottom) = effective_vertical_page_margins(page.setup, page_index);
+    let content_bottom = page.setup.height_pt - margin_bottom;
     let Some((body_top, body_bottom)) = body_indices
       .iter()
-      .filter_map(|index| page_vertical_body_item_bounds(&page.items[*index]))
+      .filter_map(|index| {
+        let item = &page.items[*index];
+        page_vertical_body_item_bounds(item).map(|(top, bottom)| {
+          // A page-relative drawing may extend above the body. Its occupied
+          // lower edge contributes height without moving the body start above
+          // the text margin. Native page/margin anchors retain this boundary.
+          let top = if matches!(
+            item,
+            PageItem::FloatingDrawing {
+              body_vertical_alignment: Some(_),
+              ..
+            }
+          ) {
+            top.max(content_top)
+          } else {
+            top
+          };
+          (top, bottom)
+        })
+      })
       .reduce(|(top, bottom), (item_top, item_bottom)| {
         (top.min(item_top), bottom.max(item_bottom))
       })
     else {
       continue;
     };
-    let (content_top, margin_bottom) = effective_vertical_page_margins(page.setup, page_index);
-    let content_bottom = page.setup.height_pt - margin_bottom;
 
     match alignment {
       w::VerticalJustificationValues::Top => {}
@@ -27311,45 +28395,75 @@ fn align_page_body_vertically(
         );
       }
       w::VerticalJustificationValues::Both => {
-        let mut lines = Vec::<(f32, f32)>::new();
-        for index in &body_indices {
-          let item = &page.items[*index];
-          let Some(y) = page_vertical_body_line_y(item) else {
+        // Vertical justification distributes extra space between paragraphs,
+        // preserving their wrapped line pitch. Native one-paragraph controls
+        // stay at the top: a text line is not a paragraph boundary.
+        let mut starts = frames
+          .iter()
+          .filter(|frame| {
+            frame.page_index == page_index
+              && frame.kind != FollowFrameKind::Notes
+              && body_indices
+                .iter()
+                .any(|index| *index >= frame.item_start && *index < frame.item_end)
+          })
+          .filter_map(|frame| {
+            frame
+              .lines
+              .first()
+              .map(|line| line.y_pt)
+              .or_else(|| frame.bounds.map(|bounds| bounds.y_pt))
+          })
+          .collect::<Vec<_>>();
+        starts.sort_by(f32::total_cmp);
+        starts.dedup_by(|a, b| (*a - *b).abs() <= LAYOUT_EPSILON_PT);
+        // Paragraphs connected by one wrap band form one alignment block.
+        // Native two/three-paragraph controls keep the text beside the box
+        // together, distributing only the later independent paragraph.
+        for item in &page.items {
+          let PageItem::FloatingDrawing {
+            body_vertical_alignment: Some(alignment),
+            ..
+          } = item
+          else {
             continue;
           };
-          let height = page_vertical_body_item_bounds(item)
-            .map(|(_, bottom)| (bottom - y).max(0.0))
-            .unwrap_or(0.0);
-          if let Some((_, line_height)) = lines
-            .iter_mut()
-            .find(|(line_y, _)| (*line_y - y).abs() <= LAYOUT_EPSILON_PT)
-          {
-            *line_height = (*line_height).max(height);
-          } else {
-            lines.push((y, height));
+          let bottom = alignment.bounds.y_pt + alignment.bounds.height_pt;
+          let first = frames
+            .iter()
+            .filter(|frame| {
+              frame.page_index == page_index
+                && frame.kind != FollowFrameKind::Notes
+                && body_indices
+                  .iter()
+                  .any(|index| *index >= frame.item_start && *index < frame.item_end)
+            })
+            .filter_map(|frame| {
+              let top = frame.lines.first()?.y_pt;
+              let end = body_frame_flow_bottom(frame)?;
+              (top < bottom && end > alignment.bounds.y_pt).then_some(top)
+            })
+            .reduce(f32::min);
+          if let Some(first) = first {
+            starts.retain(|top| *top <= first || *top >= bottom);
           }
         }
-        lines.sort_by(|left, right| left.0.total_cmp(&right.0));
-        if lines.len() < 2 {
+        if starts.len() < 2 {
           continue;
         }
-        let last_height = lines.last().map(|(_, height)| *height).unwrap_or(0.0);
-        let target_span = (content_bottom - last_height - content_top).max(0.0);
-        let divisor = (lines.len() - 1) as f32;
-        let shifts = lines
+        let surplus = (content_bottom - body_bottom).max(0.0);
+        let divisor = (starts.len() - 1) as f32;
+        let shifts = starts
           .iter()
           .enumerate()
-          .map(|(index, (old_y, _))| {
-            let target_y = content_top + target_span * index as f32 / divisor;
-            (*old_y, target_y - *old_y)
-          })
+          .map(|(index, old_y)| (*old_y, surplus * index as f32 / divisor))
           .collect::<Vec<_>>();
         for index in &body_indices {
           let item = &page.items[*index];
           let reference_y = page_vertical_body_line_y(item)
             .or_else(|| page_vertical_body_item_bounds(item).map(|(top, _)| top));
           if let Some(reference_y) = reference_y {
-            let dy = nearest_page_vertical_shift(&shifts, reference_y);
+            let dy = page_vertical_block_shift(&shifts, reference_y);
             shift_page_vertical_body_item_y(&mut page.items[*index], dy);
           }
         }
@@ -27372,6 +28486,13 @@ fn align_page_body_vertically(
 
 fn page_vertical_body_item_bounds(item: &PageItem) -> Option<(f32, f32)> {
   match item {
+    PageItem::FloatingDrawing {
+      body_vertical_alignment: Some(alignment),
+      ..
+    } => Some((
+      alignment.bounds.y_pt,
+      alignment.bounds.y_pt + alignment.bounds.height_pt,
+    )),
     PageItem::FloatingDrawing { .. } | PageItem::IndependentTextFrame(_) => None,
     PageItem::Image(image) if image.floating => None,
     PageItem::Group(items)
@@ -27388,6 +28509,10 @@ fn page_vertical_body_item_bounds(item: &PageItem) -> Option<(f32, f32)> {
 
 fn page_vertical_body_line_y(item: &PageItem) -> Option<f32> {
   match item {
+    PageItem::FloatingDrawing {
+      body_vertical_alignment: Some(alignment),
+      ..
+    } => Some(alignment.anchor_y_pt),
     PageItem::FloatingDrawing { .. } | PageItem::IndependentTextFrame(_) => None,
     PageItem::Image(image) if image.floating => None,
     PageItem::Group(items)
@@ -27399,6 +28524,13 @@ fn page_vertical_body_line_y(item: &PageItem) -> Option<f32> {
 
 fn shift_page_vertical_body_item_y(item: &mut PageItem, dy_pt: f32) {
   match item {
+    // Move the complete anchored story, including glyph paint clips, culling
+    // bounds and effect hosts. A baseline-only move can retain searchable
+    // text while its visible glyphs are still rejected by the old bounds.
+    PageItem::FloatingDrawing {
+      body_vertical_alignment: Some(_),
+      ..
+    } => translate_page_item_in_place(item, 0.0, dy_pt),
     PageItem::FloatingDrawing { .. } | PageItem::IndependentTextFrame(_) => {}
     PageItem::Image(image) if image.floating => {}
     PageItem::Group(items)
@@ -27412,10 +28544,12 @@ fn shift_page_vertical_body_item_y(item: &mut PageItem, dy_pt: f32) {
   }
 }
 
-fn nearest_page_vertical_shift(shifts: &[(f32, f32)], y_pt: f32) -> f32 {
+fn page_vertical_block_shift(shifts: &[(f32, f32)], y_pt: f32) -> f32 {
   shifts
     .iter()
-    .min_by(|left, right| (left.0 - y_pt).abs().total_cmp(&(right.0 - y_pt).abs()))
+    .rev()
+    .find(|(top, _)| *top <= y_pt + LAYOUT_EPSILON_PT)
+    .or_else(|| shifts.first())
     .map(|(_, shift)| *shift)
     .unwrap_or(0.0)
 }
@@ -27438,7 +28572,7 @@ fn shift_page_vertical_records(
     if uniform {
       shifts.first().map(|(_, shift)| *shift).unwrap_or(0.0)
     } else {
-      nearest_page_vertical_shift(shifts, y_pt)
+      page_vertical_block_shift(shifts, y_pt)
     }
   };
   let range_has_body = |start: usize, end: usize| {
@@ -27778,6 +28912,7 @@ fn repeating_slot_blocks_for_page<'a>(
   page: &Page,
   physical_page_number: usize,
   virtual_page_number: usize,
+  slots: RepeatingSlotState,
 ) -> (&'a [Block], &'a [Block]) {
   let first_page_in_section = page.section_page_index == 0;
   let section = document.sections.get(page.section_index);
@@ -27817,7 +28952,15 @@ fn repeating_slot_blocks_for_page<'a>(
   } else {
     default_footer
   };
-  (header_blocks, footer_blocks)
+  // Body reservation and painting share the same story activation. An empty
+  // style-owned placeholder must not paint its inherited border; explicit
+  // layout changes and the independently active first header still paint.
+  let (has_header, has_footer, ..) =
+    repeating_slots_present_for_page(slots, virtual_page_number, page.section_page_index);
+  (
+    if has_header { header_blocks } else { &[] },
+    if has_footer { footer_blocks } else { &[] },
+  )
 }
 
 fn repeating_slot_wrap_exclusions_for_page(
@@ -27827,8 +28970,15 @@ fn repeating_slot_wrap_exclusions_for_page(
   virtual_page_number: usize,
   text_metrics: &mut TextMetrics,
 ) -> Vec<WrapExclusion> {
-  let (header_blocks, footer_blocks) =
-    repeating_slot_blocks_for_page(document, page, physical_page_number, virtual_page_number);
+  let repeating_slots =
+    repeating_slot_state_for_page(document, page, physical_page_number, text_metrics);
+  let (header_blocks, footer_blocks) = repeating_slot_blocks_for_page(
+    document,
+    page,
+    physical_page_number,
+    virtual_page_number,
+    repeating_slots,
+  );
   if header_blocks.is_empty() && footer_blocks.is_empty() {
     return Vec::new();
   }
@@ -27841,8 +28991,6 @@ fn repeating_slot_wrap_exclusions_for_page(
   let mut discarded_pages = Vec::new();
 
   let header_top = page.setup.header_distance_pt.max(0.0);
-  let header_repeating_slots =
-    repeating_slot_state_for_page(document, page, physical_page_number, text_metrics);
   layout_repeating_blocks_into_page(
     header_blocks,
     &mut adornment,
@@ -27876,18 +29024,23 @@ fn repeating_slot_wrap_exclusions_for_page(
       do_not_expand_shift_return: document.do_not_expand_shift_return,
       suppress_top_spacing: document.suppress_top_spacing,
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
-      repeating_slots: header_repeating_slots,
+      repeating_slots,
       text_segmentation: TextSegmentation::RepeatingSlot,
       horizontal_table_cell: false,
+      table_cell_in_header_footer: false,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
+      section_carrier_lower_pt: None,
+      section_carrier_style_matches: None,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
       word_floating_table_cell: false,
       floating_table_cell_follow_top_inset_pt: 0.0,
       floating_table_cell_follow_bottom_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
+      note_continuation_bottom_inset_pt: 0.0,
       inside_paragraph_frame: false,
       paragraph_frame_translation_y_pt: None,
+      paragraph_frame_numeric_offset_decoded: (false, false),
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       table_cell_complete_first_line_fit: false,
       table_cell_legacy_nested_row_follow: false,
@@ -27900,10 +29053,8 @@ fn repeating_slot_wrap_exclusions_for_page(
     },
   );
 
-  let footer_repeating_slots =
-    repeating_slot_state_for_page(document, page, physical_page_number, text_metrics);
   let footer_height = repeating_footer_positioning_height_for_page(
-    footer_repeating_slots,
+    repeating_slots,
     virtual_page_number,
     page.section_page_index,
   );
@@ -27941,18 +29092,23 @@ fn repeating_slot_wrap_exclusions_for_page(
       do_not_expand_shift_return: document.do_not_expand_shift_return,
       suppress_top_spacing: document.suppress_top_spacing,
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
-      repeating_slots: footer_repeating_slots,
+      repeating_slots,
       text_segmentation: TextSegmentation::FooterSlot,
       horizontal_table_cell: false,
+      table_cell_in_header_footer: false,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
+      section_carrier_lower_pt: None,
+      section_carrier_style_matches: None,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
       word_floating_table_cell: false,
       floating_table_cell_follow_top_inset_pt: 0.0,
       floating_table_cell_follow_bottom_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
+      note_continuation_bottom_inset_pt: 0.0,
       inside_paragraph_frame: false,
       paragraph_frame_translation_y_pt: None,
+      paragraph_frame_numeric_offset_decoded: (false, false),
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       table_cell_complete_first_line_fit: false,
       table_cell_legacy_nested_row_follow: false,
@@ -27965,6 +29121,12 @@ fn repeating_slot_wrap_exclusions_for_page(
     },
   );
 
+  // Cell scratch pages do not transfer their line exclusions to the outer
+  // story. Legacy layoutInCell=false pictures still wrap the main story;
+  // carry the positioned picture metadata, without making the header table
+  // dodge its own picture. Native header square/top-bottom controls verify
+  // this independently of the header cell's own wrap participation.
+  collect_table_cell_picture_wraps(&adornment.items, &mut adornment.wrap_exclusions);
   repeating_story_body_wrap_exclusions(&adornment.wrap_exclusions)
 }
 
@@ -27973,13 +29135,10 @@ fn repeating_story_body_wrap_exclusions(exclusions: &[WrapExclusion]) -> Vec<Wra
     .iter()
     .copied()
     .filter(|exclusion| {
-      // A framePr fly still participates in wrapping inside its own header or
-      // footer story while that story is laid out above. It must not then be
-      // copied into the main-story wrap set. LibreOffice's Word import keeps
-      // header/footer frames independently wrap-capable (ww8par6.cxx), while
-      // its MS-compat layout tests require spill-over header objects not to
-      // move body text (tdf104254_noHeaderWrapping and
-      // tdf143793_noBodyWrapping). Preserve the other repeating exclusions:
+      // A framePr fly retains its repeating-story placement metadata, whose
+      // text-wrap compatibility is handled by paragraph_uses_wrap_exclusion.
+      // It must not be copied into the main-story wrap set (tdf104254 and
+      // tdf143793). Preserve the other repeating exclusions:
       // they are separate drawing/table owners and remain a counterexample to
       // dropping the complete repeating-wrap catalog.
       !exclusion.owner.is_paragraph_frame()
@@ -28138,11 +29297,22 @@ fn extend_wrap_exclusions_unique(target: &mut Vec<WrapExclusion>, exclusions: &[
 }
 
 fn paragraph_uses_wrap_exclusion(exclusion: &WrapExclusion, flow: FlowContext) -> bool {
+  if flow.table_cell_in_header_footer
+    && exclusion.owner == WrapExclusionOwner::RepeatingPageOwnedCellDrawing
+  {
+    // A legacy page-owned drawing does not wrap its header/footer table
+    // cell. Cell-owned drawings remain active, including when compatibility
+    // mode 15 forces layoutInCell. See SwTextFly::InitAnchoredObjList and the
+    // independent mode/layoutInCell/wrap Office controls.
+    return false;
+  }
   // Word 2007/2010 header/footer text ignores side wrapping around drawings
-  // in its own repeating story. Word 2013 enables it; body and table-cell
-  // text retain their normal wrap contract. Keep the exclusion on Page for
+  // and paragraph frames in its own repeating story. Word 2013 enables it;
+  // native mode12/14/15 body/header/footer opposites distinguish this owner
+  // from a generic tab change. Body and table-cell text keep their normal
+  // wrap contract. Retain Page metadata for independent frame placement and
   // the separate main-story catalog (SwTextFly::InitAnchoredObjList).
-  !exclusion.owner.is_drawing()
+  !(exclusion.owner.is_drawing() || exclusion.owner.is_paragraph_frame())
     || exclusion.blocks_flow
     || flow.compatibility_mode >= 15
     || !flow.text_segmentation.is_repeating_slot()
@@ -28243,8 +29413,14 @@ fn apply_headers_and_footers(
       // owns repeating content.
       continue;
     }
-    let (header_blocks, footer_blocks) =
-      repeating_slot_blocks_for_page(document, page, index + 1, page_numbers[index]);
+    let repeating_slots = repeating_slot_state_for_page(document, page, index + 1, text_metrics);
+    let (header_blocks, footer_blocks) = repeating_slot_blocks_for_page(
+      document,
+      page,
+      index + 1,
+      page_numbers[index],
+      repeating_slots,
+    );
 
     if header_blocks.is_empty() && footer_blocks.is_empty() {
       continue;
@@ -28258,8 +29434,6 @@ fn apply_headers_and_footers(
     let mut discarded_pages = Vec::new();
     let mut adornment_frames = Vec::new();
     let header_top = page.setup.header_distance_pt.max(0.0);
-    let header_repeating_slots =
-      repeating_slot_state_for_page(document, page, index + 1, text_metrics);
     layout_repeating_blocks_with_frames_into_page(
       header_blocks,
       &mut adornment,
@@ -28293,18 +29467,23 @@ fn apply_headers_and_footers(
         do_not_expand_shift_return: document.do_not_expand_shift_return,
         suppress_top_spacing: document.suppress_top_spacing,
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
-        repeating_slots: header_repeating_slots,
+        repeating_slots,
         text_segmentation: TextSegmentation::RepeatingSlot,
         horizontal_table_cell: false,
+        table_cell_in_header_footer: false,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
+        section_carrier_lower_pt: None,
+        section_carrier_style_matches: None,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
         word_floating_table_cell: false,
         floating_table_cell_follow_top_inset_pt: 0.0,
         floating_table_cell_follow_bottom_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
+        note_continuation_bottom_inset_pt: 0.0,
         inside_paragraph_frame: false,
         paragraph_frame_translation_y_pt: None,
+        paragraph_frame_numeric_offset_decoded: (false, false),
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         table_cell_complete_first_line_fit: false,
         table_cell_legacy_nested_row_follow: false,
@@ -28322,10 +29501,8 @@ fn apply_headers_and_footers(
       },
     );
 
-    let footer_repeating_slots =
-      repeating_slot_state_for_page(document, page, index + 1, text_metrics);
     let footer_height = repeating_footer_positioning_height_for_page(
-      footer_repeating_slots,
+      repeating_slots,
       page_numbers[index],
       page.section_page_index,
     );
@@ -28363,18 +29540,23 @@ fn apply_headers_and_footers(
         do_not_expand_shift_return: document.do_not_expand_shift_return,
         suppress_top_spacing: document.suppress_top_spacing,
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
-        repeating_slots: footer_repeating_slots,
+        repeating_slots,
         text_segmentation: TextSegmentation::FooterSlot,
         horizontal_table_cell: false,
+        table_cell_in_header_footer: false,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
+        section_carrier_lower_pt: None,
+        section_carrier_style_matches: None,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
         word_floating_table_cell: false,
         floating_table_cell_follow_top_inset_pt: 0.0,
         floating_table_cell_follow_bottom_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
+        note_continuation_bottom_inset_pt: 0.0,
         inside_paragraph_frame: false,
         paragraph_frame_translation_y_pt: None,
+        paragraph_frame_numeric_offset_decoded: (false, false),
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         table_cell_complete_first_line_fit: false,
         table_cell_legacy_nested_row_follow: false,
@@ -28525,7 +29707,7 @@ fn block_has_footnote_references(block: &Block) -> bool {
   }
 }
 
-fn block_has_visible_body_content(block: &Block) -> bool {
+pub(super) fn block_has_visible_body_content(block: &Block) -> bool {
   match block {
     Block::Paragraph(paragraph) => paragraph.inlines.iter().any(|inline| match inline {
       InlineItem::Text(run) => !run.text.trim().is_empty(),
@@ -28563,16 +29745,34 @@ fn apply_page_backgrounds(document: &DocxDocument, pages: &mut [Page], frames: &
     else {
       continue;
     };
-    page.items.insert(
-      0,
-      PageItem::Fill(FillItem {
+    let background = document
+      .page_background_gradient
+      .as_ref()
+      .map(|gradient| {
+        let width = page.setup.width_pt;
+        let height = page.setup.height_pt;
+        PageItem::path(common::PathItem {
+          bounds: common_rect(0.0, 0.0, width, height),
+          points: vec![
+            common_point(0.0, 0.0),
+            common_point(width, 0.0),
+            common_point(width, height),
+            common_point(0.0, height),
+          ],
+          commands: Vec::new(),
+          closed: true,
+          fill: common::Fill::Gradient(gradient.for_page(width, height)),
+          stroke: None,
+        })
+      })
+      .unwrap_or(PageItem::Fill(FillItem {
         x_pt: 0.0,
         y_pt: 0.0,
         width_pt: page.setup.width_pt,
         height_pt: page.setup.height_pt,
         paint,
-      }),
-    );
+      }));
+    page.items.insert(0, background);
     page.background_texture = document.page_background_texture.as_ref().and_then(|fill| {
       let InlineShapeImageFillMode::Tile {
         size,
@@ -28673,6 +29873,7 @@ fn wrap_floating_page_item_range(
       paint_order: placement.paint_order,
       behind_text: placement.behind_text,
       table_wrap: None,
+      body_vertical_alignment: None,
     },
   );
   (item_start, item_start + 1)
@@ -29127,7 +30328,7 @@ fn apply_page_borders(pages: &mut [Page]) {
       }
       continue;
     }
-    if page_border_3d::paint(page, (left, top, right, bottom), borders)
+    if page_border_bands::paint(page, (left, top, right, bottom), borders)
       || page_border_shadow::paint(page, (left, top, right, bottom), borders)
       || paint_word_small_gap_page_frame(page, borders)
     {
@@ -29561,6 +30762,7 @@ fn resolve_dynamic_fields(
   let mut sequence_numbers = HashMap::<Arc<str>, usize>::default();
   resolve_page_note_numbering(pages, footnote_numbering, endnote_numbering);
   let page_numbers = resolved_page_numbers(pages, pagination.initial_page_number);
+  let page_chapters = chapter_page_numbers::resolve(pages);
   for (page_index, page) in pages.iter_mut().enumerate() {
     let page_number = page_numbers[page_index];
     let context = DynamicFieldResolveContext {
@@ -29568,6 +30770,7 @@ fn resolve_dynamic_fields(
       page_index,
       page_number,
       page_number_format: page.setup.page_number_format,
+      page_chapters: &page_chapters,
       page_refs: &page_refs,
       style_ref_candidates: &style_ref_candidates,
       ui_language,
@@ -29718,6 +30921,7 @@ struct DynamicFieldResolveContext<'a, 'b, 'c> {
   page_index: usize,
   page_number: usize,
   page_number_format: FieldNumberFormat,
+  page_chapters: &'a [Option<chapter_page_numbers::ChapterNumber>],
   page_refs: &'a HashMap<&'b str, &'b AnchorPage>,
   style_ref_candidates: &'a [Vec<StyleRefCandidate>],
   ui_language: Option<&'c str>,
@@ -29733,9 +30937,13 @@ fn resolve_dynamic_field_text(
   let mut missing_page_reference = false;
   match &text.dynamic_field {
     Some(DynamicFieldKind::Page { number_format }) => {
-      text.text = super::format_field_number(
+      text.text = chapter_page_numbers::format(
         context.page_number,
         resolve_page_style_number_format(*number_format, context.page_number_format),
+        context
+          .page_chapters
+          .get(context.page_index)
+          .and_then(Option::as_ref),
       );
     }
     Some(DynamicFieldKind::NumPages { number_format }) => {
@@ -29763,9 +30971,21 @@ fn resolve_dynamic_field_text(
           virtual_page_number: anchor.virtual_page_number,
           page_number_format: anchor.page_number_format,
         });
-        let page_number = super::format_field_number(
+        // Word preserves the target chapter for an ordinary PAGEREF. An
+        // explicit numeric format (e.g. \* ROMAN) formats only the page value;
+        // PAGE itself retains its chapter even with an explicit numeric format.
+        let chapter = (*number_format == FieldNumberFormat::PageStyle)
+          .then(|| {
+            context
+              .page_chapters
+              .get(reference.page_index)
+              .and_then(Option::as_ref)
+          })
+          .flatten();
+        let page_number = chapter_page_numbers::format(
           reference.virtual_page_number,
           resolve_page_style_number_format(*number_format, reference.page_number_format),
+          chapter,
         );
         text.text = if !relative_position {
           page_number
@@ -29794,7 +31014,7 @@ fn resolve_dynamic_field_text(
       from_bottom,
       numbering_only,
       suppress_non_numerical,
-      full_context,
+      ..
     }) => {
       if let Some(value) = resolve_style_ref(
         context.style_ref_candidates,
@@ -29806,7 +31026,6 @@ fn resolve_dynamic_field_text(
           from_bottom: *from_bottom,
           numbering_only: *numbering_only,
           suppress_non_numerical: *suppress_non_numerical,
-          full_context: *full_context,
           ui_language: context.ui_language,
         },
       ) {
@@ -30034,6 +31253,7 @@ fn realign_resolved_dynamic_field_lines(items: &mut [PageItem], text_metrics: &m
     }
   }
   resize_dynamic_field_tab_leaders(items, text_metrics);
+  wordprocessing_tab_text::realize_ltr_leaders(items, text_metrics);
 }
 
 fn resize_dynamic_field_tab_leaders(items: &mut [PageItem], text_metrics: &mut TextMetrics) {
@@ -30170,10 +31390,24 @@ fn resize_dynamic_field_tab_leaders(items: &mut [PageItem], text_metrics: &mut T
         (_, true) => aligned_content_x + count as f32 * (logical_repeat_width - paint_repeat_width),
       }
     };
-    replacements.push((leader_index, x_pt, fill_char.to_string().repeat(count)));
+    replacements.push((
+      leader_index,
+      x_pt,
+      fill_char.to_string().repeat(count),
+      (!rtl_tab).then_some((start_x_pt, aligned_content_x)),
+    ));
   }
-  for (index, x_pt, text) in replacements {
+  for (index, x_pt, text, span) in replacements {
     if let Some(PageItem::Text(item)) = items.get_mut(index) {
+      if let Some((left, right)) =
+        span.filter(|_| item.style.wordprocessing_tab_leader_span.is_some())
+      {
+        item.style.wordprocessing_tab_leader_span = Some((left - x_pt, right - x_pt));
+      } else if let Some((start, end)) = &mut item.style.wordprocessing_tab_leader_span {
+        let offset = item.x_pt - x_pt;
+        *start += offset;
+        *end += offset;
+      }
       item.x_pt = x_pt;
       if let Some(advance) = item
         .style
@@ -30470,7 +31704,6 @@ struct StyleRefRequest<'a> {
   from_bottom: bool,
   numbering_only: bool,
   suppress_non_numerical: bool,
-  full_context: bool,
   ui_language: Option<&'a str>,
 }
 
@@ -30551,15 +31784,6 @@ fn resolve_style_ref_from_candidates<'a>(
     })
     .map(|candidate| {
       if request.numbering_only {
-        let numbering = if request.full_context && !request.suppress_non_numerical {
-          candidate
-            .full_numbering_text
-            .as_ref()
-            .or(candidate.numbering_text.as_ref())
-        } else {
-          candidate.numbering_text.as_ref()
-        }
-        .map_or_else(String::new, |value| value.to_string());
         if request.suppress_non_numerical {
           candidate
             .numbering_text
@@ -30567,8 +31791,17 @@ fn resolve_style_ref_from_candidates<'a>(
             .unwrap_or_default()
             .to_string()
         } else {
-          numbering
-            .trim_end_matches(style_ref_numbering_edge_delimiter)
+          // The painted label retains the literals authored in lvlText;
+          // numbering_text is the separate \t projection. In particular,
+          // a source trailing blank is not the numbering suffix or cache
+          // padding. MS-OI29500 removes trailing periods, not that blank.
+          // The label already includes the levels referenced by lvlText.
+          candidate
+            .full_numbering_text
+            .as_deref()
+            .or(candidate.numbering_text.as_deref())
+            .unwrap_or_default()
+            .trim_end_matches('.')
             .to_string()
         }
       } else {
@@ -30690,7 +31923,11 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
       let geometry = column_geometry(page.setup, columns, page_index);
       for column_index in 1..geometry.widths.len() {
         let gap = geometry.gaps.get(column_index - 1).copied().unwrap_or(0.0);
-        let x_left = geometry.lefts[column_index] - gap / 2.0;
+        let x_left = if columns.right_to_left {
+          geometry.lefts[column_index] + geometry.widths[column_index] + gap / 2.0
+        } else {
+          geometry.lefts[column_index] - gap / 2.0
+        };
         let x_right = x_left + LAYOUT_EPSILON_PT;
         page.items.push(PageItem::Line(LineItem {
           x1_pt: x_left,
@@ -30707,7 +31944,15 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
   }
 }
 
-fn body_flow_for_page(mut flow: FlowContext, page_number: usize) -> FlowContext {
+fn body_flow_for_page(flow: FlowContext, page_number: usize) -> FlowContext {
+  body_flow_for_page_setup(flow, page_number, flow.setup)
+}
+
+fn body_flow_for_page_setup(
+  mut flow: FlowContext,
+  page_number: usize,
+  physical_page_setup: PageSetup,
+) -> FlowContext {
   let page_index = page_number.saturating_sub(1);
   if matches!(
     flow.text_segmentation,
@@ -30730,12 +31975,26 @@ fn body_flow_for_page(mut flow: FlowContext, page_number: usize) -> FlowContext 
     flow.columns.balanced_height_pt = Some(height_pt);
     flow.columns.pending_balance = None;
   }
-  let (content_top_pt, body_content_bottom_pt) = body_content_limits_for_page(
+  let (content_top_pt, mut body_content_bottom_pt) = body_content_limits_for_page(
     flow.setup,
     flow.repeating_slots,
     page_number,
     flow.section_page_index,
   );
+  if physical_page_setup != flow.setup {
+    // A continuous section can change the body frame on an occupied page,
+    // but its new bottom margin applies only after a physical page advance.
+    // Keep the section setup in the flow for that follow and for horizontal
+    // geometry. Native Word margin controls also retain the existing lower
+    // page limit when the new section starts with a table (tdf#168017).
+    body_content_bottom_pt = body_content_limits_for_page(
+      physical_page_setup,
+      flow.repeating_slots,
+      page_number,
+      flow.section_page_index,
+    )
+    .1;
+  }
   let mut content_bottom = body_content_bottom_pt;
   if let Some(height_pt) = flow.columns.balanced_height_pt {
     content_bottom = content_bottom.min(content_top_pt + height_pt.max(DEFAULT_LINE_HEIGHT_PT));
@@ -31294,15 +32553,20 @@ fn measured_repeating_blocks_height_at(
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation,
     horizontal_table_cell: false,
+    table_cell_in_header_footer: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
     word_floating_table_cell: false,
     floating_table_cell_follow_top_inset_pt: 0.0,
     floating_table_cell_follow_bottom_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     table_cell_complete_first_line_fit: false,
     table_cell_legacy_nested_row_follow: false,
@@ -31424,7 +32688,10 @@ fn layout_repeating_block(
       } else {
         paragraph_spacing_after(paragraph, next, flow)
       };
-      let (_, y) = layout_paragraph(
+      let border_context = ParagraphBorderContext::for_blocks(previous, paragraph, next);
+      let shading_context =
+        ParagraphShadingContext::for_blocks(previous, paragraph, next, text_metrics);
+      let (_, y) = layout_paragraph_with_left_indent_compat(
         paragraph,
         flow,
         ParagraphLayoutTarget {
@@ -31433,15 +32700,23 @@ fn layout_repeating_block(
           anchor_pages: None,
           text_metrics,
         },
-        y + spacing_before_pt,
-        paragraph_anchor_top,
-        spacing_after_pt,
+        ParagraphLayoutOptions {
+          y: y + spacing_before_pt + paragraph_border_layout_extent(border_context.top(paragraph)),
+          paragraph_anchor_top,
+          spacing_after_pt,
+          ignore_left_indent: false,
+          border_context,
+          shading_context,
+          spacing_before_pt,
+          suppressed_spacing_before_pt: 0.0,
+          decoration_outer_bottom_pt: None,
+        },
       );
       extend_wrap_exclusions_unique(
         &mut page.wrap_exclusions,
         &ignored_floating_table_exclusions,
       );
-      y
+      y + paragraph_border_layout_extent(border_context.bottom(paragraph))
     }
     Block::Table(table) => {
       let has_ind_prev = table_has_indirect_previous_frame(page, flow, y);
@@ -31629,7 +32904,14 @@ fn layout_floating_table(
   // The parent cell consumes a following fly's logical row height separately
   // from its closing rule. Surrounding lowers still avoid that rule's ink.
   let exclusion_height = layout.frame.total_height + table_bottom_border_paint_extent(table);
-  if let Some(probed_y) = probed_floating_table_frame_y(
+  if let Some(reserved) = current
+    .body_drawing_wraps
+    .as_deref()
+    .and_then(|catalog| catalog.block_reservation(flow, pages.len()))
+  {
+    requested_x = reserved.image_x;
+    requested_frame_y = reserved.image_y;
+  } else if let Some(probed_y) = probed_floating_table_frame_y(
     current,
     placement,
     requested_exclusion_x,
@@ -31776,7 +33058,25 @@ fn layout_floating_table(
     })
     .flatten();
   if first_frame_page_is_current && let Some(first_page) = frame_pages.first_mut() {
+    let exclusion_start = first_page.wrap_exclusions.len();
     append_floating_table_wrap_exclusion(first_page, table, placement, text_metrics);
+    if total_frame_pages == 1
+      && let Some(&exclusion) = first_page.wrap_exclusions.get(exclusion_start)
+    {
+      body_drawing_wrap::capture_floating_table(
+        current,
+        pages.len(),
+        flow,
+        y,
+        FrameBounds {
+          x_pt: x,
+          y_pt: frame_y,
+          width_pt: table_width,
+          height_pt: layout.frame.total_height,
+        },
+        exclusion,
+      );
+    }
     if table.following_text_flow {
       clip_floating_table_paint_to_cell(&mut first_page.items, flow);
     }
@@ -32410,38 +33710,34 @@ fn page_item_is_path(item: &PageItem) -> bool {
   }
 }
 
-fn append_paragraph_frame_wrap_exclusion(
-  page: &mut Page,
+fn paragraph_frame_wrap_exclusion(
+  flow: FlowContext,
   placement: FloatingFramePlacement,
   bounds: FrameBounds,
   decoration_outsets: HorizontalFrameOutsets,
   owner: WrapExclusionOwner,
-) {
+) -> Option<WrapExclusion> {
   if matches!(placement.wrap, FrameWrapMode::None) {
     // Word distinguishes none (paint without affecting the surrounding
     // text) from notBeside (top/bottom wrapping), unlike the identical ECMA
     // ST_Wrap descriptions. MS-OE376 §2.1.597 records that distinction;
     // native overlap and vSpace controls retain the unshifted body line.
-    return;
+    return None;
   }
   let blocks_flow = frame_wrap_blocks_flow(placement.wrap);
-  // ECMA-376 Part 1 §17.3.1.11 limits hSpace to `wrap="around"`;
-  // vSpace is the minimum separation above and below every text frame.
-  let horizontal_space = if matches!(placement.wrap, FrameWrapMode::Around) {
-    (placement.margin_left_pt, placement.margin_right_pt)
-  } else {
-    (0.0, 0.0)
-  };
-  page.wrap_exclusions.push(WrapExclusion {
+  // Word applies hSpace to auto/tight/through as well as around. Native
+  // four-mode controls with 0/9/18pt padding retain identical side lanes,
+  // despite ECMA-376 Part 1 §17.3.1.11 limiting the attribute to around.
+  let mut exclusion = WrapExclusion {
     left_pt: if blocks_flow {
       0.0
     } else {
-      bounds.x_pt - decoration_outsets.left_pt - horizontal_space.0
+      bounds.x_pt - decoration_outsets.left_pt - placement.margin_left_pt
     },
     right_pt: if blocks_flow {
-      page.setup.width_pt
+      flow.setup.width_pt
     } else {
-      bounds.x_pt + bounds.width_pt + decoration_outsets.right_pt + horizontal_space.1
+      bounds.x_pt + bounds.width_pt + decoration_outsets.right_pt + placement.margin_right_pt
     },
     top_pt: bounds.y_pt - placement.margin_top_pt,
     bottom_pt: bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
@@ -32450,7 +33746,54 @@ fn append_paragraph_frame_wrap_exclusion(
     uses_contour: false,
     contour_band: None,
     owner,
-  });
+  };
+  if placement.wrap == FrameWrapMode::Around
+    && flow.text_segmentation == TextSegmentation::Body
+    && !flow.inside_paragraph_frame
+    && exclusion.overlaps_horizontal_span(
+      flow.content_left_pt,
+      flow.content_left_pt + flow.content_width,
+    )
+  {
+    // Native Word body-frame controls require a full inch beside an around
+    // frame, independently of font size. Both sufficiently wide lanes remain
+    // usable; when neither fits, the existing line-clear owner moves below
+    // the frame. Measure from the column edges after borders and hSpace.
+    // This is distinct from a cell Square picture's quarter-inch clearance.
+    let unusable = |gap: f32| (gap * units::TWIPS_PER_POINT).round() < 1440.0;
+    if unusable(exclusion.left_pt - flow.content_left_pt) {
+      exclusion.left_pt = exclusion.left_pt.min(flow.content_left_pt);
+    }
+    let column_right = flow.content_left_pt + flow.content_width;
+    if unusable(column_right - exclusion.right_pt) {
+      exclusion.right_pt = exclusion.right_pt.max(column_right);
+    }
+  }
+  Some(exclusion)
+}
+
+#[cfg(test)]
+fn append_paragraph_frame_wrap_exclusion(
+  page: &mut Page,
+  placement: FloatingFramePlacement,
+  bounds: FrameBounds,
+  decoration_outsets: HorizontalFrameOutsets,
+  owner: WrapExclusionOwner,
+) {
+  page.wrap_exclusions.extend(paragraph_frame_wrap_exclusion(
+    flow_context(
+      page.setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    ),
+    placement,
+    bounds,
+    decoration_outsets,
+    owner,
+  ));
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -32790,10 +34133,18 @@ fn translate_page_item_in_place(item: &mut PageItem, dx_pt: f32, dy_pt: f32) {
       }
     }
     PageItem::FloatingDrawing {
-      items, table_wrap, ..
+      items,
+      table_wrap,
+      body_vertical_alignment,
+      ..
     } => {
       if let Some(wrap) = table_wrap {
         wrap.translate(dx_pt, dy_pt);
+      }
+      if let Some(alignment) = body_vertical_alignment {
+        alignment.bounds.x_pt += dx_pt;
+        alignment.bounds.y_pt += dy_pt;
+        alignment.anchor_y_pt += dy_pt;
       }
       for item in items {
         translate_page_item_in_place(item, dx_pt, dy_pt);
@@ -33178,6 +34529,15 @@ fn suppress_fully_replaced_doughnut_labels(
   }
 }
 
+fn chart_has_authored_area_paint(chart_space: &c::ChartSpace) -> bool {
+  chart_space
+    .shape_properties
+    .as_deref()
+    .is_some_and(|properties| {
+      properties.shape_properties_choice2.is_some() || properties.outline.is_some()
+    })
+}
+
 fn lower_inline_chart_contents(
   chart: &InlineChart,
   x_pt: f32,
@@ -33232,6 +34592,10 @@ fn lower_inline_chart_contents(
     chart_space,
     shared_chart::ChartHostApplication::Wordprocessing,
   ) && model.kind == shared_chart::RadialChartKind::Pie
+    // The compact painter supplies its own fixed frame and proportional
+    // legend. Authored chart-area paint (including a:noFill) requires the
+    // shared style-aware frame and measured Word plot/legend layout.
+    && (model.legend_position.is_none() || !chart_has_authored_area_paint(chart_space))
     // The compact legacy painter places every label on its internal ring.
     // Outside or manually positioned labels need the shared Word plot,
     // measured text frame and authored offset from the appropriate anchor.
@@ -33436,6 +34800,7 @@ fn lower_inline_chart_contents(
         category_minor_gridline: chart.category_minor_gridline,
         value_minor_gridline: chart.value_minor_gridline.clone(),
         category_major_gridline_stroke: chart.category_major_gridline_stroke.clone(),
+        series_axis_strokes: chart.series_axis_strokes.clone(),
         series_colors: chart.series_colors.clone(),
         series_point_colors: chart.series_point_colors.clone(),
         series_styles: chart.series_styles.clone(),
@@ -33455,6 +34820,7 @@ fn lower_inline_chart_contents(
         group_decoration_styles: chart.group_decoration_styles.clone(),
         series_point_styles: chart.series_point_styles.clone(),
         surface_band_colors: chart.surface_band_colors.clone(),
+        surface_band_styles: chart.surface_band_styles.clone(),
         data_label_fill_colors: chart.data_label_fill_colors.clone(),
         legend_frame_style: chart.legend_frame_style.clone(),
         chart_area_style: chart.chart_area_style.clone(),
@@ -33502,17 +34868,38 @@ fn lower_word_pie_chart(
       ..BorderStyle::default()
     }
   };
-  let mut items = vec![PageItem::Rect(RectItem {
-    x_pt,
-    y_pt: chart_y_pt,
-    width_pt,
-    height_pt,
-    paragraph_alignment_locked: false,
-    fill_color: None,
-    fill_opacity: 1.0,
-    stroke: Some(frame_stroke),
-    stroke_opacity: 1.0,
-  })];
+  let mut items = if chart
+    .chart_space
+    .as_deref()
+    .is_some_and(chart_has_authored_area_paint)
+  {
+    // Frame paint is independent of data-label placement. In particular,
+    // an authored frame must not replace the compact no-legend label layout.
+    crate::pptx::chart::lower_chart_area(
+      ChartFrame {
+        x_pt,
+        y_pt: chart_y_pt,
+        width_pt,
+        height_pt,
+      },
+      &chart.chart_area_style,
+    )
+    .into_iter()
+    .flat_map(docx_chart_page_items)
+    .collect()
+  } else {
+    vec![PageItem::Rect(RectItem {
+      x_pt,
+      y_pt: chart_y_pt,
+      width_pt,
+      height_pt,
+      paragraph_alignment_locked: false,
+      fill_color: None,
+      fill_opacity: 1.0,
+      stroke: Some(frame_stroke),
+      stroke_opacity: 1.0,
+    })]
+  };
 
   let total = model.values.iter().flatten().sum::<f64>();
   if total > 0.0 {
@@ -33685,6 +35072,7 @@ fn lower_word_pie_chart(
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: label.text.clone(),
           style: chart.data_label_style.clone(),
@@ -33755,6 +35143,7 @@ fn lower_word_pie_chart(
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.clone(),
         style: chart.label_style.clone(),
@@ -33811,6 +35200,7 @@ fn lower_word_pie_chart(
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: text.clone(),
           style: chart.label_style.clone(),
@@ -33940,6 +35330,7 @@ fn lower_generic_inline_chart(
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: fixed_text,
       style,
@@ -33974,6 +35365,7 @@ fn docx_chart_page_items(item: crate::model::PageItem) -> Vec<PageItem> {
       paint_clip: text.paint_clip,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: text.text,
       style: *text.style,
@@ -34159,10 +35551,21 @@ struct TableFrameLayout<'a> {
   nested_in_floating_table_cell: bool,
 }
 
+fn table_story_setup(mut setup: PageSetup, in_header_footer: bool) -> PageSetup {
+  // A header/footer is independent of the main story's line grid, including
+  // its table cells. Native pitch/adjustLineHeightInTable opposites leave
+  // those cells unchanged. Retain the pitch for paragraph spacing line units;
+  // only the table-line snapping policy belongs to the containing story.
+  if in_header_footer {
+    setup.adjust_table_line_heights_to_grid = false;
+  }
+  setup
+}
+
 #[derive(Clone, Copy, Debug)]
 struct PendingBorderSegment {
   x_pt: f32,
-  start_y_pt: f32,
+  start: (f32, f32),
   end_y_pt: f32,
   ends_at_table_bottom: bool,
   border: BorderStyle,
@@ -34178,6 +35581,10 @@ impl<'a> TableFrameLayout<'a> {
     inside_table_cell: bool,
     text_metrics: &mut TextMetrics,
   ) -> Option<Self> {
+    let area = BlockArea {
+      setup: table_story_setup(area.setup, table.in_header_footer),
+      ..area
+    };
     let column_count = table_column_count(table);
     if column_count == 0 {
       return None;
@@ -34287,6 +35694,8 @@ impl<'a> TableFrameLayout<'a> {
       table_repeating_header_height_from_row_heights(table, repeating_header_count, &row_heights);
     let total_height = table_total_height_from_row_heights(table, &row_heights);
 
+    let row_alignment_offsets =
+      row_alignment_offsets(table, &column_widths, area, left_pt, inside_table_cell);
     Some(Self {
       table,
       frame: TableFrame {
@@ -34294,6 +35703,7 @@ impl<'a> TableFrameLayout<'a> {
         column_widths,
         left_pt,
         right_pt: left_pt + table_width,
+        row_alignment_offsets,
         full_width_horizontal_borders,
         coalesce_row_shading,
         split_allowed,
@@ -35893,6 +37303,13 @@ impl<'a> TableFrameLayout<'a> {
         layout.inside_table_cell,
       );
       layout.frame.right_pt = layout.frame.left_pt + table_width;
+      layout.frame.row_alignment_offsets = row_alignment_offsets(
+        layout.table,
+        &layout.frame.column_widths,
+        area,
+        layout.frame.left_pt,
+        layout.inside_table_cell,
+      );
       layout.frame.block = area;
       layout
     } else {
@@ -36590,7 +38007,10 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn table_row_keep_enabled(&self) -> bool {
-    self.table.split_allowed && self.table.placement.is_none()
+    // The imported flag only controls floating-table splitting. Ordinary
+    // inline tables store false there; their resolved frame still splits and
+    // must honor a row's inherited keepNext at page and column boundaries.
+    self.frame.split_allowed && self.table.placement.is_none()
   }
 
   fn allow_split_of_keep_row(
@@ -36599,13 +38019,21 @@ impl<'a> TableFrameLayout<'a> {
     has_ind_prev: bool,
     table_row_keep: bool,
   ) -> bool {
-    // SwTabFrame::MakeAll() derives bAllowSplitOfRow from the current
-    // master/follow table: no indirect previous frame and all rows starting at
-    // the current first non-headline row keep with next.
-    table_row_keep
-      && !has_ind_prev
-      && self
+    if !table_row_keep
+      || !self
         .are_body_rows_keep_with_next_from(start_row_index.max(self.frame.repeating_header_count))
+    {
+      return false;
+    }
+    // A legacy kept table taller than an empty upper starts in the available
+    // space instead of moving its entire chain to a fresh page. Native
+    // mode11/12/14 controls retain the first rows and their footnotes there;
+    // mode15 keeps the whole-table move. Fitting chains still move together.
+    !has_ind_prev
+      || (self.frame.block.compatibility_mode < 15
+        && self.follow_page_required_height(start_row_index, 0.0)
+          > self.frame.block.body_content_bottom_pt - self.frame.block.content_top_pt
+            + LAYOUT_EPSILON_PT)
   }
 
   fn are_body_rows_keep_with_next_from(&self, mut row_index: usize) -> bool {
@@ -37105,7 +38533,7 @@ fn extend_border_segment(
       if f32::abs(current.x_pt - next.x_pt) < 0.01
         && current.border == next.border
         && current.snap_to_printer_grid == next.snap_to_printer_grid
-        && f32::abs(current.end_y_pt - next.start_y_pt) < LAYOUT_EPSILON_PT =>
+        && f32::abs(current.end_y_pt - (next.start.0 + next.start.1)) < LAYOUT_EPSILON_PT =>
     {
       current.end_y_pt = next.end_y_pt;
       current.ends_at_table_bottom = next.ends_at_table_bottom;
@@ -37128,7 +38556,7 @@ fn flush_border_segment(page: &mut Page, pending: &mut Option<PendingBorderSegme
     push_word_table_fine_dashed_vertical_border(
       page,
       segment.x_pt,
-      segment.start_y_pt,
+      segment.start,
       segment.end_y_pt,
       segment.ends_at_table_bottom,
       segment.border,
@@ -37139,7 +38567,7 @@ fn flush_border_segment(page: &mut Page, pending: &mut Option<PendingBorderSegme
     page,
     (
       segment.x_pt,
-      segment.start_y_pt,
+      segment.start.0 + segment.start.1,
       segment.x_pt,
       segment.end_y_pt,
     ),
@@ -37155,6 +38583,7 @@ struct TableFrame {
   column_widths: Vec<f32>,
   left_pt: f32,
   right_pt: f32,
+  row_alignment_offsets: [f32; 3],
   full_width_horizontal_borders: bool,
   coalesce_row_shading: bool,
   split_allowed: bool,
@@ -37206,6 +38635,20 @@ struct NestedCellFollows {
 }
 
 impl TableFrame {
+  fn row_grid_origin(&self, row: &TableRow) -> f32 {
+    let offset = match row.alignment {
+      None => 0.0,
+      Some(TableAlignment::Left) => self.row_alignment_offsets[0],
+      Some(TableAlignment::Center) => self.row_alignment_offsets[1],
+      Some(TableAlignment::Right) => self.row_alignment_offsets[2],
+    };
+    self.left_pt + offset
+  }
+
+  fn row_grid_end(&self, row: &TableRow) -> f32 {
+    self.row_grid_origin(row) + (self.right_pt - self.left_pt)
+  }
+
   fn follow_top_border_space_extent(&self, table: &Table, row_index: usize, row: &TableRow) -> f32 {
     if self.repeating_header_count == 0
       || row_index < self.repeating_header_count
@@ -37690,7 +39133,7 @@ impl RowFrame<'_, '_> {
       current.items.push(PageItem::Fill(FillItem {
         x_pt: cell_left,
         y_pt: paint_bottom,
-        width_pt: self.table_frame.right_pt - cell_left,
+        width_pt: self.table_frame.row_grid_end(self.row) - cell_left,
         height_pt: cell_spacing_pt,
         paint,
       }));
@@ -37699,7 +39142,7 @@ impl RowFrame<'_, '_> {
       current.items.push(PageItem::Fill(FillItem {
         x_pt: cell_left,
         y_pt: row_top,
-        width_pt: self.table_frame.right_pt - cell_left,
+        width_pt: self.table_frame.row_grid_end(self.row) - cell_left,
         height_pt: paint_bottom - row_top,
         paint: ShadingPaint::Solid(color),
       }));
@@ -37710,7 +39153,7 @@ impl RowFrame<'_, '_> {
       current.items.push(PageItem::Fill(FillItem {
         x_pt: cell_left,
         y_pt: row_top,
-        width_pt: self.table_frame.right_pt - cell_left,
+        width_pt: self.table_frame.row_grid_end(self.row) - cell_left,
         height_pt: paint_bottom - row_top,
         paint,
       }));
@@ -38460,18 +39903,33 @@ impl RowFrame<'_, '_> {
     paint
   }
 
-  fn horizontal_border_junction(
+  fn vertical_border_at_position(&self, row: &TableRow, x: f32) -> Option<BorderStyle> {
+    let mut position = row_grid_left(self.table_frame, row, 0.0);
+    let mut grid = row.grid_before;
+    for (index, cell) in row.cells.iter().enumerate() {
+      if (position - x).abs() <= LAYOUT_EPSILON_PT {
+        return vertical_border(self.table, row, index, true);
+      }
+      position += spanned_cell_width(cell, &self.table_frame.column_widths, &mut grid, 0.0);
+    }
+    if (position - x).abs() <= LAYOUT_EPSILON_PT {
+      row
+        .cells
+        .len()
+        .checked_sub(1)
+        .and_then(|index| vertical_border(self.table, row, index, false))
+    } else {
+      None
+    }
+  }
+
+  fn horizontal_border_junction_at_position(
     &self,
-    grid_boundary: usize,
+    x: f32,
     top_edge: bool,
-    intersects_grid_boundary: bool,
     detached_top: bool,
   ) -> HorizontalTableBorderJunction {
-    if !intersects_grid_boundary {
-      return HorizontalTableBorderJunction::internal(None, None);
-    }
-
-    let current = vertical_border_at_grid_boundary(self.table, self.row, grid_boundary);
+    let current = self.vertical_border_at_position(self.row, x);
     let separated = self.cell_spacing_pt() > 0.0;
     if top_edge {
       if self.row_index == 0 || separated || detached_top {
@@ -38481,7 +39939,7 @@ impl RowFrame<'_, '_> {
           .table
           .rows
           .get(self.row_index - 1)
-          .and_then(|row| vertical_border_at_grid_boundary(self.table, row, grid_boundary));
+          .and_then(|row| self.vertical_border_at_position(row, x));
         HorizontalTableBorderJunction::internal(above, current)
       }
     } else if self.row_index + 1 == self.table.rows.len() || separated {
@@ -38491,9 +39949,66 @@ impl RowFrame<'_, '_> {
         .table
         .rows
         .get(self.row_index + 1)
-        .and_then(|row| vertical_border_at_grid_boundary(self.table, row, grid_boundary));
+        .and_then(|row| self.vertical_border_at_position(row, x));
       HorizontalTableBorderJunction::internal(current, below)
     }
+  }
+
+  fn shared_bottom_border_segments(
+    &self,
+    cell: &TableCell,
+    (left, right): (f32, f32),
+  ) -> smallvec::SmallVec<[((f32, f32), BorderStyle); 4]> {
+    let mut segments: smallvec::SmallVec<[((f32, f32), BorderStyle); 4]> =
+      smallvec::SmallVec::new();
+    // Border conflicts apply to overlapping physical cell edges. gridBefore
+    // and legacy row-jc can make identical grid indices different positions.
+    // Visit the next row's real cell intervals, retaining the existing border
+    // priority and coalescing equal adjacent paint without heap allocation in
+    // the usual one/few-segment case. Writer's SwTabFramePainter likewise
+    // merges collinear cell-edge intervals rather than testing only a span's
+    // leading grid index. Native gap/jc/red-blue controls pin this ownership.
+    let mut emit = |start: f32, end: f32, adjacent_grid: usize| {
+      if end <= start + LAYOUT_EPSILON_PT {
+        return;
+      }
+      let Some(border) =
+        cell_horizontal_border(self.table, self.row_index, adjacent_grid, cell, false)
+      else {
+        return;
+      };
+      if let Some(((_, previous_end), previous_border)) = segments.last_mut()
+        && *previous_border == border
+        && (*previous_end - start).abs() <= LAYOUT_EPSILON_PT
+      {
+        *previous_end = end;
+      } else {
+        segments.push(((start, end), border));
+      }
+    };
+    let mut cursor = left;
+    if let Some(next) = self.table.rows.get(self.row_index + 1) {
+      let mut next_left = row_grid_left(self.table_frame, next, 0.0);
+      let mut grid = next.grid_before;
+      for next_cell in &next.cells {
+        let start_grid = grid;
+        let next_right = next_left
+          + spanned_cell_width(next_cell, &self.table_frame.column_widths, &mut grid, 0.0);
+        if next_left > cursor {
+          emit(cursor, next_left.min(right), usize::MAX);
+        }
+        let start = cursor.max(next_left);
+        let end = right.min(next_right);
+        emit(start, end, start_grid);
+        cursor = cursor.max(end);
+        next_left = next_right;
+        if cursor >= right - LAYOUT_EPSILON_PT {
+          break;
+        }
+      }
+    }
+    emit(cursor, right, usize::MAX);
+    segments
   }
 
   fn paint_separate_borders(&self, page: &mut Page, row_top: f32, row_bottom: f32) {
@@ -38531,7 +40046,7 @@ impl RowFrame<'_, '_> {
     let mut grid = self.row.grid_before;
     for cell in &self.row.cells {
       let width = spanned_cell_width(cell, &self.table_frame.column_widths, &mut grid, gap);
-      let mut borders = cell.borders;
+      let mut borders = separate_cell_borders(self.table, self.row, cell);
       if cell.vertical_merge_continue {
         borders.top = None;
       }
@@ -38588,9 +40103,10 @@ impl RowFrame<'_, '_> {
     push_separate_table_border_box(
       &mut frame,
       (
-        self.table_frame.left_pt + paint_offset_x - borders.left.map_or(0.0, |b| b.width_pt / 2.0),
+        self.table_frame.row_grid_origin(self.row) + paint_offset_x
+          - borders.left.map_or(0.0, |b| b.width_pt / 2.0),
         row_top - if top { top_spacing } else { 0.0 },
-        self.table_frame.right_pt
+        self.table_frame.row_grid_end(self.row)
           + paint_offset_x
           + borders.right.map_or(0.0, |b| b.width_pt / 2.0),
         row_bottom
@@ -38660,15 +40176,11 @@ impl RowFrame<'_, '_> {
       })
       .and_then(|(row_index, _, _)| self.table.rows.get(row_index))
       .map(|row| {
-        let column_count = self.table_frame.column_widths.len();
-        let start = row.grid_before.min(column_count);
-        let end = row
-          .cells
-          .iter()
-          .fold(start, |grid, cell| {
-            grid.saturating_add(cell.grid_span.max(1))
-          })
-          .min(column_count);
+        let start = row_grid_left(self.table_frame, row, 0.0);
+        let mut grid = row.grid_before;
+        let end = row.cells.iter().fold(start, |x, cell| {
+          x + spanned_cell_width(cell, &self.table_frame.column_widths, &mut grid, 0.0)
+        });
         (start, end)
       });
     if self.full_width_horizontal_borders() {
@@ -38676,7 +40188,13 @@ impl RowFrame<'_, '_> {
         && let Some(border) = row_borders.and_then(|borders| borders.top)
       {
         let border_y = horizontal_table_border_center(row_top, border);
-        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+        if table_small_gap::is_style(border)
+          || (!border.compound
+            && matches!(
+              border.dash_pattern,
+              BorderDashPattern::FineDashed | BorderDashPattern::DashDotStroked
+            ))
+        {
           let leading = self
             .row
             .cells
@@ -38688,11 +40206,14 @@ impl RowFrame<'_, '_> {
             .len()
             .checked_sub(1)
             .and_then(|cell_index| vertical_border(self.table, self.row, cell_index, false));
-          push_word_table_fine_dashed_horizontal_border(
+          push_word_table_patterned_horizontal_border(
             current,
-            self.table_frame.left_pt,
-            border_y,
-            self.table_frame.right_pt,
+            (
+              self.table_frame.row_grid_origin(self.row),
+              border_y,
+              self.table_frame.row_grid_end(self.row),
+            ),
+            self.table_frame.row_grid_origin(self.row),
             border,
             HorizontalTableBorderEdge::Upper,
             (
@@ -38715,7 +40236,13 @@ impl RowFrame<'_, '_> {
         && let Some(border) = row_borders.and_then(|borders| borders.bottom)
       {
         let border_y = horizontal_table_border_center(row_bottom, border);
-        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
+        if table_small_gap::is_style(border)
+          || (!border.compound
+            && matches!(
+              border.dash_pattern,
+              BorderDashPattern::FineDashed | BorderDashPattern::DashDotStroked
+            ))
+        {
           let leading = self
             .row
             .cells
@@ -38727,11 +40254,14 @@ impl RowFrame<'_, '_> {
             .len()
             .checked_sub(1)
             .and_then(|cell_index| vertical_border(self.table, self.row, cell_index, false));
-          push_word_table_fine_dashed_horizontal_border(
+          push_word_table_patterned_horizontal_border(
             current,
-            self.table_frame.left_pt,
-            border_y,
-            self.table_frame.right_pt,
+            (
+              self.table_frame.row_grid_origin(self.row),
+              border_y,
+              self.table_frame.row_grid_end(self.row),
+            ),
+            self.table_frame.row_grid_origin(self.row),
             border,
             HorizontalTableBorderEdge::Lower,
             (
@@ -38765,12 +40295,32 @@ impl RowFrame<'_, '_> {
           - row_recovered_collapsed_bottom_border_extent(self.table, self.row_index, self.row)
       };
       let border_y = horizontal_table_border_center(edge_y, border);
+      if table_small_gap::is_style(border) {
+        let left = self.table_frame.row_grid_origin(self.row);
+        let right = self.table_frame.row_grid_end(self.row);
+        push_word_table_patterned_horizontal_border(
+          current,
+          (left, border_y, right),
+          left,
+          border,
+          if top_edge {
+            HorizontalTableBorderEdge::Upper
+          } else {
+            HorizontalTableBorderEdge::Lower
+          },
+          (
+            self.horizontal_border_junction_at_position(left, top_edge, detached_top),
+            self.horizontal_border_junction_at_position(right, top_edge, detached_top),
+          ),
+        );
+        continue;
+      }
       push_table_border_line_with_coordinates(
         current,
         (
-          self.table_frame.left_pt - leading_half,
+          self.table_frame.row_grid_origin(self.row) - leading_half,
           border_y,
-          self.table_frame.right_pt + trailing_half,
+          self.table_frame.row_grid_end(self.row) + trailing_half,
           border_y,
         ),
         border,
@@ -38806,20 +40356,19 @@ impl RowFrame<'_, '_> {
       // row has a real cell. gridBefore/gridAfter gaps expose the current
       // cell's top; they do not suppress it or acquire phantom cell borders.
       // Detached rows and physical follows retain their complete top owner.
-      let grid_end = grid_index + span;
       let top_ranges =
         if self.row_index == 0 || cell_spacing_pt > 0.0 || first_whole_follow || detached_top {
-          [(grid_index, grid_end), (0, 0)]
+          [(left_pt, right_pt), (0.0, 0.0)]
         } else if let Some((previous_start, previous_end)) = previous_top_coverage {
           [
-            (grid_index, grid_end.min(previous_start)),
-            (grid_index.max(previous_end), grid_end),
+            (left_pt, right_pt.min(previous_start)),
+            (left_pt.max(previous_end), right_pt),
           ]
         } else {
-          [(0, 0); 2]
+          [(0.0, 0.0); 2]
         };
-      for (top_start, top_end) in top_ranges {
-        if top_start >= top_end || cell.vertical_merge_continue || uniform_top.is_some() {
+      for (segment_left, segment_right) in top_ranges {
+        if segment_left >= segment_right || cell.vertical_merge_continue || uniform_top.is_some() {
           continue;
         }
         let Some(border) = (if first_whole_follow {
@@ -38837,7 +40386,7 @@ impl RowFrame<'_, '_> {
         } else {
           // Resolve at this exposed segment, not at a covered part of a
           // spanning cell: an adjacent bottom must not resurrect a nil top.
-          cell_horizontal_border(self.table, self.row_index, top_start, cell, true)
+          cell_horizontal_border(self.table, self.row_index, usize::MAX, cell, true)
         }) else {
           continue;
         };
@@ -38850,46 +40399,34 @@ impl RowFrame<'_, '_> {
         {
           continue;
         }
-        let segment_left = left_pt
-          + self.table_frame.column_widths[grid_index..top_start]
-            .iter()
-            .sum::<f32>();
-        let segment_right = if top_end == grid_end {
-          right_pt
-        } else {
-          left_pt
-            + self.table_frame.column_widths[grid_index..top_end]
-              .iter()
-              .sum::<f32>()
-        };
         // Inset the actual cell corners before clipping to its exposed part.
         // A split at an adjacent grid edge is not another outside corner.
-        let (border_left, border_right) =
-          self.inset_horizontal_border_for_bounds(left_pt, right_pt, border);
+        let (border_left, border_right) = if table_small_gap::is_style(border) {
+          (left_pt, right_pt)
+        } else {
+          self.inset_horizontal_border_for_bounds(left_pt, right_pt, border)
+        };
         let border_left = border_left.max(segment_left);
         let border_right = border_right.min(segment_right);
         if border_left >= border_right {
           continue;
         }
         let border_y = horizontal_table_border_center(row_top, border);
-        if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
-          let leading_junction = self.horizontal_border_junction(
-            top_start,
-            true,
-            (border_left - segment_left).abs() < LAYOUT_EPSILON_PT,
-            detached_top,
-          );
-          let trailing_junction = self.horizontal_border_junction(
-            top_end,
-            true,
-            (border_right - segment_right).abs() < LAYOUT_EPSILON_PT,
-            detached_top,
-          );
-          push_word_table_fine_dashed_horizontal_border(
+        if table_small_gap::is_style(border)
+          || (!border.compound
+            && matches!(
+              border.dash_pattern,
+              BorderDashPattern::FineDashed | BorderDashPattern::DashDotStroked
+            ))
+        {
+          let leading_junction =
+            self.horizontal_border_junction_at_position(border_left, true, detached_top);
+          let trailing_junction =
+            self.horizontal_border_junction_at_position(border_right, true, detached_top);
+          push_word_table_patterned_horizontal_border(
             current,
-            border_left,
-            border_y,
-            border_right,
+            (border_left, border_y, border_right),
+            self.table_frame.row_grid_origin(self.row),
             border,
             HorizontalTableBorderEdge::Upper,
             (leading_junction, trailing_junction),
@@ -38911,9 +40448,8 @@ impl RowFrame<'_, '_> {
         .get(self.row_index + 1)
         .and_then(|row| row_cell_at_grid(row, grid_index))
         .is_some_and(|next_cell| next_cell.vertical_merge_continue);
-      if !continues_into_next
-        && uniform_bottom.is_none()
-        && let Some(border) = if let Some(follow_index) = self
+      if !continues_into_next && uniform_bottom.is_none() {
+        let special_border = if let Some(follow_index) = self
           .table_frame
           .repeated_header_follow_row
           .get()
@@ -38921,57 +40457,61 @@ impl RowFrame<'_, '_> {
         {
           // Replayed headers share their bottom with the actual continued
           // row, rather than with the next row in the source table.
-          cell_horizontal_border_between_rows(
+          Some(cell_horizontal_border_between_rows(
             self.table,
             self.row_index,
             follow_index,
             grid_index,
             stronger_border,
-          )
+          ))
         } else if text_master && (cell.borders.bottom.is_some() || cell.border_suppressions.bottom)
         {
           // A recalculated text master closes with its own cell stencil.
           // The next source row is on another physical upper: its top cannot
           // override this cell's nil bottom or replace its explicit rule.
-          cell.borders.bottom
+          Some(cell.borders.bottom)
         } else {
-          cell_horizontal_border(self.table, self.row_index, grid_index, cell, false)
-        }
-        && !(self.full_width_horizontal_borders()
-          && self.row_index + 1 == self.table.rows.len()
-          && row_borders.and_then(|borders| borders.bottom) == Some(border))
-      {
-        let bottom_start = current.items.len();
-        self.paint_cell_bottom_border(
-          current,
-          (left_pt, right_pt),
-          grid_index..grid_index + span,
-          row_bottom,
-          border,
-          coordinates,
-        );
-        let own = cell_inherited_horizontal_border(self.table, self.row, cell, false);
-        if !text_master && self.row_index + 1 < self.table.rows.len() && own != Some(border) {
-          // Keep the two legal stencils with the row that owns them. Only an
-          // observed physical separation selects the source-owned bottom;
-          // an adjacent row retains the resolved shared rule unchanged.
-          let shared_ink = current.items.split_off(bottom_start);
-          let mut own_ink = empty_page(current.setup, current.section_index);
-          if let Some(own) = own {
-            self.paint_cell_bottom_border(
-              &mut own_ink,
-              (left_pt, right_pt),
-              grid_index..grid_index + span,
-              row_bottom,
-              own,
-              coordinates,
-            );
+          None
+        };
+        let segments = if let Some(border) = special_border {
+          border
+            .map(|border| ((left_pt, right_pt), border))
+            .into_iter()
+            .collect()
+        } else {
+          self.shared_bottom_border_segments(cell, (left_pt, right_pt))
+        };
+        for (segment_bounds, border) in segments {
+          if self.full_width_horizontal_borders()
+            && self.row_index + 1 == self.table.rows.len()
+            && row_borders.and_then(|borders| borders.bottom) == Some(border)
+          {
+            continue;
           }
-          borrowed_bottom.push(RowBottomBorderReplacement {
-            item_index: current.items.len(),
-            own_items: own_ink.items,
-          });
-          current.items.push(PageItem::Group(shared_ink));
+          let bottom_start = current.items.len();
+          self.paint_cell_bottom_border(current, segment_bounds, row_bottom, border, coordinates);
+          let own = cell_inherited_horizontal_border(self.table, self.row, cell, false);
+          if !text_master && self.row_index + 1 < self.table.rows.len() && own != Some(border) {
+            // Keep the two legal stencils with the row that owns them. Only an
+            // observed physical separation selects the source-owned bottom;
+            // an adjacent row retains the resolved shared rule unchanged.
+            let shared_ink = current.items.split_off(bottom_start);
+            let mut own_ink = empty_page(current.setup, current.section_index);
+            if let Some(own) = own {
+              self.paint_cell_bottom_border(
+                &mut own_ink,
+                segment_bounds,
+                row_bottom,
+                own,
+                coordinates,
+              );
+            }
+            borrowed_bottom.push(RowBottomBorderReplacement {
+              item_index: current.items.len(),
+              own_items: own_ink.items,
+            });
+            current.items.push(PageItem::Group(shared_ink));
+          }
         }
       }
 
@@ -39008,37 +40548,36 @@ impl RowFrame<'_, '_> {
     &self,
     current: &mut Page,
     (left_pt, right_pt): (f32, f32),
-    grid: std::ops::Range<usize>,
     row_bottom: f32,
     border: BorderStyle,
     coordinates: Option<collapsed_table_coordinates::Coordinates>,
   ) {
-    let (border_left, border_right) = self.inset_inside_horizontal_border(left_pt, right_pt);
-    let (border_left, border_right) =
-      self.inset_horizontal_border_for_bounds(border_left, border_right, border);
+    let (border_left, border_right) = if table_small_gap::is_style(border)
+      || (coordinates.is_some() && border.dash_pattern == BorderDashPattern::Dotted)
+    {
+      (left_pt, right_pt)
+    } else {
+      let (left, right) = self.inset_inside_horizontal_border(left_pt, right_pt);
+      self.inset_horizontal_border_for_bounds(left, right, border)
+    };
     let border_y = horizontal_table_border_center(
       row_bottom
         - row_recovered_collapsed_bottom_border_extent(self.table, self.row_index, self.row),
       border,
     );
-    if !border.compound && border.dash_pattern == BorderDashPattern::FineDashed {
-      let leading = self.horizontal_border_junction(
-        grid.start,
-        false,
-        (border_left - left_pt).abs() < LAYOUT_EPSILON_PT,
-        false,
-      );
-      let trailing = self.horizontal_border_junction(
-        grid.end,
-        false,
-        (border_right - right_pt).abs() < LAYOUT_EPSILON_PT,
-        false,
-      );
-      push_word_table_fine_dashed_horizontal_border(
+    if table_small_gap::is_style(border)
+      || (!border.compound
+        && matches!(
+          border.dash_pattern,
+          BorderDashPattern::FineDashed | BorderDashPattern::DashDotStroked
+        ))
+    {
+      let leading = self.horizontal_border_junction_at_position(border_left, false, false);
+      let trailing = self.horizontal_border_junction_at_position(border_right, false, false);
+      push_word_table_patterned_horizontal_border(
         current,
-        border_left,
-        border_y,
-        border_right,
+        (border_left, border_y, border_right),
+        self.table_frame.row_grid_origin(self.row),
         border,
         HorizontalTableBorderEdge::Lower,
         (leading, trailing),
@@ -39049,7 +40588,7 @@ impl RowFrame<'_, '_> {
         (border_left, border_y, border_right, border_y),
         border,
         inline_collapsed_row_has_vertical_margin_overlap(self.table, self.row),
-        coordinates,
+        coordinates.map(collapsed_table_coordinates::Coordinates::lower_edge),
       );
     }
   }
@@ -39059,6 +40598,13 @@ impl RowFrame<'_, '_> {
     // Those gaps do not acquire the table frame's outside horizontal border.
     // Complete physical rows retain their closing-ink and corner owners.
     self.table_frame.full_width_horizontal_borders
+      && !(collapsed_table_coordinates::dotted_row(self.table, self.row)
+        && collapsed_table_coordinates::Coordinates::for_row(
+          self.table,
+          self.table_frame,
+          self.row,
+        )
+        .is_some())
       // The native grid painter already owns the outside half-rails and
       // shared corners. Reapplying the point-fill overflow insets here would
       // shorten every cell strip and leave gaps between neighboring cells.
@@ -39094,14 +40640,14 @@ impl RowFrame<'_, '_> {
         .and_then(|index| vertical_border(self.table, self.row, index, false))
         .map_or(0.0, |edge| edge.width_pt / 2.0);
       (
-        self.table_frame.left_pt - leading,
-        self.table_frame.right_pt + trailing,
+        self.table_frame.row_grid_origin(self.row) - leading,
+        self.table_frame.row_grid_end(self.row) + trailing,
       )
     } else {
       let inset = border.width_pt / 2.0;
       (
-        self.table_frame.left_pt + inset,
-        self.table_frame.right_pt - inset,
+        self.table_frame.row_grid_origin(self.row) + inset,
+        self.table_frame.row_grid_end(self.row) - inset,
       )
     }
   }
@@ -39183,7 +40729,10 @@ impl RowFrame<'_, '_> {
       // Word's collapsed-border painter gives the horizontal edge the corner
       // square. Its vertical fill starts below that edge; starting both at the
       // grid coordinate overpaints the corner.
-      start_y_pt: row_top + row_top_border_space_extent(self.table, self.row_index, self.row),
+      start: (
+        row_top,
+        row_top_border_space_extent(self.table, self.row_index, self.row),
+      ),
       end_y_pt: row_bottom,
       ends_at_table_bottom: self.row_index + 1 == self.table.rows.len(),
       border,
@@ -39205,7 +40754,10 @@ impl RowFrame<'_, '_> {
     let border = vertical_border(self.table, self.row, last_cell_index, false)?;
     Some(PendingBorderSegment {
       x_pt: row_grid_right(self.table_frame, self.row, self.cell_spacing_pt()),
-      start_y_pt: row_top + row_top_border_space_extent(self.table, self.row_index, self.row),
+      start: (
+        row_top,
+        row_top_border_space_extent(self.table, self.row_index, self.row),
+      ),
       end_y_pt: row_bottom,
       ends_at_table_bottom: self.row_index + 1 == self.table.rows.len(),
       border,
@@ -39231,12 +40783,12 @@ impl RowFrame<'_, '_> {
     };
     let mut left_pt = left_pt;
     let mut right_pt = right_pt;
-    if (left_pt - self.table_frame.left_pt).abs() < LAYOUT_EPSILON_PT
+    if (left_pt - self.table_frame.row_grid_origin(self.row)).abs() < LAYOUT_EPSILON_PT
       && let Some(border) = borders.left
     {
       left_pt += border.width_pt;
     }
-    if (right_pt - self.table_frame.right_pt).abs() < LAYOUT_EPSILON_PT
+    if (right_pt - self.table_frame.row_grid_end(self.row)).abs() < LAYOUT_EPSILON_PT
       && let Some(border) = borders.right
     {
       right_pt -= border.width_pt;
@@ -39504,6 +41056,7 @@ impl CellFrame<'_, '_> {
       align_retained_master: self.align_retained_master,
       separate_borders: row_has_separate_borders(self.table, self.row),
       table_following_text_flow: self.table.following_text_flow,
+      in_header_footer: self.table.in_header_footer,
       direct_text_frame_story_owner: self.table_frame.direct_text_frame_story_owner,
       word_floating_table_cell: self.table.placement.is_some(),
       ancestor_floating_table_cell_follow_top_inset_pt: self
@@ -39541,7 +41094,7 @@ impl CellFrame<'_, '_> {
         self.row,
         self.cell,
         separate_table_coordinates::Frame {
-          grid_left: self.table_frame.left_pt,
+          grid_left: self.table_frame.row_grid_origin(self.row),
           grid_width: self.table_frame.column_widths.iter().sum(),
           available_width: self.table_frame.block.content_width,
         },
@@ -40298,12 +41851,12 @@ fn separate_table_border_paint_offset_x(table: &Table) -> f32 {
   let left = row
     .cells
     .first()
-    .and_then(|cell| cell.borders.left)
+    .and_then(|cell| cell_inherited_vertical_border(table, row, cell, true))
     .map_or(0.0, |border| border.width_pt / 2.0);
   let right = row
     .cells
     .last()
-    .and_then(|cell| cell.borders.right)
+    .and_then(|cell| cell_inherited_vertical_border(table, row, cell, false))
     .map_or(0.0, |border| border.width_pt / 2.0);
   // The separated-border painter uses the first row's outside cell-edge
   // references, not the text formatter's nominal grid. Native asymmetric
@@ -40321,7 +41874,7 @@ fn separate_table_border_paint_offset_x(table: &Table) -> f32 {
 }
 
 fn row_grid_left(table: &TableFrame, row: &TableRow, cell_spacing_pt: f32) -> f32 {
-  table.left_pt
+  table.row_grid_origin(row)
     + table
       .column_widths
       .iter()
@@ -40342,7 +41895,7 @@ fn row_grid_right(table: &TableFrame, row: &TableRow, cell_spacing_pt: f32) -> f
       .map(|cell| cell.grid_span.max(1))
       .sum::<usize>())
   .min(table.column_widths.len());
-  table.left_pt + table.column_widths.iter().take(end).sum::<f32>()
+  table.row_grid_origin(row) + table.column_widths.iter().take(end).sum::<f32>()
     - if end == table.column_widths.len() {
       cell_spacing_pt
     } else {
@@ -40553,6 +42106,37 @@ fn cell_inherited_horizontal_border(
   }
 }
 
+fn cell_inherited_vertical_border(
+  table: &Table,
+  row: &TableRow,
+  cell: &TableCell,
+  left_edge: bool,
+) -> Option<BorderStyle> {
+  let (own, suppressed) = if left_edge {
+    (cell.borders.left, cell.border_suppressions.left)
+  } else {
+    (cell.borders.right, cell.border_suppressions.right)
+  };
+  if own.is_some() || suppressed {
+    own
+  } else {
+    row_table_borders(table, row).and_then(|borders| borders.inside_vertical)
+  }
+}
+
+fn separate_cell_borders(
+  table: &Table,
+  row: &TableRow,
+  cell: &TableCell,
+) -> crate::model::CellBordersModel {
+  crate::model::CellBordersModel {
+    top: cell_inherited_horizontal_border(table, row, cell, true),
+    bottom: cell_inherited_horizontal_border(table, row, cell, false),
+    left: cell_inherited_vertical_border(table, row, cell, true),
+    right: cell_inherited_vertical_border(table, row, cell, false),
+  }
+}
+
 fn cell_horizontal_border_between_rows(
   table: &Table,
   upper_index: usize,
@@ -40581,11 +42165,12 @@ fn resolve_cell_horizontal_border(
     .get(row_index)
     .is_some_and(|row| row_has_separate_borders(table, row))
   {
-    return if top_edge {
-      cell.borders.top
-    } else {
-      cell.borders.bottom
-    };
+    // Word applies table insideH to each separate cell edge, including the
+    // first/last row, behind direct cell borders and explicit nil. The table's
+    // outer frame is painted independently. MS-OI29500 2.1.150 preserves this
+    // conflict even with nonzero spacing; native zero/positive/nil controls
+    // distinguish inheritance from collapsing the separated geometry.
+    return cell_inherited_horizontal_border(table, &table.rows[row_index], cell, top_edge);
   }
   let borders = table
     .rows
@@ -40663,11 +42248,7 @@ fn vertical_border(
   let borders = row_table_borders(table, row);
   let cell = row.cells.get(cell_index)?;
   if row_has_separate_borders(table, row) {
-    return if left_edge {
-      cell.borders.left
-    } else {
-      cell.borders.right
-    };
+    return cell_inherited_vertical_border(table, row, cell, left_edge);
   }
   if left_edge {
     let neighbor = if cell_index > 0 {
@@ -40709,32 +42290,6 @@ fn vertical_border(
       })
     }
   }
-}
-
-fn vertical_border_at_grid_boundary(
-  table: &Table,
-  row: &TableRow,
-  grid_boundary: usize,
-) -> Option<BorderStyle> {
-  let mut grid_index = row.grid_before;
-  for (cell_index, cell) in row.cells.iter().enumerate() {
-    if grid_boundary == grid_index {
-      // The following cell owns a collapsed internal boundary: its leading
-      // resolver sees both its own edge and the preceding cell's trailing
-      // edge and applies the border-conflict priority rule.
-      return vertical_border(table, row, cell_index, true);
-    }
-    grid_index = grid_index.saturating_add(cell.grid_span.max(1));
-  }
-  if grid_boundary == grid_index {
-    return row
-      .cells
-      .len()
-      .checked_sub(1)
-      .and_then(|cell_index| vertical_border(table, row, cell_index, false));
-  }
-  // A grid position inside a spanning cell has no authored vertical edge.
-  None
 }
 
 fn row_table_borders(table: &Table, row: &TableRow) -> Option<TableBordersModel> {
@@ -40932,18 +42487,21 @@ fn table_preferred_width_basis(
       + last_cell.margins.right_pt.max(trailing);
   }
 
-  // Before compatibility mode 15, Word positions a top-level table from the
-  // first cell's print edge. The same legacy containing extent is used for a
-  // percentage tblW: an Office PDF/Object Model matrix for fdo78885 resolves
-  // 92.5% and 100% against the text extent plus the first row's two outer cell
-  // margins. Mode 15 resolves both widths against the text extent alone.
-  // An Office border-only matrix for tdf160077_layoutInCellC grows its 100%
-  // fixed table by half the right border's width when its last cell has no
-  // right margin. The tdf160077_layoutInCellD 0/4/10-twip right-margin matrix
-  // shows that the border half and cell margin share one trailing allowance:
-  // the larger one wins, rather than adding both. Leave other percentages on
-  // their independent legacy width path (floattable-bad-fly-pos is 106.62%).
-  let trailing_border_half_pt = if table.preferred_width_pct == Some(1.0) {
+  // A legacy collapsed table's percentage basis encloses both outside edit
+  // edges. Each cell margin and its border half share one allowance: the
+  // larger wins. Native 50/100%, absent-side, single/compound and three-width
+  // controls distinguish both halves from the old trailing-only allowance.
+  // Keep separated cells on their independently verified complete-border path.
+  let collapsed = !row_has_separate_borders(table, row);
+  let leading_extent = if collapsed {
+    first_cell
+      .margins
+      .left_pt
+      .max(vertical_border(table, row, 0, true).map_or(0.0, |border| border.width_pt / 2.0))
+  } else {
+    first_cell.margins.left_pt
+  };
+  let trailing_border_half_pt = if collapsed || table.preferred_width_pct == Some(1.0) {
     row
       .cells
       .len()
@@ -40954,7 +42512,7 @@ fn table_preferred_width_basis(
     0.0
   };
   content_width
-    + first_cell.margins.left_pt
+    + leading_extent
     + last_cell.margins.right_pt.max(trailing_border_half_pt)
     + 2.0 * row_cell_spacing_pt(table, row)
     + if row_has_separate_borders(table, row) {
@@ -41148,6 +42706,10 @@ fn apply_fixed_table_cell_preferred_widths(
   widths: &mut [f32],
   content_width: f32,
 ) -> bool {
+  if let Some(resolved) = consistent_table_cell_widths(table, widths) {
+    widths.copy_from_slice(&resolved);
+    return true;
+  }
   let mut applied = false;
   for (row_index, row) in table.rows.iter().enumerate() {
     let mut grid_index = row.grid_before;
@@ -41184,6 +42746,55 @@ fn apply_fixed_table_cell_preferred_widths(
     }
   }
   applied
+}
+
+fn consistent_table_cell_widths(table: &Table, initial: &[f32]) -> Option<Vec<f32>> {
+  // ECMA-376 §17.18.87 sets preferred spans before resolving conflicts.
+  // A merged first row does not establish every internal grid boundary:
+  // a later row can subdivide that span without increasing its total width.
+  // Word's merged/partial-row controls retain all mutually consistent cell
+  // edges. Applying the later-row maximum independently to each saved grid
+  // column instead invents conflicts and expands the table (tdf123705).
+  // Incomplete or genuinely conflicting rows retain their existing resolver.
+  let mut edges = vec![None; initial.len() + 1];
+  edges[0] = Some(0.0_f32);
+  for row in &table.rows {
+    if row.grid_before != 0 || row.grid_after != 0 || row_has_separate_borders(table, row) {
+      return None;
+    }
+    let mut end = 0;
+    let mut position = 0.0;
+    for cell in &row.cells {
+      let preferred = cell.preferred_width_pt.filter(|width| *width > 0.0)?;
+      if cell.preferred_width_pct.is_some() {
+        return None;
+      }
+      end += cell.grid_span.max(1);
+      let edge = edges.get_mut(end)?;
+      position += preferred;
+      if edge.is_some_and(|previous| (previous - position).abs() > LAYOUT_EPSILON_PT) {
+        return None;
+      }
+      *edge = Some(position);
+    }
+    if end != initial.len() {
+      return None;
+    }
+  }
+  let mut resolved = initial.to_vec();
+  let mut start = 0;
+  let mut left = 0.0;
+  for (end, edge) in edges.iter().enumerate().skip(1) {
+    if let Some(right) = edge {
+      if *right <= left {
+        return None;
+      }
+      scale_widths_to_total(&mut resolved[start..end], right - left);
+      start = end;
+      left = *right;
+    }
+  }
+  (start == initial.len()).then_some(resolved)
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -41418,6 +43029,28 @@ fn autofit_table_column_widths(
           .iter()
           .all(|cell| cell.grid_span.max(1) == 1 && cell.text_rotation_deg.is_none())
     });
+  // An explicit numeric tblW is not the automatic fit-to-page request.
+  // Native independent grid/auto/dxa/pct controls preserve ordinary text
+  // word minima beyond the page for both auto and dxa tcW. Automatic tblW
+  // still forces breaks at the page boundary. Percentage/noWrap cells and
+  // nested object demands retain their independently established budgets.
+  let preserve_text_minima_beyond_page = preferred_table_width.is_some()
+    && table.placement.is_none()
+    && has_simple_autofit_columns
+    && table.rows.iter().all(|row| {
+      row.cells.iter().all(|cell| {
+        !cell.no_wrap
+          && cell.preferred_width_pct.is_none()
+          && cell.blocks.iter().all(|block| {
+            matches!(block, Block::Paragraph(paragraph)
+              if paragraph.list_label_image.is_none()
+                && paragraph.inlines.iter().all(|inline| matches!(inline,
+                  InlineItem::Text(_)
+                    | InlineItem::BookmarkStart(_)
+                    | InlineItem::LastRenderedPageBreak)))
+          })
+      })
+    });
   if percentage_row_table_width.is_none()
     && has_simple_autofit_columns
     && !allow_width_overflow
@@ -41483,7 +43116,9 @@ fn autofit_table_column_widths(
     let minimum_total = absolute_minimums.iter().sum::<f32>();
     let maximum_total = absolute_maximums.iter().sum::<f32>();
     let preferred = preferred_table_width.unwrap_or(maximum_total);
-    let target = if preferred > preferred_width_basis + LAYOUT_EPSILON_PT {
+    let target = if preserve_text_minima_beyond_page {
+      preferred.max(minimum_total)
+    } else if preferred > preferred_width_basis + LAYOUT_EPSILON_PT {
       if preferred_table_width.is_some() || allow_width_overflow {
         preferred.max(minimum_total)
       } else {
@@ -41741,11 +43376,12 @@ fn autofit_table_column_widths(
 
     if deficit > f32::EPSILON {
       let table_total = widths.iter().sum::<f32>();
-      // ECMA-376 §17.18.87 grows an AutoFit table beyond its preferred
-      // width only after other columns have reached their minima, and only
-      // until the table reaches the page width.
-      let growth = if preferred_table_width
-        .is_some_and(|preferred| preferred > preferred_width_basis + LAYOUT_EPSILON_PT)
+      // The guidance in ECMA-376 §17.18.87 reaches the page after exhausting
+      // donors. Native numeric-width ordinary text tables instead preserve
+      // the unbreakable minima; an automatic table retains the page limit.
+      let growth = if preserve_text_minima_beyond_page
+        || preferred_table_width
+          .is_some_and(|preferred| preferred > preferred_width_basis + LAYOUT_EPSILON_PT)
       {
         // The authored extent already opts out of the containing width.
         // Word lets such AutoFit tables grow to their content minima: a
@@ -42838,6 +44474,16 @@ fn paragraph_content_width_range_with_flow(
       | InlineItem::LastRenderedPageBreak => {}
     }
   }
+  if intrinsic_minimum.first_portion_pt.is_none()
+    && intrinsic_minimum.following_portion_pt.is_none()
+  {
+    // Indents describe the body text origin, not content in an empty mark.
+    // Native numbered/unnumbered, 0/22.8/45.6pt hanging and 10000.-label
+    // controls keep the same column while the body is empty. Adding text
+    // activates its ordinary numbering/indent demand. The label remains a
+    // separate painted owner even when it crosses that column's edit edge.
+    return CellContentWidthRange::default();
+  }
   maximum = maximum.max(current_line);
   // ECMA-376 Part 1 section 17.18.87 defines the minimum content width using
   // every available line-break location. A positive first-line offset
@@ -43017,6 +44663,69 @@ fn table_left_position(
   table_width: f32,
   inside_table_cell: bool,
 ) -> f32 {
+  table_left_position_for_alignment(
+    table,
+    table.alignment,
+    column_widths,
+    content_left,
+    content_width,
+    table_width,
+    inside_table_cell,
+  )
+}
+
+fn row_alignment_offsets(
+  table: &Table,
+  column_widths: &[f32],
+  area: BlockArea,
+  left: f32,
+  inside_table_cell: bool,
+) -> [f32; 3] {
+  // Native row-jc controls: legacy Word aligns the complete grid for each
+  // explicit row override, then applies gridBefore. Mode15 ignores trPr/jc.
+  // Resolve the three possible origins once per frame, not once per cell.
+  if area.compatibility_mode >= 15
+    || table.placement.is_some()
+    || !table.rows.iter().any(|row| row.alignment.is_some())
+  {
+    return [0.0; 3];
+  }
+  let width: f32 = column_widths.iter().sum();
+  [
+    TableAlignment::Left,
+    TableAlignment::Center,
+    TableAlignment::Right,
+  ]
+  .map(|alignment| {
+    // Unlike the table's clamped LTR fallback, an explicit legacy row right
+    // alignment retains the signed overflow (native narrow/wide controls).
+    let overflow = if alignment == TableAlignment::Right && !table.right_to_left {
+      (area.content_width - width).min(0.0)
+    } else {
+      0.0
+    };
+    table_left_position_for_alignment(
+      table,
+      alignment,
+      column_widths,
+      area.content_left_pt,
+      area.content_width,
+      width,
+      inside_table_cell,
+    ) - left
+      + overflow
+  })
+}
+
+fn table_left_position_for_alignment(
+  table: &Table,
+  alignment: TableAlignment,
+  column_widths: &[f32],
+  content_left: f32,
+  content_width: f32,
+  table_width: f32,
+  inside_table_cell: bool,
+) -> f32 {
   let remaining = content_width - table_width;
   let available = remaining.max(0.0);
   let align_leading_cell_content = table.align_leading_cell_content
@@ -43051,7 +44760,7 @@ fn table_left_position(
     } else {
       0.0
     };
-  match table.alignment {
+  match alignment {
     TableAlignment::Left => {
       let nested_inline_table = inside_table_cell && table.placement.is_none();
       let nested_collapsed_fly = inside_table_cell
@@ -43445,14 +45154,12 @@ fn table_row_height_with_widths(
             (top_border - row_top_margin - own_top).max(0.0)
           }
           + (bottom_border - row_bottom_margin).max(0.0);
-        if top_border > 0.0 || bottom_border > 0.0 {
-          // Preserve the authored strip in layout units. Rounding that strip
-          // into each row's printer height loses fractional dots repeatedly;
-          // Word rounds the resulting absolute paint positions instead.
-          units::quantize_points_to_office_print_grid(height) + own_top
-        } else {
-          height
-        }
+        // Row frames retain their layout height. Native repeated-row controls
+        // (3/6/14 rows, 55/56-twip margins) have nonuniform printer-dot steps:
+        // the absolute rails are quantized only when painted. Rounding every
+        // row here accumulates a second device conversion in the flow cursor.
+        // An authored top strip still belongs to this row independently.
+        height + own_top
       }
     }
   }
@@ -43708,6 +45415,7 @@ struct TableCellLayout<'a> {
   align_retained_master: bool,
   separate_borders: bool,
   table_following_text_flow: bool,
+  in_header_footer: bool,
   direct_text_frame_story_owner: bool,
   word_floating_table_cell: bool,
   ancestor_floating_table_cell_follow_top_inset_pt: f32,
@@ -44020,6 +45728,16 @@ fn table_cell_initial_baseline_offset(
   // preserve that same frame ownership after materialization; the cell print
   // edge therefore needs the Windows-metrics ascent in every story and for
   // both inline and floating tables.
+  if style.automatic_escapement_font_size_pt.is_some() {
+    // The cell cursor is the common, unshifted baseline. Automatic script
+    // glyphs retain their original font cell and apply their displacement
+    // when painted (ECMA-376 17.3.2.42). Using the first superscript's paint
+    // baseline here shifts every other run too and charges the script twice.
+    // Native literal/note-reference controls agree for both super/subscript.
+    let mut line_style = style.clone();
+    line_style.baseline_shift_pt = 0.0;
+    return text_metrics.baseline_offset_in_line_with_windows_metrics(&line_style, line_height);
+  }
   text_metrics.baseline_offset_in_line_with_windows_metrics(style, line_height)
 }
 
@@ -44043,7 +45761,26 @@ fn table_cell_first_baseline_offset(
   line_height: f32,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  table_cell_block_baseline_offset(cell.blocks.first(), style, line_height, text_metrics)
+  if cell.text_rotation_deg.is_some()
+    && uses_rotated_cell_font_metrics(style, TextSegmentation::TableCell)
+    && let Some(paragraph) = table_cell_first_paragraph(cell)
+    && paragraph.format.line_height_rule != LineHeightRule::Exact
+    && !table_cell_picture_only_paragraph(paragraph)
+  {
+    let metrics = text_metrics.rotated_cell_line_vertical_metrics(None, style);
+    let external = if paragraph.format.line_height_rule == LineHeightRule::Auto {
+      (metrics.line_height_pt() - metrics.windows_line_height_pt()).max(0.0)
+    } else {
+      0.0
+    };
+    crate::text_metrics::baseline_offset_in_line_with_windows_metrics_from_metrics(
+      metrics,
+      style,
+      line_height,
+    ) + external
+  } else {
+    table_cell_block_baseline_offset(cell.blocks.first(), style, line_height, text_metrics)
+  }
 }
 
 fn table_cell_block_baseline_offset(
@@ -44328,6 +46065,7 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
     align_retained_master,
     separate_borders,
     table_following_text_flow,
+    in_header_footer,
     direct_text_frame_story_owner,
     word_floating_table_cell,
     ancestor_floating_table_cell_follow_top_inset_pt,
@@ -44401,16 +46139,20 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
   } else {
     (inner_width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT)
   };
-  let content_height = if vertical_text {
+  let content_extents = if vertical_text {
     // Rotated lowers do not grow a physical row. Their block advance is
     // available after formatting below; do not measure them a second time
     // against the unrotated column width.
-    height
+    TableCellContentExtents {
+      flow_height: height,
+      alignment_height: height,
+    }
   } else {
-    table_cell_content_height_for_table(
+    table_cell_content_extents_with_mode(
       cell,
       inner_width,
       TableCellMeasureContext {
+        in_header_footer,
         horizontal_rule_reference_width_pt,
         setup,
         default_tab_stop_pt,
@@ -44420,11 +46162,13 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
           separate_borders,
         )),
       },
+      TableCellMeasureMode::WholeCell,
       table_following_text_flow,
       compatibility_mode,
       text_metrics,
     )
   };
+  let content_height = content_extents.flow_height;
   let first_line_style = table_cell_first_line_style(cell);
   let first_line_height = table_cell_first_resolved_line_height(cell, setup, true, text_metrics);
   // Table text is stored at its resolved baseline because PDF paint owners do
@@ -44499,7 +46243,11 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
         // from the width of the shared painted rule. Bottom alignment uses
         // all of that free space; subtracting the margin-inclusive measured
         // height again moves a short cell up by both of its authored margins.
-        let text_height = (content_height - cell.margins.top_pt - cell.margins.bottom_pt).max(0.0);
+        // Nonwrapping shapes belong to the alignment bounds even though
+        // they do not enlarge the row or advance subsequent paragraphs.
+        let text_height =
+          (content_extents.alignment_height - cell.margins.top_pt - cell.margins.bottom_pt)
+            .max(0.0);
         let print_height = height
           - top_print_inset_for_lowers
           - bottom_margin_for_lowers
@@ -44685,7 +46433,10 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
     horizontal_table_cell: !vertical_text,
+    table_cell_in_header_footer: in_header_footer,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     // A split-fly cell's SwTextFrame follow remains inside the follow cell;
     // it does not widen to the page body. Keeping the cell print width is
     // required before widow/orphan counting, since a widened follow can turn
@@ -44710,8 +46461,10 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
       + bottom_margin_for_lowers
       + print_border_bottom_pt,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     // A physical row cut owns the complete first-line deadline, including in
     // floating tables. Native widow/keep-off controls move a new paragraph
@@ -44841,6 +46594,7 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
         align_retained_master,
         separate_borders,
         table_following_text_flow,
+        in_header_footer,
         direct_text_frame_story_owner,
         word_floating_table_cell,
         ancestor_floating_table_cell_follow_top_inset_pt,
@@ -44889,6 +46643,7 @@ fn format_table_cell(fragment: TableCellLayout<'_>) -> TableCellFormatResult {
         &prefix_cell,
         inner_width,
         TableCellMeasureContext {
+          in_header_footer,
           horizontal_rule_reference_width_pt,
           setup,
           default_tab_stop_pt,
@@ -45967,6 +47722,18 @@ fn table_cell_first_inline_text_height(
     let Block::Paragraph(paragraph) = block else {
       continue;
     };
+    if cell.text_rotation_deg.is_some()
+      && paragraph.format.line_height_rule != LineHeightRule::Exact
+      && (!cell.hide_end_mark || paragraph.inlines.iter().any(|inline| {
+        matches!(inline, InlineItem::Text(run) if text_run_affects_line_height(&run.text))
+      }))
+    {
+      return rotated_cell_single_line_height(
+        paragraph,
+        &paragraph_base_line_style(paragraph),
+        text_metrics,
+      );
+    }
     for inline in &paragraph.inlines {
       let InlineItem::Text(run) = inline else {
         continue;
@@ -46049,13 +47816,30 @@ fn table_cell_first_resolved_line_height(
   // grid height here before `table_cell_initial_baseline_offset()` computes the
   // initial ascent. `document_grid_line_metrics()` keeps snapToGrid=false and
   // a disabled table-grid compatibility path on the natural-height branch.
-  document_grid_line_metrics(
+  let grid_metrics = document_grid_line_metrics(
     source_line_height,
     paragraph,
     setup,
     TextSegmentation::TableCell,
-  )
-  .map_or(source_line_height, |metrics| metrics.height_pt)
+  );
+  if let Some(metrics) = grid_metrics {
+    return metrics.height_pt;
+  }
+  if paragraph.format.line_height_rule == LineHeightRule::Auto
+    && paragraph_line_spacing_base_covers_line_height(paragraph)
+    && let Some(multiple) = paragraph
+      .format
+      .line_height_pt
+      .filter(|multiple| multiple.is_finite() && *multiple > 0.0 && *multiple < 1.0)
+  {
+    // A compressed Auto line fits its first ascent to the shortened line box,
+    // just as subsequent cell paragraphs do. Native 70%/100% controls with
+    // both empty and visible first paragraphs distinguish this from extra
+    // spacing above a natural line. Multiples above one retain their existing
+    // natural first ascent; the additional space belongs below the line.
+    return source_line_height * multiple;
+  }
+  source_line_height
 }
 
 fn table_cell_blocks_for_split_fragment(
@@ -46301,15 +48085,20 @@ fn table_cell_first_content_line_height(
           text_segmentation,
           horizontal_table_cell: text_segmentation == TextSegmentation::TableCell
             && cell.text_rotation_deg.is_none(),
+          table_cell_in_header_footer: measure.in_header_footer,
           paragraph_spacing_context: ParagraphSpacingContext::Normal,
+          section_carrier_lower_pt: None,
+          section_carrier_style_matches: None,
           preserve_horizontal_on_advance: false,
           script_sensitive_line_height: true,
           word_floating_table_cell: false,
           floating_table_cell_follow_top_inset_pt: 0.0,
           floating_table_cell_follow_bottom_inset_pt: 0.0,
           note_continuation_top_inset_pt: 0.0,
+          note_continuation_bottom_inset_pt: 0.0,
           inside_paragraph_frame: false,
           paragraph_frame_translation_y_pt: None,
+          paragraph_frame_numeric_offset_decoded: (false, false),
           fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
           table_cell_complete_first_line_fit: false,
           table_cell_legacy_nested_row_follow: false,
@@ -46428,15 +48217,20 @@ fn table_cell_first_content_line_height(
             text_segmentation,
             horizontal_table_cell: text_segmentation == TextSegmentation::TableCell
               && cell.text_rotation_deg.is_none(),
+            table_cell_in_header_footer: measure.in_header_footer,
             paragraph_spacing_context: ParagraphSpacingContext::Normal,
+            section_carrier_lower_pt: None,
+            section_carrier_style_matches: None,
             preserve_horizontal_on_advance: false,
             script_sensitive_line_height: true,
             word_floating_table_cell: false,
             floating_table_cell_follow_top_inset_pt: 0.0,
             floating_table_cell_follow_bottom_inset_pt: 0.0,
             note_continuation_top_inset_pt: 0.0,
+            note_continuation_bottom_inset_pt: 0.0,
             inside_paragraph_frame: false,
             paragraph_frame_translation_y_pt: None,
+            paragraph_frame_numeric_offset_decoded: (false, false),
             fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
             table_cell_complete_first_line_fit: false,
             table_cell_legacy_nested_row_follow: false,
@@ -47000,12 +48794,134 @@ fn upright_vml_text_box_content_rect(
   }
 }
 
+fn rasterize_wordprocessing_shape_metafile_story_paint(
+  shape: &crate::docx::InlineShape,
+  rect: ShapeTextBoxRect,
+  output_dpi: f32,
+  items: &mut [PageItem],
+) {
+  if !shape.wordprocessing_shape_host
+    || !shape.wordprocessing_group_textbox
+    || shape.rotation_deg.abs() > f32::EPSILON
+    || shape.flip_horizontal
+    || shape.flip_vertical
+    || shape.text_box_writing_mode != TextBoxWritingMode::Horizontal
+    || shape.text_warp.is_some()
+    || shape.static3d.is_some()
+  {
+    return;
+  }
+  // Word's grouped WPS story records WMF previews into a 600-DPI surface.
+  // Its horizontal bounds belong to the whole shape, while bodyPr's vertical
+  // insets clip the story. Quantize the two absolute endpoints independently:
+  // rounding a width instead loses one dot when the story crosses a phase.
+  // Native host/object/pict controls also retain ordinary story text separately.
+  let outline_inset = shape.wordprocessing_shape_outline_text_inset_pt;
+  let top = rect.y + (shape.text_inset_top_pt - outline_inset).max(0.0);
+  let bottom = rect.y + rect.height - (shape.text_inset_bottom_pt - outline_inset).max(0.0);
+  let grid = f64::from(units::OFFICE_FIXED_OUTPUT_DPI) / f64::from(units::POINTS_PER_INCH);
+  let left_dot = (f64::from(rect.x) * grid).round();
+  let top_dot = (f64::from(top) * grid).round();
+  let width = ((f64::from(rect.x + rect.width) * grid).round() - left_dot).max(0.0) as u32;
+  let height = ((f64::from(bottom) * grid).round() - top_dot).max(0.0) as u32;
+  if width == 0
+    || height == 0
+    || !common::drawingml_shape_raster::fixed_output_effect_raster_size_fits(width, height)
+  {
+    return;
+  }
+  let ratio = f64::from(output_dpi) / f64::from(units::OFFICE_FIXED_OUTPUT_DPI);
+  let target_width = (f64::from(width) * ratio).floor() as u32;
+  let target_height = (f64::from(height) * ratio).floor() as u32;
+  if target_width == 0
+    || target_height == 0
+    || !common::drawingml_shape_raster::fixed_output_effect_raster_size_fits(
+      target_width,
+      target_height,
+    )
+  {
+    return;
+  }
+  for item in items {
+    let PageItem::Image(image) = item else {
+      continue;
+    };
+    if image.layout_only
+      || image.floating
+      || image.rotation_deg.abs() > f32::EPSILON
+      || image.flip_horizontal
+      || image.flip_vertical
+      || image.crop != ImageCrop::default()
+      || !image.clip_path.is_empty()
+      || emfsdk::detect_format(&image.data) != Some(emfsdk::Format::Wmf)
+    {
+      continue;
+    }
+    let image_width = (f64::from(image.width_pt) * grid).round().max(0.0) as u32;
+    let image_height = (f64::from(image.height_pt) * grid).round().max(0.0) as u32;
+    if image_width == 0
+      || image_height == 0
+      || !common::drawingml_shape_raster::fixed_output_effect_raster_size_fits(
+        image_width,
+        image_height,
+      )
+    {
+      continue;
+    }
+    let Ok(Some(decoded)) = emfsdk::render::decode_wmf_as_gdi_raster_with_options(
+      &image.data,
+      emfsdk::render::RenderOptions {
+        target_width_px: Some(image_width),
+        target_height_px: Some(image_height),
+        transparent_background: true,
+        font_smoothing_contrast: Some(1200),
+        ..emfsdk::render::RenderOptions::default()
+      },
+    ) else {
+      continue;
+    };
+    let Ok(preview) = image::load_from_memory(&decoded.data) else {
+      continue;
+    };
+    let mut surface = image::RgbaImage::new(width, height);
+    image::imageops::overlay(
+      &mut surface,
+      &preview.to_rgba8(),
+      ((f64::from(image.x_pt) * grid).round() - left_dot) as i64,
+      ((f64::from(image.y_pt) * grid).round() - top_dot) as i64,
+    );
+    let resolved = common::drawingml_shape_raster::resize_premultiplied_rgba_area(
+      &surface,
+      target_width,
+      target_height,
+    );
+    let Some(png) = encode_rgba_plane_png(&resolved) else {
+      continue;
+    };
+    image.x_pt = (left_dot / grid) as f32;
+    image.y_pt = (top_dot / grid) as f32;
+    image.width_pt = (f64::from(width) / grid) as f32;
+    image.height_pt = (f64::from(height) / grid) as f32;
+    image.inline_frame_left_gap_pt = 0.0;
+    image.inline_frame_right_gap_pt = 0.0;
+    image.inline_baseline_gap_pt = 0.0;
+    image.inline_baseline_participant = false;
+    image.data = Bytes::from(png);
+    image.content_type = Some(WORD_SHAPE_STORY_PAINT_BITMAP_CONTENT_TYPE.to_string());
+    image.metafile_fixed_output_profile = common::MetafileFixedOutputProfile::Default;
+    image.semantic_metafile_text = false;
+    image.metafile_semantic_text_includes_raster_backdrop = false;
+    image.metafile_native_size = false;
+  }
+}
+
 fn rasterize_wordprocessing_shape_table_story_paint(
   shape: &crate::docx::InlineShape,
   rect: ShapeTextBoxRect,
   items: &mut Vec<PageItem>,
 ) {
   if !shape.wordprocessing_shape_host
+    || !shape.wordprocessing_group_textbox
     || !shape
       .text_box_blocks
       .iter()
@@ -47041,6 +48957,10 @@ fn rasterize_wordprocessing_shape_table_story_paint(
     return;
   }
 
+  // Only a grouped/canvas WPS story uses this bitmap. Standalone textbox
+  // tables retain vector borders, including edges outside the text box after
+  // legacy table indentation. Native paired host controls distinguish both
+  // routes independently of export quality and table fill.
   // Word Print controls vary WPS origin, width, height and bodyPr insets
   // independently. The story paint surface starts two 600-DPI dots inside
   // its near edges and ends two dots before the far edges. Vertical bodyPr
@@ -47507,10 +49427,19 @@ fn layout_shape_text_box(
   if shape.text_box_blocks.is_empty() {
     return;
   }
+  let parent_flow = shape_text_box_parent_flow(parent_flow);
 
   let border_inset = textbox_content_border_inset(shape);
-  let content_rect = shape_text_box_content_rect(shape, rect, border_inset);
-  if content_rect.width <= LAYOUT_EPSILON_PT || content_rect.height <= LAYOUT_EPSILON_PT {
+  let rotated_group_text = wordprocessing_rotated_group_text(shape);
+  let mut content_rect = shape_text_box_content_rect(shape, rect, border_inset);
+  if rotated_group_text {
+    // Insets remain literal. A rotated WPG still owns a collapsed text story;
+    // its printer clip has a one-pixel minimum, independently of layout height.
+    content_rect.height = content_rect.height.max(0.0);
+  }
+  if content_rect.width <= LAYOUT_EPSILON_PT
+    || (!rotated_group_text && content_rect.height <= LAYOUT_EPSILON_PT)
+  {
     // WpsContext.cxx imports the four bodyPr distances literally.  A shape
     // whose opposing insets consume the full extent has no Sdr text print
     // area (LibreOffice tdf#137025), so do not let point conversion or adding
@@ -47560,8 +49489,9 @@ fn layout_shape_text_box(
   // including a partially clipped last line. Native standalone WPS stories
   // instead preserve their complete clipped PDF text. Keep those owners
   // distinct; neither creates document-body follow pages.
-  let layout_clip_vertical_overflow =
-    (shape.text_box_clip_vertical_overflow && !paint_clip) || fixed_group_text;
+  let layout_clip_vertical_overflow = (shape.text_box_clip_vertical_overflow && !paint_clip)
+    || fixed_group_text
+    || rotated_group_text;
   let mut effect_host = WordprocessingTextEffectHost {
     clip_text_to_frame: paint_clip,
     paint_source_origin_y_pt: (shape.wordprocessing_shape_host
@@ -47688,7 +49618,7 @@ fn layout_shape_text_box(
   } else {
     UNBOUNDED_LAYOUT_EXTENT_PT
   };
-  if content_bottom <= content_top {
+  if content_bottom <= content_top && !rotated_group_text {
     return;
   }
 
@@ -47740,15 +49670,20 @@ fn layout_shape_text_box(
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
     horizontal_table_cell: false,
+    table_cell_in_header_footer: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
     word_floating_table_cell: false,
     floating_table_cell_follow_top_inset_pt: 0.0,
     floating_table_cell_follow_bottom_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: parent_flow.fixed_output_raster_dpi,
     table_cell_complete_first_line_fit: false,
     table_cell_legacy_nested_row_follow: false,
@@ -47805,6 +49740,12 @@ fn layout_shape_text_box(
   };
   let mut nested_page = empty_page(parent_flow.setup, current.section_index);
   let mut discarded_pages = Vec::new();
+  let story_cursor_is_baseline = shape_text_box_baseline_cursor_paragraph(
+    &shape.text_box_blocks,
+    flow,
+    shape.text_vertical_alignment == TextBoxVerticalAlignment::Center,
+  )
+  .is_some();
   let mut text_cursor_y = shape_text_box_initial_cursor_y(
     &shape.text_box_blocks,
     flow,
@@ -47845,9 +49786,11 @@ fn layout_shape_text_box(
   // an admitted line remain in PDF text. Do not prune the top/side payload.
   // These floating body paragraphs already have final page coordinates.
   // Inline, grouped, table and transformed stories have separate owners.
-  let local_body_story = shape.wordprocessing_shape_host
+  let local_story = shape.wordprocessing_shape_host
     && matches!(shape.placement, crate::docx::ImagePlacement::Floating(_))
-    && parent_flow.text_segmentation == TextSegmentation::Body
+    && (parent_flow.text_segmentation == TextSegmentation::Body
+      || (parent_flow.text_segmentation == TextSegmentation::TableCell
+        && parent_flow.horizontal_table_cell))
     && writing_transform.is_none()
     && column_mode.is_none()
     && !shape.flip_horizontal
@@ -47857,10 +49800,16 @@ fn layout_shape_text_box(
     && shape.text_box_blocks.iter().all(|block| {
       matches!(block, Block::Paragraph(paragraph) if !paragraph.format.wordprocessing_group_shape_story)
     });
+  let local_body_story = local_story && parent_flow.text_segmentation == TextSegmentation::Body;
   let plain_body_story = local_body_story && shape.rotation_deg.abs() <= f32::EPSILON;
   let page_text_bottom = (plain_body_story && text_cursor_y > parent_flow.setup.height_pt)
     .then_some(parent_flow.setup.height_pt);
-  let realize_plain_line_origins = paint_clip && plain_body_story;
+  // A WPS story inside a real table cell also owns line-top coordinates.
+  // Resolve its private baseline before flattening, or the outer table paint
+  // owner mistakes that line top for an already-resolved cell baseline.
+  // Native body/cell controls retain the same text-to-shape displacement.
+  let realize_plain_line_origins =
+    paint_clip && local_story && shape.rotation_deg.abs() <= f32::EPSILON;
   // Oblique WPS text becomes glyph paths after its private story completes.
   // Native paths retain the same logical font-cell baseline and balanced
   // printer advances as ordinary lines, before the independent rotation.
@@ -47874,6 +49823,7 @@ fn layout_shape_text_box(
     && !shape.text_box_resizes_to_fit
     && shape.text_box_writing_mode == TextBoxWritingMode::Horizontal;
   let retain_line_fragments = fixed_group_text
+    || rotated_group_text
     || page_text_bottom.is_some()
     || realize_plain_line_origins
     || realize_rotated_line_paint;
@@ -47885,6 +49835,14 @@ fn layout_shape_text_box(
       Vec::new(),
     )
   };
+  if story_cursor_is_baseline {
+    // Centered WPS stories in real cells already converted the initial
+    // cursor to a baseline. Retain that provenance when flattening so the
+    // completed-line route cannot add the ascent a second time.
+    for item in &mut nested_items {
+      preserve_table_cell_baseline_origin(item);
+    }
+  }
   let mut line_visibility = if retain_line_fragments {
     vec![None; nested_items.len()]
   } else {
@@ -47913,6 +49871,14 @@ fn layout_shape_text_box(
       let visible = (!fixed_group_text
         || (top <= content_bottom + LAYOUT_EPSILON_PT
           && top + fragment.content_advance_pt.unwrap_or(0.0) >= content_top - LAYOUT_EPSILON_PT))
+        && (!rotated_group_text
+          || wordprocessing_rotated_group_line_intersects(
+            &nested_items[fragment.item_start..fragment.item_end],
+            top,
+            content_top,
+            content_bottom,
+            text_metrics,
+          ))
         && page_text_bottom.is_none_or(|bottom| top <= bottom + LAYOUT_EPSILON_PT);
       if !realize_rotated_line_paint {
         line_visibility[fragment.item_start..fragment.item_end].fill(Some(visible));
@@ -48003,6 +49969,12 @@ fn layout_shape_text_box(
       }
     }
   }
+  rasterize_wordprocessing_shape_metafile_story_paint(
+    shape,
+    rect,
+    parent_flow.fixed_output_raster_dpi,
+    &mut items,
+  );
   rasterize_wordprocessing_shape_table_story_paint(shape, rect, &mut items);
   apply_shape_text_warp(&mut items, shape, rect, text_metrics);
   let text_rotation_deg =
@@ -48045,8 +50017,94 @@ fn layout_shape_text_box(
       clip_inline_text_paint(item, clip);
     }
   }
+  if rotated_group_text {
+    let clip = wordprocessing_rotated_group_paint_clip(shape, rect, content_rect);
+    for item in &mut items {
+      clip_inline_text_paint(item, clip);
+    }
+  }
   detach_nested_inline_baseline_participants(&mut items);
   current.items.extend(items);
+}
+
+fn wordprocessing_rotated_group_text(shape: &crate::docx::InlineShape) -> bool {
+  shape.wordprocessing_shape_host
+    && shape.text_box_word_wrap
+    && !shape.text_box_auto_fit
+    && !shape.text_box_resizes_to_fit
+    && shape.text_box_writing_mode == TextBoxWritingMode::Horizontal
+    && shape.rotation_deg.is_finite()
+    && shape.rotation_deg.abs() > f32::EPSILON
+    && shape.rotation_deg.rem_euclid(90.0) <= f32::EPSILON
+    && !shape.text_upright
+    && !shape.flip_horizontal
+    && !shape.flip_vertical
+    && shape.text_warp.is_none()
+    && shape.static3d.is_none()
+    && shape.text_box_blocks.iter().any(|block| {
+      matches!(block, Block::Paragraph(paragraph) if paragraph.format.wordprocessing_group_shape_story)
+    })
+}
+
+fn wordprocessing_rotated_group_line_intersects(
+  items: &[PageItem],
+  top: f32,
+  clip_top: f32,
+  clip_bottom: f32,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  let Some(metrics) = items
+    .iter()
+    .filter_map(|item| wordprocessing_line_metrics(item, text_metrics))
+    .reduce(WordprocessingLineMetrics::include)
+  else {
+    return items
+      .iter()
+      .any(|item| shape_text_box_item_intersects_vertical_bounds(item, clip_top, clip_bottom));
+  };
+  // Native rotated WPG output tests the baseline-aligned printer font cell,
+  // independently of its paint clip. Before-space and 6/9/18pt controls rule
+  // out both a fixed layout-height floor and the ordinary group's flow top.
+  let pixel = units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI;
+  let height = (metrics.content_height_pt() / pixel).ceil() * pixel;
+  let baseline = word_fixed_output_nearest_printer_grid_pt(top) + height
+    - word_fixed_output_nearest_printer_grid_pt(metrics.descent_pt);
+  baseline - height <= clip_bottom && baseline >= clip_top
+}
+
+fn wordprocessing_rotated_group_paint_clip(
+  shape: &crate::docx::InlineShape,
+  rect: ShapeTextBoxRect,
+  content: ShapeTextBoxRect,
+) -> common::Rect {
+  // Group import can materialize the visible outline as a path. Its text
+  // inset remains explicit even when the final shape has no direct stroke.
+  let inset = shape.wordprocessing_shape_outline_text_inset_pt;
+  let bounds = rotate_frame_bounds(
+    FrameBounds {
+      x_pt: rect.x + inset,
+      y_pt: content.y,
+      width_pt: (rect.width - inset * 2.0).max(0.0),
+      height_pt: content.height,
+    },
+    rect.x + rect.width * 0.5,
+    rect.y + rect.height * 0.5,
+    shape.rotation_deg,
+  );
+  let device = common::wordprocessing_device::source_coordinate;
+  let left = device(bounds.x_pt);
+  let top = device(bounds.y_pt);
+  // Word's source region includes its last device pixel. Collapsed or
+  // exhausted text areas consequently retain a one-pixel paint rectangle.
+  let right = device(bounds.x_pt + bounds.width_pt).max(left) + 1;
+  let bottom = device(bounds.y_pt + bounds.height_pt).max(top) + 1;
+  let pixel = units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI;
+  common_rect(
+    left as f32 * pixel,
+    top as f32 * pixel,
+    (right - left) as f32 * pixel,
+    (bottom - top) as f32 * pixel,
+  )
 }
 
 fn realize_wordprocessing_shape_line_paint(
@@ -48230,15 +50288,11 @@ fn shape_text_box_initial_cursor_y(
   resolve_centered_line_top: bool,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
-  if !resolve_centered_line_top || flow.layout_cell_bounds.is_none() {
-    return line_top_y;
-  }
-  let Some(Block::Paragraph(paragraph)) = blocks.first() else {
+  let Some(paragraph) =
+    shape_text_box_baseline_cursor_paragraph(blocks, flow, resolve_centered_line_top)
+  else {
     return line_top_y;
   };
-  if !paragraph.format.wordprocessing_shape_story {
-    return line_top_y;
-  }
 
   // A centered WPS story starts from a calculated line top, including the
   // special case where overflowing text stays at the rectangle top. When its
@@ -48254,6 +50308,20 @@ fn shape_text_box_initial_cursor_y(
       text_frame.base_line_height,
       text_metrics,
     )
+}
+
+fn shape_text_box_baseline_cursor_paragraph(
+  blocks: &[Block],
+  flow: FlowContext,
+  resolve_centered_line_top: bool,
+) -> Option<&super::Paragraph> {
+  if !resolve_centered_line_top || flow.layout_cell_bounds.is_none() {
+    return None;
+  }
+  match blocks.first()? {
+    Block::Paragraph(paragraph) if paragraph.format.wordprocessing_shape_story => Some(paragraph),
+    _ => None,
+  }
 }
 
 fn shape_text_box_vertical_adjustment(
@@ -48352,6 +50420,7 @@ fn materialize_shape_text_columns(
         paint_order,
         behind_text,
         table_wrap,
+        body_vertical_alignment,
       } => {
         materialize_shape_text_columns(
           &mut items,
@@ -48366,6 +50435,7 @@ fn materialize_shape_text_columns(
           paint_order,
           behind_text,
           table_wrap,
+          body_vertical_alignment,
         });
       }
       item => lowered.push(item),
@@ -48374,18 +50444,12 @@ fn materialize_shape_text_columns(
   *items = lowered;
 }
 
-fn materialize_shape_text_item_column(
-  source: TextItem,
-  mode: ShapeTextBoxColumnMode,
-  physical_left: f32,
-  physical_top: f32,
-  physical_right: f32,
+fn shape_text_column_segments(
+  text: &str,
+  style: &TextStyle,
+  mixed: bool,
   text_metrics: &mut TextMetrics,
-) -> Vec<PageItem> {
-  if source.text.is_empty() {
-    return vec![PageItem::Text(Box::new(source))];
-  }
-
+) -> Vec<ShapeTextColumnSegment> {
   // ECMA-376 Part 1 §20.1.10.83 assigns an orientation to each character,
   // but it does not split the shaping run. Word's fixed output keeps adjacent
   // rotated characters in one TJ operation, retaining kerning and one logical
@@ -48394,18 +50458,15 @@ fn materialize_shape_text_item_column(
   let mut segments = Vec::<ShapeTextColumnSegment>::new();
   let mut start = 0usize;
   let mut character_start = 0usize;
-  for end in GraphemeClusterSegmenter::new()
-    .segment_str(&source.text)
-    .skip(1)
-  {
-    let Some(cluster) = source.text.get(start..end) else {
+  for end in GraphemeClusterSegmenter::new().segment_str(text).skip(1) {
+    let Some(cluster) = text.get(start..end) else {
       start = end;
       continue;
     };
     let cluster_character_count = cluster.chars().count();
     let character_end = character_start + cluster_character_count;
-    let orientation = if mode.uses_mixed_orientation() {
-      mixed_vertical_grapheme_orientation(cluster, &source.style, text_metrics)
+    let orientation = if mixed {
+      mixed_vertical_grapheme_orientation(cluster, style, text_metrics)
     } else {
       VerticalGraphemeOrientation::Upright(None)
     };
@@ -48428,6 +50489,215 @@ fn materialize_shape_text_item_column(
     character_start = character_end;
     start = end;
   }
+
+  segments
+}
+
+fn section_body_paint_baseline(text: &TextItem, text_metrics: &mut TextMetrics) -> f32 {
+  if text.origin_is_baseline {
+    return text.y_pt;
+  }
+  let style = word_fixed_output_common_text_style(text.style.clone());
+  // A paragraph frame uses the common Writer line baseline, including its
+  // DirectWrite alignment offset. The fallback Windows-centered baseline is
+  // different for CJK fonts with external leading (Yu Mincho). Resolve the
+  // same realized font and line components before rotating the body frame.
+  let normalized_escapement = style.automatic_escapement_font_size.is_some()
+    && style.automatic_escapement_baseline_normalized;
+  let metrics = if normalized_escapement {
+    text_metrics.vertical_metrics_for_text(&text.text, &style)
+  } else {
+    text_metrics.line_vertical_metrics_for_text(&text.text, &style)
+  };
+  let offset = if style.use_windows_font_metrics {
+    metrics.directwrite_baseline_offset_pt
+  } else {
+    metrics.leading_above_pt() + metrics.ascent_pt
+  };
+  let shift = if style.automatic_escapement_font_size.is_some() {
+    0.0
+  } else {
+    style.baseline_shift.0
+  };
+  let line = WordprocessingLineMetrics {
+    ascent_pt: (offset + shift).max(0.0),
+    descent_pt: (metrics.line_height_pt() - offset - shift).max(0.0),
+    top_aligned: normalized_escapement,
+  };
+  text.y_pt + line.paint_baseline_offset_pt(text.line_height_pt) - style.baseline_shift.0
+}
+
+fn materialize_section_body_text(
+  items: &mut [PageItem],
+  pivot_x: f32,
+  pivot_y: f32,
+  rotation_deg: f32,
+  text_metrics: &mut TextMetrics,
+) {
+  let has_upright = items.iter().any(|item| {
+    matches!(item, PageItem::Text(text) if text.text.chars().any(|character|
+      CodePointMapData::<VerticalOrientation>::new().get(character) != VerticalOrientation::Rotated))
+  });
+  if rotation_deg != 90.0 || !has_upright {
+    materialize_shape_text_rotation(items, pivot_x, pivot_y, rotation_deg);
+    return;
+  }
+  // Section tbRl uses mixed UAX50 orientation. Drawing and table stories
+  // already own their inner transforms; keep those separate from body lines.
+  // Resolve a complete contiguous line before splitting upright graphemes so
+  // source printer-width carry does not restart at every Japanese character.
+  for item in items.iter_mut() {
+    if let PageItem::Text(text) = item
+      && text
+        .style
+        .wordprocessing_justification_expansion_pt
+        .as_deref()
+        .is_some_and(|values| values.iter().all(|&value| value == 0.0))
+    {
+      text.style.wordprocessing_justification_expansion_pt = None;
+    }
+  }
+  let mut start = 0;
+  while start < items.len() {
+    let PageItem::Text(first) = &items[start] else {
+      start += 1;
+      continue;
+    };
+    if first.style.rotation_deg != 0.0 {
+      start += 1;
+      continue;
+    }
+    let y = first.y_pt;
+    let height = first.line_height_pt;
+    let baseline = section_body_paint_baseline(first, text_metrics);
+    let mut end = start + 1;
+    while let Some(PageItem::Text(next)) = items.get(end) {
+      if next.y_pt != y || next.line_height_pt != height || next.style.rotation_deg != 0.0 {
+        break;
+      }
+      end += 1;
+    }
+    realize_wordprocessing_shape_line_character_cells(
+      &mut items[start..end],
+      baseline,
+      text_metrics,
+    );
+    start = end;
+  }
+  for item in items {
+    let PageItem::Text(source) = item else {
+      materialize_shape_text_rotation(std::slice::from_mut(item), pivot_x, pivot_y, rotation_deg);
+      continue;
+    };
+    if source.style.rotation_deg != 0.0 || source.text.is_empty() {
+      materialize_shape_text_rotation(std::slice::from_mut(item), pivot_x, pivot_y, rotation_deg);
+      continue;
+    }
+    let baseline = section_body_paint_baseline(source, text_metrics);
+    let segments = shape_text_column_segments(&source.text, &source.style, true, text_metrics);
+    // Keep contextual pair spacing and per-character justification from the
+    // completed source run. Shaping isolated punctuation would lose its next
+    // neighbour; carrying the unsliced adjustment array would lose all gaps.
+    let shaped = text_metrics.shape_text(&source.text, &source.style);
+    let mut output = Vec::with_capacity(segments.len());
+    let mut advance = 0.0;
+    for segment in segments {
+      let text = &source.text[segment.byte_start..segment.byte_end];
+      let explicit = source
+        .style
+        .semantic_character_advances_pt
+        .as_deref()
+        .and_then(|v| v.get(segment.character_start..segment.character_end));
+      let mut placed = source.as_ref().clone();
+      placed.text = text.to_string();
+      placed.style.semantic_character_advances_pt = explicit.map(Arc::from);
+      // Source-indexed layout adjustments must follow the same grapheme slice;
+      // passing a whole-line array to a one-character run discards its spacing.
+      placed.style.wordprocessing_justification_expansion_pt = source
+        .style
+        .wordprocessing_justification_expansion_pt
+        .as_deref()
+        .and_then(|values| values.get(segment.character_start..segment.character_end))
+        .map(Arc::from);
+      let segment_glyphs = shaped.as_ref().map(|shaped| {
+        shaped.glyphs.iter().filter(|glyph| {
+          glyph.text_range.start >= segment.byte_start && glyph.text_range.start < segment.byte_end
+        })
+      });
+      let width = explicit
+        .map(|v| v.iter().sum())
+        .or_else(|| {
+          segment_glyphs.clone().map(|glyphs| {
+            glyphs
+              .map(|glyph| glyph.x_advance_em * glyph.font_size_pt)
+              .sum()
+          })
+        })
+        .unwrap_or_else(|| text_metrics.measure_text(text, &placed.style))
+        + source.word_spacing_pt * text.chars().filter(|&c| c == ' ').count() as f32;
+      let inline_offset = segment_glyphs
+        .and_then(|mut glyphs| glyphs.next())
+        .map_or(0.0, |glyph| glyph.x_offset_em * glyph.font_size_pt);
+      placed.style.open_type_features.vertical_feature = match segment.orientation {
+        VerticalGraphemeOrientation::Upright(feature) => feature,
+        VerticalGraphemeOrientation::Rotated => None,
+      };
+      placed.origin_is_baseline = true;
+      placed.wordprocessing_line_metrics = None;
+      placed.decoration_span_start_x_pt = None;
+      placed.x_pt = pivot_x - (baseline - pivot_y);
+      placed.y_pt = pivot_y + (source.x_pt - pivot_x) + advance;
+      match segment.orientation {
+        VerticalGraphemeOrientation::Upright(_) => {
+          if let Some((cross, inline)) = text_metrics.word_upright_glyph_offset(text, &placed.style)
+          {
+            placed.x_pt = word_fixed_output_nearest_printer_grid_pt(placed.x_pt + cross);
+            placed.y_pt =
+              word_fixed_output_nearest_printer_grid_pt(placed.y_pt + inline + inline_offset);
+            // Layout's inline adjustments now lie on the page Y axis. Do not
+            // apply them a second time to the upright glyph's horizontal ink.
+            placed.style.semantic_character_advances_pt = None;
+            placed.style.wordprocessing_justification_expansion_pt = None;
+            placed.style.cjk_punctuation_compression_ratio = 0.0;
+            placed.style.wordprocessingml_punctuation_spacing = false;
+            placed.rotation_center_pt = None;
+          } else {
+            placed.style.rotation_deg = rotation_deg;
+            placed.rotation_center_pt = Some((placed.x_pt, placed.y_pt));
+          }
+        }
+        VerticalGraphemeOrientation::Rotated => {
+          placed.style.rotation_deg = rotation_deg;
+          placed.rotation_center_pt = Some((placed.x_pt, placed.y_pt));
+        }
+      }
+      output.push(PageItem::Text(Box::new(placed)));
+      advance += width;
+    }
+    // A group preserves the original page-item slot: frame fragment ranges,
+    // anchored objects and later ownership lookups must keep stable indices.
+    *item = PageItem::Group(output);
+  }
+}
+
+fn materialize_shape_text_item_column(
+  source: TextItem,
+  mode: ShapeTextBoxColumnMode,
+  physical_left: f32,
+  physical_top: f32,
+  physical_right: f32,
+  text_metrics: &mut TextMetrics,
+) -> Vec<PageItem> {
+  if source.text.is_empty() {
+    return vec![PageItem::Text(Box::new(source))];
+  }
+
+  let segments = shape_text_column_segments(
+    &source.text,
+    &source.style,
+    mode.uses_mixed_orientation(),
+    text_metrics,
+  );
 
   let mut output = Vec::with_capacity(segments.len());
   let mut logical_advance_pt = 0.0;
@@ -48456,7 +50726,18 @@ fn materialize_shape_text_item_column(
     };
     item.decoration_span_start_x_pt = None;
 
-    let line_offset_pt = source.y_pt - physical_top;
+    let column_line = mode
+      .uses_mixed_orientation()
+      .then_some(source.wordprocessing_line_metrics)
+      .flatten();
+    let (line_top_pt, column_width_pt) =
+      column_line.map_or((source.y_pt, source.line_height_pt), |line| {
+        (
+          source.y_pt + line.bottom_offset_pt - line.height_pt,
+          line.height_pt,
+        )
+      });
+    let line_offset_pt = line_top_pt - physical_top;
     let (column_right_pt, physical_y_pt) = if mode.starts_at_right() {
       (
         physical_right - line_offset_pt,
@@ -48464,21 +50745,30 @@ fn materialize_shape_text_item_column(
       )
     } else {
       (
-        physical_left + line_offset_pt + source.line_height_pt,
+        physical_left + line_offset_pt + column_width_pt,
         physical_top + (item.x_pt - physical_left),
       )
     };
     item.y_pt = physical_y_pt;
     match segment.orientation {
       VerticalGraphemeOrientation::Rotated => {
-        item.x_pt = column_right_pt;
+        item.x_pt = column_right_pt
+          - column_line.map_or(0.0, |line| line.height_pt - line.baseline_from_bottom_pt);
+        if column_line.is_some() {
+          // The private story already owns this column's common baseline.
+          // Paint must not add an unrotated font ascent after the transform.
+          item.origin_is_baseline = true;
+        }
         item.style.rotation_deg += 90.0;
         item.rotation_center_pt = Some((item.x_pt, item.y_pt));
       }
       VerticalGraphemeOrientation::Upright(_) => {
-        item.x_pt = column_right_pt - (source.line_height_pt + segment_advance_pt) / 2.0;
+        item.x_pt = column_right_pt - (column_width_pt + segment_advance_pt) / 2.0;
         item.rotation_center_pt = None;
       }
+    }
+    if column_line.is_some() {
+      item.wordprocessing_line_metrics = None;
     }
     output.push(PageItem::Text(Box::new(item)));
     logical_advance_pt += segment_advance_pt;
@@ -48584,6 +50874,7 @@ fn append_wordprocessing_shape_hyperlink_description(
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: line.to_owned(),
       style: TextStyle {
@@ -48744,15 +51035,20 @@ fn shape_text_box_measure_flow(parent_flow: FlowContext, content_width: f32) -> 
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
     horizontal_table_cell: false,
+    table_cell_in_header_footer: false,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
     word_floating_table_cell: false,
     floating_table_cell_follow_top_inset_pt: 0.0,
     floating_table_cell_follow_bottom_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: parent_flow.fixed_output_raster_dpi,
     table_cell_complete_first_line_fit: false,
     table_cell_legacy_nested_row_follow: false,
@@ -48765,12 +51061,32 @@ fn shape_text_box_measure_flow(parent_flow: FlowContext, content_width: f32) -> 
   }
 }
 
+fn shape_text_box_parent_flow(mut flow: FlowContext) -> FlowContext {
+  if matches!(
+    flow.text_segmentation,
+    TextSegmentation::RepeatingSlot | TextSegmentation::FooterSlot
+  ) || flow.table_cell_in_header_footer
+  {
+    // A textbox has an independent WordprocessingML story, but inherits the
+    // grid only from a body owner. Native identical-body/header/footer controls
+    // keep both repeating stories at natural spacing, including with an
+    // authored section grid. Clear it before measurement and line layout;
+    // changing only the painted baseline leaves subsequent lines displaced.
+    flow.setup.doc_grid_line_pitch_pt = None;
+    flow.setup.table_cell_doc_grid_line_pitch_pt = None;
+    flow.setup.doc_grid_character_spacing_pt = None;
+    flow.setup.doc_grid_snap_to_chars = false;
+  }
+  flow
+}
+
 fn shape_text_box_measured_content_height(
   parent_flow: FlowContext,
   shape: &crate::docx::InlineShape,
   bounded_content_width: f32,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  let parent_flow = shape_text_box_parent_flow(parent_flow);
   let content_width = if shape.text_box_word_wrap || wordprocessing_shape_fits_unwrapped_text(shape)
   {
     shape_text_box_wrap_width(shape, bounded_content_width)
@@ -48833,6 +51149,7 @@ fn shape_text_box_unwrapped_content_width(
   available_width_pt: f32,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  let parent_flow = shape_text_box_parent_flow(parent_flow);
   shape
     .text_box_blocks
     .iter()
@@ -49516,6 +51833,21 @@ fn apply_shape_text_warp(
     let [m11, m21, m12, m22] = shadow.matrix;
     let origin_x = rect.x + rect.width * (0.5 + shadow.origin.0);
     let origin_y = rect.y + rect.height * (0.5 + shadow.origin.1);
+    let (offset_x_pt, offset_y_pt) = if shadow.offset_is_page_relative && !shape.text_upright {
+      // The painter rotates this text's complete local canvas afterward.
+      // Express the page-space offset in that canvas so the shadow retains
+      // its authored direction. Native 0/90/270/45-degree controls and
+      // MS-ODRAW's axis-aligned shadowOffsetX/Y agree; perspective matrices
+      // retain their independent local projection.
+      let rotation = inline_shape_text_rotation_degrees(shape.rotation_deg, shape.flip_vertical);
+      let (sin, cos) = rotation.to_radians().sin_cos();
+      (
+        cos * shadow.offset_x_pt + sin * shadow.offset_y_pt,
+        -sin * shadow.offset_x_pt + cos * shadow.offset_y_pt,
+      )
+    } else {
+      (shadow.offset_x_pt, shadow.offset_y_pt)
+    };
     Some(common::VmlTextShadow {
       color: shadow.color,
       transform: common::Transform {
@@ -49523,8 +51855,8 @@ fn apply_shape_text_warp(
         m12,
         m21,
         m22,
-        dx: common::Pt(origin_x + shadow.offset_x_pt - m11 * origin_x - m21 * origin_y),
-        dy: common::Pt(origin_y + shadow.offset_y_pt - m12 * origin_x - m22 * origin_y),
+        dx: common::Pt(origin_x + offset_x_pt - m11 * origin_x - m21 * origin_y),
+        dy: common::Pt(origin_y + offset_y_pt - m12 * origin_x - m22 * origin_y),
       },
       perspective_per_pt: shadow
         .perspective_per_emu
@@ -50168,7 +52500,17 @@ fn text_item_ink_bounds_with_paint_metrics(
   let shaped = text_metrics.shape_text(&text.text, &text.style)?;
   for glyph in shaped.glyphs {
     let font_size = glyph.font_size_pt;
-    if let Some(glyph_bounds) = glyph.bounds_em {
+    if let Some(glyph_bounds) = glyph.bounds_em.map(|bounds| {
+      if vml_inclusive_endpoints {
+        shaped
+          .font_faces
+          .get(glyph.font_index)
+          .and_then(|face| vml_glyph_bounds::synthetic_italic_bounds(face, glyph.glyph_id))
+          .unwrap_or(bounds)
+      } else {
+        bounds
+      }
+    }) {
       if ignore_empty_glyphs
         && (glyph_bounds.x_min_em >= glyph_bounds.x_max_em
           || glyph_bounds.y_min_em >= glyph_bounds.y_max_em)
@@ -50332,6 +52674,8 @@ fn resolve_inline_shape_gradient_transform(
           height: common::Pt((bottom - top).max(0.0)),
         },
       });
+    } else if gradient.line.is_none() && gradient.transform_as_normal {
+      gradient.line = super::vml_gradient::transformed_line(gradient.angle_degrees, transform);
     } else if gradient.line.is_none() {
       let angle = gradient.angle_degrees.unwrap_or_default().to_radians();
       let (sin, cos) = angle.sin_cos();
@@ -50551,8 +52895,35 @@ fn table_cell_content_height_with_mode(
   compatibility_mode: u16,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  table_cell_content_extents_with_mode(
+    cell,
+    cell_width,
+    setup,
+    mode,
+    script_sensitive_line_height,
+    compatibility_mode,
+    text_metrics,
+  )
+  .flow_height
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct TableCellContentExtents {
+  flow_height: f32,
+  alignment_height: f32,
+}
+
+fn table_cell_content_extents_with_mode(
+  cell: &TableCell,
+  cell_width: f32,
+  setup: impl Into<TableCellMeasureContext>,
+  mode: TableCellMeasureMode,
+  script_sensitive_line_height: bool,
+  compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
+) -> TableCellContentExtents {
   let measure = setup.into();
-  let setup = measure.setup;
+  let setup = table_story_setup(measure.setup, measure.in_header_footer);
   let (left_border, right_border, separate) = measure.horizontal_borders.unwrap_or_default();
   let (left_adjustment, right_adjustment) =
     horizontal_cell_border_insets(cell, separate, left_border, right_border);
@@ -50605,15 +52976,20 @@ fn table_cell_content_height_with_mode(
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
     horizontal_table_cell: cell.text_rotation_deg.is_none(),
+    table_cell_in_header_footer: measure.in_header_footer,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    section_carrier_lower_pt: None,
+    section_carrier_style_matches: None,
     preserve_horizontal_on_advance: false,
     script_sensitive_line_height: true,
     word_floating_table_cell: false,
     floating_table_cell_follow_top_inset_pt: 0.0,
     floating_table_cell_follow_bottom_inset_pt: 0.0,
     note_continuation_top_inset_pt: 0.0,
+    note_continuation_bottom_inset_pt: 0.0,
     inside_paragraph_frame: false,
     paragraph_frame_translation_y_pt: None,
+    paragraph_frame_numeric_offset_decoded: (false, false),
     fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
     table_cell_complete_first_line_fit: false,
     table_cell_legacy_nested_row_follow: false,
@@ -50645,22 +53021,29 @@ fn table_cell_content_height_with_mode(
     .filter(|paragraph| matches!(paragraph.format.line_height_rule, LineHeightRule::Exact))
     .and_then(|paragraph| paragraph.format.line_height_pt)
     .map_or(first_text_height, |height| first_text_height.min(height));
-  let mut content =
-    table_cell_blocks_content_height(&cell.blocks, cell.hide_end_mark, flow, mode, text_metrics)
-      .max(first_text_height);
+  let extents =
+    table_cell_blocks_content_extents(&cell.blocks, cell.hide_end_mark, flow, mode, text_metrics);
+  let mut content = extents.flow_height.max(first_text_height);
   if mode == TableCellMeasureMode::WholeCell
     && let Some(reflow_height) = table_cell_wrap_reflow_content_height(cell, flow, text_metrics)
   {
-    content = if blocks_have_cell_owned_wrapping_chart(&cell.blocks, flow) {
-      // The formatter retains the chart's own empty mark line and permits
-      // side space. A paragraph-relative object bottom plus paragraph lower
-      // spacing is not that frame's height; use the actual complete lowers.
+    content = if blocks_have_cell_owned_wrapping_chart(&cell.blocks, flow)
+      || blocks_have_cell_wrapped_anchor_text(&cell.blocks, flow)
+    {
+      // The formatter owns the wrapped text lines and the chart's empty mark
+      // line. Reinstating the source-order estimate would reserve fictitious
+      // lines after a terminal picture; use the actual complete lowers.
       reflow_height.max(first_text_height)
     } else {
       content.max(reflow_height)
     };
   }
-  cell.margins.top_pt + content + cell.margins.bottom_pt
+  TableCellContentExtents {
+    flow_height: cell.margins.top_pt + content + cell.margins.bottom_pt,
+    alignment_height: cell.margins.top_pt
+      + content.max(extents.floating_alignment_bottom)
+      + cell.margins.bottom_pt,
+  }
 }
 
 fn blocks_have_cell_owned_wrapping_chart(blocks: &[Block], flow: FlowContext) -> bool {
@@ -50674,6 +53057,27 @@ fn blocks_have_cell_owned_wrapping_chart(blocks: &[Block], flow: FlowContext) ->
     }),
     Block::Frame(frame) => blocks_have_cell_owned_wrapping_chart(&frame.blocks, flow),
     Block::Table(_) => false,
+  })
+}
+
+fn blocks_have_cell_wrapped_anchor_text(blocks: &[Block], flow: FlowContext) -> bool {
+  blocks.iter().any(|block| match block {
+    Block::Paragraph(paragraph) => {
+      // Picture-only paragraphs already have their own native-observed
+      // mark/extent measurement. Here the formatter replaces a text wrapping
+      // estimate which cannot know the settled picture's source line.
+      paragraph
+        .inlines
+        .iter()
+        .any(|inline| matches!(inline, InlineItem::Text(run) if !run.text.trim().is_empty()))
+        && paragraph.inlines.iter().any(|inline| {
+          matches!(inline, InlineItem::Image(image)
+        if matches!(image.placement, crate::docx::ImagePlacement::Floating(placement)
+          if cell_owned_drawingml_object(placement, flow)
+            && matches!(placement.wrap, ImageWrapMode::Square | ImageWrapMode::Tight)))
+        })
+    }
+    Block::Frame(_) | Block::Table(_) => false,
   })
 }
 
@@ -50697,7 +53101,12 @@ fn table_cell_wrap_reflow_content_height(
         })
   });
   let wraps_chart_anchor = blocks_have_cell_owned_wrapping_chart(&cell.blocks, flow);
-  if !wraps_earlier_lowers && !wraps_later_paragraphs && !wraps_chart_anchor {
+  let wraps_picture_anchor = blocks_have_cell_wrapped_anchor_text(&cell.blocks, flow);
+  if !wraps_earlier_lowers
+    && !wraps_later_paragraphs
+    && !wraps_chart_anchor
+    && !wraps_picture_anchor
+  {
     return None;
   }
 
@@ -50762,7 +53171,14 @@ fn table_cell_wrap_reflow_content_height(
     text_metrics,
   )
   .exclusions;
-  if exclusions.is_empty() && !wraps_later_paragraphs && !wraps_chart_anchor {
+  // A positive-offset cell picture can wrap its own anchor paragraph as
+  // well. Summed intrinsic text/picture heights miss the additional broken
+  // lines; measure those through the same formatter used for final paint.
+  if exclusions.is_empty()
+    && !wraps_later_paragraphs
+    && !wraps_chart_anchor
+    && !wraps_picture_anchor
+  {
     return None;
   }
   let (end_y, pages, baseline_coordinate_advance) = layout_cell_blocks_for_overlap_probe(
@@ -50773,10 +53189,17 @@ fn table_cell_wrap_reflow_content_height(
     &exclusions,
     text_metrics,
   );
-  let painted_bottom = pages
-    .iter()
-    .filter_map(|page| page_items_vertical_bounds(&page.items).map(|(_, bottom)| bottom))
-    .fold(end_y, f32::max);
+  let painted_bottom = if wraps_earlier_lowers || wraps_later_paragraphs || wraps_chart_anchor {
+    pages
+      .iter()
+      .filter_map(|page| page_items_vertical_bounds(&page.items).map(|(_, bottom)| bottom))
+      .fold(end_y, f32::max)
+  } else {
+    // The picture-anchor path measures completed text lines and the drawing
+    // wrap extents below. Independently painted wrapNone/Through drawings
+    // can extend outside this cell without increasing its row height.
+    end_y
+  };
   let floating_bottom = pages
     .iter()
     .flat_map(|page| &page.floating_table_bounds)
@@ -50814,8 +53237,24 @@ fn table_cell_blocks_content_height(
   mode: TableCellMeasureMode,
   text_metrics: &mut TextMetrics,
 ) -> f32 {
+  table_cell_blocks_content_extents(blocks, hide_end_mark, flow, mode, text_metrics).flow_height
+}
+
+struct TableCellBlockExtents {
+  flow_height: f32,
+  floating_alignment_bottom: f32,
+}
+
+fn table_cell_blocks_content_extents(
+  blocks: &[Block],
+  hide_end_mark: bool,
+  flow: FlowContext,
+  mode: TableCellMeasureMode,
+  text_metrics: &mut TextMetrics,
+) -> TableCellBlockExtents {
   let mut flow_height: f32 = 0.0;
   let mut floating_bottom: f32 = 0.0;
+  let mut alignment_bottom: f32 = 0.0;
   for (index, block) in blocks.iter().enumerate() {
     if hide_end_mark
       && index + 1 == blocks.len()
@@ -50832,7 +53271,7 @@ fn table_cell_blocks_content_height(
     }
     match block {
       Block::Paragraph(paragraph) => {
-        let (paragraph_height, cell_print_bottom) = table_cell_paragraph_height(
+        let extents = table_cell_paragraph_height(
           BlockNeighbors::for_index(blocks, index),
           paragraph,
           flow,
@@ -50840,12 +53279,16 @@ fn table_cell_blocks_content_height(
           mode != TableCellMeasureMode::WholeCell && index == 0,
           mode == TableCellMeasureMode::LastRenderedFinalFollow,
         );
-        flow_height += paragraph_height;
+        if extents.alignment_bottom > 0.0 {
+          alignment_bottom = alignment_bottom.max(flow_height + extents.alignment_bottom);
+        }
+        alignment_bottom = alignment_bottom.max(extents.cell_print_alignment_bottom);
+        flow_height += extents.height;
         // Page/margin-relative layoutInCell anchors use the cell print area's
         // origin, even when authored in a later paragraph. Compare their
         // bottom against the entire text flow instead of charging that
         // absolute span to the anchor paragraph after its predecessors.
-        floating_bottom = floating_bottom.max(cell_print_bottom);
+        floating_bottom = floating_bottom.max(extents.cell_print_bottom);
       }
       Block::Table(table)
         if flow.text_segmentation == TextSegmentation::TableCell
@@ -50879,7 +53322,10 @@ fn table_cell_blocks_content_height(
       }
     }
   }
-  flow_height.max(floating_bottom)
+  TableCellBlockExtents {
+    flow_height: flow_height.max(floating_bottom),
+    floating_alignment_bottom: alignment_bottom,
+  }
 }
 
 fn table_cell_block_is_collapsed_empty_paragraph(blocks: &[Block], index: usize) -> bool {
@@ -50955,6 +53401,14 @@ fn row_bottom_border_paint_extent(table: &Table, row_index: usize) -> f32 {
   (painted_extent - row_recovered_collapsed_bottom_border_extent(table, row_index, row)).max(0.0)
 }
 
+#[derive(Clone, Copy, Debug)]
+struct TableCellParagraphExtents {
+  height: f32,
+  cell_print_bottom: f32,
+  alignment_bottom: f32,
+  cell_print_alignment_bottom: f32,
+}
+
 fn table_cell_paragraph_height(
   neighbors: BlockNeighbors<'_>,
   paragraph: &crate::docx::Paragraph,
@@ -50962,7 +53416,7 @@ fn table_cell_paragraph_height(
   text_metrics: &mut TextMetrics,
   split_follow_text_frame: bool,
   completed_cached_paragraph: bool,
-) -> (f32, f32) {
+) -> TableCellParagraphExtents {
   // Match Writer's flow-frame and table-row sizing: a paragraph inside a table
   // cell is measured in sequence, with upper space collapsed against the
   // previous flow frame and lower space owned once by the current frame.
@@ -51024,10 +53478,16 @@ fn table_cell_paragraph_height(
   // ends a list inside a table cell still owns its automatic upper spacing
   // (LibreOffice testTdf132807). Folding `upper` into max() swallowed almost
   // the entire 280-twip space whenever the empty line itself was shorter.
-  (
-    upper + border_extent + content.max(min_height).max(paragraph_mark_height) + lower,
-    extents.cell_print_floating_bottom,
-  )
+  TableCellParagraphExtents {
+    height: upper + border_extent + content.max(min_height).max(paragraph_mark_height) + lower,
+    cell_print_bottom: extents.cell_print_floating_bottom,
+    alignment_bottom: if extents.paragraph_alignment_floating_bottom > 0.0 {
+      upper + border_extent + extents.paragraph_alignment_floating_bottom + lower
+    } else {
+      0.0
+    },
+    cell_print_alignment_bottom: extents.cell_print_alignment_floating_bottom,
+  }
 }
 
 fn paragraph_line_spacing_excess(paragraph: &crate::docx::Paragraph) -> f32 {
@@ -51128,6 +53588,7 @@ fn floating_image_position(
             placement.horizontal_alignment,
             reference_width,
             alignment_width,
+            flow,
           )
           + floating_horizontal_position_offset(placement, reference_width),
         base_y
@@ -51145,10 +53606,10 @@ fn floating_image_position(
     effective_vertical_page_margins(flow.setup, flow.column_page_index);
   let (base_x, reference_width) = match horizontal_reference {
     HorizontalImageReference::Page => (0.0, flow.setup.width_pt),
-    HorizontalImageReference::Margin => (
-      flow.setup.margin_left_pt,
-      flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt,
-    ),
+    HorizontalImageReference::Margin => {
+      let (left, right) = floating_page_margins(flow);
+      (left, flow.setup.width_pt - left - right)
+    }
     HorizontalImageReference::Column => {
       floating_column_reference_bounds(placement, flow, paragraph_indents)
     }
@@ -51205,6 +53666,7 @@ fn floating_image_position(
           placement.horizontal_alignment,
           reference_width,
           alignment_width,
+          flow,
         )
         + floating_horizontal_position_offset(placement, reference_width),
       base_y
@@ -51236,7 +53698,7 @@ fn floating_shape_position(
   // WPS reference also keeps nested textbox table text at its Office position.
   let flow = if shape.wordprocessing_shape_host
     && flow.text_segmentation == TextSegmentation::TableCell
-    && !placement.layout_in_cell
+    && !effective_layout_in_cell(placement, flow)
   {
     FlowContext {
       layout_cell_bounds: None,
@@ -51255,6 +53717,32 @@ fn floating_shape_position(
     width,
     height,
   );
+  let (x_pt, y_pt) = if shape.wordprocessing_shape_host
+    && placement.alignment_extent.is_none()
+    && effective_layout_in_cell(placement, flow)
+    && flow.horizontal_table_cell
+    && matches!(
+      placement.wrap,
+      ImageWrapMode::Square | ImageWrapMode::Tight | ImageWrapMode::TopBottom
+    )
+    && let Some(cell) = flow.layout_cell_inner_bounds.or(flow.layout_cell_bounds)
+  {
+    // ECMA-376 §20.4.2.3 keeps an in-cell drawing inside its owning cell.
+    // Word's WPS controls capture the complete shape and its text together,
+    // inside the collapsed border but including the horizontal cell margins.
+    // The row may grow downwards; only the print-top constrains vertical
+    // placement. wrapNone preserves signed offsets. Compat15 forces this
+    // ownership even with an authored layoutInCell="0" (Writer wrtw8esh.cxx).
+    // A grouped child belongs to the host extent; independently capturing
+    // children would collapse their authored relative positions.
+    let max_x = (cell.x_pt + cell.width_pt - width).max(cell.x_pt);
+    let print_top = flow
+      .layout_cell_print_bounds
+      .map_or(cell.y_pt, |print| print.y_pt);
+    (x_pt.clamp(cell.x_pt, max_x), y_pt.max(print_top))
+  } else {
+    (x_pt, y_pt)
+  };
   (
     x_pt,
     wordprocessing_shape_body_capture_top(shape, placement, flow).map_or(y_pt, |top| y_pt.max(top)),
@@ -51577,14 +54065,44 @@ fn bottom_margin_reference_bounds(
 }
 
 fn floating_picture_position(
-  placement: FloatingImagePlacement,
+  mut placement: FloatingImagePlacement,
   flow: FlowContext,
   paragraph_indents: ParagraphIndents,
-  current_x: f32,
-  current_y: f32,
-  image_width: f32,
-  image_height: f32,
+  current_position: (f32, f32),
+  image_size: (f32, f32),
+  inside_group: bool,
 ) -> (f32, f32) {
+  let (current_x, mut current_y) = current_position;
+  let (image_width, image_height) = image_size;
+  if !inside_group
+    && flow.text_segmentation == TextSegmentation::Body
+    && !flow.inside_paragraph_frame
+    && placement.paint_order.is_drawing_ml()
+    && matches!(
+      placement.wrap,
+      ImageWrapMode::Square | ImageWrapMode::TopBottom
+    )
+    && placement.horizontal_relative_to != HorizontalImageReference::Character
+    && matches!(
+      placement.vertical_relative_to,
+      VerticalImageReference::Page
+        | VerticalImageReference::Margin
+        | VerticalImageReference::Paragraph
+    )
+    && placement.vertical_alignment.is_none()
+    && placement.vertical_offset_pct.is_none()
+  {
+    // Word retains the authored EMU offset in XML, but realizes a square or
+    // top/bottom body-picture offset by truncating to signed integer twips.
+    // The owning paragraph frame independently rounds to its nearest twip. Native .01pt
+    // offset and eight-font controls distinguish both operations from rounding
+    // the final sum. Native wrapNone counterparts retain their fractional
+    // origin. Keep those, text flow and group/cell origins independent.
+    if placement.vertical_relative_to == VerticalImageReference::Paragraph {
+      current_y = (current_y * 20.0).round() / 20.0;
+    }
+    placement.vertical_offset_pt = (placement.vertical_offset_pt * 20.0).trunc() / 20.0;
+  }
   let (mut x_pt, y_pt) = floating_image_position(
     placement,
     flow,
@@ -51844,7 +54362,7 @@ fn table_cell_drawing_baseline_offset(
   text_metrics: &mut TextMetrics,
 ) -> f32 {
   let style = paragraph_base_line_style(paragraph);
-  text_metrics.baseline_offset_in_line_with_windows_metrics(&style, line_height)
+  table_cell_initial_baseline_offset(&style, line_height, text_metrics)
     // The table's first resolved baseline also includes GDI external leading.
     // It is above the glyph baseline, not part of the anchor line's top.
     + table_cell_auto_external_leading(paragraph, &style, text_metrics)
@@ -51866,8 +54384,8 @@ fn table_cell_uses_natural_mixed_text_metrics(
       .is_some_and(|multiple| (multiple - 1.0).abs() > f32::EPSILON)
     || paragraph.inlines.iter().any(|inline| {
       matches!(inline, InlineItem::Text(run)
-        if run.style.automatic_escapement_font_size_pt.is_some()
-          || run.style.baseline_shift_pt.abs() > LAYOUT_EPSILON_PT)
+        if run.style.automatic_escapement_font_size_pt.is_none()
+          && run.style.baseline_shift_pt.abs() > LAYOUT_EPSILON_PT)
     })
   {
     return false;
@@ -51960,6 +54478,7 @@ struct FloatingWrapAnchor<'a> {
   paragraph_anchor_top: f32,
   preseeded_backward_wrap: Option<PreseededBackwardWrap>,
   body_drawings: Option<(&'a body_drawing_wrap::Catalog, usize)>,
+  pictures: Option<&'a legacy_picture_nonoverlap::Plan>,
 }
 
 fn paragraph_initial_floating_image_wrap_exclusions(
@@ -51975,6 +54494,7 @@ fn paragraph_initial_floating_image_wrap_exclusions(
     paragraph_anchor_top,
     preseeded_backward_wrap,
     body_drawings,
+    pictures,
   } = anchor;
   let line_anchor_top = floating_anchor_line_top(
     flow,
@@ -52026,9 +54546,8 @@ fn paragraph_initial_floating_image_wrap_exclusions(
           {
             return None;
           }
-          if top_bottom
-            && let Some(reservation) = body_drawings
-              .and_then(|(catalog, page)| catalog.reservation(flow, inline_index, page))
+          if let Some(reservation) =
+            body_drawings.and_then(|(catalog, page)| catalog.reservation(flow, inline_index, page))
           {
             // Earlier frames can move this paragraph's text origin without
             // moving its already positioned picture. Reusing that physical
@@ -52048,13 +54567,17 @@ fn paragraph_initial_floating_image_wrap_exclusions(
             placement,
             flow,
             text_frame.paragraph_indents(),
-            text_frame.first_line_left,
-            anchor_y,
-            metrics.frame_width_pt,
-            metrics.frame_height_pt,
+            (text_frame.first_line_left, anchor_y),
+            (metrics.frame_width_pt, metrics.frame_height_pt),
+            inside_group,
           );
-          let image_x = frame_x + metrics.content_offset_x_pt;
-          let image_y = frame_y + metrics.content_offset_y_pt;
+          let (image_x, image_y) = pictures
+            .and_then(|plan| plan.position(inline_index))
+            .unwrap_or((
+              frame_x + metrics.content_offset_x_pt,
+              frame_y + metrics.content_offset_y_pt,
+            ));
+          let owner = floating_picture_wrap_owner(placement, flow);
           if top_bottom {
             return vertical_wrap_exclusion(
               flow,
@@ -52062,19 +54585,26 @@ fn paragraph_initial_floating_image_wrap_exclusions(
               image_y - placement.margin_top_pt,
               image_x + metrics.content_width_pt + placement.margin_right_pt,
               image_y + metrics.content_height_pt + placement.margin_bottom_pt,
-            );
+            )
+            .map(|exclusion| WrapExclusion { owner, ..exclusion });
           }
-          Some(WrapExclusion {
-            left_pt: image_x - placement.margin_left_pt,
-            right_pt: image_x + metrics.content_width_pt + placement.margin_right_pt,
-            top_pt: image_y - placement.margin_top_pt,
-            bottom_pt: image_y + metrics.content_height_pt + placement.margin_bottom_pt,
-            side: placement.wrap_side,
-            blocks_flow: false,
-            uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
-            contour_band: None,
-            owner: WrapExclusionOwner::Drawing,
-          })
+          Some(cell_square_picture_wrap_exclusion(
+            WrapExclusion {
+              left_pt: image_x - placement.margin_left_pt,
+              right_pt: image_x + metrics.content_width_pt + placement.margin_right_pt,
+              top_pt: image_y - placement.margin_top_pt,
+              bottom_pt: image_y + metrics.content_height_pt + placement.margin_bottom_pt,
+              side: placement.wrap_side,
+              blocks_flow: false,
+              uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
+              contour_band: None,
+              owner,
+            },
+            placement,
+            flow,
+            text_frame.default_line_left,
+            text_frame.default_line_right,
+          ))
         }
         InlineItem::Shape(shape) => {
           let crate::docx::ImagePlacement::Floating(placement) = shape.placement else {
@@ -52090,6 +54620,14 @@ fn paragraph_initial_floating_image_wrap_exclusions(
           // wrap band before its run is reached. A WPG group's child does not
           // independently acquire the group's full-width exclusion.
           let top_bottom = !inside_group && drawingml_top_bottom_can_pre_register(placement, flow);
+          if !inside_group
+            && let Some(reservation) = body_drawings
+              .and_then(|(catalog, page)| catalog.reservation(flow, inline_index, page))
+          {
+            // A prior body replay already settled this physical rectangle.
+            // Moving earlier text must not move its paragraph-relative fly.
+            return Some(reservation.exclusion);
+          }
           let paragraph_owned =
             !inside_group && drawingml_body_text_frame_can_pre_register(shape, placement, flow);
           // Visible text must see its independently positioned VML fly before
@@ -52104,12 +54642,6 @@ fn paragraph_initial_floating_image_wrap_exclusions(
             && !shape_uses_initial_line_wrap(shape, placement)
           {
             return None;
-          }
-          if vml_square
-            && let Some(reservation) = body_drawings
-              .and_then(|(catalog, page)| catalog.reservation(flow, inline_index, page))
-          {
-            return Some(reservation.exclusion);
           }
           let metrics = floating_shape_metrics_with_auto_fit(shape, placement, flow, text_metrics);
           let anchor_y = if top_bottom
@@ -52131,16 +54663,17 @@ fn paragraph_initial_floating_image_wrap_exclusions(
             anchor_y,
             (metrics.frame_width_pt, metrics.frame_height_pt),
           );
-          let shape_x = if metrics.uses_relative_effect_frame_x {
+          let shape_x = if metrics.uses_effect_frame_x {
             frame_x + metrics.content_offset_x_pt + shape.offset_x_pt * metrics.group_scale_x
           } else {
             adjusted_floating_shape_x(
               placement,
               shape,
               frame_x + shape.offset_x_pt * metrics.group_scale_x,
+              flow,
             )
           };
-          let shape_y = if metrics.uses_relative_effect_frame_y {
+          let shape_y = if metrics.uses_effect_frame_y {
             frame_y + metrics.content_offset_y_pt + shape.offset_y_pt * metrics.group_scale_y
           } else {
             adjusted_floating_shape_y(
@@ -52275,7 +54808,16 @@ fn floating_table_position(
   // or trailing edge still aligns with that reference, so the remainder
   // must retain its sign. Native fixed-grid/page-width controls distinguish
   // this placement from the containing-cell constraint below.
-  floating_frame_position(placement, flow, current_y, table_width, 0.0, true)
+  let (x, y) = floating_frame_position(placement, flow, current_y, table_width, 0.0, true);
+  // Header flys may overlap the body margin, but their grid cannot start
+  // above the physical page. Native page/margin/text anchor controls keep
+  // negative offsets until this boundary, independently of cell alignment.
+  // Ordinary body and nested-cell frames retain their own constraints.
+  if flow.text_segmentation == TextSegmentation::RepeatingSlot {
+    (x, y.max(0.0))
+  } else {
+    (x, y)
+  }
 }
 
 fn floating_table_horizontal_alignment_offset(table: &Table, flow: FlowContext) -> f32 {
@@ -52611,6 +55153,16 @@ fn floating_table_collision_adjusted_x(
   }
 }
 
+fn paragraph_frame_numeric_offset_axes(placement: FloatingFramePlacement) -> (bool, bool) {
+  (
+    placement.horizontal_alignment.is_none() && placement.horizontal_offset_pt != 0.0,
+    placement.vertical_offset_pt != 0.0
+      && (placement.vertical_offset_explicit
+        || matches!(placement.vertical_anchor, FrameVerticalAnchor::Text)
+        || placement.vertical_alignment.is_none()),
+  )
+}
+
 fn paragraph_frame_position(
   mut placement: FloatingFramePlacement,
   flow: FlowContext,
@@ -52618,6 +55170,7 @@ fn paragraph_frame_position(
   frame_width: f32,
   frame_height: f32,
 ) -> (f32, f32) {
+  let numeric_axes = paragraph_frame_numeric_offset_axes(placement);
   // Legacy Word's zero frame coordinate is the binary Inline position
   // (MS-DOC sprmPDyaAbs), not an absolute page top. Native zero/one-twip
   // controls distinguish the sentinel; modern Word keeps explicit zero.
@@ -52637,6 +55190,12 @@ fn paragraph_frame_position(
   // yAlign, including y=0. Text-relative anchors also ignore yAlign.
   if placement.horizontal_alignment.is_some() {
     placement.horizontal_offset_pt = 0.0;
+  } else if numeric_axes.0 {
+    // Word retains MS-DOC's XAS_plusOne/YAS_plusOne encoding in numeric
+    // framePr coordinates. Native positive/negative and page/margin controls
+    // agree in both legacy and modern modes. Keep zero's sentinel semantics
+    // and aligned positions separate; other floating objects use plain twips.
+    placement.horizontal_offset_pt -= 1.0 / units::TWIPS_PER_POINT;
   }
   if placement.vertical_offset_explicit
     || matches!(placement.vertical_anchor, FrameVerticalAnchor::Text)
@@ -52644,6 +55203,9 @@ fn paragraph_frame_position(
     placement.vertical_alignment = None;
   } else if placement.vertical_alignment.is_some() {
     placement.vertical_offset_pt = 0.0;
+  }
+  if numeric_axes.1 {
+    placement.vertical_offset_pt -= 1.0 / units::TWIPS_PER_POINT;
   }
   let logical_margin_x = if matches!(placement.horizontal_anchor, FrameHorizontalAnchor::Page)
     && flow.text_segmentation != TextSegmentation::TableCell
@@ -52727,7 +55289,40 @@ fn frame_wrap_blocks_flow(wrap: FrameWrapMode) -> bool {
   matches!(wrap, FrameWrapMode::NotBeside)
 }
 
-fn floating_frame_blocks_flow(frame: &FloatingFrame) -> bool {
+fn paragraph_frame_has_fixed_body_position(
+  placement: FloatingFramePlacement,
+  flow: FlowContext,
+) -> bool {
+  flow.text_segmentation == TextSegmentation::Body
+    && !flow.inside_paragraph_frame
+    && match placement.vertical_anchor {
+      FrameVerticalAnchor::Page | FrameVerticalAnchor::Margin => true,
+      FrameVerticalAnchor::Text => {
+        placement.vertical_offset_explicit
+          && (flow.compatibility_mode >= 15 || placement.vertical_offset_pt != 0.0)
+      }
+    }
+}
+
+fn floating_frame_blocks_flow(frame: &FloatingFrame, flow: FlowContext) -> bool {
+  if matches!(
+    frame.placement.vertical_anchor,
+    FrameVerticalAnchor::Page | FrameVerticalAnchor::Margin
+  ) {
+    // A fixed frame reserves its physical band; it does not consume the
+    // body cursor up to that band. Word's bottom-aligned notBeside control
+    // retains body text above the frame even when its anchor follows onto
+    // the next page. The full-width exclusion still clears intersecting lines.
+    return false;
+  }
+  if paragraph_frame_has_fixed_body_position(frame.placement, flow) {
+    // Explicit text-relative frames retain their first position while their
+    // wrap band can move a preceding body line. Native y=0/1, vSpace and
+    // preceding-font/exact-line controls distinguish that replay from inline
+    // frame flow. Advancing directly to the frame bottom loses the moved
+    // line; with no collision, it incorrectly separates overlapping frames.
+    return false;
+  }
   if matches!(frame.height_rule, FrameHeightRule::Exact)
     && frame.placement.vertical_offset_explicit
     && matches!(frame.placement.vertical_anchor, FrameVerticalAnchor::Text)
@@ -52769,6 +55364,20 @@ fn effective_vertical_reference(
 
 fn effective_layout_in_cell(placement: FloatingImagePlacement, flow: FlowContext) -> bool {
   effective_layout_in_cell_with_mode(placement, flow.text_segmentation, flow.compatibility_mode)
+}
+
+fn floating_picture_wrap_owner(
+  placement: FloatingImagePlacement,
+  flow: FlowContext,
+) -> WrapExclusionOwner {
+  if flow.table_cell_in_header_footer
+    && placement.paint_order.is_drawing_ml()
+    && !effective_layout_in_cell(placement, flow)
+  {
+    WrapExclusionOwner::RepeatingPageOwnedCellDrawing
+  } else {
+    WrapExclusionOwner::Drawing
+  }
 }
 
 fn line_reference_forces_layout_in_cell(
@@ -52823,8 +55432,8 @@ struct FloatingShapeMetrics {
   content_height_pt: f32,
   group_scale_x: f32,
   group_scale_y: f32,
-  uses_relative_effect_frame_x: bool,
-  uses_relative_effect_frame_y: bool,
+  uses_effect_frame_x: bool,
+  uses_effect_frame_y: bool,
   vml_wrap_bounds: Option<FrameBounds>,
 }
 
@@ -52849,6 +55458,10 @@ impl FloatingShapeMetrics {
   }
 
   fn with_content_size(mut self, width_pt: f32, height_pt: f32) -> Self {
+    if let Some(bounds) = &mut self.vml_wrap_bounds {
+      bounds.width_pt = (bounds.width_pt - self.content_width_pt + width_pt).max(0.0);
+      bounds.height_pt = (bounds.height_pt - self.content_height_pt + height_pt).max(0.0);
+    }
     self.frame_width_pt = (self.frame_width_pt - self.content_width_pt + width_pt).max(0.0);
     self.frame_height_pt = (self.frame_height_pt - self.content_height_pt + height_pt).max(0.0);
     self.content_width_pt = width_pt.max(0.0);
@@ -52858,10 +55471,11 @@ impl FloatingShapeMetrics {
 }
 
 #[derive(Clone, Copy)]
-enum RelativeShapeEffectFrame {
+enum ShapeEffectFrame {
   None,
   Whole,
   PerAxis,
+  Aligned { horizontal: bool, vertical: bool },
 }
 
 fn floating_shape_metrics_for_sizes(
@@ -52869,26 +55483,30 @@ fn floating_shape_metrics_for_sizes(
   authored_height_pt: f32,
   relative_frame_width_pt: Option<f32>,
   relative_frame_height_pt: Option<f32>,
-  effect_frame: RelativeShapeEffectFrame,
+  effect_frame: ShapeEffectFrame,
   effect_extent_pt: [f32; 4],
 ) -> FloatingShapeMetrics {
   // ECMA-376 Part 1 §20.4.2.6 defines effectExtent as additional space on
   // each edge of the drawing, while §20.4.2.17 explicitly makes those
-  // additions part of wrapSquare's virtual bounding rectangle. When
-  // wp14:sizeRelH/V supplies a positive size for that rectangle, Word applies
-  // the percentage to the outer effect frame: the painted wp:extent starts at
-  // l/t and occupies the remainder inside r/b. Each percentage owns only its
-  // own axis in Word2013 compatibility: a relative width does not move the
+  // additions part of wrapSquare's virtual bounding rectangle. WPS relative
+  // sizing uses that outer effect frame independently of the wrap mode:
+  // the painted wp:extent starts at l/t and occupies the remainder inside
+  // r/b. Each percentage owns only its own axis in Word2013 compatibility:
+  // a relative width does not move the
   // fixed-height object down by t or add t+b to its vertical allocation.
   // Native same-source mode14/15 controls distinguish Word2010's whole frame:
   // it retains both offsets when either relative dimension is positive.
-  let (uses_relative_effect_frame_x, uses_relative_effect_frame_y) = match effect_frame {
-    RelativeShapeEffectFrame::None => (false, false),
-    RelativeShapeEffectFrame::Whole => {
+  let (uses_effect_frame_x, uses_effect_frame_y) = match effect_frame {
+    ShapeEffectFrame::None => (false, false),
+    ShapeEffectFrame::Aligned {
+      horizontal,
+      vertical,
+    } => (horizontal, vertical),
+    ShapeEffectFrame::Whole => {
       let relative = relative_frame_width_pt.is_some() || relative_frame_height_pt.is_some();
       (relative, relative)
     }
-    RelativeShapeEffectFrame::PerAxis => (
+    ShapeEffectFrame::PerAxis => (
       relative_frame_width_pt.is_some(),
       relative_frame_height_pt.is_some(),
     ),
@@ -52899,12 +55517,12 @@ fn floating_shape_metrics_for_sizes(
     effect_right_pt,
     effect_bottom_pt,
   ] = effect_extent_pt;
-  let (effect_left_pt, effect_right_pt) = if uses_relative_effect_frame_x {
+  let (effect_left_pt, effect_right_pt) = if uses_effect_frame_x {
     (effect_left_pt.max(0.0), effect_right_pt.max(0.0))
   } else {
     (0.0, 0.0)
   };
-  let (effect_top_pt, effect_bottom_pt) = if uses_relative_effect_frame_y {
+  let (effect_top_pt, effect_bottom_pt) = if uses_effect_frame_y {
     (effect_top_pt.max(0.0), effect_bottom_pt.max(0.0))
   } else {
     (0.0, 0.0)
@@ -52927,8 +55545,8 @@ fn floating_shape_metrics_for_sizes(
     content_height_pt,
     group_scale_x: 1.0,
     group_scale_y: 1.0,
-    uses_relative_effect_frame_x,
-    uses_relative_effect_frame_y,
+    uses_effect_frame_x,
+    uses_effect_frame_y,
     vml_wrap_bounds: None,
   }
 }
@@ -52945,42 +55563,84 @@ fn floating_shape_metrics(
     relative_width = placement
       .relative_width_to
       .zip(placement.relative_width_pct)
-      .filter(|(_, percent)| *percent > 0.0)
-      .map(|(reference, percent)| {
+      .and_then(|(reference, percent)| {
         wordprocessing_relative_shape_extent(horizontal_reference_width(reference, flow), percent)
       });
     relative_height = placement
       .relative_height_to
       .zip(placement.relative_height_pct)
-      .filter(|(_, percent)| *percent > 0.0)
-      .map(|(reference, percent)| {
+      .and_then(|(reference, percent)| {
         wordprocessing_relative_shape_extent(vertical_reference_height(reference, flow), percent)
       });
   }
-  let metrics = floating_shape_metrics_for_sizes(
-    shape.width_pt * group_scale_x,
-    shape.height_pt * group_scale_y,
-    relative_width,
-    relative_height,
-    if shape.word_text_frame && !shape.wordprocessing_shape_host {
-      // Legacy VML textbox percentages size the complete device enclosure
-      // for square, top/bottom and non-wrapping anchors alike. Both axes
-      // retain their outsets when either relative dimension is enabled.
-      RelativeShapeEffectFrame::Whole
-    } else if !matches!(placement.wrap, ImageWrapMode::Square) {
-      RelativeShapeEffectFrame::None
-    } else if shape.wordprocessing_shape_host && flow.compatibility_mode >= 15 {
-      RelativeShapeEffectFrame::PerAxis
-    } else {
-      RelativeShapeEffectFrame::Whole
-    },
-    [
+  let aligned_outsets = (shape.word_text_frame
+    && !shape.wordprocessing_shape_host
+    && flow.text_segmentation == TextSegmentation::Body
+    && !flow.inside_paragraph_frame
+    && placement.wrap == ImageWrapMode::Square
+    && relative_width.is_none()
+    && relative_height.is_none()
+    && (placement.horizontal_alignment.is_some() || placement.vertical_alignment.is_some()))
+  .then(|| crate::docx::vml_textbox_frame_outsets(shape))
+  .flatten();
+  let effect_extents = aligned_outsets
+    .as_ref()
+    .map(|extent| {
+      [
+        extent.left_pt,
+        extent.top_pt,
+        extent.right_pt,
+        extent.bottom_pt,
+      ]
+    })
+    .unwrap_or([
       shape.effect_left_pt,
       shape.effect_top_pt,
       shape.effect_right_pt,
       shape.effect_bottom_pt,
-    ],
+    ]);
+  let mut metrics = floating_shape_metrics_for_sizes(
+    shape.width_pt * group_scale_x,
+    shape.height_pt * group_scale_y,
+    relative_width,
+    relative_height,
+    if aligned_outsets.is_some() {
+      ShapeEffectFrame::Aligned {
+        horizontal: flow.compatibility_mode < 15 || placement.horizontal_alignment.is_some(),
+        vertical: flow.compatibility_mode < 15 || placement.vertical_alignment.is_some(),
+      }
+    } else if shape.wordprocessing_shape_host {
+      // Native WPS controls retain the same effect enclosure for None,
+      // Square, TopBottom, Tight and Through, with or without txBox and
+      // spAutoFit. Wrapping does not own relative shape sizing.
+      if flow.compatibility_mode >= 15 {
+        ShapeEffectFrame::PerAxis
+      } else {
+        ShapeEffectFrame::Whole
+      }
+    } else if shape.word_text_frame {
+      // Legacy VML textbox percentages size the complete device enclosure
+      // for square, top/bottom and non-wrapping anchors alike. Both axes
+      // retain their outsets when either relative dimension is enabled.
+      ShapeEffectFrame::Whole
+    } else if !matches!(placement.wrap, ImageWrapMode::Square) {
+      ShapeEffectFrame::None
+    } else {
+      ShapeEffectFrame::Whole
+    },
+    effect_extents,
   );
+  if let Some(outsets) = aligned_outsets {
+    // The aligned coordinate belongs to the outer VML device frame; paint
+    // retains the authored shape and its text. Square wrapping encloses both
+    // outsets even though the content starts at the inner near edge.
+    metrics.vml_wrap_bounds = Some(FrameBounds {
+      x_pt: -outsets.left_pt,
+      y_pt: -outsets.top_pt,
+      width_pt: metrics.content_width_pt + outsets.left_pt + outsets.right_pt,
+      height_pt: metrics.content_height_pt + outsets.top_pt + outsets.bottom_pt,
+    });
+  }
   FloatingShapeMetrics {
     group_scale_x,
     group_scale_y,
@@ -52988,16 +55648,18 @@ fn floating_shape_metrics(
   }
 }
 
-fn wordprocessing_relative_shape_extent(reference_pt: f32, percent: f32) -> f32 {
-  // wp14 percentages size a Word host in integer document twips before
-  // effectExtent is removed. Native H/V controls give166.1/209.35pt rather
-  // than their continuous166.12/209.37pt values. Recover the two integral
-  // source units before multiplication so a rounded f32 cannot lose a twip
-  // at an exact boundary. This is the same truncating host boundary used by
-  // wordprocessing_twip_host_emu_to_points during import.
+fn wordprocessing_relative_shape_extent(reference_pt: f32, percent: f32) -> Option<f32> {
+  // Word realizes wp14 percentages in thousandths, then rounds the result
+  // to document twips before removing effectExtent. Native 79.950/79.999%
+  // controls both use79.9%; half-twip controls round upwards. Recover the
+  // integral XML units first so f32 transport cannot lose an exact boundary.
+  // A percentage truncated to zero retains the authored absolute extent,
+  // just like an explicit zero percentage.
   let twips = (f64::from(reference_pt) * f64::from(units::TWIPS_PER_POINT)).round();
   let percentage_units = (f64::from(percent) * 100_000.0).round();
-  ((twips * percentage_units / 100_000.0).trunc() / f64::from(units::TWIPS_PER_POINT)) as f32
+  let per_mille = (percentage_units / 100.0).trunc();
+  (per_mille > 0.0)
+    .then(|| ((twips * per_mille / 1000.0).round() / f64::from(units::TWIPS_PER_POINT)) as f32)
 }
 
 fn wordprocessing_shape_effect_paint_rect(
@@ -53005,7 +55667,12 @@ fn wordprocessing_shape_effect_paint_rect(
   flow: FlowContext,
   rect: ShapeTextBoxRect,
 ) -> ShapeTextBoxRect {
+  // Native paired empty-story controls retain logical coordinates for an
+  // ordinary shape, but realize a WPS textbox on the printer grid. The
+  // authored story identity survives empty/linked content; txBox alone does
+  // not establish this boundary. Keep bitmap allocation's own grid separate.
   if !shape.wordprocessing_shape_host
+    || shape.text_box_link.is_none()
     || shape.flip_horizontal
     || shape.flip_vertical
     || shape.static3d.is_some()
@@ -53142,7 +55809,8 @@ fn floating_shape_metrics_with_auto_fit(
     metrics.content_width_pt,
     metrics.content_height_pt,
     text_metrics,
-  );
+  )
+  .or(metrics.vml_wrap_bounds);
   metrics
 }
 
@@ -53329,11 +55997,12 @@ fn adjusted_floating_shape_x(
   placement: FloatingImagePlacement,
   shape: &InlineShape,
   x_pt: f32,
+  flow: FlowContext,
 ) -> f32 {
   if shape.effect_left_pt <= LAYOUT_EPSILON_PT && shape.effect_right_pt <= LAYOUT_EPSILON_PT {
     return x_pt;
   }
-  match placement.horizontal_alignment {
+  match physical_horizontal_image_alignment(placement.horizontal_alignment, flow) {
     Some(HorizontalImageAlignment::Left) | Some(HorizontalImageAlignment::Inside) => {
       x_pt + (shape.effect_left_pt - BorderStyle::default().width_pt / 2.0).max(0.0)
     }
@@ -53370,46 +56039,80 @@ fn horizontal_reference_width(reference: HorizontalImageReference, flow: FlowCon
   match reference {
     HorizontalImageReference::Page => flow.setup.width_pt,
     HorizontalImageReference::Margin => {
-      flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt
+      let (left, right) = floating_page_margins(flow);
+      flow.setup.width_pt - left - right
     }
     HorizontalImageReference::Column => flow.content_width,
     HorizontalImageReference::Character => 0.0,
     HorizontalImageReference::LeftMargin => horizontal_page_left_width(flow),
     HorizontalImageReference::RightMargin => horizontal_page_right_width(flow),
-    HorizontalImageReference::InsideMargin => horizontal_inside_outside_width(true, flow),
-    HorizontalImageReference::OutsideMargin => horizontal_inside_outside_width(false, flow),
+    // Word's wp14:sizeRelH inner/outer slots use the opposite side from
+    // wp:positionH inner/outer. Native unequal-margin controls distinguish
+    // these both with and without mirrorMargins: inner uses the right
+    // margin on an odd page and the left on an even page. LO's
+    // GraphicImport::lcl_attribute similarly maps sizeRelH insideMargin to
+    // PAGE_RIGHT and outsideMargin to PAGE_LEFT. Do not invert positioning.
+    HorizontalImageReference::InsideMargin => horizontal_inside_outside_width(false, flow),
+    HorizontalImageReference::OutsideMargin => horizontal_inside_outside_width(true, flow),
   }
+}
+
+fn floating_margin_page_index(flow: FlowContext) -> usize {
+  // The first virtual page can be even; a later section restart does not
+  // reset the physical side that supplied this flow's column geometry.
+  flow.column_page_index + usize::from(flow.repeating_slots.initial_page_is_even)
+}
+
+fn physical_horizontal_image_alignment(
+  alignment: Option<HorizontalImageAlignment>,
+  flow: FlowContext,
+) -> Option<HorizontalImageAlignment> {
+  // ECMA-376 20.4.3.1: inside/outside select facing edges of the alignment
+  // base, independently of mirrorMargins. Native page/margin/column controls
+  // place inside on the left of an odd opening page and the right of its
+  // even follow. An initial even page reverses those sides; a later section's
+  // page-number restart does not. Position and effect outsets share this side.
+  let odd_page = floating_margin_page_index(flow).is_multiple_of(2);
+  match alignment {
+    Some(HorizontalImageAlignment::Inside) => Some(if odd_page {
+      HorizontalImageAlignment::Left
+    } else {
+      HorizontalImageAlignment::Right
+    }),
+    Some(HorizontalImageAlignment::Outside) => Some(if odd_page {
+      HorizontalImageAlignment::Right
+    } else {
+      HorizontalImageAlignment::Left
+    }),
+    _ => alignment,
+  }
+}
+
+fn floating_page_margins(flow: FlowContext) -> (f32, f32) {
+  // ECMA-376 17.15.1.57 mirrorMargins and 17.6.11 pgMar: the drawing's
+  // reference rectangles use the realized page margins, including binding
+  // gutter, rather than the unmirrored section values.
+  effective_horizontal_page_margins(flow.setup, floating_margin_page_index(flow))
 }
 
 fn horizontal_page_left_width(flow: FlowContext) -> f32 {
-  if flow.setup.mirror_margins {
-    horizontal_inside_outside_width(false, flow)
-  } else {
-    flow.setup.margin_left_pt
-  }
+  floating_page_margins(flow).0
 }
 
 fn horizontal_page_right_width(flow: FlowContext) -> f32 {
-  if flow.setup.mirror_margins {
-    horizontal_inside_outside_width(true, flow)
-  } else {
-    flow.setup.margin_right_pt
-  }
+  floating_page_margins(flow).1
 }
 
 fn horizontal_inside_outside_width(inside: bool, flow: FlowContext) -> f32 {
-  let odd_page = flow.section_page_index.is_multiple_of(2);
-  match (inside, odd_page) {
-    (true, true) | (false, false) => flow.setup.margin_left_pt,
-    (true, false) | (false, true) => flow.setup.margin_right_pt,
-  }
+  let (left, right) = floating_page_margins(flow);
+  let odd_page = floating_margin_page_index(flow).is_multiple_of(2);
+  if inside == odd_page { left } else { right }
 }
 
 fn horizontal_inside_outside_base(inside: bool, flow: FlowContext) -> (f32, f32) {
   let width = horizontal_inside_outside_width(inside, flow);
-  let odd_page = flow.section_page_index.is_multiple_of(2);
-  let left_side = matches!((inside, odd_page), (true, true) | (false, false));
-  if left_side {
+  let odd_page = floating_margin_page_index(flow).is_multiple_of(2);
+  if inside == odd_page {
     (0.0, width)
   } else {
     (flow.setup.width_pt - width, width)
@@ -53432,12 +56135,13 @@ fn aligned_horizontal_offset(
   alignment: Option<HorizontalImageAlignment>,
   reference_width: f32,
   image_width: f32,
+  flow: FlowContext,
 ) -> f32 {
   // ECMA-376 Part 1 §20.4.2.1 aligns the object to the selected base. Keep
   // the signed difference so an object wider than that base is still truly
   // centered or right-aligned instead of being clamped to its left edge.
   let available = reference_width - image_width;
-  match alignment {
+  match physical_horizontal_image_alignment(alignment, flow) {
     Some(HorizontalImageAlignment::Center) => available / 2.0,
     Some(HorizontalImageAlignment::Right) | Some(HorizontalImageAlignment::Outside) => available,
     Some(HorizontalImageAlignment::Left) | Some(HorizontalImageAlignment::Inside) | None => 0.0,
@@ -53563,8 +56267,8 @@ fn format_paragraph_with_left_indent_compat(
     target.text_metrics,
   )
   .with_border_context(border_context)
-  .with_shading_spacing(shading_context, spacing_before_pt)
   .with_suppressed_spacing_before(suppressed_spacing_before_pt)
+  .with_shading_spacing(shading_context, spacing_before_pt)
   .with_decoration_outer_bottom(decoration_outer_bottom_pt)
   .format_with_reflow(
     target.current,
@@ -53700,6 +56404,7 @@ struct TextFrame {
   table_cell_baseline_offset_pt: Option<f32>,
   table_cell_line_baseline_reference_pt: Option<f32>,
   drawing_wrap_baseline_offset_pt: f32,
+  following_table_wrap_baseline_offset_pt: f32,
   single_body_picture_minimum_pt: Option<f32>,
   picture_only_cell: bool,
 }
@@ -53759,6 +56464,12 @@ impl TextFrame {
       }))
     .then(|| {
       table_cell_initial_baseline_offset(&base_line_style, base_line_height, text_metrics)
+        // The resolved cell cursor includes Auto's external leading. Remove
+        // that same ascent when recovering an inline object's frame top.
+        // Native mixed text/picture controls vary font, size, paragraph
+        // position and compatibility mode; a tall picture stays at the cell
+        // print edge while only the font's text baseline carries the leading.
+        + table_cell_auto_external_leading(paragraph, &base_line_style, text_metrics)
         + flow.table_cell_baseline_delta_pt
     });
     let picture_only_cell =
@@ -53812,6 +56523,32 @@ impl TextFrame {
           .is_some_and(|multiple| multiple > 1.0)
         && paragraph_has_mixed_office_math(paragraph))
       .then_some(base_line_height);
+    let following_table_wrap_baseline_offset_pt =
+      if flow.horizontal_table_cell && flow.layout_cell_bounds.is_some() {
+        if matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+          && paragraph_has_only_office_math(paragraph)
+        {
+          flow.table_cell_anchor_baseline_offset_pt.unwrap_or(0.0)
+        } else {
+          table_cell_initial_baseline_offset(&base_line_style, base_line_height, text_metrics)
+        }
+      } else {
+        0.0
+      };
+    let drawing_wrap_baseline_offset_pt = if flow.horizontal_table_cell
+      && flow.layout_cell_bounds.is_some()
+      && !flow.inside_paragraph_frame
+    {
+      // Pictures use the same actual cursor-to-frame conversion as their
+      // anchor position. A following table has a separate line-frame owner:
+      // a table-first cell can retain a zero physical-edge cursor while its
+      // subsequent ordinary paragraph still supplies a text ascent.
+      flow
+        .table_cell_anchor_baseline_offset_pt
+        .unwrap_or(following_table_wrap_baseline_offset_pt)
+    } else {
+      following_table_wrap_baseline_offset_pt
+    };
     Self {
       default_line_left,
       first_line_left,
@@ -53872,22 +56609,8 @@ impl TextFrame {
         text_metrics,
       ),
       single_body_picture_minimum_pt: single_body_picture_minimum(paragraph, flow, text_metrics),
-      drawing_wrap_baseline_offset_pt: if flow.horizontal_table_cell
-        && flow.layout_cell_bounds.is_some()
-      {
-        if matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
-          && paragraph_has_only_office_math(paragraph)
-        {
-          // The cell owner carries its actual ascent across lower transitions.
-          // Reconstructing it from multiplied line height charges the leading
-          // again; a frame-top/measurement cursor has no ascent to remove.
-          flow.table_cell_anchor_baseline_offset_pt.unwrap_or(0.0)
-        } else {
-          table_cell_initial_baseline_offset(&base_line_style, base_line_height, text_metrics)
-        }
-      } else {
-        0.0
-      },
+      drawing_wrap_baseline_offset_pt,
+      following_table_wrap_baseline_offset_pt,
       picture_only_cell,
     }
   }
@@ -54361,11 +57084,19 @@ struct TerminalTabExtent {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ParagraphShadingFragment {
+struct ParagraphDecorationFragment {
   page_index: usize,
   column_index: usize,
   item_start: usize,
   bounds: FrameBounds,
+  kind: ParagraphDecorationFragmentKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ParagraphDecorationFragmentKind {
+  Content,
+  EmptyMaster,
+  EmptyFollow,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -54389,7 +57120,7 @@ struct TextFrameState {
   table_cell_wrap_vertical_advance_pt: f32,
   table_cell_soft_break_line: Option<TableCellSoftBreakLine>,
   page_follows: Vec<TextFrameFollow>,
-  shading_fragments: Vec<ParagraphShadingFragment>,
+  decoration_fragments: Vec<ParagraphDecorationFragment>,
   line_alignment_fragments: Vec<ParagraphLineAlignment>,
   terminal_tab_extents: Vec<TerminalTabExtent>,
   pending_bookmark_page_references: Vec<(String, usize)>,
@@ -54401,9 +57132,13 @@ struct TextFrameState {
   line_content_item_start_index: usize,
   line_content_height: f32,
   line_inline_object_portion_height: f32,
+  line_wrap_clearance_bottom_pt: Option<f32>,
   line_has_horizontal_rule: bool,
   line_text_extents: WordLineTextExtents,
+  line_last_blank_inline: Option<usize>,
   line_has_note_separator_mark: bool,
+  pending_note_separator_marks: Vec<PendingNoteSeparatorMark>,
+  line_used_shrink_fit: bool,
   smart_justify_terminal_overhang_pt: f32,
   overflow_punctuation_overhang_pt: f32,
   // Authored tab boundaries divide the line into independently ordered spans.
@@ -54425,7 +57160,7 @@ impl TextFrameState {
       table_cell_wrap_vertical_advance_pt: 0.0,
       table_cell_soft_break_line: None,
       page_follows: Vec::new(),
-      shading_fragments: Vec::new(),
+      decoration_fragments: Vec::new(),
       line_alignment_fragments: Vec::new(),
       terminal_tab_extents: Vec::new(),
       pending_bookmark_page_references: Vec::new(),
@@ -54436,14 +57171,122 @@ impl TextFrameState {
       line_content_item_start_index: 0,
       line_content_height: 0.0,
       line_inline_object_portion_height: 0.0,
+      line_wrap_clearance_bottom_pt: None,
       line_has_horizontal_rule: false,
       line_text_extents: WordLineTextExtents::default(),
+      line_last_blank_inline: None,
       line_has_note_separator_mark: false,
+      pending_note_separator_marks: Vec::new(),
+      line_used_shrink_fit: false,
       smart_justify_terminal_overhang_pt: 0.0,
       overflow_punctuation_overhang_pt: 0.0,
       bidi_tab_starts: Vec::new(),
       line_word_spacing_start_index: None,
       implicit_decimal_tab_done: false,
+    }
+  }
+
+  fn resolve_blank_line_metrics(
+    &mut self,
+    paragraph: &crate::docx::Paragraph,
+    active: ActiveTextFrame,
+    line_height: &mut f32,
+    final_line: bool,
+    text_metrics: &mut TextMetrics,
+  ) {
+    let Some(index) = self.line_last_blank_inline else {
+      return;
+    };
+    if self.line_text_extents.has_text
+      || self.line_text_extents.has_explicit_line_break
+      || self.line_inline_object_portion_height > LAYOUT_EPSILON_PT
+      || self.line_has_note_separator_mark
+      || self.line_has_horizontal_rule
+      || active.flow.text_segmentation != TextSegmentation::Body
+      || paragraph.format.bidi
+      || paragraph.format.vertical_text_flow.is_some()
+      || !matches!(active.frame.line_height_rule, LineHeightRule::Auto)
+      || !paragraph_line_spacing_base_covers_line_height(paragraph)
+      || document_grid_line_metrics(
+        1.0,
+        paragraph,
+        active.flow.setup,
+        active.flow.text_segmentation,
+      )
+      .is_some()
+    {
+      return;
+    }
+    let style = if final_line {
+      &paragraph.base_style
+    } else {
+      match &paragraph.inlines[index] {
+        InlineItem::Text(run) => &run.style,
+        InlineItem::PositionalTab(tab) => &tab.style,
+        _ => return,
+      }
+    };
+    // Native Word's blank-only physical line uses the last consumed
+    // portion's font; the terminal line instead uses the paragraph mark.
+    // Earlier larger spaces and painted leaders do not supply a maximum.
+    // Keep its resolved baseline distinct from printable text participation.
+    let mut extents = WordLineTextExtents::default();
+    extents.include(
+      TextPortion::new(style, " "),
+      active.frame.script_sensitive_line_height,
+      false,
+      false,
+      active.flow.compatibility_mode,
+      text_metrics,
+    );
+    extents.has_text = false;
+    extents.has_blank_line_metrics = true;
+    // Use the same resolved font cell for the baseline and automatic spacing.
+    // A fresh generic font query loses Word's retained DEFAULT_CHARSET metrics,
+    // shortening blank tab lines even though their baselines use that cell.
+    *line_height = extents.height_with_line_spacing(paragraph.format.line_height_pt.unwrap_or(1.0));
+    self.line_content_height = extents.height_pt();
+    self.line_text_extents = extents;
+  }
+
+  fn paint_note_separator_marks(
+    &mut self,
+    current: &mut Page,
+    line_top_pt: f32,
+    line_height_pt: f32,
+    frame: TextFrame,
+    metrics: &mut TextMetrics,
+  ) {
+    if self.pending_note_separator_marks.is_empty() {
+      return;
+    }
+    let has_visible_text = current.items[self.line_content_item_start_index..]
+      .iter()
+      .any(|item| {
+        matches!(item, PageItem::Text(run) if !run.style.semantic_only
+        && text_run_affects_line_height(&run.text))
+      });
+    let paint_height =
+      frame.text_baseline_line_height_for_text(line_height_pt, self.line_text_extents);
+    for pending in self.pending_note_separator_marks.drain(..) {
+      let font =
+        metrics.line_vertical_metrics_for_text(NOTE_SEPARATOR_METRIC_TEXT, &pending.mark.style);
+      let baseline = if has_visible_text {
+        self.line_text_extents.ascent_pt
+      } else {
+        // An otherwise empty separator line retains excess paragraph-mark
+        // height above its special character. Visible run ascent replaces this
+        // empty-line owner, as native 12/24pt mark/literal controls distinguish.
+        font.directwrite_baseline_offset_pt + (paint_height - font.line_height_pt()).max(0.0)
+      };
+      push_note_separator_mark(
+        current,
+        &pending.mark,
+        pending.x_pt,
+        line_top_pt + baseline,
+        pending.width_pt,
+        metrics,
+      );
     }
   }
 
@@ -54505,8 +57348,10 @@ impl TextFrameState {
     // before committing its fragment; a paragraph follow suppresses the
     // consumed upper spacing and carries bookmarks/drawings with the text.
     let physical_cell_line = active.flow.table_cell_complete_first_line_fit;
-    let column_note_line =
-      active.flow.text_segmentation == TextSegmentation::Notes && active.flow.columns.count > 1;
+    // A bounded note story can overflow even when each paragraph has only
+    // one physical line. Local note measurements use unbounded limits; real
+    // single-column endnotes need the same first-line follow as column notes.
+    let note_line = active.flow.text_segmentation == TextSegmentation::Notes;
     let lower_spacing_pt = if active.flow.table_cell_legacy_nested_row_follow {
       0.0
     } else {
@@ -54535,9 +57380,26 @@ impl TextFrameState {
       && self.line_fragments.is_empty()
       && (active.flow.text_segmentation == TextSegmentation::Body
         || physical_cell_line
-        || column_note_line)
-      && page_has_body_region_items_before(page, active.flow, self.alignment_item_start)
-      && exceeds_bottom;
+        || note_line)
+      && exceeds_bottom
+      && (page_has_body_region_items_before(page, active.flow, self.alignment_item_start)
+        || (physical_cell_line
+          && page.frame_fragments.iter().rev().any(|fragment| {
+            // Empty cell paragraphs consume line boxes without painting an
+            // item. Native blank/visible-prefix controls keep the same cut:
+            // the first visible paragraph must not bypass it merely because
+            // every preceding lower was blank. Require an earlier completed
+            // line in this fragment, so an oversized first lower can still
+            // make progress on an otherwise empty cell follow.
+            fragment.kind == FrameFragmentKind::ParagraphLine
+              && fragment.item_start == fragment.item_end
+              && fragment.item_end <= self.alignment_item_start
+              && fragment.bounds.is_some_and(|bounds| {
+                bounds.height_pt > LAYOUT_EPSILON_PT
+                  && bounds.y_pt >= active.flow.content_top_pt - LAYOUT_EPSILON_PT
+                  && bounds.y_pt + bounds.height_pt <= y + LAYOUT_EPSILON_PT
+              })
+          })));
   }
 
   fn note_physical_line(
@@ -54572,10 +57434,11 @@ impl TextFrameState {
       }
     }
     if !body
-      || !paragraph
-        .format
-        .shading
-        .is_some_and(|paint| paint.is_visible())
+      || (paragraph.format.borders.is_empty()
+        && !paragraph
+          .format
+          .shading
+          .is_some_and(|paint| paint.is_visible()))
     {
       return;
     }
@@ -54604,7 +57467,8 @@ impl TextFrameState {
       width_pt: (right - frame.paragraph_left).max(0.0),
       height_pt: line.height_pt,
     };
-    if let Some(fragment) = self.shading_fragments.last_mut()
+    if let Some(fragment) = self.decoration_fragments.last_mut()
+      && fragment.kind == ParagraphDecorationFragmentKind::Content
       && fragment.page_index == line.page_index
       && fragment.column_index == flow.column_index
       && (fragment.bounds.x_pt - bounds.x_pt).abs() < LAYOUT_EPSILON_PT
@@ -54616,12 +57480,35 @@ impl TextFrameState {
       fragment.bounds.height_pt = bottom - fragment.bounds.y_pt;
       return;
     }
-    self.shading_fragments.push(ParagraphShadingFragment {
+    self.decoration_fragments.push(ParagraphDecorationFragment {
       page_index: line.page_index,
       column_index: flow.column_index,
       item_start: line.item_start,
       bounds,
+      kind: ParagraphDecorationFragmentKind::Content,
     });
+  }
+
+  fn note_explicit_break_line(
+    &mut self,
+    paragraph: &crate::docx::Paragraph,
+    flow: FlowContext,
+    frame: TextFrame,
+    line: ParagraphPhysicalLine,
+    empty_leading_break: bool,
+  ) {
+    let first_fragment = self.decoration_fragments.is_empty();
+    self.note_physical_line(paragraph, flow, frame, line);
+    if empty_leading_break && let Some(fragment) = self.decoration_fragments.last_mut() {
+      // The initial dummy master has no border ink. Subsequent empty
+      // physical follows still carry the paragraph's sides, while upper
+      // spacing and the top border wait for its actual content/mark line.
+      fragment.kind = if first_fragment {
+        ParagraphDecorationFragmentKind::EmptyMaster
+      } else {
+        ParagraphDecorationFragmentKind::EmptyFollow
+      };
+    }
   }
 
   fn finish_line(&mut self, y_pt: f32, height_pt: f32) {
@@ -54635,8 +57522,10 @@ impl TextFrameState {
     });
     self.current_line_start = self.current_position;
     self.line_inline_object_portion_height = 0.0;
+    self.line_wrap_clearance_bottom_pt = None;
     self.line_has_horizontal_rule = false;
     self.line_text_extents = WordLineTextExtents::default();
+    self.line_last_blank_inline = None;
     self.line_has_note_separator_mark = false;
     self.smart_justify_terminal_overhang_pt = 0.0;
     self.overflow_punctuation_overhang_pt = 0.0;
@@ -55053,6 +57942,7 @@ struct HyphenationBreakPolicy {
   discretionary: bool,
   automatic: bool,
   line_has_prefix: bool,
+  legacy_character_window: bool,
   do_not_hyphenate_caps: bool,
   justification: Option<JustifiedHyphenation>,
 }
@@ -55154,6 +58044,21 @@ fn select_hyphenation_break(
     }
     let prefix_width_pt = text_metrics.measure_text(prefix.as_ref(), style);
     let gap_pt = available_width_pt - prefix_width_pt - hyphen_width_pt;
+    if candidate.kind == super::hyphenation::CandidateKind::Automatic
+      && policy.legacy_character_window
+    {
+      // Word's pre-2013 line service searches before the last character
+      // fitting in the unhyphenated word. A prefix plus '-' can fit even
+      // though its dictionary point lies outside that character window.
+      // The following source character must also fit; modern line services
+      // and authored discretionary operators have separate policies.
+      let following_end = candidate.resume_at + remainder_source.chars().next()?.len_utf8();
+      let through_following = super::hyphenation::visible_text(&segment.text[..following_end]);
+      let through_following_width_pt = text_metrics.measure_text(through_following.as_ref(), style);
+      if through_following_width_pt > available_width_pt + LAYOUT_EPSILON_PT {
+        continue;
+      }
+    }
     let distance = if candidate.kind == super::hyphenation::CandidateKind::Automatic
       && let Some(justification) = policy.justification
     {
@@ -55198,6 +58103,7 @@ fn automatic_hyphenation_allowed_on_line(
   line_right: f32,
 ) -> bool {
   if !flow.hyphenation.automatic
+    || style.wordprocessingml_no_proof
     || !flow.hyphenation.automatic_languages.supports(style)
     || paragraph.format.suppress_auto_hyphens == Some(true)
     // Word does not call its automatic hyphenator for a w:bidi paragraph,
@@ -55219,18 +58125,16 @@ fn automatic_hyphenation_allowed_on_line(
 struct LastRenderedHyphenationBoundary<'a> {
   left: &'a TextRun,
   right: &'a TextRun,
+  kind: super::hyphenation::CandidateKind,
 }
 
-fn last_rendered_page_break_hyphenation_boundary(
-  paragraph: &crate::docx::Paragraph,
+fn last_rendered_page_break_hyphenation_boundary<'a>(
+  paragraph: &'a crate::docx::Paragraph,
   inline_index: usize,
   flow: FlowContext,
-) -> Option<LastRenderedHyphenationBoundary<'_>> {
-  if !flow.hyphenation.automatic
-    || paragraph.format.suppress_auto_hyphens == Some(true)
-    || paragraph.format.bidi
-    || consecutive_hyphenation_limit_reached(flow)
-  {
+  url_ranges: Option<&wordprocessing_url::Ranges>,
+) -> Option<LastRenderedHyphenationBoundary<'a>> {
+  if consecutive_hyphenation_limit_reached(flow) {
     return None;
   }
   let InlineItem::Text(left) = paragraph.inlines.get(inline_index.checked_sub(1)?)? else {
@@ -55239,7 +58143,40 @@ fn last_rendered_page_break_hyphenation_boundary(
   let InlineItem::Text(right) = paragraph.inlines.get(inline_index + 1)? else {
     return None;
   };
-  if !flow.hyphenation.automatic_languages.supports(&left.style) {
+  if left.text.ends_with(super::hyphenation::SOFT_HYPHEN)
+    && right
+      .text
+      .chars()
+      .next()
+      .is_some_and(|ch| !ch.is_whitespace())
+  {
+    // A cached marker after an authored operator must not lose that operator
+    // when the following text happens to start a separate imported portion.
+    return Some(LastRenderedHyphenationBoundary {
+      left,
+      right,
+      kind: super::hyphenation::CandidateKind::Explicit,
+    });
+  }
+  if !flow.hyphenation.automatic
+    || left.style.wordprocessingml_no_proof
+    || right.style.wordprocessingml_no_proof
+    || url_ranges.is_some_and(|ranges| {
+      ranges.overlaps(
+        InlineCursor {
+          inline_index: inline_index + 1,
+          text_offset: 0,
+        },
+        InlineCursor {
+          inline_index: inline_index + 1,
+          text_offset: right.text.chars().next().map_or(0, char::len_utf8),
+        },
+      )
+    })
+    || paragraph.format.suppress_auto_hyphens == Some(true)
+    || paragraph.format.bidi
+    || !flow.hyphenation.automatic_languages.supports(&left.style)
+  {
     return None;
   }
   super::hyphenation::is_automatic_break_at_text_boundary(
@@ -55248,7 +58185,11 @@ fn last_rendered_page_break_hyphenation_boundary(
     &left.style,
     flow.hyphenation.do_not_hyphenate_caps,
   )
-  .then_some(LastRenderedHyphenationBoundary { left, right })
+  .then_some(LastRenderedHyphenationBoundary {
+    left,
+    right,
+    kind: super::hyphenation::CandidateKind::Automatic,
+  })
 }
 
 fn text_line_is_last_in_flow_slot(
@@ -55269,6 +58210,56 @@ fn text_line_is_last_in_flow_slot(
   );
   y + real_height + text_frame.page_fit_height(text_frame.base_line_height)
     > flow.content_bottom + LAYOUT_EPSILON_PT
+}
+
+#[derive(Clone, Copy)]
+struct HyphenationLineContext {
+  y_pt: f32,
+  height_pt: f32,
+  text_extents: WordLineTextExtents,
+  index: usize,
+  has_form_widget: bool,
+}
+
+fn automatic_hyphenation_moves_word_from_bottom(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  text_frame: TextFrame,
+  line: HyphenationLineContext,
+  portion: TextPortion<'_>,
+  text_metrics: &mut TextMetrics,
+) -> bool {
+  if flow.text_segmentation != TextSegmentation::Body
+    || flow.hyphenation.page_bottom != PageBottomHyphenation::MoveWord
+  {
+    return false;
+  }
+  let mut extents = line.text_extents;
+  // The proposed prefix can raise a mixed-font line. Test that prospective
+  // box without mutating the current line or moving its preceding words.
+  extents.include_ignored_blank(portion, text_metrics);
+  let height = if segment_affects_line_height(portion.text) {
+    include_text_height(
+      line.height_pt,
+      paragraph,
+      flow,
+      text_frame,
+      &mut extents,
+      portion,
+      text_metrics,
+    )
+  } else {
+    line.height_pt
+  };
+  text_line_is_last_in_flow_slot(
+    paragraph,
+    flow,
+    text_frame,
+    line.y_pt,
+    height,
+    line.index,
+    line.has_form_widget,
+  )
 }
 
 fn text_line_exceeds_flow_bottom(
@@ -55322,6 +58313,7 @@ struct InlineObjectAdvance<'a> {
   text_frame: TextFrame,
   y: f32,
   object_line_height: f32,
+  wrap_frame_size: Option<(f32, f32)>,
 }
 
 struct TextPageBreakAdvance<'a> {
@@ -55407,6 +58399,18 @@ struct ParagraphLayoutPosition {
   anchor_top: f32,
 }
 
+#[derive(Clone, Copy)]
+struct ParagraphFormatPass<'a> {
+  position: ParagraphLayoutPosition,
+  allow_reflow: bool,
+  pictures: Option<&'a legacy_picture_nonoverlap::Plan>,
+}
+
+struct ParagraphPicturePass<'a> {
+  format: ParagraphFormatPass<'a>,
+  line_pictures: &'a mut cell_line_picture_wrap::Plan,
+}
+
 fn can_defer_page_break_for_following_floating_anchor(
   paragraph: &crate::docx::Paragraph,
   next_inline_index: usize,
@@ -55457,8 +58461,10 @@ fn can_defer_page_break_for_following_floating_anchor(
   if anchor_index == usize::MAX {
     return false;
   }
-  // A TO-character floating anchor remains on the master side only when it
-  // terminates the paragraph. Content before the break does not decide this:
+  // A terminal sequence of floating anchors remains on the master side:
+  // another anchor is not ordinary follow-frame content. Native controls
+  // retain one, two and three anchors alike (tdf146984_anchorInShape).
+  // Content before the break does not decide this:
   // Word still moves the anchor to the follow when ordinary content follows
   // it (tdf153613_anchoredAfterPgBreak6). LibreOffice's corresponding QA
   // marks its master-page result as a known "DID YOU FIX ME?" limitation.
@@ -55467,6 +58473,12 @@ fn can_defer_page_break_for_following_floating_anchor(
     .iter()
     .skip(anchor_index + 1)
     .all(|inline| match inline {
+      InlineItem::Image(image) => {
+        matches!(image.placement, crate::docx::ImagePlacement::Floating(_))
+      }
+      InlineItem::Shape(shape) => {
+        matches!(shape.placement, crate::docx::ImagePlacement::Floating(_))
+      }
       InlineItem::LastRenderedPageBreak => true,
       InlineItem::Text(run) => run.text.trim().is_empty(),
       InlineItem::NoteReferenceMark(_) => true,
@@ -55481,10 +58493,7 @@ fn can_defer_page_break_for_following_floating_anchor(
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::DrawingGroupStart(_)
       | InlineItem::DrawingGroupEnd => true,
-      InlineItem::PageBreak
-      | InlineItem::ColumnBreak
-      | InlineItem::Image(_)
-      | InlineItem::Shape(_) => false,
+      InlineItem::PageBreak | InlineItem::ColumnBreak => false,
     })
 }
 
@@ -55572,6 +58581,20 @@ fn terminal_soft_break_end(paragraph: &crate::docx::Paragraph) -> Option<InlineC
 }
 
 fn page_break_has_following_content(inlines: &[InlineItem], next_inline_index: usize) -> bool {
+  page_break_follow_has_line(inlines, next_inline_index, false)
+}
+
+fn page_break_follow_has_line(
+  inlines: &[InlineItem],
+  next_inline_index: usize,
+  paragraph_mark_on_follow: bool,
+) -> bool {
+  // splitPgBreakAndParaMark gives a terminal empty follow a physical line.
+  // A further explicit break belongs to another follow, so stop there.
+  explicit_break_follow_content(inlines, next_inline_index).unwrap_or(paragraph_mark_on_follow)
+}
+
+fn explicit_break_follow_content(inlines: &[InlineItem], next_inline_index: usize) -> Option<bool> {
   inlines
     .iter()
     .skip(next_inline_index)
@@ -55595,7 +58618,6 @@ fn page_break_has_following_content(inlines: &[InlineItem], next_inline_index: u
       | InlineItem::Image(_)
       | InlineItem::Shape(_) => Some(true),
     })
-    .unwrap_or(false)
 }
 
 fn floating_anchor_has_following_line_participant(
@@ -55678,6 +58700,23 @@ impl<'a> TextFrameLayout<'a> {
     // The line-fitting flow has already removed the paragraph indents. Keep
     // the original frame width, including when a follow changes its column.
     self.frame_width_pt + f64::from(flow.content_width) - f64::from(self.flow.content_width)
+  }
+
+  fn numbering_alignment_right_limit(&self, flow: FlowContext) -> Option<f32> {
+    if self.paragraph.list_label.is_none()
+      || self.paragraph.format.bidi
+      || self.paragraph.format.wordprocessing_shape_story
+    {
+      return None;
+    }
+    let right = flow.content_left_pt + self.line_frame_width(flow) as f32
+      - self.frame.paragraph_indent_right_pt;
+    let left = flow.content_left_pt + self.frame.paragraph_indent_left_pt;
+    // Line fitting enforces a minimum width even when a positive remainder
+    // is smaller than that minimum. Native numbered-paragraph boundary
+    // controls align within the actual frame in both cases: emergency
+    // fitting capacity is not alignment room.
+    (right < left + flow.content_width).then_some(right)
   }
 
   fn widened_column_tail_has_multiple_source_lines(
@@ -55805,8 +58844,10 @@ impl<'a> TextFrameLayout<'a> {
     // Native same/different-color and unshaded opposites confirm that an
     // unshaded neighbor ends the painted span; terminal after stays unpainted.
     self.spacing_before_pt = spacing_before_pt;
-    self.shading_before_pt = if context.joins_previous {
-      spacing_before_pt
+    self.shading_before_pt = if context.joins_previous || self.border_context.joins_previous {
+      // At a flow top Word suppresses this gap for text positioning, but
+      // its joined decoration span still owns the collapsed contribution.
+      spacing_before_pt + self.suppressed_spacing_before_pt
     } else {
       0.0
     };
@@ -55855,8 +58896,11 @@ impl<'a> TextFrameLayout<'a> {
     line_height: f32,
     wrap_exclusions: &[WrapExclusion],
   ) -> (f32, f32) {
-    let exclusions =
-      physical_wrap_exclusions_at_baseline(wrap_exclusions, frame.drawing_wrap_baseline_offset_pt);
+    let exclusions = physical_wrap_exclusions_at_baseline(
+      wrap_exclusions,
+      frame.drawing_wrap_baseline_offset_pt,
+      frame.following_table_wrap_baseline_offset_pt,
+    );
     line_bounds_for_y(
       frame.default_line_left,
       frame.default_line_right,
@@ -55882,6 +58926,20 @@ impl<'a> TextFrameLayout<'a> {
     line_height: &mut f32,
     next_cell_line: Option<TableCellSoftBreakLine>,
   ) -> (FlowContext, TextFrame, f32, f32, f32) {
+    advance.state.resolve_blank_line_metrics(
+      self.paragraph,
+      advance.active,
+      line_height,
+      false,
+      advance.text_metrics,
+    );
+    advance.state.paint_note_separator_marks(
+      advance.current,
+      y,
+      *line_height,
+      advance.active.frame,
+      advance.text_metrics,
+    );
     decimal_tabs::settle_implicit(
       self.paragraph,
       advance.current,
@@ -55947,12 +59005,14 @@ impl<'a> TextFrameLayout<'a> {
         ),
       advance.text_metrics,
     );
-    if advance.justify && advance.active.frame.grid_character_pitch_pt.is_none() {
+    if (advance.justify || advance.state.line_used_shrink_fit)
+      && advance.active.frame.grid_character_pitch_pt.is_none()
+    {
       let item_start = advance.state.completed_line_word_spacing_item_start(
         *advance.line_item_start_index,
         advance.current.items.len(),
       );
-      justify_line_items(
+      adjust_justified_line_items(
         &mut advance.current.items,
         LineJustificationContext {
           item_start,
@@ -55971,6 +59031,7 @@ impl<'a> TextFrameLayout<'a> {
           ),
         },
         self.paragraph.format.justification,
+        advance.justify,
         advance.text_metrics,
       );
     }
@@ -56082,6 +59143,15 @@ impl<'a> TextFrameLayout<'a> {
       advance.active.flow,
       real_height,
       advance.text_metrics,
+    );
+    // A forced as-character object can paint at the top of an otherwise
+    // unformattable page while its avoiding lines still consume that page.
+    // Keep this flow advance separate from the object's ascent and ink.
+    let real_height = real_height.max(
+      advance
+        .state
+        .line_wrap_clearance_bottom_pt
+        .map_or(0.0, |bottom| bottom - y),
     );
     push_page_fragment(
       advance.current,
@@ -56349,6 +59419,7 @@ impl<'a> TextFrameLayout<'a> {
           advance.current,
           ParagraphAlignmentFrame {
             item_start: advance.state.alignment_item_start,
+            right_limit: self.numbering_alignment_right_limit(advance.active.flow),
             first_line_right: advance.state.first_line_alignment_right.take(),
             page_index: advance.pages.len(),
             line_rights: &advance.state.line_alignment_fragments,
@@ -56407,6 +59478,35 @@ impl<'a> TextFrameLayout<'a> {
     (next_flow, next_frame, next_y, line_left, line_right)
   }
 
+  fn explicit_break_spacing_before(&self, flow: FlowContext, page_number: usize) -> f32 {
+    let suppress = self
+      .paragraph
+      .format
+      .suppress_spacing_before_after_page_break;
+    if !suppress && flow.compatibility_mode < 15 {
+      return self.spacing_before_pt;
+    }
+    if flow.text_segmentation == TextSegmentation::Body && !flow.inside_paragraph_frame {
+      let (body_top, _) = body_content_limits_for_page(
+        flow.setup,
+        flow.repeating_slots,
+        page_number,
+        flow.section_page_index,
+      );
+      // Native Word mode14/15 page/column opposites distinguish a physical
+      // page top from a continuous section's column origin farther down it.
+      // Both the legacy flag and the modern implicit policy concern this
+      // physical boundary, not a continuous section's lower column origin.
+      // Modern Word reports the legacy property false but still suppresses.
+      if (flow.content_top_pt - body_top).abs() <= LAYOUT_EPSILON_PT {
+        return 0.0;
+      }
+    } else if suppress {
+      return 0.0;
+    }
+    self.spacing_before_pt
+  }
+
   fn force_text_page_break(
     &self,
     flow: FlowContext,
@@ -56429,6 +59529,7 @@ impl<'a> TextFrameLayout<'a> {
       current,
       ParagraphAlignmentFrame {
         item_start: state.alignment_item_start,
+        right_limit: self.numbering_alignment_right_limit(flow),
         first_line_right: state.first_line_alignment_right.take(),
         page_index: pages.len(),
         line_rights: &state.line_alignment_fragments,
@@ -56479,10 +59580,14 @@ impl<'a> TextFrameLayout<'a> {
       // Only a leading run-level break postpones the paragraph's before
       // spacing to its first content line (ECMA-376 suppressSpBfAfterPgBrk).
       // After visible content that spacing has already been consumed.
-      // Native mode14/15 leading/nonleading counterparts retain6pt only for
-      // the leading break; Writer's PARA_SPACE_MAX_AT_PAGES is not a Word
-      // rule for every continuation in the same paragraph.
-      y += paragraph_upper_space(self.paragraph, next_flow.setup.doc_grid_line_pitch_pt);
+      // The master already resolved contextual spacing and collapse against
+      // the previous paragraph. Carry that owner, subject to the follow's
+      // page-top policy, rather than the raw authored before value.
+      y += self.explicit_break_spacing_before(next_flow, pages.len() + 1);
+      if next_flow.text_segmentation == TextSegmentation::Body && !next_flow.inside_paragraph_frame
+      {
+        y += paragraph_border_layout_extent(self.border_context.top(self.paragraph));
+      }
     }
     let next_frame = TextFrame::new(self.paragraph, next_flow, text_metrics);
     // w:firstLine belongs to the paragraph's first physical line, not the
@@ -56542,21 +59647,52 @@ impl<'a> TextFrameLayout<'a> {
     // fit before the current page edge. Native picture controls keep the
     // same page boundary at 100%, 115% and 200% spacing. Cell/grid/exact
     // contracts remain owned by TextFrame::page_fit_height.
-    if !inline_object_requires_flow_advance(
+    let wrap_y = inline_object_wrap_clearance_y(
       advance.y,
+      advance.wrap_frame_size,
+      advance.flow,
+      advance.text_frame,
+      advance.wrap_exclusions,
+    );
+    let advance_flow = inline_object_requires_flow_advance(
+      wrap_y,
       advance
         .text_frame
         .page_fit_height(advance.object_line_height),
       advance.flow.content_bottom,
       page_has_body_region_items(advance.current, advance.flow),
-    ) {
+    );
+    if !advance_flow && wrap_y == advance.y {
       return None;
     }
-    let (next_flow, y) = advance_text_frame_flow(advance.flow, advance.current, advance.pages);
+    let (next_flow, y) = if advance_flow {
+      if wrap_y != advance.y && advance.flow.column_index + 1 >= advance.flow.columns.count {
+        finish_paragraph_page_alignment(
+          advance.current,
+          ParagraphAlignmentFrame {
+            item_start: advance.state.alignment_item_start,
+            right_limit: self.numbering_alignment_right_limit(advance.flow),
+            first_line_right: advance.state.first_line_alignment_right.take(),
+            page_index: advance.pages.len(),
+            line_rights: &advance.state.line_alignment_fragments,
+            terminal_tabs: &advance.state.terminal_tab_extents,
+          },
+          self.paragraph,
+          advance.text_metrics,
+          advance.text_frame.default_line_right,
+          advance.flow,
+        );
+      }
+      advance_text_frame_flow(advance.flow, advance.current, advance.pages)
+    } else {
+      (advance.flow, advance.y)
+    };
     let next_frame = TextFrame::new(self.paragraph, next_flow, advance.text_metrics);
-    advance
-      .state
-      .note_page_follow(advance.pages.len(), y, advance.current.items.len());
+    if advance_flow {
+      advance
+        .state
+        .note_page_follow(advance.pages.len(), y, advance.current.items.len());
+    }
     reset_wrap_exclusions_for_y(advance.current, next_flow, y, advance.wrap_exclusions);
     let y = legacy_square_wrap::line_start(
       &next_flow,
@@ -56573,12 +59709,44 @@ impl<'a> TextFrameLayout<'a> {
       next_frame.default_line_right,
       advance.wrap_exclusions,
     );
+    let wrap_y = inline_object_wrap_clearance_y(
+      y,
+      advance.wrap_frame_size,
+      next_flow,
+      next_frame,
+      advance.wrap_exclusions,
+    );
+    // Word forces an unplaceable inline frame on an empty body page rather
+    // than retrying identical repeating obstacles forever. The preceding
+    // occupied page was consumed above; the forced page retains its dummy
+    // lower space, so following content starts in the next flow. Native
+    // width/mode/header-height controls and tdf38575 establish both owners.
+    let y = if wrap_y > next_flow.content_bottom {
+      advance.state.line_wrap_clearance_bottom_pt = Some(next_flow.content_bottom);
+      y
+    } else {
+      wrap_y
+    };
+    let (left, right) = if advance.wrap_frame_size.is_some()
+      && next_flow.compatibility_mode >= 15
+      && next_flow.text_segmentation == TextSegmentation::Body
+      && !next_flow.inside_paragraph_frame
+    {
+      self.line_bounds(
+        next_frame,
+        y,
+        next_frame.base_line_height,
+        advance.wrap_exclusions,
+      )
+    } else {
+      (next_frame.first_line_left, next_frame.default_line_right)
+    };
     Some((
       next_flow,
       next_frame,
       y,
-      next_frame.first_line_left,
-      next_frame.default_line_right,
+      left,
+      right,
       next_frame.base_line_height,
     ))
   }
@@ -56606,6 +59774,7 @@ impl<'a> TextFrameLayout<'a> {
         current,
         ParagraphAlignmentFrame {
           item_start: state.alignment_item_start,
+          right_limit: self.numbering_alignment_right_limit(flow),
           first_line_right: state.first_line_alignment_right.take(),
           page_index: pages.len(),
           line_rights: &state.line_alignment_fragments,
@@ -56690,11 +59859,69 @@ impl<'a> TextFrameLayout<'a> {
     &self,
     current: &mut Page,
     pages: &mut Vec<Page>,
-    mut anchor_pages: Option<&mut Vec<AnchorPage>>,
+    anchor_pages: Option<&mut Vec<AnchorPage>>,
     text_metrics: &mut TextMetrics,
     position: ParagraphLayoutPosition,
     allow_reflow: bool,
   ) -> (FlowContext, f32, Vec<LineFragment>) {
+    let pictures =
+      legacy_picture_nonoverlap::prepare(self.paragraph, self.flow, self.frame, position);
+    self.format_with_picture_positions(
+      current,
+      pages,
+      anchor_pages,
+      text_metrics,
+      ParagraphFormatPass {
+        position,
+        allow_reflow,
+        pictures: pictures.as_ref(),
+      },
+    )
+  }
+
+  fn format_with_picture_positions(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    mut anchor_pages: Option<&mut Vec<AnchorPage>>,
+    text_metrics: &mut TextMetrics,
+    pass: ParagraphFormatPass<'_>,
+  ) -> (FlowContext, f32, Vec<LineFragment>) {
+    let mut line_pictures = cell_line_picture_wrap::Plan::default();
+    loop {
+      match self.format_picture_pass(
+        current,
+        pages,
+        anchor_pages.as_deref_mut(),
+        text_metrics,
+        ParagraphPicturePass {
+          format: pass,
+          line_pictures: &mut line_pictures,
+        },
+      ) {
+        ControlFlow::Continue(formatted) => return formatted,
+        ControlFlow::Break(()) => {}
+      }
+    }
+  }
+
+  fn format_picture_pass(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    mut anchor_pages: Option<&mut Vec<AnchorPage>>,
+    text_metrics: &mut TextMetrics,
+    pass: ParagraphPicturePass<'_>,
+  ) -> ControlFlow<(), (FlowContext, f32, Vec<LineFragment>)> {
+    let ParagraphPicturePass {
+      format: pass,
+      line_pictures,
+    } = pass;
+    let ParagraphFormatPass {
+      position,
+      allow_reflow,
+      pictures,
+    } = pass;
     let mut y = position.y;
     let mut paragraph_anchor_top = position.anchor_top;
     let paragraph = self.paragraph;
@@ -56714,8 +59941,9 @@ impl<'a> TextFrameLayout<'a> {
       .any(|exclusion| exclusion.reaches_line_top(y))
       && !has_pending_floating_table_follows;
     let start_page_snapshot = (!current.wrap_exclusions.is_empty()
-      || has_pending_floating_table_follows)
-      .then(|| current.clone());
+      || has_pending_floating_table_follows
+      || pictures.is_some())
+    .then(|| current.clone());
     let start_pending_snapshot =
       has_pending_floating_table_follows.then(|| TextFramePendingSnapshot {
         current: current.pending_floating_table_follows.clone(),
@@ -56754,6 +59982,13 @@ impl<'a> TextFrameLayout<'a> {
           }) || exclusion.owner.uses_physical_line_bounds())
       })
       .collect::<Vec<_>>();
+    if let Some(catalog) = current.body_drawing_wraps.as_deref() {
+      catalog.include_terminal_collisions(flow, pages.len(), &mut wrap_exclusions);
+    }
+    for exclusion in line_pictures.exclusions() {
+      extend_paragraph_wrap_exclusions_unique(&mut wrap_exclusions, &[exclusion], flow);
+      extend_wrap_exclusions_unique(&mut current.wrap_exclusions, &[exclusion]);
+    }
     let suppress_initial_wrap_after_first_page_break = paragraph
       .inlines
       .iter()
@@ -56777,6 +60012,7 @@ impl<'a> TextFrameLayout<'a> {
           .body_drawing_wraps
           .as_deref()
           .map(|catalog| (catalog, pages.len())),
+        pictures,
       },
       suppress_initial_wrap_after_first_page_break,
       text_metrics,
@@ -56799,10 +60035,35 @@ impl<'a> TextFrameLayout<'a> {
     let mut first_inline_index = 0;
     let mut leading_break_was_page = false;
     if has_list_label {
+      if matches!(paragraph.inlines.first(), Some(InlineItem::PageBreak))
+        || (!ignore_cell_column_breaks
+          && matches!(paragraph.inlines.first(), Some(InlineItem::ColumnBreak)))
+      {
+        // The label belongs to the first content frame, but the leading
+        // break still owns an empty decoration line on its master. Reuse
+        // the ordinary run-break paint owner before advancing the label.
+        text_state.note_explicit_break_line(
+          paragraph,
+          flow,
+          text_frame,
+          ParagraphPhysicalLine {
+            page_index: pages.len(),
+            item_start: current.items.len(),
+            item_end: current.items.len(),
+            y_pt: y - self.spacing_before_pt - first_line_top_border,
+            height_pt: text_frame.base_line_height,
+            right_pt: None,
+          },
+          true,
+        );
+      }
       match paragraph.inlines.first() {
         Some(InlineItem::PageBreak) => {
-          let preserve_paragraph_upper_space =
-            page_break_has_following_content(&paragraph.inlines, 1);
+          let preserve_paragraph_upper_space = page_break_follow_has_line(
+            &paragraph.inlines,
+            1,
+            flow.split_page_break_and_paragraph_mark,
+          );
           (flow, text_frame, y, _, _, _) = self.force_text_page_break(
             flow,
             TextPageBreakAdvance {
@@ -56819,9 +60080,15 @@ impl<'a> TextFrameLayout<'a> {
           leading_break_was_page = true;
         }
         Some(InlineItem::ColumnBreak) if !ignore_cell_column_breaks => {
+          let master_bottom = y - self.spacing_before_pt - first_line_top_border
+            + if flow.compatibility_mode >= 15 {
+              text_frame.base_line_height
+            } else {
+              0.0
+            };
           (flow, text_frame, y, _, _, _, _) = self.apply_column_break(
             flow,
-            y,
+            master_bottom,
             TextColumnBreakAdvance {
               state: &mut text_state,
               current,
@@ -56830,6 +60097,11 @@ impl<'a> TextFrameLayout<'a> {
               wrap_exclusions: &mut wrap_exclusions,
             },
           );
+          // Retain the same resolved upper contribution as an unnumbered
+          // leading column break. Advancing before label paint must not
+          // discard either collapsed before-space or the first top border.
+          y += self.explicit_break_spacing_before(flow, pages.len() + 1);
+          y += first_line_top_border;
           first_inline_index = 1;
         }
         _ => {}
@@ -56900,9 +60172,15 @@ impl<'a> TextFrameLayout<'a> {
         // consuming the text font's proportional leading below it. Native
         // large-shape/label18/run9 controls distinguish this from applying
         // the line multiple to the bitmap or dropping the leading entirely.
-        let source_line_height =
+        let source_line_height = if let Some((numbering, height)) =
+          centered_picture_numbering_metrics(metrics, paragraph, flow, text_frame, text_metrics)
+        {
+          text_state.line_text_extents.numbering = Some(numbering);
+          height
+        } else {
           inline_image_line_height(metrics, paragraph, text_frame, text_metrics)
-            + text_frame.proportional_auto_gap_below_pt;
+            + text_frame.proportional_auto_gap_below_pt
+        };
         if at_least_uses_separate_content_height(paragraph, flow) {
           line_content_height = line_content_height.max(source_line_height);
         }
@@ -56923,6 +60201,7 @@ impl<'a> TextFrameLayout<'a> {
     let mut first_line_wrap_exclusions = physical_wrap_exclusions_at_baseline(
       &page_owned_exclusions,
       text_frame.drawing_wrap_baseline_offset_pt,
+      text_frame.following_table_wrap_baseline_offset_pt,
     );
     if flow.text_segmentation == TextSegmentation::Body && !flow.inside_paragraph_frame {
       include_first_line_square_drawing_upper_space(
@@ -56931,7 +60210,7 @@ impl<'a> TextFrameLayout<'a> {
         self.spacing_before_pt,
       );
     }
-    if text_frame.drawing_wrap_baseline_offset_pt > LAYOUT_EPSILON_PT
+    if text_frame.following_table_wrap_baseline_offset_pt > LAYOUT_EPSILON_PT
       && self.spacing_before_pt > LAYOUT_EPSILON_PT
       && first_line_wrap_exclusions
         .iter()
@@ -56960,6 +60239,7 @@ impl<'a> TextFrameLayout<'a> {
       physical_wrap_exclusions_at_baseline(
         &wrap_exclusions,
         text_frame.drawing_wrap_baseline_offset_pt,
+        text_frame.following_table_wrap_baseline_offset_pt,
       )
     };
     extend_legacy_empty_paragraph_floating_table_lower_space(
@@ -57117,7 +60397,11 @@ impl<'a> TextFrameLayout<'a> {
     let mut x = line.x_pt.max(line_left);
     let line_content_item_start_index = current.items.len();
     if let Some(label) = &paragraph.list_label {
-      let blank_list_label = label.chars().all(char::is_whitespace);
+      // An empty w:lvlText still has a real tab suffix. Word anchors its
+      // zero-width number at the first-line origin and advances from there,
+      // just as for a visible number. Keep whitespace placeholder labels on
+      // their separate indentation-only path.
+      let blank_list_label = label != "\t" && label.chars().all(char::is_whitespace);
       let mut list_label_style = paragraph.list_label_style.clone();
       if blank_list_label && label.starts_with(' ') {
         let base_line_style = paragraph_base_line_style(paragraph);
@@ -57200,8 +60484,20 @@ impl<'a> TextFrameLayout<'a> {
           text_frame,
         ),
         paint_clip: None,
-        page_culling_bounds: None,
+        // Word exports a body line's number portion even when its authored
+        // indent places every glyph beyond the page edge. The admitted line
+        // owns that semantic payload; the physical page still clips its ink.
+        // Drawing stories retain their enclosing frame's separate admission.
+        page_culling_bounds: (!paragraph.format.wordprocessing_shape_story).then(|| {
+          common_rect(
+            flow.content_left_pt,
+            y,
+            self.line_frame_width(flow) as f32,
+            line_height,
+          )
+        }),
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: visible_label.to_string(),
         style: list_label_style.clone(),
@@ -57262,6 +60558,27 @@ impl<'a> TextFrameLayout<'a> {
           },
           text_metrics,
         );
+        if label_follow == Some('\t')
+          && !paragraph.format.bidi
+          && !paragraph.format.wordprocessing_shape_story
+          && !paragraph.format.word_text_frame_story
+          && matches!(
+            paragraph.format.alignment,
+            ParagraphAlignment::Center | ParagraphAlignment::Right
+          )
+        {
+          // The generated suffix is part of the numbered line's occupied
+          // width even when there is no body text (ECMA-376 §17.9.28).
+          // Native empty/body and narrow/wide cell controls align the whole
+          // number-plus-tab portion. Its resolved stop can exceed the cell's
+          // right edge; emergency fitting space must not move the number.
+          // Reuse nonpainting tab extents, attached to this first-line label.
+          text_state.terminal_tab_extents.push(TerminalTabExtent {
+            page_index: pages.len(),
+            item_index: current.items.len() - 1,
+            right_pt: x,
+          });
+        }
       }
     }
     if let Some(label_image) = paragraph.list_label_image.as_ref() {
@@ -57361,15 +60678,19 @@ impl<'a> TextFrameLayout<'a> {
     // reaches the right paragraph margin for w:jc="both" list paragraphs.
     let justify_wrapped_lines =
       justification.is_block() || paragraph.format.alignment == ParagraphAlignment::Justify;
+    let modern_cjk_justification = flow.compatibility_mode >= 15 && justify_wrapped_lines;
     let shrink_justified_lines = justify_wrapped_lines
       && flow.justify_lines_with_shrinking
       && justification.can_shrink_word_spacing();
-    let mut line_used_shrink_fit = false;
     let mut pending_smart_justify_continuation = None;
     let mut emergency_word_end: Option<InlineCursor> = None;
     let mut line_used_punctuation_fit = false;
     let font_portion_line_segments =
       wordprocessing_font_portion_line_segments(paragraph, flow.compatibility_mode);
+    let automatic_hyphenation_urls = flow
+      .hyphenation
+      .automatic
+      .then(|| wordprocessing_url::Ranges::new(&paragraph.inlines));
     // ECMA-376 Part 1 §17.3.1.21 makes omission equivalent to true. Modern
     // Word applies [MS-OE376]'s exact parent-language lists from Word 2013
     // compatibility mode (15) onward. Earlier compatibility modes retain the
@@ -57736,13 +61057,14 @@ impl<'a> TextFrameLayout<'a> {
               && (pending.y_pt - y).abs() < 0.01)
               .then_some(pending.leader_start_x_pt)
           });
+          text_state.line_last_blank_inline = Some(inline_index);
           let leader_start_x = inherited_leader_start_x.unwrap_or(x);
           x = tab_stop.x_pt;
           tab_over_margin_active = false;
           if x > line_right {
             tab_over_margin_active = true;
           }
-          line_used_shrink_fit = false;
+          text_state.line_used_shrink_fit = false;
           line_used_punctuation_fit = false;
           line_has_tab = true;
           if paragraph.format.bidi {
@@ -57863,24 +61185,38 @@ impl<'a> TextFrameLayout<'a> {
             x = line_left;
             width = note_separator_mark_width(mark, x, line_right);
           }
-          let source_line_height = inline_text_height(&mark.style, text_metrics);
-          if at_least_uses_separate_content_height(paragraph, flow) {
-            text_state.line_content_height = text_state.line_content_height.max(source_line_height);
-          }
-          // The separator's font owns its painted baseline and thickness,
-          // but an exact paragraph line still owns the physical advance.
-          // Keep this consistent with the separator height estimator.
-          if !matches!(text_frame.line_height_rule, LineHeightRule::Exact) {
-            line_height = line_height.max(
-              inline_object_line_metrics_for_flow(source_line_height, paragraph, flow).height_pt,
-            );
-          }
-          push_note_separator_mark(current, mark, x, y, width, source_line_height, text_metrics);
+          line_height = include_note_separator_height(
+            line_height,
+            paragraph,
+            flow,
+            text_frame,
+            &mut text_state.line_text_extents,
+            mark,
+            text_metrics,
+          );
+          text_state.line_content_height = include_text_content_height(
+            text_state.line_content_height,
+            paragraph,
+            flow,
+            text_frame,
+            &mut text_state.line_text_extents,
+            TextPortion::new(&mark.style, NOTE_SEPARATOR_METRIC_TEXT),
+            text_metrics,
+          );
+          // Delay paint until all run metrics and the terminal mark are known.
+          // This also avoids retaining item indices across tab-leader insertion.
+          text_state
+            .pending_note_separator_marks
+            .push(PendingNoteSeparatorMark {
+              mark: mark.clone(),
+              x_pt: x,
+              width_pt: width,
+            });
           x += width;
           text_state.line_has_note_separator_mark = true;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           emitted = true;
-          line_used_shrink_fit = false;
+          text_state.line_used_shrink_fit = false;
           line_used_punctuation_fit = false;
           line_has_tab = false;
           text_state.reset_tab_segments();
@@ -57911,7 +61247,7 @@ impl<'a> TextFrameLayout<'a> {
             text_state.line_content_item_start_index = line_item_start_index;
             line_has_form_widget = false;
             pending_text_page_break = false;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -57962,7 +61298,7 @@ impl<'a> TextFrameLayout<'a> {
             paragraph_left = text_frame.paragraph_left;
             base_line_height = text_frame.base_line_height;
             x = line_left;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -58028,7 +61364,7 @@ impl<'a> TextFrameLayout<'a> {
             text_state.line_content_item_start_index = line_item_start_index;
             line_has_form_widget = false;
             pending_text_page_break = false;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -58084,7 +61420,7 @@ impl<'a> TextFrameLayout<'a> {
             paragraph_left = text_frame.paragraph_left;
             base_line_height = text_frame.base_line_height;
             x = line_left;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -58112,6 +61448,7 @@ impl<'a> TextFrameLayout<'a> {
               x_pt: x,
               y_pt: y,
               line_height_pt: baseline_line_height,
+              line_top_offset_pt: -text_frame.drawing_wrap_baseline_offset_pt,
               size_pt,
               portion_ascent_pt,
               table_cell_resolved_baseline: flow.horizontal_table_cell
@@ -58161,7 +61498,7 @@ impl<'a> TextFrameLayout<'a> {
             text_state.line_content_item_start_index = line_item_start_index;
             line_has_form_widget = false;
             pending_text_page_break = false;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -58327,7 +61664,7 @@ impl<'a> TextFrameLayout<'a> {
               base_line_height = text_frame.base_line_height;
               x = line_left;
               chunk_x = x;
-              line_used_shrink_fit = false;
+              text_state.line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
               line_has_tab = false;
               text_state.reset_tab_segments();
@@ -58378,6 +61715,14 @@ impl<'a> TextFrameLayout<'a> {
                 text_metrics,
                 false,
               );
+              // Legacy Word can continue past the margin after a right-tab
+              // result has consumed that edge. This differs from merely
+              // reaching the edge on the automatic tab grid (native +/-one
+              // twip controls). Retain the owner before settling the span.
+              let legacy_right_tab_at_margin = flow.compatibility_mode < 15
+                && pending_tab.as_ref().is_some_and(|tab| {
+                  tab.stop.alignment == TabStopAlignment::Right && tab.stop.x_pt >= line_right
+                });
               x = apply_pending_aligned_tab_to_cursor(
                 current,
                 &mut pending_tab,
@@ -58411,7 +61756,7 @@ impl<'a> TextFrameLayout<'a> {
                 if x > line_right {
                   tab_over_margin_active = true;
                 }
-                line_used_shrink_fit = false;
+                text_state.line_used_shrink_fit = false;
                 line_used_punctuation_fit = false;
                 line_has_tab = true;
                 if paragraph.format.bidi {
@@ -58451,22 +61796,49 @@ impl<'a> TextFrameLayout<'a> {
                   text_metrics,
                 );
               }
-              // An automatic tab only starts a new line when it has a
-              // following line portion. At paragraph end Word resolves the
-              // tab during FormatEOL without allocating an empty follow line.
+              // A stop beyond the margin wraps even at paragraph end: the
+              // tab itself owns a portion on the follow line. At the exact
+              // edge, only a following portion can require that transfer.
               let tab_has_following_content = segments
                 .iter()
                 .any(|segment| !segment.text.trim().is_empty())
                 || page_break_has_following_content(&paragraph.inlines, inline_index + 1);
+              let legacy_tab_over_margin = !paragraph.format.bidi
+                && flow.compatibility_mode < 15
+                && (tab_over_margin_active || (legacy_right_tab_at_margin && x >= line_right));
               if tab_stop.automatic
-                && tab_stop.x_pt > line_right + LAYOUT_EPSILON_PT
+                && !legacy_tab_over_margin
                 && x > line_left + LAYOUT_EPSILON_PT
-                && tab_has_following_content
+                && ((tab_stop.x_pt > line_right
+                  && (tab_has_following_content
+                    || (!paragraph.format.bidi
+                      && flow.text_segmentation != TextSegmentation::DrawingLayer)))
+                  || (tab_has_following_content
+                    && if !paragraph.format.bidi
+                      && flow.text_segmentation != TextSegmentation::DrawingLayer
+                    {
+                      automatic_tab_following_text_width(
+                        paragraph,
+                        inline_index,
+                        segments.front(),
+                        flow.compatibility_mode,
+                        text_metrics,
+                      )
+                      .map_or(tab_stop.x_pt == line_right, |width| {
+                        text_overflows_line(tab_stop.x_pt, width, line_right)
+                      })
+                    } else {
+                      tab_stop.x_pt == line_right
+                    }))
               {
-                // SwTabPortion::PreFormat() treats an automatic left tab whose
-                // full width does not fit as the start of the next line. The
-                // tab is then resolved again from that line, so an authored
-                // first tab stop (and its leader) becomes active there.
+                // Word keeps an automatic tab with its first following text
+                // portion. Native mode12/15 controls distinguish this from
+                // explicit left stops and from terminal tabs. Re-resolve the
+                // tab on the follow line instead of consuming it before the
+                // word wraps. A following tab owns its own advance: at the
+                // exact right edge the current tab is consumed, and the next
+                // one starts the follow line. Native modes12/15 distinguish
+                // this from a first text portion, including +/-one twip.
                 apply_pending_aligned_tab(
                   current,
                   &mut pending_tab,
@@ -58514,12 +61886,13 @@ impl<'a> TextFrameLayout<'a> {
                   explicit_default_word_text_tab,
                 );
               }
+              text_state.line_last_blank_inline = Some(inline_index);
               let leader_start_x = x;
               x = tab_stop.x_pt;
               if x > line_right {
                 tab_over_margin_active = true;
               }
-              line_used_shrink_fit = false;
+              text_state.line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
               line_has_tab = true;
               if paragraph.format.bidi {
@@ -58639,7 +62012,7 @@ impl<'a> TextFrameLayout<'a> {
               && flow.text_segmentation != TextSegmentation::DrawingLayer
               && segments.is_empty()
             {
-              cross_run_unbreakable_continuation_width_for_break_options(
+              cross_run_unbreakable_continuation_width_impl(
                 &paragraph.inlines,
                 inline_index,
                 &segment.text,
@@ -58650,6 +62023,21 @@ impl<'a> TextFrameLayout<'a> {
                   kashida: paragraph.format.justification.kashida.is_some(),
                 },
                 Some(terminal_punctuation_policy),
+                flow.hyphenation.page_bottom == PageBottomHyphenation::MoveWord
+                  && automatic_hyphenation_moves_word_from_bottom(
+                    paragraph,
+                    flow,
+                    text_frame,
+                    HyphenationLineContext {
+                      y_pt: y,
+                      height_pt: line_height,
+                      text_extents: text_state.line_text_extents,
+                      index: text_state.line_fragments.len(),
+                      has_form_widget: line_has_form_widget || meta.form_widget_id.is_some(),
+                    },
+                    TextPortion::from_run(run, &segment.text),
+                    text_metrics,
+                  ),
                 text_metrics,
               )
             } else {
@@ -58720,6 +62108,7 @@ impl<'a> TextFrameLayout<'a> {
             {
               wordprocessing_auto_gap::contract(
                 wordprocessing_auto_gap::Fit {
+                  modern_justified: modern_cjk_justification,
                   items: &mut current.items,
                   start: line_item_start_index,
                   y,
@@ -58743,6 +62132,7 @@ impl<'a> TextFrameLayout<'a> {
                 line_cjk_compression_fit(
                   CjkLineFit {
                     overflow_punctuation,
+                    modern_justified: modern_cjk_justification,
                     x: x + leading_script_spacing,
                     line_right: fit_line_right,
                     items: &current.items,
@@ -58779,15 +62169,21 @@ impl<'a> TextFrameLayout<'a> {
                   && segment_start >= pending.source_start
                   && segment_end <= pending.source_end
               });
+            // Hanging punctuation may cross the paragraph's right margin,
+            // not an interior wrapping obstacle. Native hSpace/alignment
+            // controls retain the whole word at this boundary; ordinary
+            // contraction and the right-hand lane keep their own rules.
+            let smart_justify_can_hang =
+              overflow_punctuation_policy.enabled && line_right >= text_frame.default_line_right;
             let smart_justify_continuation = continuation.filter(|continuation| {
-              overflow_punctuation_policy.enabled
+              smart_justify_can_hang
                 && flow.text_segmentation != TextSegmentation::TableCell
                 && !paragraph.format.bidi
                 && !run.style.wordprocessingml_field_group
                 && continuation.outside_field_group
                 && continuation.western_forbidden_line_start_only
             });
-            let smart_justify_current_overhang = if overflow_punctuation_policy.enabled
+            let smart_justify_current_overhang = if smart_justify_can_hang
               && flow.text_segmentation != TextSegmentation::TableCell
               && !paragraph.format.bidi
               && !run.style.wordprocessingml_field_group
@@ -58864,15 +62260,26 @@ impl<'a> TextFrameLayout<'a> {
             } else {
               natural_overflows_line
             };
+            // Legacy characterSpacingControl also compresses Western spaces,
+            // independently of paragraph alignment. Native mode14/15, setting,
+            // alignment and width sweeps distinguish this 80% lower bound from
+            // modern smart justification's expansion/contraction comparison.
+            // balanceSingleByteDoubleByteWidth retains fixed space advances:
+            // native single-flag controls disable only this legacy contraction.
+            let legacy_space_compression = flow.compatibility_mode < 15
+              && run.style.cjk_punctuation_compression_ratio > 0.0
+              && !run
+                .style
+                .wordprocessingml_balance_single_byte_double_byte_width;
             let can_fit_with_shrink = !fits_pending_smart_justify_continuation
               && overflows_line
-              && shrink_justified_lines
+              && (shrink_justified_lines || legacy_space_compression)
               // A space-shrink retry must not bypass the break already
               // established by CJK punctuation compression. Native mixed
               // Latin/Han controls retain that boundary even when the Latin
               // spaces alone could absorb the compressed candidate overflow.
               && !blocks_compression_only_fit
-              && !line_used_shrink_fit
+              && (!text_state.line_used_shrink_fit || legacy_space_compression)
               // Native Word contracts spaces after a left tab while keeping
               // the prefix/leader fixed. Center/right and bidi tab spans
               // retain their independent aligned-tab fitting contract.
@@ -58881,18 +62288,33 @@ impl<'a> TextFrameLayout<'a> {
               && !tab_over_margin_active;
             let fitted_smart_justify_overhang = can_fit_with_shrink
               .then(|| {
-                smart_justify_fit_terminal_overhang(
-                  LineShrinkFit {
-                    x,
-                    width: fit_width_with_continuation,
-                    text: &segment.text,
-                    line_right: fit_line_right,
-                    items: &current.items,
-                    item_start: text_state.word_spacing_item_start(line_item_start_index),
-                    chunk: &chunk,
-                    style: &run.style,
-                    word_spacing: justification.word_spacing,
+                let fit = LineShrinkFit {
+                  modern_kashida: justification.modern_wordprocessing
+                    && justification.kashida.is_some(),
+                  x,
+                  width: fit_width_with_continuation,
+                  text: &segment.text,
+                  line_right: fit_line_right,
+                  items: &current.items,
+                  item_start: text_state.word_spacing_item_start(line_item_start_index),
+                  chunk: &chunk,
+                  style: &run.style,
+                  word_spacing: if legacy_space_compression {
+                    crate::docx::JustificationWordSpacing {
+                      desired_pct: 100,
+                      minimum_pct: 80,
+                      maximum_pct: 100,
+                    }
+                  } else {
+                    justification.word_spacing
                   },
+                };
+                if legacy_space_compression {
+                  return line_fits_with_word_space_shrink_policy(fit, true, text_metrics)
+                    .then_some(0.0);
+                }
+                smart_justify_fit_terminal_overhang(
+                  fit,
                   smart_justify_overhang,
                   smart_justify_numeric_postfix,
                   text_metrics,
@@ -58901,7 +62323,7 @@ impl<'a> TextFrameLayout<'a> {
               .flatten();
             let fits_with_shrink = fitted_smart_justify_overhang.is_some();
             if fits_with_shrink {
-              line_used_shrink_fit = true;
+              text_state.line_used_shrink_fit = true;
               // The accepted fit includes the complete connected token.
               // Carry that decision into every following formatting portion,
               // including ordinary cell text. Those portions still use the
@@ -58921,6 +62343,18 @@ impl<'a> TextFrameLayout<'a> {
             }
 
             let allow_automatic_hyphenation = continuation_fit_width <= LAYOUT_EPSILON_PT
+              && !automatic_hyphenation_urls.as_ref().is_some_and(|ranges| {
+                ranges.overlaps(
+                  InlineCursor {
+                    inline_index,
+                    text_offset: source_segment.start,
+                  },
+                  InlineCursor {
+                    inline_index,
+                    text_offset: source_segment.end,
+                  },
+                )
+              })
               && automatic_hyphenation_allowed_on_line(
                 paragraph,
                 &run.style,
@@ -58945,11 +62379,14 @@ impl<'a> TextFrameLayout<'a> {
                     automatic: allow_automatic_hyphenation,
                     line_has_prefix: text_state.line_text_extents.has_text
                       && x > line_left + LAYOUT_EPSILON_PT,
+                    legacy_character_window: flow.compatibility_mode < 15,
                     do_not_hyphenate_caps: flow.hyphenation.do_not_hyphenate_caps,
                     justification: (can_fit_with_shrink && allow_automatic_hyphenation)
                       .then(|| {
                         JustifiedHyphenation::for_line(
                           LineShrinkFit {
+                            modern_kashida: justification.modern_wordprocessing
+                              && justification.kashida.is_some(),
                             x,
                             width: fit_width_with_continuation,
                             text: &segment.text,
@@ -58968,7 +62405,29 @@ impl<'a> TextFrameLayout<'a> {
                   text_metrics,
                 )
               })
-              .flatten();
+              .flatten()
+              .filter(|selected| {
+                // MoveWord suppresses automatic breaks, while a source
+                // w:softHyphen retains its authored opportunity. Native
+                // controls keep MoveLine's separate complete-line retry for
+                // both kinds and let Allow retain either kind here.
+                selected.kind != super::hyphenation::CandidateKind::Automatic
+                  || flow.hyphenation.page_bottom != PageBottomHyphenation::MoveWord
+                  || !automatic_hyphenation_moves_word_from_bottom(
+                    paragraph,
+                    flow,
+                    text_frame,
+                    HyphenationLineContext {
+                      y_pt: y,
+                      height_pt: line_height,
+                      text_extents: text_state.line_text_extents,
+                      index: text_state.line_fragments.len(),
+                      has_form_widget: line_has_form_widget || meta.form_widget_id.is_some(),
+                    },
+                    TextPortion::from_run(run, &selected.prefix),
+                    text_metrics,
+                  )
+              });
             if let Some(selected) = selected_hyphenation {
               if leading_script_spacing > LAYOUT_EPSILON_PT {
                 flush_text(
@@ -59101,7 +62560,7 @@ impl<'a> TextFrameLayout<'a> {
               base_line_height = text_frame.base_line_height;
               x = line_left;
               chunk_x = x;
-              line_used_shrink_fit = false;
+              text_state.line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
               line_has_tab = false;
               text_state.reset_tab_segments();
@@ -59246,7 +62705,7 @@ impl<'a> TextFrameLayout<'a> {
                 x = line_left;
               }
               chunk_x = x;
-              line_used_shrink_fit = false;
+              text_state.line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
               line_has_tab = false;
               text_state.reset_tab_segments();
@@ -59307,6 +62766,7 @@ impl<'a> TextFrameLayout<'a> {
                 &physical_wrap_exclusions_at_baseline(
                   &wrap_exclusions,
                   text_frame.drawing_wrap_baseline_offset_pt,
+                  text_frame.following_table_wrap_baseline_offset_pt,
                 ),
               )
             {
@@ -59338,6 +62798,7 @@ impl<'a> TextFrameLayout<'a> {
                 &physical_wrap_exclusions_at_baseline(
                   &wrap_exclusions,
                   text_frame.drawing_wrap_baseline_offset_pt,
+                  text_frame.following_table_wrap_baseline_offset_pt,
                 ),
               )
               .into_iter()
@@ -59375,7 +62836,7 @@ impl<'a> TextFrameLayout<'a> {
               }
               x = line_left;
               chunk_x = x;
-              line_used_shrink_fit = false;
+              text_state.line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
               line_has_tab = false;
               text_state.reset_tab_segments();
@@ -59443,6 +62904,7 @@ impl<'a> TextFrameLayout<'a> {
                         line_cjk_compression_fit(
                           CjkLineFit {
                             overflow_punctuation,
+                            modern_justified: modern_cjk_justification,
                             x,
                             line_right: aligned_tab_provisional_line_right(
                               pending_tab.as_ref(),
@@ -59532,7 +62994,7 @@ impl<'a> TextFrameLayout<'a> {
                       base_line_height = text_frame.base_line_height;
                       x = line_left;
                       chunk_x = x;
-                      line_used_shrink_fit = false;
+                      text_state.line_used_shrink_fit = false;
                       line_used_punctuation_fit = false;
                       line_has_tab = false;
                       text_state.reset_tab_segments();
@@ -59597,6 +63059,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_cjk_compression_fit(
                     CjkLineFit {
                       overflow_punctuation,
+                      modern_justified: modern_cjk_justification,
                       x,
                       line_right: aligned_tab_provisional_line_right(
                         pending_tab.as_ref(),
@@ -59686,7 +63149,7 @@ impl<'a> TextFrameLayout<'a> {
                   base_line_height = text_frame.base_line_height;
                   x = line_left;
                   chunk_x = x;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -59818,6 +63281,10 @@ impl<'a> TextFrameLayout<'a> {
               inline_index,
               text_offset: segment.end,
             });
+            if !segment.text.is_empty() && segment.text.chars().all(word_line_height_ignored_blank)
+            {
+              text_state.line_last_blank_inline = Some(inline_index);
+            }
             text_state
               .line_text_extents
               .include_ignored_blank(TextPortion::from_run(run, &segment.text), text_metrics);
@@ -59945,8 +63412,12 @@ impl<'a> TextFrameLayout<'a> {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           let mut advanced_for_hyphenation = false;
           if flow.text_segmentation != TextSegmentation::DrawingLayer
-            && let Some(boundary) =
-              last_rendered_page_break_hyphenation_boundary(paragraph, inline_index, flow)
+            && let Some(boundary) = last_rendered_page_break_hyphenation_boundary(
+              paragraph,
+              inline_index,
+              flow,
+              automatic_hyphenation_urls.as_ref(),
+            )
           {
             let right_word_end = boundary
               .right
@@ -59978,9 +63449,13 @@ impl<'a> TextFrameLayout<'a> {
             let page_bottom_policy_applies = flow.text_segmentation == TextSegmentation::Body;
             let page_bottom_policy_allows_break = !page_bottom_policy_applies
               || !line_is_last_in_slot
-              || flow.hyphenation.page_bottom == PageBottomHyphenation::Allow;
+              || flow.hyphenation.page_bottom == PageBottomHyphenation::Allow
+              || (flow.hyphenation.page_bottom == PageBottomHyphenation::MoveWord
+                && boundary.kind == super::hyphenation::CandidateKind::Explicit);
             let hyphen_width = text_metrics.measure_text("-", &boundary.left.style);
             if continuation_overflows
+              && (boundary.kind != super::hyphenation::CandidateKind::Explicit
+                || x > line_left + LAYOUT_EPSILON_PT)
               && page_bottom_policy_allows_break
               && x + hyphen_width <= line_right + LAYOUT_EPSILON_PT
             {
@@ -60002,7 +63477,7 @@ impl<'a> TextFrameLayout<'a> {
                 &mut hyphen,
                 &boundary.left.style,
                 &meta,
-                super::hyphenation::CandidateKind::Automatic,
+                boundary.kind,
               );
               line_ended_with_discretionary_hyphen = true;
               apply_pending_aligned_tab(
@@ -60038,7 +63513,7 @@ impl<'a> TextFrameLayout<'a> {
               paragraph_left = text_frame.paragraph_left;
               base_line_height = text_frame.base_line_height;
               x = line_left;
-              line_used_shrink_fit = false;
+              text_state.line_used_shrink_fit = false;
               line_used_punctuation_fit = false;
               line_has_tab = false;
               text_state.reset_tab_segments();
@@ -60141,7 +63616,7 @@ impl<'a> TextFrameLayout<'a> {
             x = line_left;
             line_item_start_index = current.items.len();
             text_state.line_content_item_start_index = line_item_start_index;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -60174,6 +63649,9 @@ impl<'a> TextFrameLayout<'a> {
           ended_with_explicit_page_break = false;
           text_state.set_position(InlineCursor::after_inline(inline_index));
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
+            let picture_wrap_owner = floating_picture_wrap_owner(placement, flow);
+            let repeating_page_owned_cell_picture =
+              picture_wrap_owner == WrapExclusionOwner::RepeatingPageOwnedCellDrawing;
             let page_owned_cell_anchor =
               flow.table_cell_replay.is_some() && !effective_layout_in_cell(placement, flow);
             if page_owned_cell_anchor
@@ -60199,13 +63677,21 @@ impl<'a> TextFrameLayout<'a> {
               placement,
               flow,
               text_frame.paragraph_indents(),
-              x,
-              anchor_y,
-              metrics.frame_width_pt,
-              metrics.frame_height_pt,
+              (x, anchor_y),
+              (metrics.frame_width_pt, metrics.frame_height_pt),
+              !drawing_groups.is_empty(),
             );
-            let image_x = frame_x + metrics.content_offset_x_pt;
-            let image_y = frame_y + metrics.content_offset_y_pt;
+            let (image_x, image_y) = (pages.len() == start_pages_len)
+              .then(|| {
+                line_pictures
+                  .position(inline_index)
+                  .or_else(|| pictures.and_then(|plan| plan.position(inline_index)))
+              })
+              .flatten()
+              .unwrap_or((
+                frame_x + metrics.content_offset_x_pt,
+                frame_y + metrics.content_offset_y_pt,
+              ));
             let width = metrics.content_width_pt;
             let height = metrics.content_height_pt;
             let (image_x, image_y) = capture_picture_in_cell(
@@ -60371,7 +63857,9 @@ impl<'a> TextFrameLayout<'a> {
             });
             if flow.text_segmentation == TextSegmentation::TableCell
               && !flow.inside_paragraph_frame
-              && legacy_page_owned_cell_picture_wrap(image, placement, flow.compatibility_mode)
+              && (legacy_page_owned_cell_picture_wrap(image, placement, flow.compatibility_mode)
+                || (repeating_page_owned_cell_picture
+                  && placement.wrap == ImageWrapMode::TopBottom))
               && let Some(PageItem::FloatingDrawing { table_wrap, .. }) =
                 current.items.get_mut(image_item_start)
               && let Some(bounds) = influence_bounds
@@ -60379,6 +63867,7 @@ impl<'a> TextFrameLayout<'a> {
               *table_wrap = Some(TableCellPictureWrap {
                 bounds,
                 side: placement.wrap_side,
+                blocks_flow: placement.wrap == ImageWrapMode::TopBottom,
               });
             }
             match placement.wrap {
@@ -60410,6 +63899,9 @@ impl<'a> TextFrameLayout<'a> {
                     if page_owned_cell_anchor && drawing_groups.is_empty() {
                       exclusion.owner = WrapExclusionOwner::PageOwnedCellTopBottom;
                     }
+                    if repeating_page_owned_cell_picture {
+                      exclusion.owner = WrapExclusionOwner::RepeatingPageOwnedCellDrawing;
+                    }
                     extend_wrap_exclusions_unique(&mut current.wrap_exclusions, &[exclusion]);
                   }
                   if drawingml_body_wrap {
@@ -60439,7 +63931,8 @@ impl<'a> TextFrameLayout<'a> {
                   } else {
                     floating_anchor_line_top(flow, paragraph, y, line_height, text_metrics)
                   };
-                  let wrap_origin = if page_owned_cell_anchor {
+                  let wrap_origin = if page_owned_cell_anchor && !repeating_page_owned_cell_picture
+                  {
                     // Native row controls keep the anchoring line below its
                     // own TopBottom picture even when it starts above it.
                     y + (image_y + height + placement.margin_bottom_pt - wrap_line_top).max(0.0)
@@ -60482,11 +63975,12 @@ impl<'a> TextFrameLayout<'a> {
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                 if !page_owned_cell_anchor
+                  && !repeating_page_owned_cell_picture
                   && (!drawingml_body_wrap || (y - wrap_entry_y).abs() > LAYOUT_EPSILON_PT)
                 {
                   x = line_left;
                   line_height = base_line_height;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -60497,17 +63991,51 @@ impl<'a> TextFrameLayout<'a> {
                 // Writer still creates a contour/square text exclusion for a
                 // behind-document object when wp:wrapTight/wp:wrapSquare is
                 // present (tdf#128198).
-                let exclusion = WrapExclusion {
-                  left_pt: image_x - placement.margin_left_pt,
-                  right_pt: image_x + width + placement.margin_right_pt,
-                  top_pt: image_y - placement.margin_top_pt,
-                  bottom_pt: image_y + height + placement.margin_bottom_pt,
-                  side: placement.wrap_side,
-                  blocks_flow: false,
-                  uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
-                  contour_band: None,
-                  owner: WrapExclusionOwner::Drawing,
-                };
+                let exclusion = cell_square_picture_wrap_exclusion(
+                  WrapExclusion {
+                    left_pt: image_x - placement.margin_left_pt,
+                    right_pt: image_x + width + placement.margin_right_pt,
+                    top_pt: image_y - placement.margin_top_pt,
+                    bottom_pt: image_y + height + placement.margin_bottom_pt,
+                    side: placement.wrap_side,
+                    blocks_flow: false,
+                    uses_contour: matches!(placement.wrap, ImageWrapMode::Tight),
+                    contour_band: None,
+                    owner: picture_wrap_owner,
+                  },
+                  placement,
+                  flow,
+                  text_frame.default_line_left,
+                  text_frame.default_line_right,
+                );
+                if drawing_groups.is_empty()
+                  && pages.len() == start_pages_len
+                  && cell_line_picture_wrap::owns(placement, flow)
+                  && line_pictures.capture(inline_index, (image_x, image_y), exclusion)
+                  && image_item_start > start_item_index
+                {
+                  // The picture's source character is reached only after its
+                  // prefix has been broken into lines. Native Line controls
+                  // retain that first physical picture position even when
+                  // wrapping splits the prefix's terminal line. Invalidate
+                  // the trial paragraph, then use this same rectangle for
+                  // both wrap and paint. Each source picture is captured once;
+                  // later anchors are resolved only after earlier reflow.
+                  restore_text_frame_start_page(
+                    current,
+                    pages,
+                    start_pages_len,
+                    start_current,
+                    start_page_snapshot.as_ref(),
+                    start_pending_snapshot.as_ref(),
+                  );
+                  if let (Some(anchors), Some(len)) =
+                    (anchor_pages.as_deref_mut(), start_anchor_pages_len)
+                  {
+                    anchors.truncate(len);
+                  }
+                  return ControlFlow::Break(());
+                }
                 extend_paragraph_wrap_exclusions_unique(&mut wrap_exclusions, &[exclusion], flow);
                 extend_wrap_exclusions_unique(&mut current.wrap_exclusions, &[exclusion]);
                 push_page_influence(
@@ -60526,7 +64054,7 @@ impl<'a> TextFrameLayout<'a> {
                   // width fly keeps its usable side segment, and a fly after
                   // already-painted text retains the ordinary reflow path.
                   let previous_y = y;
-                  y = if cell_owned_drawingml_picture(placement, flow) {
+                  y = if cell_owned_drawingml_object(placement, flow) {
                     // Cell text stores a resolved baseline, while pictures
                     // and wrap bands use physical frame coordinates. Reuse
                     // the same conversion as TopBottom: a picture below the
@@ -60582,7 +64110,7 @@ impl<'a> TextFrameLayout<'a> {
                     self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                   x = line_left;
                   line_height = base_line_height;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -60621,7 +64149,7 @@ impl<'a> TextFrameLayout<'a> {
             text_state.line_content_item_start_index = line_item_start_index;
             line_has_form_widget = false;
             pending_text_page_break = false;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -60667,7 +64195,7 @@ impl<'a> TextFrameLayout<'a> {
                 paragraph_left = text_frame.paragraph_left;
                 base_line_height = text_frame.base_line_height;
                 x = line_left;
-                line_used_shrink_fit = false;
+                text_state.line_used_shrink_fit = false;
                 line_used_punctuation_fit = false;
                 line_has_tab = false;
                 text_state.reset_tab_segments();
@@ -60708,7 +64236,7 @@ impl<'a> TextFrameLayout<'a> {
                   default_line_right = text_frame.default_line_right;
                   paragraph_left = text_frame.paragraph_left;
                   base_line_height = text_frame.base_line_height;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -60756,7 +64284,7 @@ impl<'a> TextFrameLayout<'a> {
                     paragraph_left = text_frame.paragraph_left;
                     base_line_height = text_frame.base_line_height;
                     x = line_left;
-                    line_used_shrink_fit = false;
+                    text_state.line_used_shrink_fit = false;
                     line_used_punctuation_fit = false;
                     line_has_tab = false;
                     text_state.reset_tab_segments();
@@ -60909,6 +64437,7 @@ impl<'a> TextFrameLayout<'a> {
                         text_frame,
                         y,
                         object_line_height,
+                        wrap_frame_size: None,
                       })
                     {
                       (flow, text_frame, y, line_left, line_right, line_height) = next;
@@ -60919,7 +64448,7 @@ impl<'a> TextFrameLayout<'a> {
                       line_item_start_index = current.items.len();
                       text_state.line_content_item_start_index = line_item_start_index;
                       line_has_form_widget = false;
-                      line_used_shrink_fit = false;
+                      text_state.line_used_shrink_fit = false;
                       line_used_punctuation_fit = false;
                       line_has_tab = false;
                       text_state.reset_tab_segments();
@@ -61062,7 +64591,7 @@ impl<'a> TextFrameLayout<'a> {
             paragraph_left = text_frame.paragraph_left;
             base_line_height = text_frame.base_line_height;
             x = line_left;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -61105,6 +64634,7 @@ impl<'a> TextFrameLayout<'a> {
               text_frame,
               y,
               object_line_height,
+              wrap_frame_size: None,
             })
           {
             (flow, text_frame, y, line_left, line_right, line_height) = next;
@@ -61115,7 +64645,7 @@ impl<'a> TextFrameLayout<'a> {
             line_item_start_index = current.items.len();
             text_state.line_content_item_start_index = line_item_start_index;
             line_has_form_widget = false;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -61217,7 +64747,14 @@ impl<'a> TextFrameLayout<'a> {
           } else {
             InlineCursor::after_inline(inline_index)
           });
-          pending_tab = None;
+          // wp:inline shapes are characters in the pending tab span, just
+          // like inline pictures. Floating shapes and horizontal rules keep
+          // their separate positioning/paragraph ownership.
+          if is_inline_horizontal_rule
+            || !matches!(shape.placement, crate::docx::ImagePlacement::Inline)
+          {
+            pending_tab = None;
+          }
           let place_shape = |current: &mut Page,
                              shape_flow: FlowContext,
                              text_metrics: &mut TextMetrics,
@@ -61719,7 +65256,7 @@ impl<'a> TextFrameLayout<'a> {
                     initial_line_anchor_top,
                     (metrics.frame_width_pt, metrics.frame_height_pt),
                   );
-                  let initial_shape_y = if metrics.uses_relative_effect_frame_y {
+                  let initial_shape_y = if metrics.uses_effect_frame_y {
                     initial_frame_y
                       + metrics.content_offset_y_pt
                       + shape.offset_y_pt * metrics.group_scale_y
@@ -61758,23 +65295,16 @@ impl<'a> TextFrameLayout<'a> {
                 && matches!(placement.wrap, ImageWrapMode::Through)
                 && flow.text_segmentation == TextSegmentation::TableCell
               {
-                // Absolute legacy VML with
-                // `mso-position-vertical-relative:text` is imported as an
-                // at-character FRAME-relative object. For wrap-through
-                // objects Writer's GetTopForObjPos() uses the owning
-                // SwTextFrame's top plus its upper space. A framePr fly owns
-                // an independent SwTextFrame even when its anchor is in a
-                // table cell, and `y` is already that inner frame's line top;
-                // subtracting the outer table-cell baseline would move the
-                // shape above its owner. Outside an independent frame,
-                // table-cell text stores the paragraph origin as a resolved
-                // baseline, so translate it back to the line/frame top.
-                // DrawingML paragraph-relative anchors retain the paragraph
-                // frame origin (tdf165478_bottomAligned.docx).
+                // Native body/cell controls with 0/3/9pt paragraph-before
+                // spacing retain the same paragraph-relative VML position,
+                // while the text line moves. Its frame origin excludes the
+                // upper spacing; the resolved cell line top includes it.
+                // A framePr fly already owns an independent inner cursor
+                // and must not consume the outer cell's origin/baseline.
                 if flow.inside_paragraph_frame {
                   y
                 } else {
-                  line_anchor_top
+                  paragraph_anchor_top
                 }
               } else {
                 floating_anchor_reference_y(placement, paragraph_anchor_top, line_anchor_top)
@@ -61831,12 +65361,12 @@ impl<'a> TextFrameLayout<'a> {
               };
               let shape_y =
                 shape_y + shape.offset_y_pt * metrics.group_scale_y + text_anchor_offset;
-              let shape_x = if metrics.uses_relative_effect_frame_x {
+              let shape_x = if metrics.uses_effect_frame_x {
                 shape_x + metrics.content_offset_x_pt
               } else {
-                adjusted_floating_shape_x(placement, shape, shape_x)
+                adjusted_floating_shape_x(placement, shape, shape_x, flow)
               };
-              let shape_y = if metrics.uses_relative_effect_frame_y {
+              let shape_y = if metrics.uses_effect_frame_y {
                 shape_y + metrics.content_offset_y_pt
               } else {
                 adjusted_floating_shape_y(placement, shape, shape_y)
@@ -62016,6 +65546,26 @@ impl<'a> TextFrameLayout<'a> {
                   + placement.margin_top_pt
                   + placement.margin_bottom_pt,
               });
+              if flow.text_segmentation == TextSegmentation::Body
+                && !flow.inside_paragraph_frame
+                && shape.word_text_frame
+                && !shape.wordprocessing_shape_host
+                && placement.paint_order.is_vml()
+                && placement.wrap == ImageWrapMode::Square
+                && (placement.horizontal_alignment.is_some()
+                  || placement.vertical_alignment.is_some())
+                && crate::docx::vml_textbox_frame_outsets(shape).is_some()
+                && let Some(PageItem::FloatingDrawing {
+                  body_vertical_alignment,
+                  ..
+                }) = current.items.get_mut(shape_item_start)
+              {
+                *body_vertical_alignment =
+                  influence_bounds.map(|bounds| BodyDrawingVerticalAlignment {
+                    bounds,
+                    anchor_y_pt: current_line_anchor_top,
+                  });
+              }
               let contour_exclusions = floating_wrap_polygon_exclusions(
                 shape,
                 shape_x,
@@ -62425,7 +65975,7 @@ impl<'a> TextFrameLayout<'a> {
                   default_line_right = text_frame.default_line_right;
                   paragraph_left = text_frame.paragraph_left;
                   base_line_height = text_frame.base_line_height;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -62486,6 +66036,7 @@ impl<'a> TextFrameLayout<'a> {
                     text_frame,
                     y,
                     object_line_height,
+                    wrap_frame_size: None,
                   })
                 {
                   (flow, text_frame, y, line_left, line_right, line_height) = next;
@@ -62495,7 +66046,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_item_start_index = current.items.len();
                   text_state.line_content_item_start_index = line_item_start_index;
                   line_has_form_widget = false;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -62569,7 +66120,7 @@ impl<'a> TextFrameLayout<'a> {
                   paragraph_left = text_frame.paragraph_left;
                   base_line_height = text_frame.base_line_height;
                   x = line_left;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -62611,7 +66162,18 @@ impl<'a> TextFrameLayout<'a> {
                   }
                 }
                 let mut compatibility_forced_shape_line = false;
-                if x + frame_width > line_right && x > line_left {
+                let fit_line_right =
+                  aligned_tab_provisional_line_right(pending_tab.as_ref(), line_right);
+                if x + frame_width > fit_line_right && x > line_left {
+                  apply_pending_aligned_tab(
+                    current,
+                    &mut pending_tab,
+                    text_metrics,
+                    y,
+                    line_left,
+                    line_right,
+                  );
+                  pending_tab = None;
                   (flow, text_frame, y, line_left, line_right) = self.advance_line(
                     TextLineAdvance {
                       current,
@@ -62639,7 +66201,7 @@ impl<'a> TextFrameLayout<'a> {
                   base_line_height = text_frame.base_line_height;
                   x = line_left;
                   compatibility_forced_shape_line = true;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -62691,6 +66253,7 @@ impl<'a> TextFrameLayout<'a> {
                     text_frame,
                     y,
                     object_line_height,
+                    wrap_frame_size: Some((frame_width, frame_height)),
                   })
                 {
                   (flow, text_frame, y, line_left, line_right, line_height) = next;
@@ -62701,7 +66264,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_item_start_index = current.items.len();
                   text_state.line_content_item_start_index = line_item_start_index;
                   line_has_form_widget = false;
-                  line_used_shrink_fit = false;
+                  text_state.line_used_shrink_fit = false;
                   line_used_punctuation_fit = false;
                   line_has_tab = false;
                   text_state.reset_tab_segments();
@@ -62750,17 +66313,29 @@ impl<'a> TextFrameLayout<'a> {
                 } else {
                   y
                 } + object_line_metrics.ascent_adjustment_pt;
-                // Word registers a body-frame canvas against the preceding
-                // document twip, separately from the paragraph's text origin.
-                // Native frame x/y sweeps retain this near-edge ownership in
-                // both compatibility modes; an unframed canvas has no inset.
+                // Native body-frame canvases use the preceding document twip.
+                // Numeric frame positioning already decoded that twip; only
+                // the axes with a zero/aligned sentinel still need it here.
+                // The native x/y sweeps must not receive the correction twice.
                 let canvas_frame_near = if shape.canvas_children.is_some()
                   && flow.inside_paragraph_frame
                   && flow.text_segmentation == TextSegmentation::Body
                 {
-                  1.0 / 20.0
+                  let (decoded_x, decoded_y) = flow.paragraph_frame_numeric_offset_decoded;
+                  (
+                    if decoded_x {
+                      0.0
+                    } else {
+                      1.0 / units::TWIPS_PER_POINT
+                    },
+                    if decoded_y {
+                      0.0
+                    } else {
+                      1.0 / units::TWIPS_PER_POINT
+                    },
+                  )
                 } else {
-                  0.0
+                  (0.0, 0.0)
                 };
                 let (shape_item_start, shape_item_end) = place_shape(
                   current,
@@ -62769,12 +66344,12 @@ impl<'a> TextFrameLayout<'a> {
                   x + inline_shape_content_offset_x(shape)
                     + shape.offset_x_pt
                     + wordart_paint_shift_x_pt
-                    - canvas_frame_near,
+                    - canvas_frame_near.0,
                   shape_frame_y
                     + inline_shape_content_offset_y(shape)
                     + shape.offset_y_pt
                     + wordart_paint_shift_y_pt
-                    - canvas_frame_near,
+                    - canvas_frame_near.1,
                   shape.width_pt,
                   shape.height_pt,
                 );
@@ -62926,7 +66501,7 @@ impl<'a> TextFrameLayout<'a> {
           paragraph_left = text_frame.paragraph_left;
           base_line_height = text_frame.base_line_height;
           x = line_left;
-          line_used_shrink_fit = false;
+          text_state.line_used_shrink_fit = false;
           line_used_punctuation_fit = false;
           line_has_tab = false;
           text_state.reset_tab_segments();
@@ -62958,7 +66533,51 @@ impl<'a> TextFrameLayout<'a> {
               }
             }
           }
-          let break_precedes_first_visible_line = !emitted && text_state.line_fragments.is_empty();
+          let break_precedes_first_visible_line = !text_state.line_text_extents.has_text
+            && text_state.line_inline_object_portion_height <= LAYOUT_EPSILON_PT
+            && text_state.line_fragments.is_empty();
+          if text_state.line_text_extents.has_text
+            || text_state.line_inline_object_portion_height > LAYOUT_EPSILON_PT
+          {
+            // A manual break ends this physical line, but does not exempt
+            // its visible prefix from normal first-line admission. Defer to
+            // the same complete-line rollback used by ordinary wrapping.
+            // A leading empty break instead keeps its authored master.
+            text_state.check_first_line_fit(
+              current,
+              ActiveTextFrame {
+                flow,
+                frame: text_frame,
+              },
+              y,
+              line_height,
+              0.0,
+              pages.len() == start_pages_len && flow.column_index == start_flow.column_index,
+            );
+          }
+          let empty_master_upper = if break_precedes_first_visible_line
+            && pages.len() == start_pages_len
+            && flow.column_index == start_flow.column_index
+          {
+            self.spacing_before_pt + first_line_top_border
+          } else {
+            0.0
+          };
+          let follow_content = explicit_break_follow_content(&paragraph.inlines, inline_index + 1);
+          let preserve_paragraph_upper_space =
+            follow_content.unwrap_or(flow.split_page_break_and_paragraph_mark);
+          let empty_master_after = if break_precedes_first_visible_line
+            && text_state.decoration_fragments.is_empty()
+            && !preserve_paragraph_upper_space
+            && follow_content.is_none()
+          {
+            // With no follow mark, this terminal dummy line also owns the
+            // paragraph's lower space on its master, even beside an unshaded
+            // next paragraph. A later explicit break is a separate fragment.
+            self.spacing_after_pt
+          } else {
+            0.0
+          };
           wordprocessing_line_geometry::bind(
             &mut current.items[text_state.line_content_item_start_index..],
             paragraph,
@@ -62980,21 +66599,25 @@ impl<'a> TextFrameLayout<'a> {
             },
             text_metrics,
           );
-          if !break_precedes_first_visible_line {
-            text_state.note_physical_line(
-              paragraph,
-              flow,
-              text_frame,
-              ParagraphPhysicalLine {
-                page_index: pages.len(),
-                item_start: text_state.line_content_item_start_index,
-                item_end: current.items.len(),
-                y_pt: y,
-                height_pt: line_height,
-                right_pt: Some(line_right),
-              },
-            );
-          }
+          // A leading run-level page break still owns an empty shaded line
+          // on the master page. Record its paint fragment independently of
+          // consuming the first text line below: the follow keeps firstLine/
+          // hanging indentation. Native leading/nonleading, repeated-break,
+          // exact-height and pageBreakBefore controls distinguish the owners.
+          text_state.note_explicit_break_line(
+            paragraph,
+            flow,
+            text_frame,
+            ParagraphPhysicalLine {
+              page_index: pages.len(),
+              item_start: text_state.line_content_item_start_index,
+              item_end: current.items.len(),
+              y_pt: y - empty_master_upper,
+              height_pt: line_height + empty_master_after,
+              right_pt: Some(line_right),
+            },
+            break_precedes_first_visible_line,
+          );
           text_state.finish_line(y, line_height);
           if break_precedes_first_visible_line {
             // A leading w:br moves this paragraph to the next page without
@@ -63011,8 +66634,6 @@ impl<'a> TextFrameLayout<'a> {
           ) {
             pending_text_page_break = true;
           } else {
-            let preserve_paragraph_upper_space =
-              page_break_has_following_content(&paragraph.inlines, inline_index + 1);
             (flow, text_frame, y, line_left, line_right, line_height) = self.force_text_page_break(
               flow,
               TextPageBreakAdvance {
@@ -63032,7 +66653,7 @@ impl<'a> TextFrameLayout<'a> {
             line_item_start_index = current.items.len();
             text_state.line_content_item_start_index = line_item_start_index;
             emitted = false;
-            line_used_shrink_fit = false;
+            text_state.line_used_shrink_fit = false;
             line_used_punctuation_fit = false;
             line_has_tab = false;
             text_state.reset_tab_segments();
@@ -63047,8 +66668,26 @@ impl<'a> TextFrameLayout<'a> {
           ended_with_explicit_page_break = false;
           let has_line_content = text_state.line_text_extents.has_text
             || text_state.line_inline_object_portion_height > LAYOUT_EPSILON_PT;
-          let source_upper = if text_state.line_fragments.is_empty() {
-            self.spacing_before_pt
+          let break_precedes_first_visible_line =
+            !has_line_content && text_state.line_fragments.is_empty();
+          if has_line_content {
+            text_state.check_first_line_fit(
+              current,
+              ActiveTextFrame {
+                flow,
+                frame: text_frame,
+              },
+              y,
+              line_height,
+              0.0,
+              pages.len() == start_pages_len && flow.column_index == start_flow.column_index,
+            );
+          }
+          let source_upper = if break_precedes_first_visible_line
+            && pages.len() == start_pages_len
+            && flow.column_index == start_flow.column_index
+          {
+            self.spacing_before_pt + first_line_top_border
           } else {
             0.0
           };
@@ -63088,7 +66727,7 @@ impl<'a> TextFrameLayout<'a> {
             },
             text_metrics,
           );
-          text_state.note_physical_line(
+          text_state.note_explicit_break_line(
             paragraph,
             flow,
             text_frame,
@@ -63096,12 +66735,16 @@ impl<'a> TextFrameLayout<'a> {
               page_index: pages.len(),
               item_start: text_state.line_content_item_start_index,
               item_end: current.items.len(),
-              y_pt: y,
+              y_pt: y - source_upper,
               height_pt: line_height,
               right_pt: Some(line_right),
             },
+            break_precedes_first_visible_line,
           );
           text_state.finish_line(y, line_height);
+          if break_precedes_first_visible_line {
+            text_state.line_fragments.pop();
+          }
           let column_emitted;
           (flow, text_frame, y, _, _, line_height, column_emitted) = self.apply_column_break(
             flow,
@@ -63114,12 +66757,16 @@ impl<'a> TextFrameLayout<'a> {
               wrap_exclusions: &mut wrap_exclusions,
             },
           );
-          if inline_index == 0 && (flow.compatibility_mode < 15 || column_emitted) {
-            // A leading same-page column break retains before-spacing in
-            // both legacy and modern modes. Modern page follows suppress it;
-            // tdf153964's one-column controls exercise that separate case.
-            // A break after visible text must not apply the spacing again.
-            y += paragraph.format.spacing_before_pt;
+          let defers_upper_to_later_break =
+            explicit_break_follow_content(&paragraph.inlines, inline_index + 1) == Some(false);
+          if break_precedes_first_visible_line && !defers_upper_to_later_break {
+            // As with page breaks and numbered paragraphs, only the first
+            // content follow can own deferred before-space. Continuous
+            // section columns retain it below the physical body top.
+            y += self.explicit_break_spacing_before(flow, pages.len() + 1);
+          }
+          if break_precedes_first_visible_line && !defers_upper_to_later_break {
+            y += first_line_top_border;
           }
           // A column transition creates a new physical wrap segment. Its
           // first text cursor must use that segment, not the unwrapped frame
@@ -63127,7 +66774,7 @@ impl<'a> TextFrameLayout<'a> {
           // indent relative to the available leading edge; modern modes
           // prevent a hanging indent from re-entering the avoided object.
           (line_left, line_right) = self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
-          if inline_index == 0 {
+          if break_precedes_first_visible_line {
             let indent = text_frame.first_line_left - text_frame.default_line_left;
             let obstructed = if paragraph.format.bidi {
               line_right < text_frame.default_line_right - LAYOUT_EPSILON_PT
@@ -63156,7 +66803,7 @@ impl<'a> TextFrameLayout<'a> {
           text_state.line_content_item_start_index = line_item_start_index;
           line_has_form_widget = false;
           emitted = column_emitted;
-          line_used_shrink_fit = false;
+          text_state.line_used_shrink_fit = false;
           line_used_punctuation_fit = false;
           line_has_tab = false;
           text_state.reset_tab_segments();
@@ -63283,6 +66930,11 @@ impl<'a> TextFrameLayout<'a> {
       base_line_height = text_frame.base_line_height;
     }
     if pending_text_page_break {
+      // Floating anchors did not consume a follow-frame text portion. Keep
+      // the terminal break's paragraph mark on the master, just as for a
+      // break without anchors; otherwise the next paragraph gains an empty
+      // line on the destination page.
+      ended_with_explicit_page_break = true;
       (flow, text_frame, y, _, _, line_height) = self.force_text_page_break(
         flow,
         TextPageBreakAdvance {
@@ -63391,7 +67043,7 @@ impl<'a> TextFrameLayout<'a> {
       && !paragraph.inlines.iter().any(|inline| {
         matches!(inline, InlineItem::Image(image)
           if matches!(image.placement, crate::docx::ImagePlacement::Floating(placement)
-            if cell_owned_drawingml_picture(placement, flow)
+            if cell_owned_drawingml_object(placement, flow)
               && matches!(placement.wrap, ImageWrapMode::TopBottom | ImageWrapMode::Square)))
       })
     {
@@ -63405,6 +67057,16 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y;
       y = paragraph_bottom + self.spacing_after_pt;
     } else if emitted {
+      text_state.resolve_blank_line_metrics(
+        paragraph,
+        ActiveTextFrame {
+          flow,
+          frame: text_frame,
+        },
+        &mut line_height,
+        true,
+        text_metrics,
+      );
       let final_character_picture_line = character_picture_line_height(
         paragraph,
         text_frame,
@@ -63440,6 +67102,7 @@ impl<'a> TextFrameLayout<'a> {
           text_frame.text_baseline_line_height_for_text(line_height, text_state.line_text_extents),
         );
       }
+      text_state.paint_note_separator_marks(current, y, line_height, text_frame, text_metrics);
       if paragraph.format.bidi
         || line_has_wordprocessing_bidi_scopes(&current.items, line_item_start_index, y)
         || line_has_wordprocessing_rtl_runs(&current.items, line_item_start_index, y)
@@ -63484,7 +67147,7 @@ impl<'a> TextFrameLayout<'a> {
           ),
           preserve_foreign_tail: false,
         },
-        line_used_shrink_fit,
+        text_state.line_used_shrink_fit,
         text_metrics,
       );
       // Include a first-line numbering portion beside an inline object.
@@ -63598,6 +67261,11 @@ impl<'a> TextFrameLayout<'a> {
         },
         |resolved| resolved.gap_below_pt,
       );
+      let real_height = real_height.max(
+        text_state
+          .line_wrap_clearance_bottom_pt
+          .map_or(0.0, |bottom| bottom - y),
+      );
       let cleared_y = body_drawing_wrap::terminal_line_clearance(
         FrameBounds {
           x_pt: text_frame.default_line_left,
@@ -63611,6 +67279,17 @@ impl<'a> TextFrameLayout<'a> {
           0.0
         },
         self.spacing_after_pt,
+        &wrap_exclusions,
+      );
+      let cleared_y = body_drawing_wrap::legacy_top_bottom_terminal_clearance(
+        FrameBounds {
+          x_pt: text_frame.default_line_left,
+          y_pt: cleared_y,
+          width_pt: text_frame.default_line_right - text_frame.default_line_left,
+          height_pt: real_height,
+        },
+        self.spacing_after_pt,
+        flow,
         &wrap_exclusions,
       );
       if cleared_y > y + LAYOUT_EPSILON_PT {
@@ -63767,6 +67446,17 @@ impl<'a> TextFrameLayout<'a> {
         text_metrics,
       )
       .map_or(base_line_height, |height| base_line_height.max(height));
+      y = body_drawing_wrap::legacy_top_bottom_terminal_clearance(
+        FrameBounds {
+          x_pt: text_frame.default_line_left,
+          y_pt: y,
+          width_pt: text_frame.default_line_right - text_frame.default_line_left,
+          height_pt: empty_line_height,
+        },
+        self.spacing_after_pt,
+        flow,
+        &wrap_exclusions,
+      );
       if y + text_frame.page_fit_height(empty_line_height) > flow.content_bottom
         && page_has_body_region_items(current, flow)
       {
@@ -63844,6 +67534,36 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y + empty_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
     }
+    if let Some(replay) = pictures.and_then(|plan| {
+      let master = pages.get(start_pages_len).unwrap_or(current);
+      plan.after_paragraph(&master.frame_fragments[start_current.frame_fragments_len..])
+    }) {
+      // Collision placement belongs to both initial wrapping and final paint.
+      // Retry only this anchor paragraph from its existing checkpoint after
+      // its actual line extents become known; later paragraphs cannot move it.
+      restore_text_frame_start_page(
+        current,
+        pages,
+        start_pages_len,
+        start_current,
+        start_page_snapshot.as_ref(),
+        start_pending_snapshot.as_ref(),
+      );
+      if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
+        anchors.truncate(len);
+      }
+      return ControlFlow::Continue(self.format_with_picture_positions(
+        current,
+        pages,
+        anchor_pages,
+        text_metrics,
+        ParagraphFormatPass {
+          position,
+          allow_reflow,
+          pictures: Some(&replay),
+        },
+      ));
+    }
     if reflow_first_line_for_inline_object || (allow_reflow && text_state.first_line_overflows) {
       // Retry the complete first line on the follow, including its text,
       // inline objects and anchor records. This also handles a text line
@@ -63860,33 +67580,35 @@ impl<'a> TextFrameLayout<'a> {
         anchors.truncate(len);
       }
       let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
-      return TextFrameLayout::new(
-        paragraph,
-        follow_flow,
-        self.line_frame_width(follow_flow),
-        self.spacing_after_pt,
-        text_metrics,
-      )
-      .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-      .with_border_context(self.border_context)
-      .with_shading_spacing(
-        ParagraphShadingContext {
-          joins_previous: self.shading_before_pt > 0.0,
-          joins_next: self.shading_after_pt > 0.0,
-        },
-        self.spacing_before_pt,
-      )
-      .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-      .with_terminal_line_follows(self.terminal_line_follows.clone())
-      .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
-      .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
-      .format_with_reflow(
-        current,
-        pages,
-        anchor_pages,
-        text_metrics,
-        self.whole_paragraph_follow_position(follow_y),
-        false,
+      return ControlFlow::Continue(
+        TextFrameLayout::new(
+          paragraph,
+          follow_flow,
+          self.line_frame_width(follow_flow),
+          self.spacing_after_pt,
+          text_metrics,
+        )
+        .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
+        .with_border_context(self.border_context)
+        .with_shading_spacing(
+          ParagraphShadingContext {
+            joins_previous: self.shading_before_pt > 0.0,
+            joins_next: self.shading_after_pt > 0.0,
+          },
+          self.spacing_before_pt,
+        )
+        .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
+        .with_terminal_line_follows(self.terminal_line_follows.clone())
+        .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
+        .format_with_reflow(
+          current,
+          pages,
+          anchor_pages,
+          text_metrics,
+          self.whole_paragraph_follow_position(follow_y),
+          false,
+        ),
       );
     }
     track_bottom_hyphenation_slots
@@ -63911,36 +67633,38 @@ impl<'a> TextFrameLayout<'a> {
       if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
         anchors.truncate(len);
       }
-      return TextFrameLayout::new(
-        paragraph,
-        start_flow,
-        self.line_frame_width(start_flow),
-        self.spacing_after_pt,
-        text_metrics,
-      )
-      .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-      .with_border_context(self.border_context)
-      .with_shading_spacing(
-        ParagraphShadingContext {
-          joins_previous: self.shading_before_pt > 0.0,
-          joins_next: self.shading_after_pt > 0.0,
-        },
-        self.spacing_before_pt,
-      )
-      .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-      .with_terminal_line_follows(self.terminal_line_follows.clone())
-      .with_hyphenation_bottom_line_slots(reserved_slots)
-      .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1))
-      .format_with_reflow(
-        current,
-        pages,
-        anchor_pages,
-        text_metrics,
-        ParagraphLayoutPosition {
-          y: paragraph_top,
-          anchor_top: paragraph_anchor_top,
-        },
-        allow_reflow,
+      return ControlFlow::Continue(
+        TextFrameLayout::new(
+          paragraph,
+          start_flow,
+          self.line_frame_width(start_flow),
+          self.spacing_after_pt,
+          text_metrics,
+        )
+        .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
+        .with_border_context(self.border_context)
+        .with_shading_spacing(
+          ParagraphShadingContext {
+            joins_previous: self.shading_before_pt > 0.0,
+            joins_next: self.shading_after_pt > 0.0,
+          },
+          self.spacing_before_pt,
+        )
+        .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
+        .with_terminal_line_follows(self.terminal_line_follows.clone())
+        .with_hyphenation_bottom_line_slots(reserved_slots)
+        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1))
+        .format_with_reflow(
+          current,
+          pages,
+          anchor_pages,
+          text_metrics,
+          ParagraphLayoutPosition {
+            y: paragraph_top,
+            anchor_top: paragraph_anchor_top,
+          },
+          allow_reflow,
+        ),
       );
     }
 
@@ -63985,7 +67709,7 @@ impl<'a> TextFrameLayout<'a> {
       .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
       .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth);
       reflow.widow_rebalance_page_index = self.widow_rebalance_page_index;
-      return reflow.format_with_reflow(
+      return ControlFlow::Continue(reflow.format_with_reflow(
         current,
         pages,
         anchor_pages,
@@ -63995,7 +67719,7 @@ impl<'a> TextFrameLayout<'a> {
           anchor_top: paragraph_anchor_top,
         },
         allow_reflow,
-      );
+      ));
     }
 
     // The paragraph's final line is not followed by a discretionary automatic
@@ -64067,31 +67791,33 @@ impl<'a> TextFrameLayout<'a> {
             anchors.truncate(len);
           }
           let (follow_flow, follow_y) = advance_text_frame_flow(start_flow, current, pages);
-          return TextFrameLayout::new(
-            paragraph,
-            follow_flow,
-            self.line_frame_width(follow_flow),
-            self.spacing_after_pt,
-            text_metrics,
-          )
-          .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-          .with_border_context(self.border_context)
-          .with_shading_spacing(
-            ParagraphShadingContext {
-              joins_previous: self.shading_before_pt > 0.0,
-              joins_next: self.shading_after_pt > 0.0,
-            },
-            self.spacing_before_pt,
-          )
-          .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-          .with_terminal_line_follows(self.terminal_line_follows.clone())
-          .format_with_reflow(
-            current,
-            pages,
-            anchor_pages,
-            text_metrics,
-            self.whole_paragraph_follow_position(follow_y),
-            false,
+          return ControlFlow::Continue(
+            TextFrameLayout::new(
+              paragraph,
+              follow_flow,
+              self.line_frame_width(follow_flow),
+              self.spacing_after_pt,
+              text_metrics,
+            )
+            .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
+            .with_border_context(self.border_context)
+            .with_shading_spacing(
+              ParagraphShadingContext {
+                joins_previous: self.shading_before_pt > 0.0,
+                joins_next: self.shading_after_pt > 0.0,
+              },
+              self.spacing_before_pt,
+            )
+            .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
+            .with_terminal_line_follows(self.terminal_line_follows.clone())
+            .format_with_reflow(
+              current,
+              pages,
+              anchor_pages,
+              text_metrics,
+              self.whole_paragraph_follow_position(follow_y),
+              false,
+            ),
           );
         }
         TextSplitDecision::RebalanceWidow {
@@ -64133,37 +67859,39 @@ impl<'a> TextFrameLayout<'a> {
           {
             anchors.truncate(len);
           }
-          return TextFrameLayout::new(
-            paragraph,
-            start_flow,
-            self.line_frame_width(start_flow),
-            self.spacing_after_pt,
-            text_metrics,
-          )
-          .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-          .with_border_context(self.border_context)
-          .with_shading_spacing(
-            ParagraphShadingContext {
-              joins_previous: self.shading_before_pt > 0.0,
-              joins_next: self.shading_after_pt > 0.0,
-            },
-            self.spacing_before_pt,
-          )
-          .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-          .with_widow_rebalance_page(page_index)
-          .with_terminal_line_follows(terminal_line_follows)
-          .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
-          .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
-          .format_with_reflow(
-            current,
-            pages,
-            anchor_pages,
-            text_metrics,
-            ParagraphLayoutPosition {
-              y: paragraph_top,
-              anchor_top: paragraph_anchor_top,
-            },
-            false,
+          return ControlFlow::Continue(
+            TextFrameLayout::new(
+              paragraph,
+              start_flow,
+              self.line_frame_width(start_flow),
+              self.spacing_after_pt,
+              text_metrics,
+            )
+            .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
+            .with_border_context(self.border_context)
+            .with_shading_spacing(
+              ParagraphShadingContext {
+                joins_previous: self.shading_before_pt > 0.0,
+                joins_next: self.shading_after_pt > 0.0,
+              },
+              self.spacing_before_pt,
+            )
+            .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
+            .with_widow_rebalance_page(page_index)
+            .with_terminal_line_follows(terminal_line_follows)
+            .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+            .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
+            .format_with_reflow(
+              current,
+              pages,
+              anchor_pages,
+              text_metrics,
+              ParagraphLayoutPosition {
+                y: paragraph_top,
+                anchor_top: paragraph_anchor_top,
+              },
+              false,
+            ),
           );
         }
         TextSplitDecision::NoSplit
@@ -64182,6 +67910,7 @@ impl<'a> TextFrameLayout<'a> {
       current,
       ParagraphAlignmentFrame {
         item_start: text_state.alignment_item_start,
+        right_limit: self.numbering_alignment_right_limit(flow),
         first_line_right: text_state.first_line_alignment_right,
         page_index: pages.len(),
         line_rights: &text_state.line_alignment_fragments,
@@ -64195,48 +67924,83 @@ impl<'a> TextFrameLayout<'a> {
     // A paragraph can own physical fragments on several pages or columns.
     // Keep paint deferred until widow/reflow decisions are final: inserting it
     // into a trial master would invalidate the checkpoint's item indices.
-    let split_shading = text_state.shading_fragments.len() > 1
+    let split_decoration = text_state.decoration_fragments.len() > 1
       || text_state
-        .shading_fragments
+        .decoration_fragments
         .first()
         .is_some_and(|fragment| {
           fragment.page_index != start_pages_len
+            || fragment.page_index != pages.len()
+            || fragment.column_index != flow.column_index
+            || fragment.kind != ParagraphDecorationFragmentKind::Content
             || fragment.column_index != start_flow.column_index
             || (fragment.bounds.x_pt + fragment.bounds.width_pt - default_line_right).abs()
               >= LAYOUT_EPSILON_PT
         });
-    if split_shading {
-      let fragment_count = text_state.shading_fragments.len();
+    if split_decoration {
+      let fragment_count = text_state.decoration_fragments.len();
+      let first_content = text_state
+        .decoration_fragments
+        .iter()
+        .position(|fragment| fragment.kind == ParagraphDecorationFragmentKind::Content);
       // Descending insertion preserves captured indices in same-page columns.
-      for (index, fragment) in text_state.shading_fragments.iter().enumerate().rev() {
+      for (index, fragment) in text_state.decoration_fragments.iter().enumerate().rev() {
         let page = if fragment.page_index == pages.len() {
           &mut *current
         } else {
           &mut pages[fragment.page_index]
         };
-        decorate_paragraph_shading(
+        decorate_paragraph(
           page,
           ParagraphDecoration {
             start_item_index: fragment.item_start,
             paragraph,
             border_context: self.border_context,
+            empty_master_device_shading: fragment.kind
+              == ParagraphDecorationFragmentKind::EmptyMaster
+              && flow.compatibility_mode >= 15
+              && flow.text_segmentation == TextSegmentation::Body
+              && !flow.inside_paragraph_frame
+              && flow.paragraph_shading_clip.is_none(),
+            edges: if fragment.kind == ParagraphDecorationFragmentKind::EmptyMaster {
+              ParagraphDecorationEdges::NONE
+            } else {
+              ParagraphDecorationEdges {
+                top: Some(index) == first_content,
+                bottom: index + 1 == fragment_count,
+                sides: true,
+              }
+            },
             x: fragment.bounds.x_pt,
             y: fragment.bounds.y_pt,
             width: fragment.bounds.width_pt,
             height: fragment.bounds.height_pt,
             baseline_offset_pt: 0.0,
-            shading_before_pt: if index == 0 {
+            shading_before_pt: if Some(index) == first_content {
               self.shading_before_pt
             } else {
               0.0
             },
-            shading_after_pt: if index + 1 == fragment_count {
+            shading_after_pt: if index + 1 == fragment_count
+              && fragment.kind == ParagraphDecorationFragmentKind::Content
+            {
               self.shading_after_pt
             } else {
               0.0
             },
-            border_after_pt: 0.0,
-            outer_bottom_pt: (index + 1 == fragment_count)
+            border_before_pt: if Some(index) == first_content && self.border_context.joins_previous
+            {
+              self.spacing_before_pt + self.suppressed_spacing_before_pt
+            } else {
+              0.0
+            },
+            border_after_pt: if index + 1 == fragment_count && self.border_context.joins_next {
+              self.spacing_after_pt
+            } else {
+              0.0
+            },
+            outer_bottom_pt: (index + 1 == fragment_count
+              && fragment.kind != ParagraphDecorationFragmentKind::EmptyMaster)
               .then_some(self.decoration_outer_bottom_pt)
               .flatten(),
             cell_inner_horizontal_bounds: None,
@@ -64245,7 +68009,7 @@ impl<'a> TextFrameLayout<'a> {
         );
       }
     }
-    if start_item_index <= current.items.len() {
+    if !split_decoration && start_item_index <= current.items.len() {
       // Shape text reuses TableCell text segmentation for line breaking, but
       // without real cell bounds its input cursor is still a line top. Only a
       // real table cell passes an already-resolved baseline that decoration
@@ -64282,6 +68046,8 @@ impl<'a> TextFrameLayout<'a> {
         start_item_index,
         paragraph,
         border_context: self.border_context,
+        empty_master_device_shading: false,
+        edges: ParagraphDecorationEdges::ALL,
         x: paragraph_left,
         y: paragraph_top,
         width: default_line_right - paragraph_left,
@@ -64291,8 +68057,13 @@ impl<'a> TextFrameLayout<'a> {
         baseline_offset_pt: decoration_baseline_offset_pt,
         shading_before_pt: self.shading_before_pt,
         shading_after_pt: self.shading_after_pt,
-        border_after_pt: if flow.inside_paragraph_frame
-          && flow.content_bottom >= UNBOUNDED_LAYOUT_EXTENT_PT
+        border_before_pt: if self.border_context.joins_previous {
+          self.spacing_before_pt + self.suppressed_spacing_before_pt
+        } else {
+          0.0
+        },
+        border_after_pt: if self.border_context.joins_next
+          || (flow.inside_paragraph_frame && flow.content_bottom >= UNBOUNDED_LAYOUT_EXTENT_PT)
         {
           self.spacing_after_pt
         } else {
@@ -64302,22 +68073,18 @@ impl<'a> TextFrameLayout<'a> {
         cell_inner_horizontal_bounds: table_cell_paragraph_shading_bounds(flow),
         shading_clip: flow.paragraph_shading_clip,
       };
-      if split_shading {
-        decorate_paragraph_borders(current, decoration);
-      } else {
-        decorate_paragraph(current, decoration);
-      }
+      decorate_paragraph(current, decoration);
     }
 
     // The cell's block cursor is expressed in its established first-baseline
     // coordinate system. Later paragraph/font transitions already convert
     // from that owner; returning the last line's conversion would apply it
     // twice and move BODY even after all preceding glyphs matched Word.
-    (
+    ControlFlow::Continue((
       flow,
       y - text_state.table_cell_soft_break_baseline_offset(),
       text_state.line_fragments,
-    )
+    ))
   }
 }
 
@@ -64815,14 +68582,33 @@ fn wordprocessing_run_line_segments_with_offsets(
   text: &str,
   options: WordprocessingLineBreakOptions,
 ) -> Vec<TextSegment> {
-  let prefix_start = text.trim_end_matches('/').len();
-  if prefix_start == text.len() || !text[..prefix_start].ends_with(' ') {
+  #[derive(Clone, Copy)]
+  enum PrefixState {
+    Slashes,
+    Spaces,
+    Dot,
+  }
+  let (prefix, mut state) = if let Some(before_dot) = text.strip_suffix('.') {
+    (before_dot.trim_end_matches(' '), PrefixState::Dot)
+  } else {
+    let trimmed = text.trim_end_matches(' ');
+    (
+      trimmed,
+      if trimmed.len() < text.len() {
+        PrefixState::Spaces
+      } else {
+        PrefixState::Slashes
+      },
+    )
+  };
+  let prefix_start = prefix.trim_end_matches('/').len();
+  if prefix_start == prefix.len() || !text[..prefix_start].ends_with(' ') {
     return text_segments_with_offsets_for_break_options(text, options);
   }
 
-  // A formatting boundary may divide " /word" immediately after its slash.
-  // Word's single-run and colored-run controls choose the preceding space,
-  // not the after-slash opportunity. Resolve only this unfinished prefix;
+  // Formatting may divide " /word" or " / .word" within the prefix.
+  // Native single-run and colored-run controls choose the preceding space,
+  // keeping the slash/dot prefix with its word. Resolve this finite prefix;
   // ordinary runs need neither look-ahead nor a concatenated source string.
   let mut context = text.to_owned();
   let mut preceding_direction = inlines.get(inline_index).and_then(|inline| {
@@ -64841,19 +68627,33 @@ fn wordprocessing_run_line_segments_with_offsets(
     if run.text.is_empty() {
       continue;
     }
-    let slashes = run.text.bytes().take_while(|byte| *byte == b'/').count();
-    context.push_str(&run.text[..slashes]);
-    if let Some(&next) = run.text.as_bytes().get(slashes) {
+    for (index, next) in run.text.bytes().enumerate() {
+      let complete = match state {
+        PrefixState::Slashes if next == b'/' => false,
+        PrefixState::Slashes | PrefixState::Spaces if next == b' ' => {
+          state = PrefixState::Spaces;
+          false
+        }
+        PrefixState::Slashes | PrefixState::Spaces if next == b'.' => {
+          state = PrefixState::Dot;
+          false
+        }
+        PrefixState::Slashes | PrefixState::Dot if next.is_ascii_alphanumeric() => true,
+        _ => return text_segments_with_offsets_for_break_options(text, options),
+      };
       // Preserve the independent RTL-number owner used by cross-run fit.
-      if !next.is_ascii_alphanumeric()
-        || (slashes == 0
-          && preceding_direction != Some(true)
-          && run.style.right_to_left == Some(true)
-          && next.is_ascii_digit())
+      if complete
+        && index == 0
+        && preceding_direction != Some(true)
+        && run.style.right_to_left == Some(true)
+        && next.is_ascii_digit()
       {
-        break;
+        return text_segments_with_offsets_for_break_options(text, options);
       }
       context.push(char::from(next));
+      if !complete {
+        continue;
+      }
       let mut segments = text_segments_with_offsets_for_break_options(&context, options);
       segments.retain_mut(|segment| {
         if segment.start >= text.len() {
@@ -65064,6 +68864,26 @@ fn cross_run_unbreakable_continuation_width_for_break_options(
   overflow_punctuation: Option<WordprocessingOverflowPunctuationPolicy>,
   text_metrics: &mut TextMetrics,
 ) -> Option<CrossRunContinuation> {
+  cross_run_unbreakable_continuation_width_impl(
+    inlines,
+    inline_index,
+    current_segment,
+    options,
+    overflow_punctuation,
+    false,
+    text_metrics,
+  )
+}
+
+fn cross_run_unbreakable_continuation_width_impl(
+  inlines: &[InlineItem],
+  inline_index: usize,
+  current_segment: &str,
+  options: WordprocessingLineBreakOptions,
+  overflow_punctuation: Option<WordprocessingOverflowPunctuationPolicy>,
+  skip_cached_page_boundaries: bool,
+  text_metrics: &mut TextMetrics,
+) -> Option<CrossRunContinuation> {
   if current_segment.is_empty() {
     return None;
   }
@@ -65097,7 +68917,11 @@ fn cross_run_unbreakable_continuation_width_for_break_options(
     // A bookmark is a zero-width source anchor, not a word boundary. Keep its
     // inline index for anchor paint while looking through it for the same
     // connected-token fit and emergency-break owner as adjacent text runs.
-    if matches!(inline, InlineItem::BookmarkStart(_)) {
+    // A MoveWord bottom slot similarly looks through cached page markers;
+    // authored breaks still stop the word, and source indices stay intact.
+    if matches!(inline, InlineItem::BookmarkStart(_))
+      || (skip_cached_page_boundaries && matches!(inline, InlineItem::LastRenderedPageBreak))
+    {
       continue;
     }
     let InlineItem::Text(run) = inline else {
@@ -65675,6 +69499,7 @@ const WORD_LEGACY_WESTERN_OVERFLOW_PUNCTUATION: &str =
 
 struct CjkLineFit<'a> {
   overflow_punctuation: WordprocessingOverflowPunctuationPolicy,
+  modern_justified: bool,
   x: f32,
   line_right: f32,
   items: &'a [PageItem],
@@ -65694,8 +69519,10 @@ fn blocks_cjk_compression_only_fit(
   // line does not keep consuming arbitrary extra CJK characters merely
   // because earlier punctuation can be compressed. The first
   // compression-only fit establishes that boundary. Native Word also limits
-  // ordinary-character pull-in to half an em, independently of how much
-  // punctuation capacity the complete line has. A prohibited line-start
+  // ordinary-character pull-in to half an em in legacy/ragged lines and one
+  // em for mode15 justified lines. Independent width/count/alignment/mode
+  // controls establish both limits. Keep the first-compression boundary as
+  // well as that budget. A prohibited line-start
   // character remains on the preceding line for East Asian kinsoku handling.
   natural_overflow
     && (line_used_punctuation_fit || exceeds_pull_limit)
@@ -65739,9 +69566,22 @@ fn line_cjk_compression_fit(fit: CjkLineFit<'_>, text_metrics: &mut TextMetrics)
   // Capacity and the line cursor belong to logical layout. Rounding only
   // the natural font to the print grid invents capacity for ordinary letters.
   let natural_right = fit.x + capacity + natural_next_width;
+  let limit_em = if fit.modern_justified { 1.0 } else { 0.5 };
+  let pulled_right =
+    ((f64::from(natural_right) - f64::from(fit.style.font_size_pt) * limit_em) * 4096.0).round();
+  let right = (f64::from(fit.line_right) * 4096.0).round();
+  // Modern justification can pull the next ordinary character only when
+  // some of its natural cell already fits. Native exact-em controls retain
+  // the full natural line: the one-em bound is exclusive, unlike the legacy
+  // half-em bound. Trailing hanging punctuation still has its separate fit.
+  let exceeds_limit = if fit.modern_justified {
+    pulled_right >= right
+  } else {
+    pulled_right > right
+  };
   (
     text_overflows_line(natural_right, 0.0, fit.line_right),
-    text_overflows_line(natural_right, -fit.style.font_size_pt * 0.5, fit.line_right),
+    exceeds_limit,
   )
 }
 
@@ -65789,6 +69629,7 @@ fn text_overflows_line(x: f32, width: f32, line_right: f32) -> bool {
 
 #[derive(Clone, Copy)]
 struct LineShrinkFit<'a> {
+  modern_kashida: bool,
   x: f32,
   width: f32,
   text: &'a str,
@@ -65908,6 +69749,32 @@ fn line_fits_with_word_space_shrink_policy(
   let fits_at_minimum = overflow <= shrinkability;
   if !fits_at_minimum {
     return false;
+  }
+
+  if !prefer_full_fit_at_minimum && fit.modern_kashida {
+    let mut connection_capacity =
+      text_metrics.modern_kashida_expansion_capacity(fit.chunk, fit.style);
+    for item in fit.items.iter().skip(fit.item_start) {
+      if let PageItem::Text(text) = item {
+        connection_capacity +=
+          text_metrics.modern_kashida_expansion_capacity(&text.text, &text.style);
+      }
+    }
+    if connection_capacity > 0.0 {
+      // Modern LS compares the complete non-emergency expansion range,
+      // including every eligible Arabic connection. Counting spaces alone
+      // contracts a line which Word instead fills with short Kashidas.
+      // Capacities and costs remain in ideal layout coordinates; printer
+      // rounding and the selected extender count belong to painting.
+      let space_capacity = normal_space_count as f32
+        * space_width
+        * (word_spacing.maximum_pct as f32 / PERCENT_SCALE - 1.0);
+      let printable_right = fit.x - terminal_space_count as f32 * space_width;
+      let expansion_distance =
+        (fit.line_right - printable_right).max(0.0) / (space_capacity + connection_capacity);
+      let shrink_distance = overflow / shrinkability;
+      return expansion_distance >= shrink_distance;
+    }
   }
 
   prefer_full_fit_at_minimum
@@ -66070,11 +69937,23 @@ fn word_ascii_slash_prefixes(text: &str) -> impl Iterator<Item = std::ops::Range
         .bytes()
         .take_while(|byte| *byte == b'/')
         .count();
-    text
+    if text
       .as_bytes()
       .get(end)
       .is_some_and(u8::is_ascii_alphanumeric)
-      .then_some(start..end)
+    {
+      return Some(start..end);
+    }
+    // Word joins a slash to a following dot-prefixed ASCII word even with
+    // ordinary blanks between them. Bare dots, ellipses, other punctuation
+    // and a space followed directly by a letter retain their own boundaries.
+    let dot = text.len() - text[end..].trim_start_matches(' ').len();
+    (text.as_bytes().get(dot) == Some(&b'.')
+      && text
+        .as_bytes()
+        .get(dot + 1)
+        .is_some_and(u8::is_ascii_alphanumeric))
+    .then_some(start..dot + 1)
   })
 }
 
@@ -66349,7 +70228,19 @@ fn wordprocessing_ellipsis_forbids_line_break(preceding: &str, following: &str) 
     return true;
   }
   preceding.chars().next_back().is_some_and(ellipsis)
-    && following.chars().next().is_some_and(western_word_character)
+    && following.chars().next().is_some_and(|character| {
+      western_word_character(character)
+        // Word also retains a regular Western symbol after a dot leader:
+        // Fields…→Document, Fields…§Document and Fields…+Document. Native
+        // symbol-class contrasts keep CJK and following spaces independent.
+        // Reuse Unicode's word-like classes without extending the preceding
+        // word predicate or admitting breaking dashes and punctuation.
+        || (character.script() == Script::Common
+          && matches!(
+            CodePointMapData::<LineBreak>::new().get(character),
+            LineBreak::Alphabetic | LineBreak::Ambiguous | LineBreak::PrefixNumeric
+          ))
+    })
     && preceding
       .trim_end_matches(ellipsis)
       .trim_end_matches(' ')
@@ -66595,6 +70486,86 @@ fn libreoffice_forbidden_line_start_after_text(ch: char) -> bool {
   )
 }
 
+fn automatic_tab_following_text_width(
+  paragraph: &crate::docx::Paragraph,
+  inline_index: usize,
+  next_segment: Option<&TextSegment>,
+  compatibility_mode: u16,
+  text_metrics: &mut TextMetrics,
+) -> Option<f32> {
+  for (index, inline) in paragraph.inlines.iter().enumerate().skip(inline_index) {
+    if matches!(inline, InlineItem::BookmarkStart(_)) {
+      continue;
+    }
+    let InlineItem::Text(run) = inline else {
+      return None;
+    };
+    let options = WordprocessingLineBreakOptions {
+      compatibility_mode,
+      compress_punctuation: run.style.cjk_punctuation_compression_ratio > 0.0,
+      strict_japanese: strict_japanese_line_breaks(paragraph, &run.style),
+      kashida: paragraph.format.justification.kashida.is_some(),
+    };
+    let following_segments;
+    let segment = if index == inline_index {
+      let Some(segment) = next_segment else {
+        continue;
+      };
+      segment
+    } else {
+      following_segments = wordprocessing_run_line_segments_with_offsets(
+        &paragraph.inlines,
+        index,
+        &run.text,
+        options,
+      );
+      let Some(segment) = following_segments.first() else {
+        continue;
+      };
+      segment
+    };
+    // A following tab contributes no text width to this tab. At the exact
+    // right edge it starts the follow line itself, rather than taking this
+    // tab with it. Native1/2/3/4-tab controls distinguish equality from a stop
+    // strictly beyond the edge, both within and across text runs.
+    if segment.text == "\t" {
+      return Some(0.0);
+    }
+    // A blank, explicit break, or preserved literal tab keeps its own owner.
+    let text = segment
+      .text
+      .trim_end_matches(libreoffice_line_end_elidable_blank);
+    if text.is_empty()
+      || text.chars().any(|ch| {
+        matches!(
+          ch,
+          '\n'
+            | '\t'
+            | crate::docx::PRESERVED_WORD_TEXT_TAB
+            | crate::docx::EXPLICIT_DEFAULT_WORD_TEXT_TAB
+        )
+      })
+    {
+      return None;
+    }
+    let mut width = text_metrics.measure_text(text, &run.style);
+    if segment.end == run.text.len()
+      && let Some(continuation) = cross_run_unbreakable_continuation_width_for_break_options(
+        &paragraph.inlines,
+        index,
+        &segment.text,
+        options,
+        None,
+        text_metrics,
+      )
+    {
+      width += continuation.fit_width_pt;
+    }
+    return Some(width);
+  }
+  None
+}
+
 fn next_tab_stop(
   x: f32,
   tab_origin_left: f32,
@@ -66823,24 +70794,35 @@ fn page_owned_cell_wrap_exclusions_at_baseline<'a>(
 
 fn physical_wrap_exclusions_at_baseline(
   exclusions: &[WrapExclusion],
-  baseline_offset: f32,
+  drawing_baseline_offset: f32,
+  table_baseline_offset: f32,
 ) -> std::borrow::Cow<'_, [WrapExclusion]> {
-  wrap_exclusions_at_baseline(exclusions, baseline_offset, true)
+  wrap_exclusions_at_baseline(
+    exclusions,
+    drawing_baseline_offset,
+    table_baseline_offset,
+    true,
+  )
 }
 
 fn wrap_exclusions_at_baseline(
   exclusions: &[WrapExclusion],
-  baseline_offset: f32,
+  drawing_baseline_offset: f32,
+  table_baseline_offset: f32,
   physical_following_tables: bool,
 ) -> std::borrow::Cow<'_, [WrapExclusion]> {
-  let uses_physical_bounds = |owner: WrapExclusionOwner| {
-    (owner.is_drawing() && owner != WrapExclusionOwner::PageOwnedCellTopBottom)
-      || (physical_following_tables && owner == WrapExclusionOwner::FollowingFloatingTable)
+  let offset = |owner: WrapExclusionOwner| {
+    if owner.is_drawing() && owner != WrapExclusionOwner::PageOwnedCellTopBottom {
+      drawing_baseline_offset
+    } else if physical_following_tables && owner == WrapExclusionOwner::FollowingFloatingTable {
+      table_baseline_offset
+    } else {
+      0.0
+    }
   };
-  if baseline_offset <= LAYOUT_EPSILON_PT
-    || !exclusions
-      .iter()
-      .any(|exclusion| uses_physical_bounds(exclusion.owner))
+  if !exclusions
+    .iter()
+    .any(|exclusion| offset(exclusion.owner) > LAYOUT_EPSILON_PT)
   {
     return std::borrow::Cow::Borrowed(exclusions);
   }
@@ -66853,7 +70835,8 @@ fn wrap_exclusions_at_baseline(
       .iter()
       .map(|exclusion| {
         let mut exclusion = *exclusion;
-        if uses_physical_bounds(exclusion.owner) {
+        let baseline_offset = offset(exclusion.owner);
+        if baseline_offset > LAYOUT_EPSILON_PT {
           exclusion.top_pt += baseline_offset;
           exclusion.bottom_pt += baseline_offset;
         }
@@ -67037,10 +71020,19 @@ struct CellWrapDodge {
 }
 
 fn contour_line_start_after(origin: f32, line_height: f32, bottom: f32) -> Option<f32> {
+  line_start_after_wrap_edge(origin, line_height, bottom, true)
+}
+
+fn line_start_after_wrap_edge(
+  origin: f32,
+  line_height: f32,
+  bottom: f32,
+  closed_bottom: bool,
+) -> Option<f32> {
   if !origin.is_finite() || !bottom.is_finite() || !line_height.is_finite() || line_height <= 0.0 {
     return None;
   }
-  if origin > bottom {
+  if origin > bottom || (!closed_bottom && origin == bottom) {
     return Some(origin);
   }
   // Native Tight/Through controls retain complete avoiding lines, including
@@ -67049,20 +71041,29 @@ fn contour_line_start_after(origin: f32, line_height: f32, bottom: f32) -> Optio
   // has a separate direct-to-bottom contract.
   let start = f64::from(origin);
   let height = f64::from(line_height);
-  let steps = ((f64::from(bottom) - start) / height).floor() + 1.0;
+  let distance = (f64::from(bottom) - start) / height;
+  let steps = if closed_bottom {
+    distance.floor() + 1.0
+  } else {
+    distance.ceil()
+  };
   let at_step = |step| (start + step * height) as f32;
   let next = at_step(steps);
   // A fractional source height can round a nominally later slot onto the
   // same f32 boundary. It still touches the closed contour and needs another
   // complete line. No geometric tolerance may swallow a one-EMU opposite.
-  let next = if next <= bottom {
+  let next = if next < bottom || (closed_bottom && next == bottom) {
     at_step(steps + 1.0)
   } else {
     next
   };
   // At extreme coordinates a whole line can be smaller than one f32 cell.
   // Preserve strict progress in the representable coordinate space.
-  Some(next.max(bottom.next_up()))
+  Some(next.max(if closed_bottom {
+    bottom.next_up()
+  } else {
+    bottom
+  }))
 }
 
 fn dodge_text_wrap_exclusions(
@@ -67073,6 +71074,60 @@ fn dodge_text_wrap_exclusions(
   exclusions: &[WrapExclusion],
 ) -> f32 {
   dodge_text_wrap_exclusions_tracking(y, line_height, default_left, default_right, exclusions).y_pt
+}
+
+fn inline_object_wrap_clearance_y(
+  mut y: f32,
+  frame_size: Option<(f32, f32)>,
+  flow: FlowContext,
+  text_frame: TextFrame,
+  exclusions: &[WrapExclusion],
+) -> f32 {
+  let Some((width, height)) = frame_size else {
+    return y;
+  };
+  if flow.compatibility_mode < 15
+    || flow.text_segmentation != TextSegmentation::Body
+    || flow.inside_paragraph_frame
+    || exclusions.is_empty()
+  {
+    return y;
+  }
+  let left = text_frame.default_line_left;
+  let right = text_frame.default_line_right;
+  // An intrinsically overwide object can overhang an unobstructed frame.
+  // A narrower side lane must first be cleared. Compare source twips: the
+  // ordinary text-fit tolerance would swallow the native 408.4/408.6pt pair.
+  let required_twips = (width.min(right - left) * units::TWIPS_PER_POINT).round();
+  let dummy_height = height.max(1.0 / units::TWIPS_PER_POINT);
+  loop {
+    if available_line_segments_for_y(left, right, y, dummy_height, exclusions)
+      .iter()
+      .any(|(left, right)| ((right - left) * units::TWIPS_PER_POINT).round() >= required_twips)
+    {
+      return y;
+    }
+    let Some(exclusion) = exclusions
+      .iter()
+      .filter(|exclusion| wrap_exclusion_overlaps_line(exclusion, left, right, y, dummy_height))
+      .min_by(|a, b| a.bottom_pt.total_cmp(&b.bottom_pt))
+    else {
+      return y;
+    };
+    // Tight/Through avoiding lines retain the inline frame's own height,
+    // rather than the font of text already placed on a preceding line.
+    // Jump to the first complete slot beyond the closed contour. Square
+    // wrapping instead clears directly to its half-open bottom edge.
+    let next_y = if exclusion.uses_contour {
+      contour_line_start_after(y, dummy_height, exclusion.bottom_pt).unwrap_or(exclusion.bottom_pt)
+    } else {
+      exclusion.bottom_pt
+    };
+    if next_y <= y {
+      return y;
+    }
+    y = next_y;
+  }
 }
 
 fn dodge_text_wrap_exclusions_tracking(
@@ -67109,9 +71164,33 @@ fn dodge_text_wrap_exclusions_tracking(
         page_owned_advance_pt,
       };
     };
-    let contour_y = exclusion
-      .uses_contour
-      .then(|| contour_line_start_after(y, line_height, exclusion.bottom_pt))
+    // A contour can close the last usable lane beside a shorter Square
+    // obstacle. Its avoiding lines still own the shared vertical strip even
+    // though the Square object supplies the earliest clearing edge. Native
+    // Square/Tight/Through header opposites distinguish this combined case
+    // from an independently blocking Square object, which clears directly.
+    let contour_closes_side_lane = !exclusion.uses_contour
+      && lacks_side_space
+      && exclusions.iter().any(|other| {
+        other.uses_contour
+          && wrap_exclusion_overlaps_line(other, default_left, default_right, y, line_height)
+      })
+      && available_line_bounds_for_y(
+        default_left,
+        default_right,
+        y,
+        line_height,
+        &exclusions
+          .iter()
+          .filter(|other| !other.uses_contour)
+          .copied()
+          .collect::<Vec<_>>(),
+      )
+      .is_some();
+    let contour_y = (exclusion.uses_contour || contour_closes_side_lane)
+      .then(|| {
+        line_start_after_wrap_edge(y, line_height, exclusion.bottom_pt, exclusion.uses_contour)
+      })
       .flatten();
     let next_y = if let Some(contour_y) = contour_y {
       contour_y
@@ -67213,10 +71292,11 @@ fn dodge_first_line_text_wrap_exclusions(
     if cleared_y <= y + LAYOUT_EPSILON_PT
       || spacing_before_pt <= LAYOUT_EPSILON_PT
       || !exclusions.iter().any(|exclusion| {
-        matches!(
+        (matches!(
           exclusion.owner,
           WrapExclusionOwner::FloatingTable | WrapExclusionOwner::DisplacedHeaderDrawing
-        ) && (exclusion.bottom_pt - cleared_y).abs() <= LAYOUT_EPSILON_PT
+        ) || (exclusion.owner == WrapExclusionOwner::ParagraphFrame && exclusion.blocks_flow))
+          && (exclusion.bottom_pt - cleared_y).abs() <= LAYOUT_EPSILON_PT
           && exclusion.overlaps_horizontal_span(default_left, default_right)
       })
     {
@@ -67225,8 +71305,10 @@ fn dodge_first_line_text_wrap_exclusions(
         page_owned_advance_pt,
       };
     }
-    // Word retains upper space below a full-width table or displaced header
-    // textbox. This moves the line, not its logical paragraph anchor: native
+    // Word retains upper space below a full-width table, notBeside paragraph
+    // frame or displaced header textbox. The paragraph chain already collapsed
+    // its before/after spacing; clearing the frame must not consume it again.
+    // This moves the line, not its logical paragraph anchor: native
     // paragraph-relative drawings retain their original position reference.
     // Usable side lanes and ordinary following lines keep their owners.
     y = cleared_y + spacing_before_pt;
@@ -67426,10 +71508,32 @@ fn shift_first_line_below_upper_margin_exclusions(
 }
 
 #[derive(Clone, Copy)]
+struct ParagraphDecorationEdges {
+  top: bool,
+  bottom: bool,
+  sides: bool,
+}
+
+impl ParagraphDecorationEdges {
+  const ALL: Self = Self {
+    top: true,
+    bottom: true,
+    sides: true,
+  };
+  const NONE: Self = Self {
+    top: false,
+    bottom: false,
+    sides: false,
+  };
+}
+
+#[derive(Clone, Copy)]
 struct ParagraphDecoration<'a> {
   start_item_index: usize,
   paragraph: &'a crate::docx::Paragraph,
   border_context: ParagraphBorderContext,
+  empty_master_device_shading: bool,
+  edges: ParagraphDecorationEdges,
   x: f32,
   y: f32,
   width: f32,
@@ -67437,11 +71541,40 @@ struct ParagraphDecoration<'a> {
   baseline_offset_pt: f32,
   shading_before_pt: f32,
   shading_after_pt: f32,
+  border_before_pt: f32,
   // Paragraph-frame borders enclose lower spacing; shading has its own owner.
   border_after_pt: f32,
   outer_bottom_pt: Option<f32>,
   cell_inner_horizontal_bounds: Option<(f32, f32)>,
   shading_clip: Option<FrameBounds>,
+}
+
+impl ParagraphDecoration<'_> {
+  fn borders(self) -> ParagraphBordersModel {
+    ParagraphBordersModel {
+      top: self
+        .edges
+        .top
+        .then(|| self.border_context.top(self.paragraph))
+        .flatten(),
+      bottom: self
+        .edges
+        .bottom
+        .then(|| self.border_context.bottom(self.paragraph))
+        .flatten(),
+      left: self
+        .edges
+        .sides
+        .then_some(self.paragraph.format.borders.left)
+        .flatten(),
+      right: self
+        .edges
+        .sides
+        .then_some(self.paragraph.format.borders.right)
+        .flatten(),
+      ..Default::default()
+    }
+  }
 }
 
 fn table_cell_paragraph_shading_bounds(flow: FlowContext) -> Option<(f32, f32)> {
@@ -67471,8 +71604,6 @@ fn decorate_paragraph(page: &mut Page, decoration: ParagraphDecoration<'_>) {
 
 fn paragraph_decoration_bounds(decoration: ParagraphDecoration<'_>) -> (f32, f32, f32, f32) {
   let ParagraphDecoration {
-    paragraph,
-    border_context,
     x,
     y,
     width,
@@ -67499,7 +71630,7 @@ fn paragraph_decoration_bounds(decoration: ParagraphDecoration<'_>) -> (f32, f32
   let box_top = y - baseline_offset_pt;
   let box_right = x + width + horizontal_padding_pt;
   let mut box_bottom = box_top + height;
-  let bottom = border_context.bottom(paragraph);
+  let bottom = decoration.borders().bottom;
   if let Some(outer_bottom_pt) = outer_bottom_pt {
     box_bottom = box_bottom.max(outer_bottom_pt - paragraph_border_layout_extent(bottom));
   }
@@ -67511,7 +71642,6 @@ fn decorate_paragraph_shading(page: &mut Page, decoration: ParagraphDecoration<'
   let ParagraphDecoration {
     start_item_index,
     paragraph,
-    border_context,
     shading_before_pt,
     shading_after_pt,
     cell_inner_horizontal_bounds,
@@ -67519,20 +71649,21 @@ fn decorate_paragraph_shading(page: &mut Page, decoration: ParagraphDecoration<'
     ..
   } = decoration;
   let (box_left, box_top, box_right, box_bottom) = paragraph_decoration_bounds(decoration);
-  let top = border_context.top(paragraph);
-  let bottom = border_context.bottom(paragraph);
+  let borders = decoration.borders();
+  let top = borders.top;
+  let bottom = borders.bottom;
   if let Some(paint) = paragraph.format.shading.filter(|paint| paint.is_visible()) {
-    // ECMA-376 Part 1 §17.3.1.24 defines pBdr/@space from the text
-    // contents to the border. Word therefore paints paragraph shading
-    // through that space, up to the inner edge of each effective border.
-    let mut shading_left = paragraph
-      .format
-      .borders
-      .left
-      .map_or(box_left, |border| box_left - border.spacing_pt);
-    let mut shading_right = paragraph
-      .format
-      .borders
+    // Word's paragraph background uses the right border's distance for
+    // both horizontal outsets, but only extends on sides with a border.
+    // Native edge-mask and unequal-distance controls distinguish this from
+    // using each side's own pBdr/@space: a lone left border leaves its gap
+    // unshaded. Border ink and vertical background distances remain separate.
+    let mut shading_left = if borders.left.is_some() {
+      box_left - borders.right.map_or(0.0, |border| border.spacing_pt)
+    } else {
+      box_left
+    };
+    let mut shading_right = borders
       .right
       .map_or(box_right, |border| box_right + border.spacing_pt);
     if let Some((cell_left, cell_right)) = cell_inner_horizontal_bounds {
@@ -67561,12 +71692,26 @@ fn decorate_paragraph_shading(page: &mut Page, decoration: ParagraphDecoration<'
     // paragraph decoration box inside table cells: the paired LibreOffice
     // tdf165492 exact/atLeast fixtures contain pPr/shd but no tcPr/shd, and
     // Word leaves their large authored row-margin remainders unpainted.
-    let (x, y, width, height) = (
-      shading_left,
-      shading_top,
-      shading_right - shading_left,
-      shading_bottom - shading_top,
-    );
+    let (x, y, width, height) = decoration
+      .empty_master_device_shading
+      .then(|| {
+        word_empty_master_shading_rectangle(
+          page,
+          (
+            decoration.x,
+            decoration.x + decoration.width,
+            shading_top,
+            shading_bottom,
+          ),
+        )
+      })
+      .flatten()
+      .unwrap_or((
+        shading_left,
+        shading_top,
+        shading_right - shading_left,
+        shading_bottom - shading_top,
+      ));
     insert_page_item_with_frame_records(
       page,
       start_item_index,
@@ -67581,23 +71726,38 @@ fn decorate_paragraph_shading(page: &mut Page, decoration: ParagraphDecoration<'
   }
 }
 
+fn word_empty_master_shading_rectangle(
+  page: &Page,
+  (frame_left, frame_right, top, bottom): (f32, f32, f32, f32),
+) -> Option<(f32, f32, f32, f32)> {
+  let device =
+    wordprocessing_table_device::page_coordinates(page.setup.width_pt, page.setup.height_pt)?;
+  // Actual Word PDF EMF PatBlt records realize the paragraph frame first,
+  // then expand its two horizontal edges by twelve 600-DPI dots. Converting
+  // the old approximate 1.5pt enclosure as one sum loses a source pixel.
+  // The empty master has no text/border outsets or clipped child-frame owner.
+  let coordinate = wordprocessing_table_device::source_coordinate;
+  let left = coordinate(frame_left) - 12;
+  let right = coordinate(frame_right) + 12;
+  let top = coordinate(top);
+  let bottom = coordinate(bottom);
+  Some(device.map_device_rectangle((left, top, right - left, bottom - top)))
+}
+
 fn decorate_paragraph_borders(page: &mut Page, decoration: ParagraphDecoration<'_>) {
   let decoration = ParagraphDecoration {
-    height: decoration.height + decoration.border_after_pt,
+    y: decoration.y - decoration.border_before_pt,
+    height: decoration.height + decoration.border_before_pt + decoration.border_after_pt,
     ..decoration
   };
-  let ParagraphDecoration {
-    paragraph,
-    border_context,
-    ..
-  } = decoration;
+  let borders = decoration.borders();
   let (box_left, box_top, box_right, box_bottom) = paragraph_decoration_bounds(decoration);
-  let top = border_context.top(paragraph);
-  let bottom = border_context.bottom(paragraph);
-  let left_x = paragraph.format.borders.left.map_or(box_left, |border| {
+  let top = borders.top;
+  let bottom = borders.bottom;
+  let left_x = borders.left.map_or(box_left, |border| {
     box_left - border.spacing_pt - border.width_pt / 2.0
   });
-  let right_x = paragraph.format.borders.right.map_or(box_right, |border| {
+  let right_x = borders.right.map_or(box_right, |border| {
     box_right + border.spacing_pt + border.width_pt / 2.0
   });
   let top_y = top.map_or(box_top, |border| {
@@ -67610,13 +71770,13 @@ fn decorate_paragraph_borders(page: &mut Page, decoration: ParagraphDecoration<'
   if let Some(border) = top {
     push_styled_line(page, left_x, top_y, right_x, top_y, border);
   }
-  if let Some(border) = paragraph.format.borders.right {
+  if let Some(border) = borders.right {
     push_styled_line(page, right_x, top_y, right_x, bottom_y, border);
   }
   if let Some(border) = bottom {
     push_styled_line(page, left_x, bottom_y, right_x, bottom_y, border);
   }
-  if let Some(border) = paragraph.format.borders.left {
+  if let Some(border) = borders.left {
     push_styled_line(page, left_x, top_y, left_x, bottom_y, border);
   }
 }
@@ -67705,6 +71865,7 @@ fn trim_word_compatible_trailing_blanks(
 #[derive(Clone, Copy)]
 struct ParagraphAlignmentFrame<'a> {
   item_start: usize,
+  right_limit: Option<f32>,
   first_line_right: Option<f32>,
   page_index: usize,
   line_rights: &'a [ParagraphLineAlignment],
@@ -67741,7 +71902,7 @@ fn finish_paragraph_page_alignment(
       physical_line_owners.as_deref(),
       text_metrics,
     );
-    let line_rights = if has_line_rights {
+    let mut line_rights = if has_line_rights {
       paragraph_alignment_line_rights(
         current,
         frame,
@@ -67751,6 +71912,11 @@ fn finish_paragraph_page_alignment(
     } else {
       Vec::new()
     };
+    if let Some(limit) = frame.right_limit {
+      for (_, right) in &mut line_rights {
+        *right = right.min(limit);
+      }
+    }
     let rtl_leading_numbering_labels = if numbering_label_uses_rtl_leading_edge(
       paragraph.format.list_label_justification,
       paragraph.format.bidi,
@@ -67766,6 +71932,14 @@ fn finish_paragraph_page_alignment(
     trim_word_compatible_trailing_blanks(
       &mut current.items[alignment_start_item_index..],
       paragraph,
+      text_metrics,
+    );
+    align_latin_character_grid_blocks(
+      current,
+      alignment_start_item_index,
+      paragraph,
+      flow,
+      default_line_right,
       text_metrics,
     );
     let line_coordinates = paragraph_alignment_line_coordinates(
@@ -67851,8 +72025,11 @@ fn finish_paragraph_page_alignment(
       &mut current.items[alignment_start_item_index..],
       alignment,
       text_metrics,
-      default_line_right,
-      first_line_right,
+      frame
+        .right_limit
+        .map_or(default_line_right, |limit| default_line_right.min(limit)),
+      first_line_right
+        .map(|(y, right)| (y, frame.right_limit.map_or(right, |limit| right.min(limit)))),
       ParagraphItemAlignment {
         line_coordinates,
         block_justification: paragraph.format.justification.adjust
@@ -67873,6 +72050,96 @@ fn finish_paragraph_page_alignment(
         cell_bounds.x_pt + cell_bounds.width_pt,
       );
     }
+  }
+}
+
+fn align_latin_character_grid_blocks(
+  current: &mut Page,
+  item_start: usize,
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+  line_right: f32,
+  text_metrics: &mut TextMetrics,
+) {
+  if !flow.setup.doc_grid_snap_to_chars
+    || flow.text_segmentation != TextSegmentation::Body
+    || paragraph.format.bidi
+    || paragraph.list_label.is_some()
+    || !matches!(
+      effective_paragraph_alignment(paragraph),
+      ParagraphAlignment::Left | ParagraphAlignment::Justify
+    )
+  {
+    return;
+  }
+  let Some(pitch) = doc_grid_character_pitch(paragraph, flow.setup, flow.text_segmentation) else {
+    return;
+  };
+  // ECMA-376 §17.6.5 and [MS-OI29500] §2.1.534: an uninterrupted Latin
+  // block occupies whole snapToChars cells and is centered within them.
+  // Run formatting boundaries do not split the block. Mixed-script, tab,
+  // object and bidi lines retain their independent allocation owners.
+  for fragment in &current.frame_fragments {
+    if fragment.kind != FrameFragmentKind::ParagraphLine
+      || fragment.item_start < item_start
+      || fragment.item_start == fragment.item_end
+    {
+      continue;
+    }
+    let items = &mut current.items[fragment.item_start..fragment.item_end];
+    let Some(PageItem::Text(first)) = items.first() else {
+      continue;
+    };
+    let start = first.x_pt;
+    let y = first.y_pt;
+    let mut end = start;
+    let mut eligible = true;
+    for item in items.iter() {
+      let PageItem::Text(text) = item else {
+        eligible = false;
+        break;
+      };
+      if text.text.is_empty()
+        || !text.text.bytes().all(|byte| (0x20..=0x7e).contains(&byte))
+        || text.origin_is_baseline
+        || text.style.rotation_deg != 0.0
+        || text.style.baseline_shift_pt != 0.0
+        || text.wordprocessing_effect_host.is_some()
+        || text.word_spacing_pt != 0.0
+        || (text.x_pt - end).abs() > LAYOUT_EPSILON_PT
+        || (text.y_pt - y).abs() > LAYOUT_EPSILON_PT
+      {
+        eligible = false;
+        break;
+      }
+      end += text_metrics.measure_text(&text.text, &text.style);
+    }
+    if !eligible || end <= start {
+      continue;
+    }
+    let width = end - start;
+    let cells_width = (width / pitch).ceil() * pitch;
+    let grid_start = flow.content_left_pt + ((start - flow.content_left_pt) / pitch).ceil() * pitch;
+    if grid_start + cells_width > line_right + LAYOUT_EPSILON_PT {
+      continue;
+    }
+    let shift = grid_start - start + (cells_width - width) / 2.0;
+    for item in items.iter_mut() {
+      shift_item_x(item, shift);
+    }
+    let PageItem::Text(first) = &items[0] else {
+      unreachable!("validated Latin line");
+    };
+    let baseline = first.y_pt
+      + text_metrics.baseline_offset_in_line_with_windows_metrics_for_text(
+        &first.text,
+        &first.style,
+        first.line_height_pt,
+      );
+    // Resolve the complete block before a vertical section rotates it.
+    // The late PDF path excludes transformed runs; leaving realization
+    // there would scale logical advances to the rounded paint em twice.
+    realize_wordprocessing_shape_line_character_cells(items, baseline, text_metrics);
   }
 }
 
@@ -69005,6 +73272,16 @@ fn reorder_bidi_items_with_base(
   let scoped_line = line_has_wordprocessing_bidi_scopes(items, item_start, y);
   let ltr_run_regions =
     apply_run_direction && line_has_unmarked_ltr_rtl_regions(items, item_start, y);
+  // Native Word analyzes ordinary embedding scopes in separate w:rtl
+  // property regions. Overrides retain their distinct portion/glyph policy.
+  let scoped_run_regions = apply_run_direction
+    && scoped_line
+    && base_level.is_rtl()
+    && !items.iter().skip(item_start).any(|item| {
+      matches!(item, PageItem::Text(text) if (text.y_pt - y).abs() < 0.01
+        && text.style.wordprocessing_bidi_scopes.as_deref()
+          .is_some_and(|scopes| scopes.iter().any(|scope| scope.override_direction)))
+    });
   let directional_line = scoped_line || ltr_run_regions;
   let original_logical_indices = items
     .iter()
@@ -69059,86 +73336,97 @@ fn reorder_bidi_items_with_base(
   }
   let mut analysis_text = String::new();
   let mut analysis_byte_starts = Vec::with_capacity(logical_chars.len());
-  let mut active_scopes: &[crate::model::WordprocessingBidiScope] = &[];
-  for (char_index, &(logical_byte_start, ch)) in logical_chars.iter().enumerate() {
-    let logical_item = logical_item_by_byte[logical_byte_start];
-    let scopes = match &items[original_logical_indices[logical_item]] {
-      PageItem::Text(text) => text
-        .style
-        .wordprocessing_bidi_scopes
-        .as_deref()
-        .unwrap_or_default(),
-      _ => &[],
-    };
-    let shared = active_scopes
-      .iter()
-      .zip(scopes)
-      .take_while(|(a, b)| a.id == b.id)
-      .count();
-    analysis_text.extend(std::iter::repeat_n(
-      '\u{202c}',
-      active_scopes.len() - shared,
-    ));
-    for scope in &scopes[shared..] {
-      analysis_text.push(match (scope.override_direction, scope.right_to_left) {
-        (false, false) => '\u{202a}', // LRE
-        (false, true) => '\u{202b}',  // RLE
-        (true, false) => '\u{202d}',  // LRO
-        (true, true) => '\u{202e}',   // RLO
-      });
-    }
-    if shared < scopes.len()
-      && let PageItem::Text(text) = &items[original_logical_indices[logical_item]]
-      && let Some(prefix) = &text.style.wordprocessing_bidi_prefix
-    {
-      // UAX #9 resolves explicit controls over the paragraph, before line
-      // reordering. Word's actual AnalyzeBidi input likewise retains their
-      // state across wraps within a direction region. Replaying its consumed
-      // prefix once when the region resumes prevents a new line from opening
-      // again an XML embedding already closed by a literal PDF.
-      analysis_text.push_str(prefix);
-    }
-    active_scopes = scopes;
-    analysis_byte_starts.push(analysis_text.len());
-    analysis_text.push(
-      if apply_run_direction
-        && !ltr_run_regions
+  if !scoped_run_regions {
+    let mut active_scopes: &[crate::model::WordprocessingBidiScope] = &[];
+    for (char_index, &(logical_byte_start, ch)) in logical_chars.iter().enumerate() {
+      let logical_item = logical_item_by_byte[logical_byte_start];
+      let scopes = match &items[original_logical_indices[logical_item]] {
+        PageItem::Text(text) => text
+          .style
+          .wordprocessing_bidi_scopes
+          .as_deref()
+          .unwrap_or_default(),
+        _ => &[],
+      };
+      let shared = active_scopes
+        .iter()
+        .zip(scopes)
+        .take_while(|(a, b)| a.id == b.id)
+        .count();
+      analysis_text.extend(std::iter::repeat_n(
+        '\u{202c}',
+        active_scopes.len() - shared,
+      ));
+      for scope in &scopes[shared..] {
+        analysis_text.push(match (scope.override_direction, scope.right_to_left) {
+          (false, false) => '\u{202a}', // LRE
+          (false, true) => '\u{202b}',  // RLE
+          (true, false) => '\u{202d}',  // LRO
+          (true, true) => '\u{202e}',   // RLO
+        });
+      }
+      if shared < scopes.len()
         && let PageItem::Text(text) = &items[original_logical_indices[logical_item]]
-        && (!scoped_line || (text.paragraph_bidi && base_level.is_rtl()))
+        && let Some(prefix) = &text.style.wordprocessing_bidi_prefix
       {
-        // Word keeps neutral separators between Latin strong characters in
-        // their ordinary LTR order, even if the same w:rtl line portion also
-        // contains Persian text. ECMA-376 leaves w:rtl on strong LTR text
-        // unspecified; native URL and punctuation controls establish this
-        // behavior. Run-edge neutrals and numeric separators keep their
-        // WordprocessingML override below.
-        let latin_infix = preceding_strong[char_index] == Some(BidiClass::L)
-          && following_strong[char_index] == Some(BidiClass::L)
-          && !matches!(
-            logical_chars
-              .get(char_index.wrapping_sub(1))
-              .map(|&(_, ch)| bidi_class(ch)),
-            Some(BidiClass::EN | BidiClass::AN)
-          )
-          && !matches!(
-            logical_chars
-              .get(char_index + 1)
-              .map(|&(_, ch)| bidi_class(ch)),
-            Some(BidiClass::EN | BidiClass::AN)
-          );
-        if text.style.right_to_left == Some(true) && latin_infix {
-          ch
+        // UAX #9 resolves explicit controls over the paragraph, before line
+        // reordering. Word's actual AnalyzeBidi input likewise retains their
+        // state across wraps within a direction region. Replaying its consumed
+        // prefix once when the region resumes prevents a new line from opening
+        // again an XML embedding already closed by a literal PDF.
+        analysis_text.push_str(prefix);
+      }
+      active_scopes = scopes;
+      analysis_byte_starts.push(analysis_text.len());
+      analysis_text.push(
+        if apply_run_direction
+          && !ltr_run_regions
+          && let PageItem::Text(text) = &items[original_logical_indices[logical_item]]
+          && (!scoped_line || (text.paragraph_bidi && base_level.is_rtl()))
+        {
+          // Word keeps neutral separators between Latin strong characters in
+          // their ordinary LTR order, even if the same w:rtl line portion also
+          // contains Persian text. ECMA-376 leaves w:rtl on strong LTR text
+          // unspecified; native URL and punctuation controls establish this
+          // behavior. Run-edge neutrals and numeric separators keep their
+          // WordprocessingML override below.
+          let latin_infix = preceding_strong[char_index] == Some(BidiClass::L)
+            && following_strong[char_index] == Some(BidiClass::L)
+            && !matches!(
+              logical_chars
+                .get(char_index.wrapping_sub(1))
+                .map(|&(_, ch)| bidi_class(ch)),
+              Some(BidiClass::EN | BidiClass::AN)
+            )
+            && !matches!(
+              logical_chars
+                .get(char_index + 1)
+                .map(|&(_, ch)| bidi_class(ch)),
+              Some(BidiClass::EN | BidiClass::AN)
+            );
+          if text.style.right_to_left == Some(true) && latin_infix {
+            ch
+          } else {
+            office_bidi_analysis_char(&logical_chars, char_index, &text.style)
+          }
         } else {
-          office_bidi_analysis_char(&logical_chars, char_index, &text.style)
-        }
-      } else {
-        ch
-      },
-    );
+          ch
+        },
+      );
+    }
+    analysis_text.extend(std::iter::repeat_n('\u{202c}', active_scopes.len()));
   }
-  analysis_text.extend(std::iter::repeat_n('\u{202c}', active_scopes.len()));
   let mut logical_levels = vec![base_level; logical_text.len()];
-  if ltr_run_regions {
+  if scoped_run_regions {
+    resolve_scoped_bidi_regions(
+      items,
+      &original_logical_indices,
+      &logical_text,
+      &byte_starts,
+      base_level,
+      &mut logical_levels,
+    );
+  } else if ltr_run_regions {
     let mut start = 0;
     while start < original_logical_indices.len() {
       let is_rtl = |index: usize| {
@@ -69313,6 +73601,88 @@ fn reorder_bidi_items_with_base(
     };
     shift_item_x(&mut items[item_index], x - old_x);
     x += widths[logical_index];
+  }
+}
+
+// The source/sink contract of IDWriteTextAnalyzer::AnalyzeBidi applies UAX #9
+// to each producer-owned region. Actual Word callbacks retain raw punctuation
+// here: the leading/trailing brackets of an LRE region resolve at level 2,
+// while its Arabic letters resolve at level 3. Neither concatenating regions
+// nor replacing their neutrals with strong RTL characters preserves that input.
+fn resolve_scoped_bidi_regions(
+  items: &[PageItem],
+  logical_indices: &[usize],
+  logical_text: &str,
+  byte_starts: &[usize],
+  base_level: Level,
+  logical_levels: &mut [Level],
+) {
+  let region_key = |index: usize| match &items[logical_indices[index]] {
+    PageItem::Text(text) => (
+      text
+        .style
+        .wordprocessing_bidi_scopes
+        .as_deref()
+        .unwrap_or_default(),
+      text.style.right_to_left == Some(true),
+    ),
+    _ => (&[][..], false),
+  };
+  let mut start = 0;
+  let mut analysis = String::new();
+  while start < logical_indices.len() {
+    let (scopes, rtl) = region_key(start);
+    let mut end = start + 1;
+    while end < logical_indices.len() && region_key(end) == (scopes, rtl) {
+      end += 1;
+    }
+    analysis.clear();
+    for scope in scopes {
+      analysis.push(if scope.right_to_left {
+        '\u{202b}'
+      } else {
+        '\u{202a}'
+      });
+    }
+    if let PageItem::Text(text) = &items[logical_indices[start]]
+      && let Some(prefix) = &text.style.wordprocessing_bidi_prefix
+    {
+      analysis.push_str(prefix);
+    }
+    let active_embeddings = analysis.chars().fold(0usize, |depth, ch| {
+      if ch == '\u{202c}' {
+        depth.saturating_sub(1)
+      } else {
+        depth + 1
+      }
+    });
+    let region_base = if active_embeddings > 0 {
+      base_level
+    } else if rtl {
+      Level::rtl()
+    } else {
+      Level::ltr()
+    };
+    let content_start = analysis.len();
+    let byte_start = byte_starts[start];
+    let byte_end = byte_starts.get(end).copied().unwrap_or(logical_text.len());
+    analysis.push_str(&logical_text[byte_start..byte_end]);
+    let bidi = BidiInfo::new(&analysis, Some(region_base));
+    for (output, &level) in logical_levels[byte_start..byte_end]
+      .iter_mut()
+      .zip(&bidi.levels[content_start..])
+    {
+      // A bare LTR source region is analyzed at zero by DirectWrite, but it
+      // remains an LTR portion of the containing RTL paragraph. Lifting its
+      // levels preserves inner glyph direction without splitting that outer
+      // paragraph into independent visual fragments at every Latin word.
+      *output = if region_base.is_ltr() {
+        Level::new(level.number() + 2).unwrap_or(level)
+      } else {
+        level
+      };
+    }
+    start = end;
   }
 }
 
@@ -69872,6 +74242,17 @@ fn apply_pending_aligned_tab_in_context(
     }
     aligned_left = aligned_left.max(tab.leader_start_x_pt);
   }
+  // Wholly blank right-tab results retain their cursor width before the
+  // next tab, but do not shorten the painted leader. Native independent
+  // blank-font/count controls keep its end at the authored stop.
+  let leader_end_x = if ignore_trailing_blanks
+    && printable_right.is_none()
+    && tab.stop.alignment == TabStopAlignment::Right
+  {
+    tab_right
+  } else {
+    aligned_left
+  };
   let dx = aligned_left - min_x;
   let leader = tab.stop.leader;
   let leader_style = tab.style.clone();
@@ -69923,7 +74304,7 @@ fn apply_pending_aligned_tab_in_context(
         layout: tab.leader_layout,
         reserve_natural_boundary,
         start_x: leader_start_x,
-        end_x: aligned_left,
+        end_x: leader_end_x,
         y: leader_y,
         line_height: leader_line_height,
         paragraph_bidi: tab.paragraph_bidi,
@@ -69950,7 +74331,7 @@ fn apply_pending_aligned_tab_in_context(
       layout: tab.leader_layout,
       reserve_natural_boundary,
       start_x: leader_start_x,
-      end_x: aligned_left,
+      end_x: leader_end_x,
       y: leader_y,
       line_height: leader_line_height,
       paragraph_bidi: tab.paragraph_bidi,
@@ -70146,9 +74527,9 @@ fn tab_leader_metrics(
   {
     style.font_size_pt = size;
   }
-  if fill_char == '.'
+  if (fill_char == '.' || (fill_char == '_' && !paragraph_bidi))
     && let Some((source_advance, paint_advance)) =
-      text_metrics.word_dot_leader_advances(&style, paragraph_bidi)
+      text_metrics.word_tab_leader_advances(fill_char, &style, paragraph_bidi)
   {
     let current = tab_leader_repeat_width(fill_char, &style, text_metrics);
     style.character_spacing_pt += paint_advance - current;
@@ -70322,6 +74703,7 @@ fn push_tab_leader(
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: String::new(),
       style: style.clone(),
@@ -70416,10 +74798,8 @@ fn push_tab_leader(
   let mut paint_style = metrics.paint_style;
   if let Some(advance) = metrics.explicit_paint_advance_pt {
     paint_style.semantic_character_advances_pt = Some(vec![advance; count].into());
-    if placement.paragraph_bidi {
-      paint_style.wordprocessing_tab_leader_span =
-        Some((placement.start_x - x_pt, placement.end_x - x_pt));
-    }
+    paint_style.wordprocessing_tab_leader_span =
+      Some((placement.start_x - x_pt, placement.end_x - x_pt));
   }
   let item = PageItem::Text(Box::new(TextItem {
     x_pt,
@@ -70432,6 +74812,7 @@ fn push_tab_leader(
     paint_clip: None,
     page_culling_bounds: None,
     wordprocessing_effect_host: None,
+    side_ruby: None,
     wordprocessing_terminal_effect_style: None,
     text: fill_char.to_string().repeat(count),
     style: paint_style,
@@ -70589,6 +74970,7 @@ fn adjust_justified_text_span(
   let mut last_text_index = None;
   let mut first_text_index = None;
   let mut last_visible_text_index = None;
+  let mut first_inline_object_index = None;
   let mut last_inline_object_index = None;
   let mut all_ltr = true;
   for (index, item) in items.iter().enumerate().skip(start_index) {
@@ -70596,11 +74978,12 @@ fn adjust_justified_text_span(
       continue;
     }
     let PageItem::Text(text) = item else {
-      // An as-character picture consumes a fixed advance, but does not stop
-      // the surrounding text's space adjustment (ECMA-376 20.4.2.8; native
-      // image/leading-blank controls). Tabs and floating drawings retain
-      // their separate fixed-margin/segment owners.
-      if is_inline_baseline_alignment_item(item) {
+      // As-character pictures and legacy form checkboxes consume a fixed
+      // advance without stopping surrounding space adjustment. Native Word
+      // controls retain their size and stretch the following interior blanks.
+      // Tabs and floating drawings keep their separate segment owners.
+      if inline_justification_horizontal_bounds(item).is_some() {
+        first_inline_object_index.get_or_insert(index);
         last_inline_object_index = Some(index);
         continue;
       }
@@ -70645,7 +75028,7 @@ fn adjust_justified_text_span(
       continue;
     }
     let PageItem::Text(text) = item else {
-      if let Some((_, right)) = inline_alignment_horizontal_bounds(item) {
+      if let Some((_, right)) = inline_justification_horizontal_bounds(item) {
         natural_right = natural_right.max(right);
       }
       continue;
@@ -70690,7 +75073,12 @@ fn adjust_justified_text_span(
     // punctuation as ordinary w:overflowPunct hanging punctuation.
     natural_right = natural_right.max(text.x_pt + portion_width - terminal_overhang);
     let leading_spaces = if Some(index) == first_text_index {
-      rtl_justified_leading_space_count(text) + ltr_justified_leading_space_count(text)
+      rtl_justified_leading_space_count(text)
+        + if first_inline_object_index.is_some_and(|object_index| object_index < index) {
+          0
+        } else {
+          ltr_justified_leading_space_count(text)
+        }
     } else {
       0
     };
@@ -70702,8 +75090,25 @@ fn adjust_justified_text_span(
   natural_right -= rtl_tail_width;
   if allow_expansion
     && last_inline_object_index.is_none()
+    && justification.modern_wordprocessing
+    && justification.kashida.is_none()
+    && justification.is_block()
+    && justification.last_line_adjust != crate::docx::ParagraphAdjust::Block
+    && wordprocessing_kashida::adjust_ordinary(items, line, text_metrics) == Some(true)
+  {
+    return;
+  }
+  if allow_expansion
+    && last_inline_object_index.is_none()
     && justification.kashida.is_some()
-    && justify_kashida_line(items, line, last_text_index, space_count, text_metrics)
+    && justify_kashida_line(
+      items,
+      line,
+      last_text_index,
+      space_count,
+      justification.modern_wordprocessing,
+      text_metrics,
+    )
   {
     return;
   }
@@ -70808,7 +75213,7 @@ fn adjust_justified_text_span(
     .filter_map(|(index, item)| match item {
       PageItem::Text(text) if (text.y_pt - y).abs() < 0.01 => Some((index, text.x_pt)),
       _ if item_y(item).is_some_and(|item_y| (item_y - y).abs() < 0.01) => {
-        inline_alignment_horizontal_bounds(item).map(|(left, _)| (index, left))
+        inline_justification_horizontal_bounds(item).map(|(left, _)| (index, left))
       }
       _ => None,
     })
@@ -70823,7 +75228,14 @@ fn adjust_justified_text_span(
     text.x_pt += preceding_space_advance;
     text.word_spacing_pt = extra_per_space;
     let leading_spaces = if Some(index) == first_text_index {
-      let ltr_leading_spaces = ltr_justified_leading_space_count(text);
+      let ltr_leading_spaces =
+        if first_inline_object_index.is_some_and(|object_index| object_index < index) {
+          // These blanks follow a fixed inline portion, so they are interior
+          // glue even when they begin the first text formatting portion.
+          0
+        } else {
+          ltr_justified_leading_space_count(text)
+        };
       // The PDF writer applies one word-spacing value to every space in a
       // text portion. Cancel it at the logical line start while leaving the
       // interior glue stretched. Office's stress003 controls with zero, one
@@ -70862,9 +75274,12 @@ fn justify_kashida_line(
   line: LineJustificationContext,
   last_text_index: Option<usize>,
   space_count: usize,
+  modern: bool,
   metrics: &mut TextMetrics,
 ) -> bool {
-  if let Some(adjusted) = wordprocessing_kashida::adjust(items, line, last_text_index, metrics) {
+  if let Some(adjusted) =
+    wordprocessing_kashida::adjust(items, line, last_text_index, modern, metrics)
+  {
     return adjusted;
   }
   let mut visual = Vec::new();
@@ -71011,6 +75426,8 @@ fn justify_paragraph_last_line(
     // its last word. Word native controls and Writer's FormatBlock preserve
     // that negative glue; ordinary short final lines must remain unexpanded.
     adjust_justified_line_items(items, line, justification, false, text_metrics);
+  } else if justification.modern_wordprocessing && justification.kashida.is_some() {
+    let _ = wordprocessing_kashida::adjust_ragged(items, line, text_metrics);
   }
 }
 
@@ -71682,8 +76099,9 @@ fn finalize_cjk_punctuation_compression(
   // internal commas and a trailing full stop require full compression, while
   // counting all three as in-line capacity produces only 77.14%.
   let natural_right = compressed_right + total_capacity;
-  let trailing_hanging_capacity =
+  let trailing_punctuation =
     trailing_cjk_punctuation_compression_capacity(items, start_index, y, text_metrics);
+  let trailing_hanging_capacity = trailing_punctuation.map_or(0.0, |(_, capacity)| capacity);
   let terminal = allow_terminal_compression
     .then(|| {
       traditional_chinese_terminal_compression(items, start_index, y, natural_right, line_right)
@@ -71724,6 +76142,22 @@ fn finalize_cjk_punctuation_compression(
   {
     let mut adjustments = vec![0.0; text.text.chars().count()];
     *adjustments.last_mut().expect("terminal punctuation") = -reduction;
+    text.style.wordprocessing_justification_expansion_pt = Some(adjustments.into());
+  } else if ratio > 0.0
+    && let Some((index, capacity)) = trailing_punctuation
+    && let PageItem::Text(text) = &mut items[index]
+  {
+    // The terminal bearing excluded from the in-line compression budget
+    // retains its natural advance. Native MSLS70 horizontal/vertical arrays
+    // reduce the internal commas but keep the terminal comma at one em.
+    // Compressing it as well creates false slack which justification would
+    // distribute across every preceding character.
+    let mut adjustments = text
+      .style
+      .wordprocessing_justification_expansion_pt
+      .as_deref()
+      .map_or_else(|| vec![0.0; text.text.chars().count()], <[f32]>::to_vec);
+    *adjustments.last_mut().expect("terminal punctuation") += capacity * ratio;
     text.style.wordprocessing_justification_expansion_pt = Some(adjustments.into());
   }
 }
@@ -71773,8 +76207,8 @@ fn trailing_cjk_punctuation_compression_capacity(
   start_index: usize,
   y: f32,
   text_metrics: &mut TextMetrics,
-) -> f32 {
-  for item in items.iter().skip(start_index).rev() {
+) -> Option<(usize, f32)> {
+  for (index, item) in items.iter().enumerate().skip(start_index).rev() {
     match item {
       PageItem::Text(text) if (text.y_pt - y).abs() < 0.01 => {
         let Some(character) = text.text.chars().last() else {
@@ -71783,7 +76217,7 @@ fn trailing_cjk_punctuation_compression_capacity(
         if text.style.cjk_punctuation_compression_ratio <= 0.0
           || !libreoffice_forbidden_line_start_after_text(character)
         {
-          return 0.0;
+          return None;
         }
         let mut buffer = [0; 4];
         let punctuation = character.encode_utf8(&mut buffer);
@@ -71791,12 +76225,13 @@ fn trailing_cjk_punctuation_compression_capacity(
         natural_style.cjk_punctuation_compression_ratio = 0.0;
         let mut maximum_style = text.style.clone();
         maximum_style.cjk_punctuation_compression_ratio = 1.0;
-        return (text_metrics.measure_text(punctuation, &natural_style)
+        let capacity = (text_metrics.measure_text(punctuation, &natural_style)
           - text_metrics.measure_text(punctuation, &maximum_style))
         .max(0.0);
+        return (capacity > 0.0).then_some((index, capacity));
       }
-      PageItem::Image(image) if (image.y_pt - y).abs() < 0.01 => return 0.0,
-      PageItem::LegacyFormCheckBox(check_box) if (check_box.y_pt - y).abs() < 0.01 => return 0.0,
+      PageItem::Image(image) if (image.y_pt - y).abs() < 0.01 => return None,
+      PageItem::LegacyFormCheckBox(check_box) if (check_box.y_pt - y).abs() < 0.01 => return None,
       PageItem::Group(items)
       | PageItem::InlineObjectGroup(items)
       | PageItem::CompositingGroup { items, .. }
@@ -71806,12 +76241,12 @@ fn trailing_cjk_punctuation_compression_capacity(
           .find_map(item_y)
           .is_some_and(|item_y| (item_y - y).abs() < 0.01) =>
       {
-        return 0.0;
+        return None;
       }
       _ => {}
     }
   }
-  0.0
+  None
 }
 
 fn resolved_cjk_punctuation_compression_ratio(
@@ -71964,6 +76399,15 @@ fn vml_wordart_alignment_bounds(text: &TextItem) -> Option<(f32, f32)> {
     .as_ref()?;
   warp.vml_fit_path.as_ref()?;
   Some((warp.paint_bounds.origin.x.0, warp.paint_bounds.size.width.0))
+}
+
+fn inline_justification_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
+  match item {
+    PageItem::LegacyFormCheckBox(check_box) => {
+      Some((check_box.x_pt, check_box.x_pt + check_box.size_pt))
+    }
+    _ => inline_alignment_horizontal_bounds(item),
+  }
 }
 
 fn inline_alignment_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
@@ -72337,7 +76781,7 @@ fn push_inline_object_run_border(
   // signed-axis order. Word's thinThickSmallGap has the thin rail inside.
   let rails: Vec<(f32, f32)> = if border.compound {
     let (inner, gap, outer) = match border.compound_pattern {
-      BorderCompoundPattern::Equal => (
+      BorderCompoundPattern::Equal | BorderCompoundPattern::Double => (
         border.width_pt / 3.0,
         border.width_pt / 3.0,
         border.width_pt / 3.0,
@@ -72386,11 +76830,21 @@ fn push_inline_object_run_border(
 }
 
 fn image_frame_width(image: &crate::docx::InlineImage) -> f32 {
-  (image.width_pt + image.effect_left_pt + image.effect_right_pt).max(0.0)
+  let width = if image.inline_frame_axes_swapped {
+    image.height_pt
+  } else {
+    image.width_pt
+  };
+  (width + image.effect_left_pt + image.effect_right_pt).max(0.0)
 }
 
 fn image_frame_height(image: &crate::docx::InlineImage) -> f32 {
-  (image.height_pt + image.effect_top_pt + image.effect_bottom_pt).max(0.0)
+  let height = if image.inline_frame_axes_swapped {
+    image.width_pt
+  } else {
+    image.height_pt
+  };
+  (height + image.effect_top_pt + image.effect_bottom_pt).max(0.0)
 }
 
 fn inline_shape_frame_width(shape: &InlineShape) -> f32 {
@@ -72891,19 +77345,33 @@ fn inline_image_metrics_for_frame(
   } else {
     0.0
   };
+  // Word's modern inline frame exchanges axes in the quarter-turn sectors,
+  // before adding effectExtent. Keep the authored picture centered in that
+  // frame; its arbitrary visual angle does not define a tight layout AABB.
+  // Native 12/14/15 controls and LO GraphicImport::lcl_doMSOWidthHeightSwap
+  // distinguish the frame policy from rotation of the actual picture.
+  let center_shift_y = if image.inline_frame_axes_swapped {
+    (image.width_pt - image.height_pt) / 2.0
+  } else {
+    0.0
+  };
   InlineImageMetrics {
     frame_width_pt,
     frame_height_pt,
     // A picture directly inside wpc:wpc/wpg:grpSp keeps its a:xfrm/a:off
     // relative to the host DrawingML coordinate space. The child offset is
     // paint geometry; the outer wp:inline owns the line box.
-    content_offset_x_pt: (image.effect_left_pt.max(0.0) + image.inline_offset_x_pt) * scale,
-    content_offset_y_pt: (image.effect_top_pt.max(0.0) + image.inline_offset_y_pt) * scale,
+    content_offset_x_pt: (image.effect_left_pt.max(0.0) + image.inline_offset_x_pt
+      - center_shift_y)
+      * scale,
+    content_offset_y_pt: (image.effect_top_pt.max(0.0) + image.inline_offset_y_pt + center_shift_y)
+      * scale,
     content_width_pt: visible_image_width(image) * scale,
     content_height_pt: visible_image_height(image) * scale,
-    content_bottom_gap_pt: image
+    content_bottom_gap_pt: (image
       .inline_baseline_gap_pt
       .unwrap_or_else(|| image.effect_bottom_pt.max(0.0))
+      + center_shift_y)
       * scale,
     explicit_baseline_gap: image.inline_baseline_gap_pt.is_some(),
     line_box: image.line_box,
@@ -72925,10 +77393,11 @@ fn floating_image_metrics(
   flow: FlowContext,
 ) -> InlineImageMetrics {
   let (group_scale_x, group_scale_y) = floating_group_scale(placement, flow);
-  let content_width = relative_floating_width(placement, flow)
-    .unwrap_or_else(|| visible_image_width(image) * group_scale_x);
-  let content_height = relative_floating_height(placement, flow)
-    .unwrap_or_else(|| visible_image_height(image) * group_scale_y);
+  let relative_width = relative_floating_width(placement, flow);
+  let relative_height = relative_floating_height(placement, flow);
+  let content_width = relative_width.unwrap_or_else(|| visible_image_width(image) * group_scale_x);
+  let content_height =
+    relative_height.unwrap_or_else(|| visible_image_height(image) * group_scale_y);
   // wp:align aligns the object's outer visual bounds, including effectExtent.
   // A wp:posOffset instead fixes the visible wp:extent origin; effectExtent
   // still expands the wrap influence through placement margins, but must not
@@ -72940,15 +77409,58 @@ fn floating_image_metrics(
   let aligns_effect_frame = placement.horizontal_alignment.is_some()
     || placement.vertical_alignment.is_some()
     || line_reference_forces_layout_in_cell(placement, flow);
-  let (effect_left, effect_top, effect_right, effect_bottom) = if aligns_effect_frame {
+  // Modern independent body pictures with genuine wrapNone position each
+  // axis separately: aligning horizontally must not translate a vertical
+  // posOffset by effectExtent.t, or vice versa. Native mode12/14 opposites
+  // retain the joint effect frame. A polygon proxy can clear placement.wrap
+  // while retaining the authored wrap owner in contour_owned_wrap; that is
+  // not the wrapNone case. Keep cell, group and relative-size frames separate.
+  let native_no_wrap_picture = (placement.paint_order.is_drawing_ml()
+    && placement.wrap == ImageWrapMode::None)
+    || (placement.paint_order.is_vml()
+      && placement.behind_text
+      && matches!(placement.wrap, ImageWrapMode::None | ImageWrapMode::Through)
+      && image.picture_frame.as_deref().is_some_and(|frame| {
+        matches!(
+          frame.geometry,
+          InlineShapeGeometry::Path {
+            preset: Some(crate::docx::a::ShapeTypeValues::Rectangle),
+            ..
+          }
+        )
+      }));
+  // VML's behind-text picture uses the same native no-wrap owner, although
+  // its omitted external wrap is retained as Through by the legacy importer.
+  // Native 14/15 x H/V controls distinguish its joint and independent axes.
+  let independent_effect_axes = flow.compatibility_mode >= 15
+    && flow.text_segmentation == TextSegmentation::Body
+    && !flow.inside_paragraph_frame
+    && native_no_wrap_picture
+    && image.contour_owned_wrap.is_none()
+    && placement.alignment_extent.is_none()
+    // A declared zero percentage retains the absolute extent, just as the
+    // size resolver above does; it does not establish a relative-size frame.
+    && relative_width.is_none()
+    && relative_height.is_none();
+  let aligns_effect_x =
+    aligns_effect_frame && (!independent_effect_axes || placement.horizontal_alignment.is_some());
+  let aligns_effect_y =
+    aligns_effect_frame && (!independent_effect_axes || placement.vertical_alignment.is_some());
+  let (effect_left, effect_right) = if aligns_effect_x {
     (
       image.effect_left_pt.max(0.0),
-      image.effect_top_pt.max(0.0),
       image.effect_right_pt.max(0.0),
+    )
+  } else {
+    (0.0, 0.0)
+  };
+  let (effect_top, effect_bottom) = if aligns_effect_y {
+    (
+      image.effect_top_pt.max(0.0),
       image.effect_bottom_pt.max(0.0),
     )
   } else {
-    (0.0, 0.0, 0.0, 0.0)
+    (0.0, 0.0)
   };
   let frame_width = content_width + effect_left + effect_right;
   let frame_height = content_height + effect_top + effect_bottom;
@@ -72962,9 +77474,8 @@ fn floating_image_metrics(
   InlineImageMetrics {
     frame_width_pt,
     frame_height_pt,
-    // wp:position* aligns the outer effect box. The authored picture extent
-    // starts inside it by effectExtent.l/t; rotation, fat strokes, shadows,
-    // and glow are precisely why those insets exist.
+    // Aligned axes start inside the selected effect frame; explicit offsets
+    // retain their independent content origin in the modern wrapNone owner.
     content_offset_x_pt: effect_left * scale,
     content_offset_y_pt: effect_top * scale,
     content_width_pt: content_width * scale,
@@ -73080,7 +77591,10 @@ fn text_chunk_meta<'a>(
     (
       run.style_ref_keys.as_slice(),
       run.style_ref_text.as_ref(),
-      run.style_ref_numbering_text.as_ref(),
+      run
+        .style_ref_numbering_text
+        .as_ref()
+        .or(paragraph.style_ref_numbering_text.as_ref()),
     )
   };
   TextChunkMeta {
@@ -73102,8 +77616,14 @@ fn wordprocessing_auto_line_spacing_units(paragraph: &crate::docx::Paragraph) ->
   if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto) {
     return None;
   }
-  let units =
-    f64::from(paragraph.format.line_height_pt?) * f64::from(units::WORD_LINE_HEIGHT_UNITS_PER_LINE);
+  // An omitted WPS auto-spacing multiplier is natural single spacing
+  // (ECMA-376 §17.3.1.33), not an exact/minimum line. Keep this distinction
+  // when its independent story later realizes completed line baselines.
+  let multiple = paragraph
+    .format
+    .line_height_pt
+    .or_else(|| paragraph.format.wordprocessing_shape_story.then_some(1.0))?;
+  let units = f64::from(multiple) * f64::from(units::WORD_LINE_HEIGHT_UNITS_PER_LINE);
   if !units.is_finite() || units <= 0.0 || units > f64::from(i32::MAX) {
     return None;
   }
@@ -73163,6 +77683,7 @@ fn push_text_item(
     paint_clip: None,
     page_culling_bounds: None,
     wordprocessing_effect_host: None,
+    side_ruby: None,
     wordprocessing_terminal_effect_style: None,
     text,
     style,
@@ -73219,6 +77740,7 @@ fn flush_discretionary_hyphen(
     paint_clip: None,
     page_culling_bounds: None,
     wordprocessing_effect_host: None,
+    side_ruby: None,
     wordprocessing_terminal_effect_style: None,
     text: std::mem::take(chunk),
     style,
@@ -73279,6 +77801,7 @@ fn push_ruby_text(
     paint_clip: None,
     page_culling_bounds: None,
     wordprocessing_effect_host: None,
+    side_ruby: None,
     wordprocessing_terminal_effect_style: None,
     text,
     style,
@@ -73495,8 +78018,7 @@ fn push_ruby_items(
   segmentation: TextSegmentation,
   text_metrics: &mut TextMetrics,
 ) {
-  let x = placement.x_pt;
-  let y = placement.y_pt;
+  let base_start = page.items.len();
   push_ruby_horizontal_line(
     page,
     paragraph,
@@ -73532,32 +78054,15 @@ fn push_ruby_items(
     return;
   }
 
-  let base_width = text_runs_width(&ruby.base, text_metrics);
-  let guide_x = x + base_width;
-  let guide_width = metrics.width_pt - base_width;
-  let mut guide_y = y;
-  for run in &ruby.guide {
-    for ch in run.text.chars() {
-      let mut encoded = [0; 4];
-      let text = ch.encode_utf8(&mut encoded);
-      let char_height = inline_text_height_for_text(&run.style, text, text_metrics);
-      let char_width = text_metrics.measure_text(text, &run.style);
-      push_ruby_text(
-        page,
-        paragraph,
-        run,
-        text.to_string(),
-        run.style.clone(),
-        TextPlacement {
-          x_pt: guide_x + (guide_width - char_width).max(0.0) / 2.0,
-          y_pt: guide_y,
-          line_height_pt: char_height,
-        },
-        segmentation,
-      );
-      guide_y += char_height;
-    }
-  }
+  side_ruby::push_guides(
+    page,
+    paragraph,
+    ruby,
+    base_start,
+    placement,
+    segmentation,
+    text_metrics,
+  );
 }
 
 fn separate_table_border_color(border: BorderStyle, leading: bool, outer: bool) -> RgbColor {
@@ -73794,13 +78299,22 @@ fn word_table_compound_rails(border: BorderStyle) -> Option<[i64; 3]> {
   let gap_twips = ((f64::from(border.width_pt) - 2.25).max(0.0) * 20.0).floor() as i64;
   let gap = gap_twips * 5 / 12;
   match border.compound_pattern {
-    BorderCompoundPattern::Equal => {
+    BorderCompoundPattern::Equal | BorderCompoundPattern::Double => {
       let twips = (f64::from(border.width_pt / 3.0) * 20.0).floor() as i64;
       let rail = (twips * 5 / 12).max(1);
       Some([rail; 3])
     }
     BorderCompoundPattern::ThinThickLargeGap => Some([12, gap, 6]),
     BorderCompoundPattern::ThickThinLargeGap => Some([6, gap, 12]),
+    BorderCompoundPattern::ThinThickSmallGap | BorderCompoundPattern::ThickThinSmallGap => {
+      let twips = ((f64::from(border.width_pt) - 1.5).max(0.0) * 20.0).floor() as i64;
+      let authored = (twips * 5 / 12).max(1);
+      if border.compound_pattern == BorderCompoundPattern::ThinThickSmallGap {
+        Some([authored, 6, 6])
+      } else {
+        Some([6, 6, authored])
+      }
+    }
     _ => None,
   }
 }
@@ -73898,6 +78412,24 @@ fn push_cell_vertical_border_line(
   let (x_pt, row_span_pt) = line;
   let row_top_pt = row_span_pt.start;
   let row_bottom_pt = row_span_pt.end;
+  if let Some(coordinates) = coordinates
+    && !border.compound
+    && border.dash_pattern == BorderDashPattern::Dotted
+  {
+    push_table_border_line_with_coordinates(
+      page,
+      (
+        x_pt,
+        row_top_pt + row_top_border_space_extent(table, row_index, row),
+        x_pt,
+        row_bottom_pt,
+      ),
+      border,
+      false,
+      Some(coordinates),
+    );
+    return;
+  }
   if row_cell_spacing_pt(table, row) <= 0.0
     && !border.compound
     && border.dash_pattern == BorderDashPattern::FineDashed
@@ -73912,7 +78444,10 @@ fn push_cell_vertical_border_line(
     push_word_table_fine_dashed_vertical_border(
       page,
       x_pt,
-      row_top_pt + row_top_border_space_extent(table, row_index, row),
+      (
+        row_top_pt,
+        row_top_border_space_extent(table, row_index, row),
+      ),
       row_bottom_pt,
       row_index + 1 == table.rows.len(),
       border,
@@ -74032,7 +78567,17 @@ fn encode_word_table_border_bitmap(
   width_px: u32,
   height_px: u32,
   color: RgbColor,
+  alpha: impl FnMut(u32, u32) -> u8,
+) -> Option<Bytes> {
+  encode_word_table_border_profile_bitmap(width_px, height_px, color, alpha, None)
+}
+
+fn encode_word_table_border_profile_bitmap(
+  width_px: u32,
+  height_px: u32,
+  color: RgbColor,
   mut alpha: impl FnMut(u32, u32) -> u8,
+  screen: Option<Bytes>,
 ) -> Option<Bytes> {
   let mut rgba = Vec::with_capacity(width_px as usize * height_px as usize * 4);
   for y in 0..height_px {
@@ -74041,6 +78586,21 @@ fn encode_word_table_border_bitmap(
     }
   }
   let mut png = Cursor::new(Vec::new());
+  if let Some(screen) = screen {
+    // Reuse the Word 3-D raster transport: an ancillary PNG chunk preserves
+    // the other profile's raster. The primary image remains the proven Print
+    // bitmap; Screen samples the original 600-DPI pen phase independently.
+    let mut encoder = png::Encoder::new(&mut png, width_px, height_px);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().ok()?;
+    writer
+      .write_chunk(png::chunk::ChunkType(*b"oxDr"), &screen)
+      .ok()?;
+    writer.write_image_data(&rgba).ok()?;
+    writer.finish().ok()?;
+    return Some(Bytes::from(png.into_inner()));
+  }
   PngEncoder::new(&mut png)
     .write_image(&rgba, width_px, height_px, ColorType::Rgba8.into())
     .ok()?;
@@ -74091,24 +78651,54 @@ fn word_table_fine_dash_device_bitmap(
     (pattern.cross_sample_count, axis_sample_count)
   };
   let period_dot_count = i64::from(pattern.period_dot_count);
-  encode_word_table_border_bitmap(width_px, height_px, color, |x, y| {
-    let axis_sample = if horizontal { x } else { y };
-    // Office advances dashSmallGap on the 600-DPI printer grid, then emits a
-    // compact one-bit tile. For a 0.5-point full period the 20-dot destination
-    // is sampled at [0, 3, 7, 10, 13, 17], exactly round(j * 20 / 6). The
-    // caller supplies the source extent: horizontal boundary tiles retain the
-    // full-period sampler established by Matrix F, while a vertical tail uses
-    // its independently established destination extent.
-    let source_dot_offset = (u64::from(axis_sample) * u64::from(axis_extent_dot_count)
-      + u64::from(axis_sample_count / 2))
-      / u64::from(axis_sample_count);
-    let style_dot = (phase_dot + source_dot_offset as i64).rem_euclid(period_dot_count);
-    if style_dot < i64::from(pattern.on_dot_count) {
+  let screen_cross = (pattern.thickness_dot_count * 96 / 600).max(1);
+  let screen_axis = if axis_extent_dot_count == pattern.period_dot_count
+    && axis_sample_count == pattern.cross_sample_count
+  {
+    screen_cross
+  } else {
+    (axis_extent_dot_count * 96 / 600).max(1)
+  };
+  let (screen_width, screen_height) = if horizontal {
+    (screen_axis, screen_cross)
+  } else {
+    (screen_cross, screen_axis)
+  };
+  let screen = encode_word_table_border_bitmap(screen_width, screen_height, color, |x, y| {
+    let sample = if horizontal { x } else { y };
+    let offset = (u64::from(sample) * u64::from(axis_extent_dot_count)
+      + u64::from(screen_axis / 2))
+      / u64::from(screen_axis);
+    if (phase_dot + offset as i64).rem_euclid(period_dot_count) < i64::from(pattern.on_dot_count) {
       u8::MAX
     } else {
       0
     }
-  })
+  })?;
+  encode_word_table_border_profile_bitmap(
+    width_px,
+    height_px,
+    color,
+    |x, y| {
+      let axis_sample = if horizontal { x } else { y };
+      // Office advances dashSmallGap on the 600-DPI printer grid, then emits a
+      // compact one-bit tile. For a 0.5-point full period the 20-dot destination
+      // is sampled at [0, 3, 7, 10, 13, 17], exactly round(j * 20 / 6). The
+      // caller supplies the source extent: horizontal boundary tiles retain the
+      // full-period sampler established by Matrix F, while a vertical tail uses
+      // its independently established destination extent.
+      let source_dot_offset = (u64::from(axis_sample) * u64::from(axis_extent_dot_count)
+        + u64::from(axis_sample_count / 2))
+        / u64::from(axis_sample_count);
+      let style_dot = (phase_dot + source_dot_offset as i64).rem_euclid(period_dot_count);
+      if style_dot < i64::from(pattern.on_dot_count) {
+        u8::MAX
+      } else {
+        0
+      }
+    },
+    Some(screen),
+  )
 }
 
 fn word_table_fine_dash_tail_sample_count(
@@ -74149,6 +78739,20 @@ fn push_word_table_border_bitmap(
   height_pt: f32,
   data: Bytes,
 ) {
+  push_word_border_bitmap(
+    page,
+    (x_pt, y_pt, width_pt, height_pt),
+    data,
+    WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE,
+  );
+}
+
+fn push_word_border_bitmap(
+  page: &mut Page,
+  (x_pt, y_pt, width_pt, height_pt): (f32, f32, f32, f32),
+  data: Bytes,
+  content_type: &str,
+) {
   if width_pt <= f32::EPSILON || height_pt <= f32::EPSILON {
     return;
   }
@@ -74169,7 +78773,7 @@ fn push_word_table_border_bitmap(
     flip_horizontal: false,
     flip_vertical: false,
     data,
-    content_type: Some(WORD_TABLE_BORDER_BITMAP_CONTENT_TYPE.to_string()),
+    content_type: Some(content_type.to_string()),
     blip_compression_state: common::BlipCompressionState::NotApplicable,
     metafile_background_color: None,
     alt_text: None,
@@ -74434,15 +79038,24 @@ fn horizontal_table_border_junction_geometry(
   }
 }
 
-fn push_word_table_fine_dashed_horizontal_border(
+fn push_word_table_patterned_horizontal_border(
   page: &mut Page,
-  x1: f32,
-  y: f32,
-  x2: f32,
+  (x1, y, x2): (f32, f32, f32),
+  grid_origin: f32,
   border: BorderStyle,
   edge: HorizontalTableBorderEdge,
   junctions: (HorizontalTableBorderJunction, HorizontalTableBorderJunction),
 ) {
+  if table_small_gap::is_style(border) {
+    if !table_small_gap::paint_horizontal(page, (x1, y, x2), border, edge, junctions) {
+      push_table_border_line(page, x1, y, x2, y, border);
+    }
+    return;
+  }
+  if border.dash_pattern == BorderDashPattern::DashDotStroked {
+    stroked_border::paint_horizontal(page, (x1, y, x2), grid_origin, border, edge, junctions);
+    return;
+  }
   let (leading_junction, trailing_junction) = junctions;
   let Some(device_axis) = WordTableDeviceAxis::new(page.setup.width_pt) else {
     push_word_table_fine_dashed_border(page, x1, y, x2, y, border);
@@ -74606,11 +79219,12 @@ fn push_word_table_fine_dashed_horizontal_border(
 fn push_word_table_fine_dashed_vertical_border(
   page: &mut Page,
   x: f32,
-  y1: f32,
+  (row_top_y_pt, top_inset_pt): (f32, f32),
   y2: f32,
   ends_at_table_bottom: bool,
   border: BorderStyle,
 ) {
+  let y1 = row_top_y_pt + top_inset_pt;
   let (logical_start_y_pt, logical_end_y_pt) = if y1 <= y2 { (y1, y2) } else { (y2, y1) };
   if logical_end_y_pt - logical_start_y_pt <= f32::EPSILON {
     return;
@@ -74625,8 +79239,13 @@ fn push_word_table_fine_dashed_vertical_border(
 
   let pattern = word_table_fine_dash_pattern(border.width_pt);
   let painter_edge_adjustment_pt = 1.0 / units::TWIPS_PER_POINT;
+  // The horizontal intersection owns the start: convert its row origin,
+  // then add the realized inset. Combining them before conversion loses a
+  // source dot at fractional border widths. Native 32 vertical-edge controls
+  // and the page EMF retain this same source origin and page-anchored brush.
+  let inset_twips = (f64::from(top_inset_pt) * 20.0).floor() as i64;
   let tile_start_dot =
-    vertical_axis.logical_to_device_dot(logical_start_y_pt + painter_edge_adjustment_pt);
+    wordprocessing_table_device::source_coordinate(row_top_y_pt) + inset_twips * 5 / 12;
   let end_bias_dots = if ends_at_table_bottom {
     WORD_TABLE_VERTICAL_BORDER_END_BIAS_DOTS
   } else {
@@ -74704,12 +79323,15 @@ fn push_word_table_fine_dashed_vertical_border(
 }
 
 fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border: BorderStyle) {
+  if stroked_border::paint(page, (x1, y1, x2, y2), border) {
+    return;
+  }
   if push_three_d_border_line_items(&mut page.items, (x1, y1, x2, y2), border) {
     return;
   }
   if border.compound {
     let (negative_width, gap_width, positive_width) = match border.compound_pattern {
-      BorderCompoundPattern::Equal => (
+      BorderCompoundPattern::Equal | BorderCompoundPattern::Double => (
         border.width_pt / 3.0,
         border.width_pt / 3.0,
         border.width_pt / 3.0,
@@ -75145,6 +79767,7 @@ mod tests {
           paragraph_anchor_top: 72.0,
           preseeded_backward_wrap: None,
           body_drawings: None,
+          pictures: None,
         },
         false,
         &mut metrics,
@@ -75762,6 +80385,7 @@ mod tests {
             paragraph_anchor_top: 300.0,
             preseeded_backward_wrap: frozen,
             body_drawings: None,
+            pictures: None,
           },
           false,
           &mut metrics,
@@ -76215,7 +80839,7 @@ mod tests {
       available_line_segments_for_y(0.0, 200.0, 65.0, 10.0, &bands),
       vec![(0.0, 30.0), (170.0, 200.0)]
     );
-    let translated = wrap_exclusions_at_baseline(&bands, 14.0, false);
+    let translated = wrap_exclusions_at_baseline(&bands, 14.0, 14.0, false);
     assert_eq!(
       available_line_segments_for_y(0.0, 200.0, 79.0, 10.0, &translated),
       vec![(0.0, 30.0), (170.0, 200.0)]
@@ -76384,23 +81008,35 @@ mod tests {
           < 0.05
       );
       if size == 12.0 {
-        // Native table-indent resolves its logical-start mark through the
-        // East Asian slot. The taller DEFAULT_CHARSET Latin record must not
-        // override that owner, even in an otherwise empty paragraph.
-        paragraph.base_style.east_asia_font_family = Some("Noto Serif CJK SC".into());
+        // Independent native start/left controls with NSimSun, YaHei,
+        // Noto Serif CJK SC and Arial in the East Asian slot retain the
+        // same Latin mark. The old table-indent value was within rounding
+        // distance of this height and did not establish East Asian ownership.
         paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Start;
         paragraph.format.justification.logical_start = true;
-        let mark_height = word_paragraph_mark_single_line_height(
-          &paragraph,
-          15,
-          TextSegmentation::Body,
-          false,
-          0,
-          PageSetup::default(),
-          &mut metrics,
-        )
-        .expect("East Asian paragraph-mark owner");
-        assert!((mark_height - 17.244).abs() < 0.001, "{mark_height}");
+        for family in ["NSimSun", "Microsoft YaHei", "Noto Serif CJK SC", "Arial"] {
+          paragraph.base_style.east_asia_font_family = Some(family.into());
+          for (charset, expected) in [
+            (FontCharset::Other(1), mark_step),
+            (FontCharset::Ansi, physical_step),
+          ] {
+            paragraph.base_style.font_charset = Some(charset);
+            let mark_height = word_paragraph_mark_single_line_height(
+              &paragraph,
+              15,
+              TextSegmentation::Body,
+              false,
+              0,
+              PageSetup::default(),
+              &mut metrics,
+            )
+            .unwrap_or_else(|| inline_text_height(&paragraph.base_style, &mut metrics));
+            assert!(
+              (mark_height - expected).abs() < 0.05,
+              "{family}/{charset:?}: {mark_height}"
+            );
+          }
+        }
         paragraph.base_style = style.clone();
         *paragraph.format = ParagraphFormat::default();
       }
@@ -76778,6 +81414,89 @@ mod tests {
       assert!(items.iter().any(|item| matches!(item, PageItem::Path(path)
         if (path.bounds.size.width.0 - side).abs() < 0.01 && (path.bounds.size.height.0 - side).abs() < 0.01)),
         "manual label must retain the native automatic plot: {side}");
+    }
+  }
+
+  #[test]
+  fn authored_pie_frame_preserves_paint_and_measured_word_legend() {
+    use ooxmlsdk::sdk::SdkType;
+
+    // Native Word controls vary only frame paint, legend position and Arial
+    // size. Paint does not change the plot; right legend rows use realized
+    // text metrics, whereas bottom legends retain one horizontal row.
+    let mut metrics = TextMetrics::new();
+    for (size, row_step) in [(8, 14.8456), (10, 17.0632), (14, 21.4836)] {
+      for position in ["r", "b"] {
+        for stroke in [false, true] {
+          let line = if stroke {
+            r#"<a:ln w="25400"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:ln>"#
+          } else {
+            "<a:ln><a:noFill/></a:ln>"
+          };
+          let xml = format!(
+            r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:pieChart><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:strLit><c:ptCount val="4"/><c:pt idx="0"><c:v>One</c:v></c:pt><c:pt idx="1"><c:v>Two</c:v></c:pt><c:pt idx="2"><c:v>Three</c:v></c:pt><c:pt idx="3"><c:v>Four</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:ptCount val="4"/><c:pt idx="0"><c:v>1</c:v></c:pt><c:pt idx="1"><c:v>2</c:v></c:pt><c:pt idx="2"><c:v>3</c:v></c:pt><c:pt idx="3"><c:v>4</c:v></c:pt></c:numLit></c:val></c:ser></c:pieChart><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:plotArea><c:legend><c:legendPos val="{position}"/><c:overlay val="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="{}" spc="-1"><a:latin typeface="Arial"/></a:defRPr></a:pPr></a:p></c:txPr></c:legend></c:chart><c:spPr><a:noFill/>{line}</c:spPr></c:chartSpace>"#,
+            size * 100
+          );
+          let chart_space = c::ChartSpace::from_bytes(xml.as_bytes()).expect("styled pie");
+          let mut shapes = crate::docx::chart_space_shapes(
+            &chart_space,
+            None,
+            304.45,
+            171.2,
+            crate::docx::ImagePlacement::Inline,
+            crate::docx::DrawingEffectExtent::default(),
+            &crate::docx::StylesCatalog::default(),
+          )
+          .expect("chart host");
+          let chart = shapes.remove(0).chart.expect("pie model");
+          let items =
+            lower_inline_chart_contents(&chart, 10.0, 20.0, 304.45, 171.2, 200.0, &mut metrics);
+          assert!(!items.iter().any(|item| matches!(item, PageItem::Rect(rect)
+            if rect.stroke.is_some() && rect.width_pt == 304.45)));
+          let frame = items.iter().find_map(|item| match item {
+            PageItem::Path(path) if path.bounds == common_rect(10.0, 20.0, 304.45, 171.2) => {
+              Some(path)
+            }
+            _ => None,
+          });
+          if stroke {
+            let frame = frame.expect("authored chart frame");
+            let line = frame.stroke.as_ref().expect("authored outline");
+            assert_eq!(line.width, common::Pt(2.0));
+            assert_eq!(
+              line.color,
+              common::Color {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 255
+              }
+            );
+          } else {
+            assert!(frame.is_none(), "explicit noFill must not paint a frame");
+          }
+          let labels = items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text)
+                if ["One", "Two", "Three", "Four"].contains(&text.text.as_str()) =>
+              {
+                Some(text)
+              }
+              _ => None,
+            })
+            .collect::<Vec<_>>();
+          assert_eq!(labels.len(), 4);
+          for pair in labels.windows(2) {
+            let expected = if position == "r" { row_step } else { 0.0 };
+            assert!(
+              (pair[1].y_pt - pair[0].y_pt - expected).abs() < 0.03,
+              "{size}/{position}/{stroke}: legend row step {} versus {expected}",
+              pair[1].y_pt - pair[0].y_pt
+            );
+          }
+        }
+      }
     }
   }
 
@@ -77239,6 +81958,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "TbmgTbmg".to_string(),
       style: TextStyle {
@@ -77984,6 +82704,57 @@ mod tests {
         actual, expected,
         "matrix={matrix}, offset={offset}, enabled={enabled}"
       );
+    }
+  }
+
+  #[test]
+  fn vml_single_shadow_keeps_the_native_page_vector_after_text_rotation() {
+    // Native WordArt contrasts keep (2,2) and (4,1) in page coordinates at
+    // zero, quarter and arbitrary turns; a perspective map has its own owner.
+    let mut metrics = TextMetrics::new();
+    for rotation in [0.0_f32, 90.0, 270.0, 45.0, -31.153_427] {
+      for (dx, dy) in [(2.0, 2.0), (4.0, 1.0)] {
+        let mut shape = curved_vml_wordart_test_shape(
+          "SHADOW",
+          &format!(r#"<v:shadow on="t" offset="{dx}pt,{dy}pt"/>"#),
+        );
+        shape.rotation_deg = rotation;
+        let Block::Paragraph(paragraph) = &shape.text_box_blocks[0] else {
+          unreachable!()
+        };
+        let mut text = text_warp_bounds_test_item(11.0);
+        text.text = "SHADOW".to_string();
+        text.style = paragraph.base_style.clone();
+        let mut items = vec![PageItem::Text(Box::new(text))];
+        apply_shape_text_warp(
+          &mut items,
+          &shape,
+          ShapeTextBoxRect {
+            x: 36.0,
+            y: 200.0,
+            width: shape.width_pt,
+            height: shape.height_pt,
+          },
+          &mut metrics,
+        );
+        let PageItem::Text(text) = &items[0] else {
+          unreachable!()
+        };
+        let shadow = text
+          .style
+          .pdf_glyph_outline_options
+          .as_ref()
+          .unwrap()
+          .vml_text_shadow
+          .unwrap();
+        let local = kurbo::Point::new(
+          f64::from(shadow.transform.dx.0),
+          f64::from(shadow.transform.dy.0),
+        );
+        let actual = Affine::rotate(f64::from(rotation.to_radians())) * local;
+        assert!((actual.x - dx).abs() < 0.0001);
+        assert!((actual.y - dy).abs() < 0.0001);
+      }
     }
   }
 
@@ -78949,7 +83720,7 @@ mod tests {
       172.9,
       Some(166.12),
       None,
-      RelativeShapeEffectFrame::PerAxis,
+      ShapeEffectFrame::PerAxis,
       [7.5, 7.5, 12.4, 62.65],
     );
 
@@ -78959,8 +83730,8 @@ mod tests {
     assert_eq!(metrics.content_offset_y_pt, 0.0);
     assert!((metrics.content_width_pt - 146.22).abs() < 0.001);
     assert!((metrics.content_height_pt - 172.9).abs() < 0.001);
-    assert!(metrics.uses_relative_effect_frame_x);
-    assert!(!metrics.uses_relative_effect_frame_y);
+    assert!(metrics.uses_effect_frame_x);
+    assert!(!metrics.uses_effect_frame_y);
   }
 
   #[test]
@@ -78970,7 +83741,7 @@ mod tests {
       172.85,
       None,
       Some(209.35),
-      RelativeShapeEffectFrame::PerAxis,
+      ShapeEffectFrame::PerAxis,
       [7.5, 7.5, 12.4, 62.65],
     );
 
@@ -78980,8 +83751,8 @@ mod tests {
     assert!((metrics.frame_height_pt - 209.35).abs() < 0.001);
     assert!((metrics.content_height_pt - 139.2).abs() < 0.001);
     assert!((metrics.content_offset_y_pt - 7.5).abs() < 0.001);
-    assert!(!metrics.uses_relative_effect_frame_x);
-    assert!(metrics.uses_relative_effect_frame_y);
+    assert!(!metrics.uses_effect_frame_x);
+    assert!(metrics.uses_effect_frame_y);
   }
 
   #[test]
@@ -78991,7 +83762,7 @@ mod tests {
       172.85,
       Some(166.12),
       Some(209.35),
-      RelativeShapeEffectFrame::PerAxis,
+      ShapeEffectFrame::PerAxis,
       [7.5, 7.5, 12.4, 62.65],
     );
 
@@ -79001,7 +83772,7 @@ mod tests {
     assert!((metrics.frame_height_pt - 209.35).abs() < 0.001);
     assert!((metrics.content_height_pt - 139.2).abs() < 0.001);
     assert!((metrics.content_offset_y_pt - 7.5).abs() < 0.001);
-    assert!(metrics.uses_relative_effect_frame_x && metrics.uses_relative_effect_frame_y);
+    assert!(metrics.uses_effect_frame_x && metrics.uses_effect_frame_y);
   }
 
   fn wordprocessing_test_textbox_shape(rotation_units: i32) -> InlineShape {
@@ -79345,6 +84116,423 @@ mod tests {
         .unwrap()
         .clip_text_to_frame
     );
+  }
+
+  #[test]
+  fn rotated_group_collapsed_area_preserves_native_font_cells_and_clip() {
+    // Configured Word source controls: three quarter turns, independent
+    // before-space, and 6/9/18pt fonts. Horizontal exhausted areas omit text;
+    // rotated printer-cell overlap retains9pt before0/1/2 and18pt before4,
+    // but rejects9pt before3/4/10 and6pt before2. No layout-height constant.
+    let mut flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    flow.compatibility_mode = 15;
+    let mut metrics = TextMetrics::new();
+    for rotation in [0, 5_400_000, 10_800_000, 16_200_000] {
+      for (size, before, retained) in [
+        (9.0, 0.0, true),
+        (9.0, 1.0, true),
+        (9.0, 2.0, true),
+        (9.0, 3.0, false),
+        (9.0, 4.0, false),
+        (9.0, 10.0, false),
+        (6.0, 2.0, false),
+        (18.0, 4.0, true),
+      ] {
+        let mut shape = wordprocessing_test_textbox_shape(rotation);
+        shape.text_vertical_alignment = TextBoxVerticalAlignment::Center;
+        shape.text_inset_left_pt = 7.58661;
+        shape.text_inset_right_pt = 7.58661;
+        shape.text_inset_top_pt = 19.208662;
+        shape.text_inset_bottom_pt = 19.208662;
+        let Block::Paragraph(paragraph) = &mut shape.text_box_blocks[0] else {
+          panic!("text story")
+        };
+        paragraph.format.wordprocessing_group_shape_story = true;
+        paragraph.format.spacing_before_pt = before;
+        paragraph.format.spacing_after_pt = 0.0;
+        paragraph.format.line_height_rule = LineHeightRule::Auto;
+        paragraph.format.line_height_pt = Some(1.0);
+        let style = TextStyle {
+          font_family: Some(Arc::from("Calibri")),
+          font_size_pt: size,
+          bold: true,
+          use_windows_font_metrics: true,
+          wordprocessingml_font_slots: true,
+          ..TextStyle::default()
+        };
+        paragraph.base_style = style.clone();
+        for inline in &mut paragraph.inlines {
+          if let InlineItem::Text(run) = inline {
+            run.text = "AAAA".into();
+            run.style = style.clone();
+          }
+        }
+        let mut page = empty_page(flow.setup, 0);
+        layout_shape_text_box(
+          &mut page,
+          flow,
+          &mut metrics,
+          &shape,
+          ShapeTextBoxRect {
+            x: 214.38696,
+            y: 63.37835,
+            width: 133.93701,
+            height: 18.651968,
+          },
+        );
+        let text = page
+          .items
+          .iter()
+          .filter_map(|item| {
+            if let PageItem::Text(text) = item {
+              Some(text)
+            } else {
+              None
+            }
+          })
+          .collect::<Vec<_>>();
+        let expected = retained && rotation != 0;
+        assert_eq!(
+          !text.is_empty(),
+          expected,
+          "rotation{rotation} size{size} before{before}"
+        );
+        if expected {
+          assert_eq!(
+            text
+              .iter()
+              .map(|text| text.text.as_str())
+              .collect::<String>(),
+            "AAAA"
+          );
+          for text in text {
+            let clip = text.paint_clip.expect("native printer region");
+            assert!((clip.size.width.0.min(clip.size.height.0) - 0.12).abs() < 0.0001);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn cell_capture_does_not_collapse_wordprocessing_group_child_offsets() {
+    let shape = wordprocessing_test_textbox_shape(0);
+    let mut placement = wordprocessing_test_relative_shape_placement();
+    placement.relative_width_to = None;
+    placement.relative_width_pct = None;
+    placement.wrap = ImageWrapMode::Square;
+    placement.layout_in_cell = true;
+    placement.alignment_extent = Some(crate::docx::FloatingAlignmentExtent {
+      width_pt: 200.0,
+      height_pt: 100.0,
+      relative_width_to: None,
+      relative_width_pct: None,
+      relative_height_to: None,
+      relative_height_pct: None,
+    });
+    let cell = FrameBounds {
+      x_pt: 50.0,
+      y_pt: 60.0,
+      width_pt: 150.0,
+      height_pt: 100.0,
+    };
+    let flow = FlowContext {
+      text_segmentation: TextSegmentation::TableCell,
+      horizontal_table_cell: true,
+      compatibility_mode: 15,
+      content_left_pt: 55.0,
+      content_width: 140.0,
+      layout_cell_bounds: Some(cell),
+      layout_cell_inner_bounds: Some(cell),
+      layout_cell_print_bounds: Some(cell),
+      ..flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      )
+    };
+    let mut positions = Vec::new();
+    for offset in [200.0, 240.0] {
+      placement.group_child_offset_x_pt = offset;
+      positions.push(floating_shape_position(
+        &shape,
+        placement,
+        flow,
+        ParagraphIndents::default(),
+        55.0,
+        60.0,
+        (100.0, 50.0),
+      ));
+    }
+    assert!((positions[1].0 - positions[0].0 - 40.0).abs() < 0.001);
+    assert_eq!(positions[1].1, positions[0].1);
+  }
+
+  #[test]
+  fn snap_to_chars_centers_a_latin_block_across_formatting_runs() {
+    let shape = wordprocessing_test_textbox_shape(0);
+    let Block::Paragraph(template) = &shape.text_box_blocks[0] else {
+      unreachable!()
+    };
+    let InlineItem::Text(run) = &template.inlines[0] else {
+      unreachable!()
+    };
+    let mut run = run.clone();
+    run.style.font_family = Some(Arc::from("Noto Sans"));
+    run.style.high_ansi_font_family = Some(Arc::from("Noto Sans"));
+    run.style.font_size_pt = 10.5;
+    run.style.bold = false;
+    run.style.kerning_minimum_size_pt = Some(1.0);
+    run.style.use_windows_font_metrics = true;
+    run.style.wordprocessingml_font_slots = true;
+    let source = "Genko Yoshi (Manuscript paper) Sample File";
+    let mut metrics = TextMetrics::new();
+    for (snap_type, snap_paragraph) in [(true, true), (false, true), (true, false)] {
+      for split in [false, true] {
+        let mut paragraph = template.as_ref().clone();
+        paragraph.format.wordprocessing_shape_story = false;
+        paragraph.format.word_text_frame_story = false;
+        paragraph.format.alignment = ParagraphAlignment::Left;
+        paragraph.format.justification = Default::default();
+        paragraph.format.line_height_rule = LineHeightRule::Auto;
+        paragraph.format.line_height_pt = None;
+        paragraph.format.snap_to_grid = Some(snap_paragraph);
+        paragraph.base_style = run.style.clone();
+        paragraph.inlines = if split {
+          vec![&source[..1], &source[1..]]
+        } else {
+          vec![source]
+        }
+        .into_iter()
+        .map(|text| {
+          InlineItem::Text(TextRun {
+            text: text.into(),
+            ..run.clone()
+          })
+        })
+        .collect();
+        let block = Block::paragraph(paragraph);
+        for left in [20.0, 83.0] {
+          let mut flow = flow_context(
+            PageSetup {
+              doc_grid_line_pitch_pt: Some(33.55),
+              doc_grid_character_spacing_pt: Some(12.064_958),
+              doc_grid_snap_to_chars: snap_type,
+              ..PageSetup::default()
+            },
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            DEFAULT_TAB_STOP_PT,
+          );
+          flow.content_left_pt = left;
+          flow.content_width = 450.0;
+          let mut page = empty_page(flow.setup, 0);
+          let mut pages = Vec::new();
+          layout_document_block(
+            BlockNeighbors::for_index(std::slice::from_ref(&block), 0),
+            &block,
+            flow,
+            LayoutBlockTarget {
+              current: &mut page,
+              pages: &mut pages,
+              anchor_pages: None,
+              text_metrics: &mut metrics,
+              paragraph_decoration_outer_bottom_pt: None,
+            },
+            72.0,
+          );
+          let text = page
+            .items
+            .iter()
+            .find_map(|item| match item {
+              PageItem::Text(text) => Some(text),
+              _ => None,
+            })
+            .unwrap();
+          if snap_type && snap_paragraph {
+            // Saved Office and independent hint/split controls: 4.80pt
+            // leading allocation for this complete Latin block.
+            assert!(
+              (text.x_pt - left - 4.8).abs() < 0.12,
+              "{}",
+              text.x_pt - left
+            );
+            assert!(text.origin_is_baseline);
+            assert!(text.style.semantic_character_advances_pt.is_some());
+          } else {
+            assert!((text.x_pt - left).abs() < LAYOUT_EPSILON_PT);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn repeating_story_textbox_does_not_inherit_the_body_grid() {
+    let mut shape = wordprocessing_test_textbox_shape(0);
+    let Block::Paragraph(paragraph) = &mut shape.text_box_blocks[0] else {
+      unreachable!();
+    };
+    paragraph.format.line_height_rule = LineHeightRule::Auto;
+    paragraph.format.line_height_pt = Some(1.0);
+    paragraph.format.spacing_after_pt = 0.0;
+    paragraph.format.spacing_after_auto = Some(false);
+    shape.text_box_blocks.push(shape.text_box_blocks[0].clone());
+    let base = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let mut metrics = TextMetrics::new();
+    for segmentation in [
+      TextSegmentation::Body,
+      TextSegmentation::RepeatingSlot,
+      TextSegmentation::FooterSlot,
+      TextSegmentation::TableCell,
+    ] {
+      let mut observations = Vec::new();
+      for grid in [false, true] {
+        let flow = FlowContext {
+          setup: PageSetup {
+            doc_grid_line_pitch_pt: grid.then_some(33.55),
+            table_cell_doc_grid_line_pitch_pt: grid.then_some(33.55),
+            doc_grid_character_spacing_pt: grid.then_some(12.0),
+            ..base.setup
+          },
+          text_segmentation: segmentation,
+          table_cell_in_header_footer: segmentation == TextSegmentation::TableCell,
+          ..base
+        };
+        let height = shape_text_box_measured_content_height(flow, &shape, 160.0, &mut metrics);
+        let mut page = empty_page(flow.setup, 0);
+        layout_shape_text_box(
+          &mut page,
+          flow,
+          &mut metrics,
+          &shape,
+          ShapeTextBoxRect {
+            x: 40.0,
+            y: 100.0,
+            width: 180.0,
+            height: 90.0,
+          },
+        );
+        let origins = page
+          .items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) => Some((text.x_pt, text.y_pt, text.line_height_pt)),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(origins.len(), 2);
+        observations.push((height, origins));
+      }
+      if segmentation == TextSegmentation::Body {
+        assert!(observations[1].0 > observations[0].0 + 10.0);
+      } else {
+        assert_eq!(observations[0], observations[1], "{segmentation:?}");
+      }
+    }
+  }
+
+  #[test]
+  fn wordprocessing_cell_textbox_keeps_its_private_baseline() {
+    let mut shape = wordprocessing_test_textbox_shape(0);
+    let mut placement = wordprocessing_test_relative_shape_placement();
+    placement.relative_width_to = None;
+    placement.relative_width_pct = None;
+    shape.placement = crate::docx::ImagePlacement::Floating(placement);
+    let Block::Paragraph(paragraph) = &mut shape.text_box_blocks[0] else {
+      panic!("ordinary WPS paragraph");
+    };
+    paragraph.format.line_height_rule = LineHeightRule::Auto;
+    paragraph.format.line_height_pt = Some(1.0);
+    let base_flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    for alignment in [
+      TextBoxVerticalAlignment::Top,
+      TextBoxVerticalAlignment::Center,
+    ] {
+      shape.text_vertical_alignment = alignment;
+      let mut reference = None;
+      let mut metrics = TextMetrics::new();
+      for (in_cell, multiplier) in [
+        (false, None),
+        (false, Some(1.0)),
+        (true, None),
+        (true, Some(1.0)),
+      ] {
+        let Block::Paragraph(paragraph) = &mut shape.text_box_blocks[0] else {
+          unreachable!();
+        };
+        paragraph.format.line_height_pt = multiplier;
+        for top in [80.0, 110.0] {
+          let flow = FlowContext {
+            text_segmentation: if in_cell {
+              TextSegmentation::TableCell
+            } else {
+              TextSegmentation::Body
+            },
+            horizontal_table_cell: in_cell,
+            layout_cell_bounds: in_cell.then_some(FrameBounds {
+              x_pt: 50.0,
+              y_pt: 60.0,
+              width_pt: 150.0,
+              height_pt: 180.0,
+            }),
+            ..base_flow
+          };
+          let mut page = empty_page(flow.setup, 0);
+          layout_shape_text_box(
+            &mut page,
+            flow,
+            &mut metrics,
+            &shape,
+            ShapeTextBoxRect {
+              x: 60.0,
+              y: top,
+              width: 100.0,
+              height: 100.0,
+            },
+          );
+          let text = page
+            .items
+            .iter()
+            .find_map(|item| match item {
+              PageItem::Text(text) => Some(text),
+              _ => None,
+            })
+            .expect("private textbox text");
+          assert!(text.origin_is_baseline, "in_cell={in_cell}");
+          let baseline_offset = text.y_pt - top;
+          let expected = *reference.get_or_insert(baseline_offset);
+          assert!((baseline_offset - expected).abs() < 0.12);
+          assert!(baseline_offset > 0.0);
+        }
+      }
+    }
   }
 
   #[test]
@@ -79950,6 +85138,147 @@ mod tests {
       };
       assert_eq!(first.x_pt, 99.8);
       assert!(first.style.semantic_character_advances_pt.is_none());
+    }
+  }
+
+  #[test]
+  fn picture_rectangle_outline_consumes_native_primitive_and_oblique_path_order() {
+    use ooxmlsdk::sdk::SdkType;
+    let properties = a::ShapeProperties::from_bytes(
+      br#"<a:spPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></a:spPr>"#,
+    )
+    .unwrap();
+    for (units, primitive) in [
+      (0, true),
+      (1_980_000, false),
+      (5_400_000, true),
+      (10_800_000, true),
+      (16_200_000, true),
+      (19_620_000, false),
+    ] {
+      for (flip_horizontal, flip_vertical) in
+        [(false, false), (true, false), (false, true), (true, true)]
+      {
+        let mut frame = wordprocessing_test_textbox_shape(units);
+        frame.wordprocessing_shape_host = false;
+        frame.width_pt = 117.75;
+        frame.height_pt = 117.75;
+        frame.flip_horizontal = flip_horizontal;
+        frame.flip_vertical = flip_vertical;
+        frame.stroke = Some(BorderStyle {
+          width_pt: 0.75,
+          dash_pattern: BorderDashPattern::Dashed,
+          ..Default::default()
+        });
+        frame.geometry = crate::docx::drawingml_path_geometry_from_properties(
+          &crate::docx::DrawingMlShapeProperties::Generic(properties.clone()),
+          frame.width_pt,
+          frame.height_pt,
+        )
+        .unwrap();
+        let transform = inline_shape_path_transform(&frame, 30.0, 40.0, 117.75, 117.75);
+        let placement = || DocxPictureFramePlacement {
+          x_pt: 30.0,
+          y_pt: 40.0,
+          width_pt: 117.75,
+          height_pt: 117.75,
+          shape_transform: transform,
+          bounds: common_rect(30.0, 40.0, 117.75, 117.75),
+          picture_clips_image: true,
+        };
+        let mut background = Vec::new();
+        let mut foreground = Vec::new();
+        push_docx_picture_frame_layers(&mut background, &mut foreground, &frame, placement());
+        assert_eq!(foreground.len(), 1);
+        let PageItem::Path(path) = &foreground[0] else {
+          panic!("picture outline path");
+        };
+        let [
+          common::PathCommand::MoveTo(a),
+          common::PathCommand::LineTo(b),
+          common::PathCommand::LineTo(c),
+          common::PathCommand::LineTo(d),
+          common::PathCommand::Close,
+        ] = path.commands.as_slice()
+        else {
+          panic!("picture rectangle contour");
+        };
+        if primitive {
+          assert!(a.x < b.x && a.y > c.y);
+          assert_eq!((a.y, b.x, c.y, d.x), (b.y, c.x, d.y, a.x));
+        } else {
+          for (actual, local) in [(*a, (29.625, 39.625)), (*b, (148.125, 39.625))] {
+            let expected = common::drawingml_geometry::transform_point(
+              common_point(local.0, local.1),
+              transform,
+            );
+            assert!((actual.x.0 - expected.x.0).abs() < 0.0001);
+            assert!((actual.y.0 - expected.y.0).abs() < 0.0001);
+          }
+        }
+        // Authored custom rectangle commands retain their original path
+        // identity. A rectangle-shaped custom contour is not a preset.
+        let InlineShapeGeometry::Path { preset, .. } = &mut frame.geometry else {
+          unreachable!();
+        };
+        *preset = None;
+        foreground.clear();
+        push_docx_picture_frame_layers(&mut background, &mut foreground, &frame, placement());
+        let PageItem::Path(path) = &foreground[0] else {
+          unreachable!();
+        };
+        let common::PathCommand::MoveTo(actual) = path.commands[0] else {
+          unreachable!();
+        };
+        let expected =
+          common::drawingml_geometry::transform_point(common_point(29.625, 158.125), transform);
+        assert_eq!(actual, expected);
+      }
+    }
+  }
+
+  #[test]
+  fn vml_picture_template_outline_retains_native_primitive_start() {
+    for custom in [false, true] {
+      let changes = if custom {
+        vec![(
+          "m@4@5l@4@11@9@11@9@5xe",
+          "m0,0l0,21600,21600,21600,21600,0xe",
+        )]
+      } else {
+        Vec::new()
+      };
+      let image = crate::docx::vml_picture::frame_test_image(0.75, &changes);
+      let frame = image.picture_frame.as_deref().unwrap();
+      let mut background = Vec::new();
+      let mut foreground = Vec::new();
+      push_docx_picture_frame_layers(
+        &mut background,
+        &mut foreground,
+        frame,
+        DocxPictureFramePlacement {
+          x_pt: 157.8,
+          y_pt: 90.6,
+          width_pt: 117.75,
+          height_pt: 117.75,
+          shape_transform: Affine::IDENTITY,
+          bounds: common_rect(157.8, 90.6, 117.75, 117.75),
+          picture_clips_image: false,
+        },
+      );
+      let [PageItem::Path(path)] = foreground.as_slice() else {
+        panic!("single picture outline")
+      };
+      let common::PathCommand::MoveTo(first) = path.commands[0] else {
+        unreachable!()
+      };
+      if custom {
+        assert_eq!(first, common_point(157.8, 90.6));
+      } else {
+        assert!((first.x.0 - 157.32).abs() < 0.01);
+        assert!((first.y.0 - 208.71).abs() < 0.01);
+      }
+      assert_eq!(path.stroke.as_ref().unwrap().width.0, 0.75);
     }
   }
 
@@ -80647,6 +85976,108 @@ mod tests {
         assert_eq!(outline.stroke.as_ref().unwrap().width.0, width);
       }
     }
+  }
+
+  #[test]
+  fn wordprocessing_combined_inner_shadow_preserves_layers_and_reflected_color() {
+    use common::drawingml_image_effects as effects;
+    use ooxmlsdk::sdk::SdkType;
+    fn collect(items: &[PageItem], paths: &mut usize, images: &mut Vec<Vec<u8>>) {
+      for item in items {
+        match item {
+          PageItem::Path(_) => *paths += 1,
+          PageItem::Image(image) => images.push(image.data.to_vec()),
+          PageItem::Group(items) => collect(items, paths, images),
+          _ => panic!("unexpected shape paint"),
+        }
+      }
+    }
+    let resolver = crate::docx::DocxImageEffectColorResolver {
+      theme_colors: &crate::docx::ThemeColors::default(),
+      images: None,
+      chart_images: None,
+      chart_color_map: None,
+      placeholder_color: None,
+      word_group_glow: false,
+      word_shape_fixed_output_outer_shadow: true,
+    };
+    let bounds = common_rect(10.0, 20.0, 30.0, 20.0);
+    let mut outputs = Vec::new();
+    for mask in 0_u32..8 {
+      let inner = if mask & 1 != 0 {
+        r#"<a:innerShdw blurRad="38100" dist="25400" dir="2700000"><a:srgbClr val="FF0000"/></a:innerShdw>"#
+      } else {
+        ""
+      };
+      let glow = if mask & 2 != 0 {
+        r#"<a:glow rad="76200"><a:srgbClr val="00FF00"/></a:glow>"#
+      } else {
+        ""
+      };
+      let reflection = if mask & 4 != 0 {
+        r#"<a:reflection blurRad="6350" stA="100000" endA="100000" sy="-100000" algn="bl" rotWithShape="0"/>"#
+      } else {
+        ""
+      };
+      let list = a::EffectList::from_bytes(format!(
+        r#"<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">{glow}{inner}{reflection}</a:effectLst>"#,
+      ).as_bytes()).unwrap();
+      let resolved = effects::from_effect_list(&list, None, &resolver);
+      let source = common::DrawingEffectSource::List {
+        source: Box::new(list),
+        resolved: Some(resolved),
+      };
+      let host = DocxDrawingEffectHost {
+        effects: Some(&source),
+        static3d: None,
+        wordprocessing_shape_host: true,
+        wordprocessing_diagram_host: false,
+        wordprocessing_shape_effect_pen: None,
+        wordprocessing_preset_rectangle: false,
+        wordprocessing_rectangle_effect_source: None,
+        wordprocessing_canvas_has_background_paint: false,
+        rotation_degrees: 0.0,
+        visual_rotation_degrees: 0.0,
+        placement: crate::docx::ImagePlacement::Floating(
+          wordprocessing_test_relative_shape_placement(),
+        ),
+        fixed_output_base_pixels_per_point: Some(96.0 / units::POINTS_PER_INCH),
+      };
+      let mut items = vec![PageItem::path(common::PathItem {
+        bounds,
+        points: Vec::new(),
+        commands: vec![
+          common::PathCommand::MoveTo(common_point(10.0, 20.0)),
+          common::PathCommand::LineTo(common_point(40.0, 20.0)),
+          common::PathCommand::LineTo(common_point(40.0, 40.0)),
+          common::PathCommand::LineTo(common_point(10.0, 40.0)),
+          common::PathCommand::Close,
+        ],
+        closed: true,
+        fill: common::Fill::Solid(common_rgb(RgbColor { r: 0, g: 0, b: 255 }, 1.0)),
+        stroke: Some(common::Stroke {
+          width: common::Pt(2.0),
+          color: common_rgb(RgbColor { r: 0, g: 0, b: 0 }, 1.0),
+          ..Default::default()
+        }),
+      })];
+      finish_docx_drawing_effects(&mut items, 0, host, bounds);
+      let (mut paths, mut images) = (0, Vec::new());
+      collect(&items, &mut paths, &mut images);
+      assert_eq!(paths, if mask & 1 != 0 { 2 } else { 1 }, "mask={mask}");
+      assert_eq!(images.len(), mask.count_ones() as usize, "mask={mask}");
+      outputs.push(images);
+    }
+    // Native subsets have identical visible glow and inner-shadow resources.
+    for mask in [3_usize, 5, 7] {
+      assert_eq!(outputs[mask].last(), outputs[1].last());
+    }
+    for mask in [3_usize, 6, 7] {
+      assert_eq!(outputs[mask][usize::from(mask & 4 != 0)], outputs[2][0]);
+    }
+    // Reflection retains the inner shadow's color, unlike an alpha-only input.
+    assert_ne!(outputs[5][0], outputs[4][0]);
+    assert_ne!(outputs[7][0], outputs[6][0]);
   }
 
   #[test]
@@ -81475,6 +86906,14 @@ mod tests {
   fn centered_wordprocessing_shape_aligns_its_effect_enclosure() {
     let mut shape = wordprocessing_test_textbox_shape(0);
     let mut placement = wordprocessing_test_relative_shape_placement();
+    let flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      36.0,
+    );
     placement.horizontal_alignment = Some(HorizontalImageAlignment::Center);
     placement.relative_width_to = None;
     placement.relative_width_pct = None;
@@ -81487,7 +86926,7 @@ mod tests {
       shape.effect_left_pt = left;
       shape.effect_right_pt = right;
       assert_eq!(
-        adjusted_floating_shape_x(placement, &shape, 123.0),
+        adjusted_floating_shape_x(placement, &shape, 123.0, flow),
         expected
       );
       let explicit_offset = FloatingImagePlacement {
@@ -81495,7 +86934,7 @@ mod tests {
         ..placement
       };
       assert_eq!(
-        adjusted_floating_shape_x(explicit_offset, &shape, 123.0),
+        adjusted_floating_shape_x(explicit_offset, &shape, 123.0, flow),
         123.0
       );
     }
@@ -81510,7 +86949,209 @@ mod tests {
     shape.effect_top_pt = 7.5;
     shape.effect_right_pt = 12.4;
     shape.effect_bottom_pt = 62.65;
-    let placement = wordprocessing_test_relative_shape_placement();
+    let mut placement = wordprocessing_test_relative_shape_placement();
+    let mut flow = flow_context(
+      PageSetup {
+        width_pt: 612.0,
+        ..PageSetup::default()
+      },
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    for wrap in [
+      ImageWrapMode::None,
+      ImageWrapMode::Square,
+      ImageWrapMode::TopBottom,
+      ImageWrapMode::Tight,
+      ImageWrapMode::Through,
+    ] {
+      placement.wrap = wrap;
+      flow.compatibility_mode = 14;
+      let legacy = floating_shape_metrics(&shape, placement, flow);
+      assert!((legacy.content_offset_y_pt - 7.5).abs() < 0.001);
+      assert!((legacy.frame_height_pt - 243.0).abs() < 0.001);
+      flow.compatibility_mode = 15;
+      let modern = floating_shape_metrics(&shape, placement, flow);
+      assert_eq!(modern.content_offset_y_pt, 0.0);
+      assert_eq!(modern.frame_height_pt, shape.height_pt);
+      assert_eq!(modern.content_width_pt, legacy.content_width_pt);
+      assert_eq!(modern.content_offset_x_pt, legacy.content_offset_x_pt);
+      assert!((modern.content_width_pt - (187.2 - 7.5 - 12.4)).abs() < 0.001);
+    }
+    placement.wrap = ImageWrapMode::Square;
+    shape.wordprocessing_shape_host = false;
+    let legacy_shape = floating_shape_metrics(&shape, placement, flow);
+    assert_eq!(legacy_shape.content_offset_y_pt, 7.5);
+  }
+
+  #[test]
+  fn wordprocessing_relative_shape_size_uses_integral_document_twips() {
+    assert_eq!(
+      wordprocessing_relative_shape_extent(415.3, 0.4),
+      Some(166.1)
+    );
+    assert_eq!(
+      wordprocessing_relative_shape_extent(697.9, 0.3),
+      Some(209.35)
+    );
+    assert_eq!(
+      wordprocessing_relative_shape_extent(451.3, 0.4),
+      Some(180.5)
+    );
+    // Source integer percentages still preserve a complete twip at a boundary.
+    assert_eq!(
+      wordprocessing_relative_shape_extent(400.0, 0.4),
+      Some(160.0)
+    );
+    assert_eq!(wordprocessing_relative_shape_extent(70.85, 0.8), Some(56.7));
+    for percent in [0.7995, 0.79999] {
+      assert_eq!(
+        wordprocessing_relative_shape_extent(70.85, percent),
+        Some(56.6)
+      );
+    }
+    for percent in [0.8002, 0.8005, 0.80099] {
+      assert_eq!(
+        wordprocessing_relative_shape_extent(70.85, percent),
+        Some(56.7)
+      );
+    }
+    assert_eq!(
+      wordprocessing_relative_shape_extent(72.1, 0.25),
+      Some(18.05)
+    );
+    assert_eq!(wordprocessing_relative_shape_extent(72.3, 0.25), Some(18.1));
+    for percent in [0.0, 0.00001, 0.00099] {
+      assert_eq!(wordprocessing_relative_shape_extent(70.85, percent), None);
+    }
+  }
+
+  #[test]
+  fn wordprocessing_effect_physical_mapping_preserves_crop_and_axis_ownership() {
+    let display = common_rect(12.25, 30.5, 41.7, 23.1);
+    let target = common::drawingml_image_effects::EffectBitmapTarget {
+      left_px: 3,
+      top_px: 5,
+      width_px: 29,
+      height_px: 15,
+    };
+    let mapping = wordprocessing_shape_physical_effect_mapping(display, [35, 24], target).unwrap();
+    assert_eq!((mapping.width_px, mapping.height_px), (35, 24));
+    for (point, expected) in [
+      ([12.25, 30.5], [3.0, 5.0]),
+      ([12.25 + 41.7, 30.5 + 23.1], [32.0, 20.0]),
+    ] {
+      assert!((point[0] * mapping.scale_x + mapping.translate_x - expected[0]).abs() < 0.0001);
+      assert!((point[1] * mapping.scale_y + mapping.translate_y - expected[1]).abs() < 0.0001);
+    }
+    assert_ne!(mapping.scale_x, mapping.scale_y);
+    assert!(wordprocessing_shape_physical_effect_mapping(display, [31, 24], target).is_none());
+    assert!(wordprocessing_shape_physical_effect_mapping(display, [35, 19], target).is_none());
+  }
+
+  #[test]
+  fn wordprocessing_solid_effect_pens_use_the_completed_physical_frame() {
+    let source = common::DrawingMlDeviceStroke {
+      width_emu: 25_400,
+      emu_to_points: [1.0 / 12_700.0, 0.0, 0.0, 1.0 / 12_700.0],
+      snap: true,
+      realized_width_emu: None,
+    };
+    // Actual GFX width-helper input/output pairs: shadow, glow and soft edge.
+    // The two antialiased axes retain independently rounded bitmap extents.
+    for (physical, bitmap, native) in [
+      ([123.36, 121.68], [82, 81], 1.504_390_2),
+      ([131.52, 129.84], [88, 87], 1.494_545_5),
+      ([115.2, 113.52], [154, 151], 2.244_155_8),
+    ] {
+      let width =
+        wordprocessing_shape_physical_effect_pen_width(&source, physical, bitmap).unwrap();
+      assert!((f64::from(width) - native).abs() < 0.000_001);
+    }
+  }
+
+  #[test]
+  fn wordprocessing_soft_edge_keeps_complete_paint_and_native_bitmap_extent() {
+    use common::drawingml_image_effects::{
+      ImageEffect, ImageEffectContainer, ImageEffectContainerKind,
+    };
+    // Native outline/radius controls keep the same physical range at both
+    // output densities, but independently allocate nearest-pixel extents.
+    for (width, expected, screen, print) in [
+      (0.0, [113.04, 195.84, 113.28, 111.6], (151, 149), (315, 310)),
+      (2.0, [112.08, 194.88, 115.2, 113.52], (154, 151), (320, 315)),
+      (4.0, [111.0, 193.92, 117.24, 115.56], (156, 154), (326, 321)),
+    ] {
+      for radius in [5.0, 10.0] {
+        for dpi in [96.0, 200.0] {
+          let mut shape = wordprocessing_test_textbox_shape(0);
+          shape.effects = Some(common::DrawingEffectSource::List {
+            source: Box::default(),
+            resolved: Some(ImageEffectContainer {
+              kind: ImageEffectContainerKind::Sibling,
+              effects: vec![ImageEffect::Container(ImageEffectContainer {
+                kind: ImageEffectContainerKind::Tree,
+                effects: vec![ImageEffect::SoftEdge(radius * 96.0 / 72.0)],
+              })],
+            }),
+          });
+          let bounds = common_rect(113.15, 196.017_58, 113.0, 111.3);
+          let mut items = vec![PageItem::path(common::PathItem {
+            bounds,
+            points: Vec::new(),
+            commands: vec![
+              common::PathCommand::MoveTo(common_point(113.15, 196.017_58)),
+              common::PathCommand::LineTo(common_point(226.15, 196.017_58)),
+              common::PathCommand::LineTo(common_point(226.15, 307.317_57)),
+              common::PathCommand::LineTo(common_point(113.15, 307.317_57)),
+              common::PathCommand::Close,
+            ],
+            closed: true,
+            fill: common::Fill::Solid(common_rgb(RgbColor { r: 0, g: 0, b: 255 }, 1.0)),
+            stroke: (width > 0.0).then_some(common::Stroke {
+              width: common::Pt(width),
+              color: common_rgb(RgbColor { r: 0, g: 0, b: 0 }, 1.0),
+              ..Default::default()
+            }),
+          })];
+          finish_docx_shape_effects(&mut items, 0, &shape, bounds, dpi);
+          let [PageItem::Image(bitmap)] = items.as_slice() else {
+            panic!("standalone soft edge must retain the filtered source");
+          };
+          for (actual, expected) in [bitmap.x_pt, bitmap.y_pt, bitmap.width_pt, bitmap.height_pt]
+            .into_iter()
+            .zip(expected)
+          {
+            assert!((actual - expected).abs() < 0.0001, "{actual} vs {expected}");
+          }
+          let image = image::load_from_memory(&bitmap.data).unwrap().to_rgba8();
+          assert_eq!(image.dimensions(), if dpi == 96.0 { screen } else { print });
+          assert_eq!(
+            image.get_pixel(image.width() / 2, image.height() / 2).0,
+            [0, 0, 255, 255]
+          );
+          assert_eq!(image.get_pixel(0, 0).0[3], 0);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn wordprocessing_effect_printer_origin_requires_a_textbox_story() {
+    use ooxmlsdk::sdk::SdkType;
+    let list = a::EffectList::from_bytes(br#"<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:outerShdw blurRad="50800" dist="38100" dir="2700000"><a:srgbClr val="000000"/></a:outerShdw></a:effectLst>"#).unwrap();
+    let resolver = crate::docx::DocxImageEffectColorResolver {
+      theme_colors: &crate::docx::ThemeColors::default(),
+      images: None,
+      chart_images: None,
+      chart_color_map: None,
+      placeholder_color: None,
+      word_group_glow: false,
+      word_shape_fixed_output_outer_shadow: true,
+    };
     let mut flow = flow_context(
       PageSetup::default(),
       0,
@@ -81520,27 +87161,47 @@ mod tests {
       DEFAULT_TAB_STOP_PT,
     );
     flow.compatibility_mode = 14;
-    let legacy = floating_shape_metrics(&shape, placement, flow);
-    assert!((legacy.content_offset_y_pt - 7.5).abs() < 0.001);
-    assert!((legacy.frame_height_pt - 243.0).abs() < 0.001);
-    flow.compatibility_mode = 15;
-    let modern = floating_shape_metrics(&shape, placement, flow);
-    assert_eq!(modern.content_offset_y_pt, 0.0);
-    assert_eq!(modern.frame_height_pt, shape.height_pt);
-    assert_eq!(modern.content_width_pt, legacy.content_width_pt);
-    assert_eq!(modern.content_offset_x_pt, legacy.content_offset_x_pt);
-    shape.wordprocessing_shape_host = false;
-    let legacy_shape = floating_shape_metrics(&shape, placement, flow);
-    assert_eq!(legacy_shape.content_offset_y_pt, legacy.content_offset_y_pt);
-  }
-
-  #[test]
-  fn wordprocessing_relative_shape_size_uses_integral_document_twips() {
-    assert_eq!(wordprocessing_relative_shape_extent(415.3, 0.4), 166.1);
-    assert_eq!(wordprocessing_relative_shape_extent(697.9, 0.3), 209.35);
-    assert_eq!(wordprocessing_relative_shape_extent(451.3, 0.4), 180.5);
-    // Source integer percentages still preserve a complete twip at a boundary.
-    assert_eq!(wordprocessing_relative_shape_extent(400.0, 0.4), 160.0);
+    for marker in [false, true] {
+      for story in [false, true] {
+        let mut shape = wordprocessing_test_textbox_shape(0);
+        shape.word_text_frame = marker;
+        shape.text_box_blocks.clear();
+        if !story {
+          shape.text_box_link = None;
+        }
+        let mut placement = wordprocessing_test_relative_shape_placement();
+        placement.relative_width_to = None;
+        placement.relative_width_pct = None;
+        placement.vertical_offset_pt = 3.05;
+        shape.placement = crate::docx::ImagePlacement::Floating(placement);
+        shape.effects = Some(common::DrawingEffectSource::List {
+          resolved: Some(common::drawingml_image_effects::from_effect_list(
+            &list, None, &resolver,
+          )),
+          source: Box::new(list.clone()),
+        });
+        let rect = ShapeTextBoxRect {
+          x: 112.45,
+          y: 73.9,
+          width: 113.0,
+          height: 111.3,
+        };
+        let actual = wordprocessing_shape_effect_paint_rect(&shape, flow, rect);
+        let expected = if story {
+          (112.44, 73.8)
+        } else {
+          (112.45, 73.9)
+        };
+        assert!(
+          (actual.x - expected.0).abs() < 0.0001,
+          "marker={marker}, story={story}"
+        );
+        assert!(
+          (actual.y - expected.1).abs() < 0.0001,
+          "marker={marker}, story={story}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -81631,7 +87292,7 @@ mod tests {
       172.9,
       None,
       None,
-      RelativeShapeEffectFrame::PerAxis,
+      ShapeEffectFrame::PerAxis,
       [7.5, 7.5, 12.4, 62.65],
     );
 
@@ -81641,17 +87302,17 @@ mod tests {
     assert_eq!(metrics.content_offset_y_pt, 0.0);
     assert!((metrics.content_width_pt - 159.5).abs() < 0.001);
     assert!((metrics.content_height_pt - 172.9).abs() < 0.001);
-    assert!(!metrics.uses_relative_effect_frame_x && !metrics.uses_relative_effect_frame_y);
+    assert!(!metrics.uses_effect_frame_x && !metrics.uses_effect_frame_y);
   }
 
   #[test]
-  fn relative_wrap_none_size_targets_the_visible_shape() {
+  fn relative_size_without_an_effect_frame_targets_the_visible_shape() {
     let metrics = floating_shape_metrics_for_sizes(
       166.12,
       110.6,
       Some(166.12),
       Some(83.06),
-      RelativeShapeEffectFrame::None,
+      ShapeEffectFrame::None,
       [0.0, 0.0, 1.55, 1.15],
     );
 
@@ -81661,7 +87322,7 @@ mod tests {
     assert_eq!(metrics.content_offset_y_pt, 0.0);
     assert!((metrics.content_width_pt - 166.12).abs() < 0.001);
     assert!((metrics.content_height_pt - 83.06).abs() < 0.001);
-    assert!(!metrics.uses_relative_effect_frame_x && !metrics.uses_relative_effect_frame_y);
+    assert!(!metrics.uses_effect_frame_x && !metrics.uses_effect_frame_y);
   }
 
   #[test]
@@ -82044,6 +87705,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -82106,7 +87768,8 @@ mod tests {
           text
             .style
             .wordprocessing_justification_expansion_pt
-            .is_some(),
+            .as_deref()
+            .is_some_and(|adjustments| adjustments.iter().any(|&value| value < 0.0)),
           expected,
           "{family}/{language}/{enabled}/{overflow}"
         );
@@ -82119,6 +87782,206 @@ mod tests {
               .wordprocessing_justification_expansion_pt
               .as_deref(),
             Some([0.0, 0.0, 0.0, 0.0, -2.625].as_slice())
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn justified_cjk_fit_does_not_inherit_ragged_half_em_limit() {
+    let mut metrics = TextMetrics::new();
+    let mut controls = vec![
+      (15, false, 1, 120.0, 11),
+      (15, false, 1, 130.0, 12),
+      (15, false, 2, 120.0, 11),
+      (15, false, 2, 130.0, 12),
+    ];
+    // Actual Office mode15 justified controls: punctuation count 1..4,
+    // eight independent widths. More punctuation cannot remove the em cap.
+    for (count, counts) in [
+      (1, [11, 11, 11, 12, 12, 12, 12, 13]),
+      (2, [11, 12, 12, 12, 12, 12, 13, 13]),
+      (3, [11, 12, 12, 12, 12, 12, 13, 13]),
+      (4, [12, 12, 12, 12, 12, 12, 13, 13]),
+    ] {
+      for (width, expected) in [114.0, 118.0, 120.0, 122.0, 124.0, 126.0, 130.0, 134.0]
+        .into_iter()
+        .zip(counts)
+      {
+        controls.push((15, true, count, width, expected));
+      }
+    }
+    for justified in [false, true] {
+      for width in [118.0, 120.0] {
+        controls.push((14, justified, 2, width, 11));
+        controls.push((14, justified, 4, width, 12));
+      }
+    }
+    for (mode, justified, count, width, expected) in controls {
+      let mut text = "漢漢、".repeat(count);
+      text.extend(std::iter::repeat_n('漢', 24 - text.chars().count()));
+      let mut paragraph = early_admission_test_paragraph(&text);
+      let style = TextStyle {
+        font_family: Some(Arc::from("MS Mincho")),
+        east_asia_font_family: Some(Arc::from("MS Mincho")),
+        east_asia_language: Some(Arc::from("ja-JP")),
+        font_size_pt: 10.5,
+        use_windows_font_metrics: true,
+        wordprocessingml_font_slots: true,
+        wordprocessingml_punctuation_spacing: true,
+        cjk_punctuation_compression_ratio: 1.0,
+        ..Default::default()
+      };
+      paragraph.base_style = style.clone();
+      let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+        unreachable!()
+      };
+      run.style = style;
+      paragraph.format.alignment = if justified {
+        ParagraphAlignment::Justify
+      } else {
+        ParagraphAlignment::Left
+      };
+      paragraph.format.justification.adjust = if justified {
+        crate::docx::ParagraphAdjust::Block
+      } else {
+        crate::docx::ParagraphAdjust::Left
+      };
+      let mut flow = flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      );
+      flow.compatibility_mode = mode;
+      flow.content_width = width;
+      let mut current = empty_page(flow.setup, 0);
+      let mut pages = Vec::new();
+      layout_paragraph(
+        &paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut current,
+          pages: &mut pages,
+          anchor_pages: None,
+          text_metrics: &mut metrics,
+        },
+        flow.content_top_pt,
+        flow.content_top_pt,
+        0.0,
+      );
+      assert!(pages.is_empty());
+      let line = current
+        .items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) => Some(text),
+          _ => None,
+        })
+        .unwrap();
+      assert_eq!(
+        line.text.chars().count(),
+        expected,
+        "mode={mode} count={count} width={width} justified={justified}"
+      );
+    }
+  }
+
+  #[test]
+  fn compressed_cjk_terminal_punctuation_does_not_create_justification_glue() {
+    let mut metrics = TextMetrics::new();
+    // Native horizontal and vertical controls have 41 glyphs: internal
+    // commas at18/34 have ideal advances32154/32153, while the terminal
+    // comma at40 and all ordinary glyphs retain43008 (1/4096pt units).
+    let source = format!(
+      "{}、{}、{}、{}",
+      "漢".repeat(18),
+      "漢".repeat(15),
+      "漢".repeat(5),
+      "漢".repeat(10)
+    );
+    for family in ["Yu Mincho", "MS Mincho"] {
+      for split_runs in [false, true] {
+        let mut paragraph = early_admission_test_paragraph(&source);
+        let style = TextStyle {
+          font_family: Some(family.into()),
+          east_asia_font_family: Some(family.into()),
+          east_asia_language: Some("ja-JP".into()),
+          font_size_pt: 10.5,
+          use_windows_font_metrics: true,
+          wordprocessingml_font_slots: true,
+          wordprocessingml_punctuation_spacing: true,
+          cjk_punctuation_compression_ratio: 1.0,
+          ..Default::default()
+        };
+        paragraph.base_style = style.clone();
+        let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+          unreachable!()
+        };
+        run.style = style;
+        if split_runs {
+          let template = run.clone();
+          paragraph.inlines = source
+            .chars()
+            .map(|ch| {
+              let mut run = template.clone();
+              run.text = ch.to_string();
+              InlineItem::Text(run)
+            })
+            .collect();
+        }
+        paragraph.format.alignment = ParagraphAlignment::Justify;
+        paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Block;
+        let mut flow = flow_context(
+          PageSetup::default(),
+          0,
+          SectionColumns::default(),
+          0,
+          0,
+          DEFAULT_TAB_STOP_PT,
+        );
+        flow.compatibility_mode = 15;
+        flow.content_width = 425.2;
+        let mut current = empty_page(flow.setup, 0);
+        let mut pages = Vec::new();
+        layout_paragraph(
+          &paragraph,
+          flow,
+          ParagraphLayoutTarget {
+            current: &mut current,
+            pages: &mut pages,
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+          },
+          flow.content_top_pt,
+          flow.content_top_pt,
+          0.0,
+        );
+        assert!(pages.is_empty());
+        let glyphs = current
+          .items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) if (text.y_pt - flow.content_top_pt).abs() < 0.01 => Some(text),
+            _ => None,
+          })
+          .flat_map(|text| {
+            metrics
+              .shape_text(&text.text, &text.style)
+              .unwrap()
+              .glyphs
+              .to_vec()
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(glyphs.len(), 41, "{family}/{split_runs}");
+        for (index, glyph) in glyphs.iter().enumerate() {
+          let expected = if matches!(index, 18 | 34) { 7.85 } else { 10.5 };
+          assert!(
+            (glyph.x_advance_em * glyph.font_size_pt - expected).abs() < 0.001,
+            "{family}/{split_runs}/{index}: {glyph:?}"
           );
         }
       }
@@ -82428,6 +88291,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "Effect".to_string(),
       style,
@@ -82444,6 +88308,135 @@ mod tests {
       preserve_text_portion: true,
       decoration_span_start_x_pt: None,
       pdf_text_segmentation: PdfTextSegmentation::Portion,
+    }
+  }
+
+  #[test]
+  fn body_vertical_glyph_uses_paint_metrics_and_preserves_frame_slots() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Yu Mincho")),
+      font_size_pt: 10.5,
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      wordprocessingml_cjk_line_metrics: true,
+      ..TextStyle::default()
+    };
+    let mut text = legacy_effect_test_text(style);
+    text.text = "彼".into();
+    text.x_pt = 742.65;
+    text.y_pt = 85.05;
+    text.line_height_pt = 18.0;
+    text.origin_is_baseline = false;
+    text.pdf_text_segmentation = PdfTextSegmentation::WordLine;
+    let mut items = vec![PageItem::Text(Box::new(text))];
+    materialize_section_body_text(&mut items, 742.65, 85.05, 90.0, &mut TextMetrics::new());
+    assert_eq!(items.len(), 1);
+    let PageItem::Group(children) = &items[0] else {
+      panic!("stable original item slot")
+    };
+    let PageItem::Text(placed) = &children[0] else {
+      panic!("upright text")
+    };
+    // Word native source-device origins, before the independently verified
+    // page EMF replay: (728.64,94.32) -> PDF (728.736,94.344).
+    assert!((placed.x_pt - 728.64).abs() < 0.001, "{}", placed.x_pt);
+    assert!((placed.y_pt - 94.32).abs() < 0.001, "{}", placed.y_pt);
+    assert_eq!(placed.style.rotation_deg, 0.0);
+    assert!(placed.origin_is_baseline);
+    assert_eq!(
+      placed.hyperlink_url.as_deref(),
+      Some("https://example.invalid")
+    );
+  }
+
+  #[test]
+  fn mixed_vertical_shape_columns_keep_native_font_cells_and_fixed_spacing() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let styles = crate::docx::StylesCatalog::default();
+    let images = crate::docx::ImageCatalog::default();
+    let hyperlinks = crate::docx::HyperlinkCatalog::default();
+    let setup = PageSetup::default();
+    let flow = flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let mut metrics = TextMetrics::new();
+    // Native GDI at 2048 ppem: Baiti 2242+184, Arial 2352+67.
+    // Word's independent Single/1.15/Double controls retain these cells.
+    for (font, natural) in [("Mongolian Baiti", 26.060_547_f32), ("Arial", 25.985_352)] {
+      for direction in ["mongolianVert", "eaVert"] {
+        for (rule, line, pitch) in [
+          ("auto", 240, natural),
+          ("auto", 276, natural * 1.15),
+          ("auto", 480, natural * 2.0),
+          ("exact", 400, 20.0),
+          ("exact", 800, 40.0),
+          ("atLeast", 400, natural),
+          ("atLeast", 800, 40.0),
+        ] {
+          let paragraphs = ["Mongolian", "Second line", "Third line"]
+            .map(|text| format!(r#"<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="{line}" w:lineRule="{rule}"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="{font}" w:hAnsi="{font}" w:eastAsia="{font}" w:cs="{font}"/><w:sz w:val="44"/></w:rPr><w:t>{text}</w:t></w:r></w:p>"#))
+            .join("");
+          let xml = format!(
+            r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2540000" cy="2540000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="0"><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent>{paragraphs}</w:txbxContent></wps:txbx><wps:bodyPr vert="{direction}" lIns="0" tIns="0" rIns="0" bIns="0"><a:noAutofit/></wps:bodyPr></wps:wsp>"#
+          );
+          let source = crate::docx::wps::WordprocessingShape::from_bytes(xml.as_bytes()).unwrap();
+          let shape = crate::docx::wordprocessing_shape_textbox_frame(
+            &source,
+            crate::docx::ImagePlacement::Inline,
+            crate::docx::DrawingMlGroupTransform::identity(),
+            crate::docx::DrawingTextBoxImportContext {
+              styles: &styles,
+              images: &images,
+              hyperlinks: &hyperlinks,
+              inside_wordprocessing_group: false,
+              wordprocessing_canvas_has_background_paint: false,
+            },
+          )
+          .unwrap();
+          let mut page = empty_page(setup, 0);
+          layout_shape_text_box(
+            &mut page,
+            flow,
+            &mut metrics,
+            &shape,
+            ShapeTextBoxRect {
+              x: 100.0,
+              y: 100.0,
+              width: shape.width_pt,
+              height: shape.height_pt,
+            },
+          );
+          let text = page
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) => Some(text.as_ref()),
+              _ => None,
+            })
+            .collect::<Vec<_>>();
+          assert_eq!(text.len(), 3, "{font} {direction} {rule} {line}");
+          for pair in text.windows(2) {
+            let actual = (pair[1].x_pt - pair[0].x_pt).abs();
+            assert!(
+              (actual - pitch).abs() < 0.002,
+              "{font} {direction} {rule} {line}: {actual} != {pitch}"
+            );
+          }
+          assert!(
+            text
+              .iter()
+              .all(|text| text.origin_is_baseline == (rule != "exact")
+                && text.wordprocessing_line_metrics.is_none())
+          );
+          assert!(text.iter().all(|text| (text.y_pt - 100.0).abs() < 0.001));
+        }
+      }
     }
   }
 
@@ -82695,6 +88688,7 @@ mod tests {
       static3d: None,
       width_pt: 72.0,
       height_pt: 36.0,
+      inline_frame_axes_swapped: false,
       inline_offset_x_pt: 0.0,
       inline_offset_y_pt: 0.0,
       effect_left_pt: 0.0,
@@ -82799,6 +88793,7 @@ mod tests {
       x_pt: 10.0,
       y_pt: 20.0,
       line_height_pt: 14.4,
+      line_top_offset_pt: 0.0,
       size_pt: 11.52,
       portion_ascent_pt: 9.25,
       table_cell_resolved_baseline: false,
@@ -82849,11 +88844,64 @@ mod tests {
   }
 
   #[test]
+  fn legacy_form_checkbox_highlight_owns_the_line_box_in_body_and_cells() {
+    for cell in [false, true] {
+      for hidden in [false, true] {
+        let item = LegacyFormCheckBoxItem {
+          x_pt: 10.0,
+          y_pt: if cell { 36.0 } else { 20.0 },
+          line_height_pt: 20.0,
+          line_top_offset_pt: if cell { -16.0 } else { 0.0 },
+          size_pt: 11.52,
+          portion_ascent_pt: 9.36,
+          table_cell_resolved_baseline: cell,
+          checked: false,
+          style: TextStyle {
+            highlight: Some(RgbColor {
+              r: 192,
+              g: 192,
+              b: 192,
+            }),
+            hidden,
+            ..Default::default()
+          },
+          hyperlink_url: None,
+          rotation_deg: 0.0,
+          rotation_center_pt: None,
+        };
+        let common::DisplayItem::Group(group) = into_common_legacy_form_check_box(item) else {
+          unreachable!()
+        };
+        if hidden {
+          assert!(group.items.is_empty());
+          continue;
+        }
+        let [
+          common::DisplayItem::Rect(background),
+          common::DisplayItem::Rect(border),
+        ] = group.items.as_slice()
+        else {
+          panic!("highlight must precede the separate checkbox border");
+        };
+        assert_eq!(background.bounds, common_rect(10.0, 20.0, 11.52, 20.0));
+        assert!(background.stroke.is_none());
+        let common::Fill::Solid(color) = background.fill else {
+          unreachable!()
+        };
+        assert_eq!([color.r, color.g, color.b, color.a], [192, 192, 192, 255]);
+        assert!(border.stroke.is_some());
+        assert!(matches!(border.fill, common::Fill::None));
+      }
+    }
+  }
+
+  #[test]
   fn legacy_form_checkbox_rotates_with_shape_text() {
     let mut item = PageItem::LegacyFormCheckBox(Box::new(LegacyFormCheckBoxItem {
       x_pt: 20.0,
       y_pt: 30.0,
       line_height_pt: 12.0,
+      line_top_offset_pt: 0.0,
       size_pt: 12.0,
       portion_ascent_pt: 9.0,
       table_cell_resolved_baseline: false,
@@ -82952,6 +89000,199 @@ mod tests {
         expected,
         "{text:?}"
       );
+    }
+  }
+
+  #[test]
+  fn word_slash_prefix_dot_word_matches_native_plain_and_colored_lines() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Times New Roman")),
+      font_size_pt: 12.0,
+      ..TextStyle::default()
+    };
+    let flow = FlowContext {
+      content_width: 116.5,
+      ..flow_context(
+        PageSetup::default(),
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      )
+    };
+    let mut metrics = TextMetrics::new();
+    // Actual native 116.5pt lanes distinguish dot-prefixed words from a bare
+    // dot/ellipsis, ordinary following spaces and non-slash punctuation.
+    for (phrase, expected) in [
+      (
+        "Word / .doc",
+        vec![
+          "TextboxesinWord",
+          "/.docdonothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word /.doc",
+        vec![
+          "TextboxesinWord",
+          "/.docdonothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word / .123",
+        vec![
+          "TextboxesinWord",
+          "/.123donothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word /doc",
+        vec![
+          "TextboxesinWord/doc",
+          "donothavetheability",
+          "tohavethetextbe",
+          "verticallyaligned.",
+        ],
+      ),
+      (
+        "Word / doc",
+        vec![
+          "TextboxesinWord/",
+          "docdonothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word / _doc",
+        vec![
+          "TextboxesinWord/",
+          "_docdonothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word / (doc)",
+        vec![
+          "TextboxesinWord/",
+          "(doc)donothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word / .",
+        vec![
+          "TextboxesinWord/.",
+          "donothavetheability",
+          "tohavethetextbe",
+          "verticallyaligned.",
+        ],
+      ),
+      (
+        "Word / ... doc",
+        vec![
+          "TextboxesinWord/...",
+          "docdonothavethe",
+          "abilitytohavethetext",
+          "beverticallyaligned.",
+        ],
+      ),
+      (
+        "Word .doc",
+        vec![
+          "TextboxesinWord.doc",
+          "donothavetheability",
+          "tohavethetextbe",
+          "verticallyaligned.",
+        ],
+      ),
+    ] {
+      let text = format!(
+        "Textboxes in {phrase} do not have the ability to have the text be vertically aligned."
+      );
+      for split in [None, text.find('/'), text.find('.')] {
+        let mut paragraph = paragraph_frame_picture_control("", "", None);
+        paragraph.base_style = style.clone();
+        let source = split.map_or_else(|| vec![text.as_str()], |at| vec![&text[..at], &text[at..]]);
+        paragraph.runs = source
+          .into_iter()
+          .enumerate()
+          .map(|(i, text)| TextRun {
+            text: text.to_owned(),
+            style: TextStyle {
+              color: if i == 0 {
+                style.color
+              } else {
+                RgbColor { r: 0, g: 0, b: 255 }
+              },
+              ..style.clone()
+            },
+            hyperlink_url: None,
+            dynamic_field: None,
+            style_ref_keys: Vec::new(),
+            style_ref_text: None,
+            style_ref_numbering_text: None,
+            preserve_text_portion: false,
+          })
+          .collect();
+        paragraph.inlines = paragraph
+          .runs
+          .iter()
+          .cloned()
+          .map(InlineItem::Text)
+          .collect();
+        let mut page = empty_page(flow.setup, 0);
+        let mut pages = Vec::new();
+        layout_paragraph(
+          &paragraph,
+          flow,
+          ParagraphLayoutTarget {
+            current: &mut page,
+            pages: &mut pages,
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+          },
+          100.0,
+          100.0,
+          0.0,
+        );
+        assert!(pages.is_empty());
+        let mut lines: Vec<(f32, String)> = Vec::new();
+        for item in &page.items {
+          let PageItem::Text(item) = item else {
+            continue;
+          };
+          let visible: String = item.text.chars().filter(|ch| !ch.is_whitespace()).collect();
+          if visible.is_empty() {
+            continue;
+          }
+          if let Some((_, text)) = lines
+            .last_mut()
+            .filter(|(y, _)| (item.y_pt - *y).abs() < 0.01)
+          {
+            text.push_str(&visible);
+          } else {
+            lines.push((item.y_pt, visible));
+          }
+        }
+        assert_eq!(
+          lines
+            .iter()
+            .map(|(_, text)| text.as_str())
+            .collect::<Vec<_>>(),
+          expected,
+          "phrase={phrase:?}, split={split:?}"
+        );
+      }
     }
   }
 
@@ -83100,7 +89341,7 @@ mod tests {
         // actual owner even when each source character is a separate run.
         let measured = cell_text_measure::paragraph_extents(&paragraph, flow, &mut metrics)
           .expect("ordinary cell text has a complete measurement owner");
-        let (cell_height, floating_bottom) = table_cell_paragraph_height(
+        let cell_extents = table_cell_paragraph_height(
           BlockNeighbors::direct(None, None),
           &paragraph,
           flow,
@@ -83108,6 +89349,8 @@ mod tests {
           false,
           false,
         );
+        let cell_height = cell_extents.height;
+        let floating_bottom = cell_extents.cell_print_bottom;
         let mut page = empty_page(flow.setup, 0);
         let mut pages = Vec::new();
         layout_paragraph(
@@ -83472,6 +89715,89 @@ mod tests {
       table_cell_first_baseline_offset(&exact_cell, &exact_style, 24.0, &mut text_metrics),
       19.2
     );
+
+    // Native Cambria 28pt table controls: compressed Auto fits the ascent,
+    // while single/expanded spacing keeps the natural first baseline. Both
+    // a paragraph mark and visible text own the same first-line contract.
+    for visible in [false, true] {
+      for (multiple, expected_baseline) in [(0.7, 18.6), (1.0, 26.6), (1.5, 26.6)] {
+        let mut auto_cell = cell(Some(false));
+        let Some(Block::Paragraph(paragraph)) = auto_cell.blocks.first_mut() else {
+          unreachable!();
+        };
+        paragraph.base_style.font_family = Some("Cambria".into());
+        paragraph.base_style.font_size_pt = 28.0;
+        paragraph.base_style.wordprocessingml_font_slots = true;
+        paragraph.format.line_height_rule = LineHeightRule::Auto;
+        paragraph.format.line_height_pt = Some(multiple);
+        paragraph.format.line_height_set = true;
+        if visible {
+          for inline in &mut paragraph.inlines {
+            if let InlineItem::Text(run) = inline {
+              run.style = paragraph.base_style.clone();
+            }
+          }
+        } else {
+          paragraph.inlines.clear();
+        }
+        let style = table_cell_first_line_style(&auto_cell);
+        let height = table_cell_first_resolved_line_height(
+          &auto_cell,
+          PageSetup::default(),
+          true,
+          &mut text_metrics,
+        );
+        let baseline =
+          table_cell_first_baseline_offset(&auto_cell, &style, height, &mut text_metrics);
+        assert!(
+          (baseline - expected_baseline).abs() < 0.1,
+          "visible={visible}, multiple={multiple}: {baseline}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn header_floating_table_negative_offsets_stop_at_the_physical_page() {
+    let setup = PageSetup {
+      margin_top_pt: 36.0,
+      header_distance_pt: 64.8,
+      ..PageSetup::default()
+    };
+    let base = flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    for (anchor, offset, expected) in [
+      (FrameVerticalAnchor::Margin, -77.7, 0.0),
+      (FrameVerticalAnchor::Page, -77.7, 0.0),
+      (FrameVerticalAnchor::Text, -77.7, 0.53),
+      (FrameVerticalAnchor::Margin, 30.0, 66.0),
+      (FrameVerticalAnchor::Page, 30.0, 30.0),
+      (FrameVerticalAnchor::Text, 30.0, 108.23),
+    ] {
+      let placement = FloatingFramePlacement {
+        vertical_anchor: anchor,
+        vertical_offset_pt: offset,
+        ..Default::default()
+      };
+      let header = FlowContext {
+        text_segmentation: TextSegmentation::RepeatingSlot,
+        ..base
+      };
+      let (_, actual) = floating_table_position(placement, header, 78.23, 611.75);
+      assert!(
+        (actual - expected).abs() < 0.01,
+        "{anchor:?}, {offset}: {actual}"
+      );
+      let (_, body) = floating_table_position(placement, base, 78.23, 611.75);
+      let (_, requested) = floating_frame_position(placement, base, 78.23, 611.75, 0.0, true);
+      assert_eq!(body, requested, "body constraints have a separate owner");
+    }
   }
 
   #[test]
@@ -83711,6 +90037,7 @@ mod tests {
       page: PageSetup::default(),
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -83809,6 +90136,7 @@ mod tests {
       page: setup,
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -84063,6 +90391,7 @@ mod tests {
       page: PageSetup::default(),
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -84165,6 +90494,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -84266,6 +90596,7 @@ mod tests {
         static3d: None,
         width_pt: 700.0,
         height_pt: 20.0,
+        inline_frame_axes_swapped: false,
         inline_offset_x_pt: 0.0,
         inline_offset_y_pt: 0.0,
         effect_left_pt: 0.0,
@@ -84330,6 +90661,7 @@ mod tests {
         page: PageSetup::default(),
         page_background_pattern: None,
         page_background_texture: None,
+        page_background_gradient: None,
         line_number_style: TextStyle::default(),
         note_separator_style: TextStyle::default(),
         footnote_separator_stories: Default::default(),
@@ -84423,6 +90755,70 @@ mod tests {
       let run = text_run(text);
       paragraph.runs.push(run.clone());
       paragraph.inlines.push(InlineItem::Text(run));
+    }
+
+    // Native Word keeps the entire terminal floating sequence on the master,
+    // independently of its length. A visible tail or splitPgBreakAndParaMark
+    // instead owns a real follow. Check emitted pages, not only the predicate.
+    for count in [2, 3] {
+      for split in [false, true] {
+        for tail in [false, true] {
+          let mut multiple = document(split);
+          let Block::Paragraph(anchor) = &mut multiple.blocks[1] else {
+            panic!("anchor paragraph");
+          };
+          anchor.inlines.truncate(1);
+          for index in 0..count {
+            let mut image = floating_picture();
+            image.width_pt = 60.0;
+            let crate::docx::ImagePlacement::Floating(placement) = &mut image.placement else {
+              panic!("floating fixture");
+            };
+            placement.wrap = ImageWrapMode::Through;
+            placement.horizontal_offset_pt = index as f32 * 80.0;
+            anchor.inlines.push(InlineItem::Image(image));
+          }
+          if tail {
+            append_anchor_text(&mut multiple, "anchor-follow");
+          }
+          let multiple = layout(&multiple, &LayoutOptions::default()).expect("multiple anchors");
+          let expected_page = usize::from(split || tail);
+          assert_eq!(multiple.pages.len(), 2);
+          assert_eq!(floating_picture_position(&multiple).0, expected_page);
+          fn count_images(items: &[PageItem]) -> usize {
+            items
+              .iter()
+              .map(|item| match item {
+                PageItem::Image(image) => usize::from(image.floating),
+                PageItem::Group(items)
+                | PageItem::InlineObjectGroup(items)
+                | PageItem::IndependentTextFrame(items)
+                | PageItem::FloatingDrawing { items, .. } => count_images(items),
+                _ => 0,
+              })
+              .sum()
+          }
+          assert_eq!(count_images(&multiple.pages[expected_page].items), count);
+          assert_eq!(count_images(&multiple.pages[1 - expected_page].items), 0);
+          assert_eq!(text_position(&multiple, "after").0, 1);
+          if !split && !tail {
+            let mut plain_break = document(false);
+            let Block::Paragraph(anchor) = &mut plain_break.blocks[1] else {
+              panic!("anchor paragraph");
+            };
+            anchor.inlines.truncate(1);
+            let plain_break = layout(&plain_break, &LayoutOptions::default())
+              .expect("terminal break without floating anchors");
+            assert_eq!(
+              text_position(&multiple, "after"),
+              text_position(&plain_break, "after")
+            );
+          }
+          if tail {
+            assert_eq!(text_position(&multiple, "anchor-follow").0, 1);
+          }
+        }
+      }
     }
 
     let mut trailing = document(false);
@@ -84671,7 +91067,7 @@ mod tests {
           &level.to_string(),
           Some(language)
         ));
-        assert!(style_ref_candidate_matches(
+        assert!(!style_ref_candidate_matches(
           &candidate,
           "OpaqueSourceIdCharacter",
           Some(language)
@@ -84803,7 +91199,6 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
-          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -84820,7 +91215,6 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
-          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -84837,7 +91231,6 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
-          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -84854,7 +91247,6 @@ mod tests {
           from_bottom: false,
           numbering_only: true,
           suppress_non_numerical: false,
-          full_context: false,
           ui_language: Some("zh-CN"),
         },
       ),
@@ -84869,7 +91261,7 @@ mod tests {
   #[test]
   fn invisible_style_ref_marker_is_collected_without_display_text() {
     let keys = [Arc::<str>::from("Main Index Entry")];
-    let style_ref_text = Arc::<str>::from(" ");
+    let style_ref_text = Arc::<str>::from("");
     let meta = TextChunkMeta {
       hyperlink_url: None,
       dynamic_field: None,
@@ -84912,12 +91304,196 @@ mod tests {
           from_bottom: false,
           numbering_only: false,
           suppress_non_numerical: false,
-          full_context: false,
           ui_language: None,
         },
       ),
-      Some(" ".to_string())
+      Some("".to_string())
     );
+  }
+
+  #[test]
+  fn character_style_ref_number_comes_from_the_containing_paragraph() {
+    for number in [None, Some("4")] {
+      for hidden in [false, true] {
+        let run = TextRun {
+          text: if hidden {
+            String::new()
+          } else {
+            "snippet".into()
+          },
+          style: TextStyle {
+            hidden,
+            ..TextStyle::default()
+          },
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: vec![Arc::from("Character reference")],
+          style_ref_text: Some(Arc::from(if hidden { "" } else { "snippet" })),
+          style_ref_numbering_text: None,
+          preserve_text_portion: false,
+        };
+        let paragraph = Paragraph {
+          inlines: vec![InlineItem::Text(run.clone())],
+          field_events: Vec::new(),
+          footnote_reference_ids: Vec::new(),
+          endnote_reference_ids: Vec::new(),
+          starts_after_last_rendered_page_break: false,
+          base_style: TextStyle::default(),
+          runs: Vec::new(),
+          format: Box::default(),
+          style_ref_keys: vec![Arc::from("Paragraph reference")],
+          style_ref_text: Some(Arc::from("Unstyled prefix snippet unstyled suffix")),
+          style_ref_numbering_text: number.map(Arc::from),
+          list_label: number.map(str::to_owned),
+          list_label_image: None,
+          list_label_style: TextStyle::default(),
+          list_label_hyperlink_url: None,
+          list_label_tab_stop_pt: None,
+        };
+        let meta = text_chunk_meta(&paragraph, &run, None, TextSegmentation::Body);
+        let mut page = empty_page(PageSetup::default(), 0);
+        let placement = TextPlacement {
+          x_pt: 72.0,
+          y_pt: 144.0,
+          line_height_pt: 14.0,
+        };
+        if hidden {
+          push_invisible_style_ref_marker(&mut page, placement, &run.style, &meta);
+        } else {
+          push_text_item(&mut page, placement, run.text.clone(), &run.style, &meta);
+        }
+        let candidates = style_ref_candidates_by_page(&[page]);
+        for numbering_only in [false, true] {
+          assert_eq!(
+            resolve_style_ref(
+              &candidates,
+              0,
+              StyleRefRequest {
+                field_y_pt: 36.0,
+                in_marginal: true,
+                style_name: "Character reference",
+                from_bottom: false,
+                numbering_only,
+                suppress_non_numerical: false,
+                ui_language: None,
+              }
+            ),
+            Some(
+              if numbering_only {
+                number.unwrap_or("")
+              } else if hidden {
+                ""
+              } else {
+                "snippet"
+              }
+              .to_owned()
+            ),
+            "number={number:?}, hidden={hidden}, numbering_only={numbering_only}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn style_ref_numbering_keeps_authored_literals_and_trailing_blanks() {
+    for (label, expected) in [("1", "1"), ("1 ", "1 "), ("Chapter 1.", "Chapter 1")] {
+      let candidate = StyleRefCandidate {
+        y_pt: 100.0,
+        keys: vec![Arc::from("Reference")],
+        text: Arc::from("VISIBLE"),
+        numbering_text: Some(Arc::from("1")),
+        full_numbering_text: Some(Arc::from(label)),
+      };
+      for suppress_non_numerical in [false, true] {
+        assert_eq!(
+          resolve_style_ref_from_candidates(
+            std::iter::once(&candidate),
+            StyleRefRequest {
+              field_y_pt: 36.0,
+              in_marginal: true,
+              style_name: "Reference",
+              from_bottom: false,
+              numbering_only: true,
+              suppress_non_numerical,
+              ui_language: None,
+            }
+          ),
+          Some(
+            if suppress_non_numerical {
+              "1"
+            } else {
+              expected
+            }
+            .to_owned()
+          )
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn following_page_character_style_ref_does_not_select_the_paragraph_remainder() {
+    let styles = super::super::StylesCatalog {
+      styles: std::collections::HashMap::from([
+        (
+          "Heading1".to_string(),
+          super::super::StyleEntry {
+            name: Some("heading 1".to_string()),
+            style_type: Some(super::super::w::StyleValues::Paragraph),
+            ..Default::default()
+          },
+        ),
+        (
+          "IndependentReference".to_string(),
+          super::super::StyleEntry {
+            name: Some("Heading 1 Character".to_string()),
+            style_type: Some(super::super::w::StyleValues::Character),
+            ..Default::default()
+          },
+        ),
+      ]),
+      ..Default::default()
+    };
+    for visible in ["VISIBLE", ""] {
+      let pages = vec![
+        vec![
+          StyleRefCandidate {
+            y_pt: 100.0,
+            keys: styles.style_ref_keys("IndependentReference"),
+            text: Arc::from(visible),
+            numbering_text: Some(Arc::from("1")),
+            full_numbering_text: Some(Arc::from("1 ")),
+          },
+          StyleRefCandidate {
+            y_pt: 120.0,
+            keys: styles.style_ref_keys("Heading1"),
+            text: Arc::from("VISIBLE UNSTYLED REMAINDER"),
+            numbering_text: Some(Arc::from("1")),
+            full_numbering_text: None,
+          },
+        ],
+        Vec::new(),
+      ];
+      for page in 0..2 {
+        assert_eq!(
+          resolve_style_ref(
+            &pages,
+            page,
+            StyleRefRequest {
+              field_y_pt: 36.0,
+              in_marginal: true,
+              style_name: "Heading 1 Character",
+              from_bottom: false,
+              numbering_only: false,
+              suppress_non_numerical: false,
+              ui_language: None,
+            }
+          ),
+          Some(visible.to_owned())
+        );
+      }
+    }
   }
 
   #[test]
@@ -85317,6 +91893,77 @@ mod tests {
   }
 
   #[test]
+  fn western_dot_leaders_keep_following_common_symbols_with_the_word() {
+    for mode in [12, 14, 15] {
+      for dots in ['․', '‥', '…', '⋯'] {
+        for symbol in ['→', '←', '↔', '⇒', '≥', '=', '+', '§', '•', '★'] {
+          let token = format!("Fields{dots}{symbol}Document");
+          assert_eq!(
+            text_segments_for_compatibility(&format!("alpha {token} omega"), mode, false),
+            ["alpha ".to_owned(), format!("{token} "), "omega".to_owned()],
+          );
+          assert_eq!(
+            text_segments_for_compatibility(
+              &format!("alpha Fields{dots} {symbol}Document omega"),
+              mode,
+              false
+            ),
+            [
+              "alpha ".to_owned(),
+              format!("Fields{dots} "),
+              format!("{symbol}Document "),
+              "omega".to_owned()
+            ],
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn western_dot_leaders_keep_symbols_across_formatting_boundaries() {
+    let mut metrics = TextMetrics::new();
+    for mode in [12, 14, 15] {
+      for (first, following) in [("Fields…", "→Document TAIL"), ("Fields…→", "Document TAIL")]
+      {
+        let inlines = [first, following].map(|text| {
+          InlineItem::Text(TextRun {
+            text: text.to_owned(),
+            style: TextStyle::default(),
+            hyperlink_url: None,
+            dynamic_field: None,
+            style_ref_keys: Vec::new(),
+            style_ref_text: None,
+            style_ref_numbering_text: None,
+            preserve_text_portion: false,
+          })
+        });
+        let continuation = cross_run_unbreakable_continuation_width_for_break_options(
+          &inlines,
+          0,
+          first,
+          WordprocessingLineBreakOptions {
+            compatibility_mode: mode,
+            compress_punctuation: false,
+            strict_japanese: false,
+            kashida: false,
+          },
+          None,
+          &mut metrics,
+        )
+        .expect("Word keeps the dotted menu token across source portions");
+        assert_eq!(
+          continuation.source_end,
+          InlineCursor {
+            inline_index: 1,
+            text_offset: following.find("TAIL").unwrap(),
+          }
+        );
+      }
+    }
+  }
+
+  #[test]
   fn quoted_dot_leaders_retain_opening_and_closing_punctuation_ownership() {
     for mode in [12, 14, 15] {
       for opening in ['“', '‘', '(', '[', '{', '«', '»', '\'', '"'] {
@@ -85467,22 +92114,26 @@ mod tests {
       ..Default::default()
     };
     let mut metrics = TextMetrics::new();
-    for (language, available) in [
-      ("en-US", true),
-      ("en-GB", true),
-      ("de-DE", true),
-      ("fr-FR", true),
-      ("it-IT", true),
-      ("es-ES", true),
-      ("hu-HU", false),
-      ("pl-PL", false),
-      ("ro-RO", false),
-      ("sk-SK", false),
-      ("ru-RU", false),
-      ("sv-SE", false),
+    for (language, available, no_proof) in [
+      ("en-US", true, false),
+      ("en-GB", true, false),
+      ("de-DE", true, false),
+      ("fr-FR", true, false),
+      ("it-IT", true, false),
+      ("es-ES", true, false),
+      ("hu-HU", false, false),
+      ("pl-PL", false, false),
+      ("ro-RO", false, false),
+      ("sk-SK", false, false),
+      ("ru-RU", false, false),
+      ("sv-SE", false, false),
+      ("en-US", true, true),
+      ("de-DE", true, true),
+      ("es-MX", true, true),
     ] {
       let mut style = style.clone();
       style.language = Some(Arc::from(language));
+      style.wordprocessingml_no_proof = no_proof;
       for word_text_frame_story in [false, true] {
         for alignment in [
           ParagraphAlignment::Left,
@@ -85579,12 +92230,12 @@ mod tests {
               } else {
                 assert_eq!(
                   first_line.trim(),
-                  if bidi || !available {
+                  if bidi || no_proof || !available {
                     "Standing"
                   } else {
                     "Standing Com-"
                   },
-                  "language={language}, VML={word_text_frame_story}, alignment={alignment:?}, bidi={bidi}"
+                  "language={language}, VML={word_text_frame_story}, alignment={alignment:?}, bidi={bidi}, noProof={no_proof}"
                 );
               }
             }
@@ -87375,6 +94026,7 @@ mod tests {
       TextPortion::new(&plain, "Alpha"),
       true,
       false,
+      false,
       15,
       &mut metrics,
     );
@@ -87382,6 +94034,7 @@ mod tests {
     extents.include(
       TextPortion::new(&effected, "shadow"),
       true,
+      false,
       false,
       15,
       &mut metrics,
@@ -87396,6 +94049,7 @@ mod tests {
       TextPortion::new(&effected, "again"),
       true,
       false,
+      false,
       15,
       &mut metrics,
     );
@@ -87409,6 +94063,7 @@ mod tests {
     extents.include(
       TextPortion::new(&taller, "Tall"),
       true,
+      false,
       false,
       15,
       &mut metrics,
@@ -87429,6 +94084,7 @@ mod tests {
       extents.include(
         TextPortion::new(&style, "Alpha"),
         true,
+        false,
         false,
         15,
         &mut metrics,
@@ -92717,6 +99373,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: " ".to_string(),
       style,
@@ -92876,6 +99533,154 @@ mod tests {
             ..setup
           };
           assert_eq!(page_border_reference_rect(text_border, 0).1, 72.0 + gutter);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn floating_horizontal_inside_outside_tracks_page_side_and_effects() {
+    // Word native contrasts: page/margin/column bases, unequal mirrored
+    // margins, initial even numbering, later restart and asymmetric effects.
+    // Explicit physical alignment and posOffset retain their authored sides.
+    let mut shape = wordprocessing_test_textbox_shape(0);
+    shape.effect_left_pt = 6.0;
+    shape.effect_right_pt = 9.0;
+    for mirror in [false, true] {
+      for first_even in [false, true] {
+        for physical_page in 0..2 {
+          for restart in [None, Some(1), Some(2)] {
+            let setup = PageSetup {
+              width_pt: 600.0,
+              margin_left_pt: 120.0,
+              margin_right_pt: 60.0,
+              mirror_margins: mirror,
+              gutter_pt: 18.0,
+              page_number_start: restart,
+              ..Default::default()
+            };
+            let mut flow = flow_context(setup, 0, SectionColumns::default(), 0, 0, 36.0);
+            flow.column_page_index = physical_page;
+            flow.section_page_index = 0;
+            flow.repeating_slots.initial_page_is_even = first_even;
+            let odd = (physical_page == 0) != first_even;
+            let (left, right) = if mirror && !odd {
+              (60.0, 138.0)
+            } else {
+              (138.0, 60.0)
+            };
+            flow.content_left_pt = left;
+            flow.content_width = 600.0 - left - right;
+            for (reference, origin, width) in [
+              (HorizontalImageReference::Page, 0.0, 600.0),
+              (HorizontalImageReference::Margin, left, 600.0 - left - right),
+              (HorizontalImageReference::Column, left, 600.0 - left - right),
+            ] {
+              for image_width in [50.0, 700.0] {
+                for alignment in [
+                  Some(HorizontalImageAlignment::Inside),
+                  Some(HorizontalImageAlignment::Outside),
+                  Some(HorizontalImageAlignment::Left),
+                  Some(HorizontalImageAlignment::Right),
+                  Some(HorizontalImageAlignment::Center),
+                  None,
+                ] {
+                  let placement = FloatingImagePlacement {
+                    horizontal_relative_to: reference,
+                    horizontal_alignment: alignment,
+                    relative_width_to: None,
+                    relative_width_pct: None,
+                    horizontal_offset_pt: if alignment.is_none() { 12.0 } else { 0.0 },
+                    ..wordprocessing_test_relative_shape_placement()
+                  };
+                  let (offset, effect) = match alignment {
+                    Some(HorizontalImageAlignment::Inside) if odd => (0.0, 5.75),
+                    Some(HorizontalImageAlignment::Outside) if !odd => (0.0, 5.75),
+                    Some(HorizontalImageAlignment::Inside | HorizontalImageAlignment::Outside)
+                    | Some(HorizontalImageAlignment::Right) => (width - image_width, -9.25),
+                    Some(HorizontalImageAlignment::Left) => (0.0, 5.75),
+                    Some(HorizontalImageAlignment::Center) => ((width - image_width) / 2.0, -1.5),
+                    None => (12.0, 0.0),
+                  };
+                  let (x, _) = floating_image_position(
+                    placement,
+                    flow,
+                    ParagraphIndents::default(),
+                    left,
+                    100.0,
+                    image_width,
+                    20.0,
+                  );
+                  assert!((x - (origin + offset)).abs() < 0.001);
+                  assert!(
+                    (adjusted_floating_shape_x(placement, &shape, x, flow) - (x + effect)).abs()
+                      < 0.001
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn floating_margin_size_and_position_use_distinct_inside_outside_sides() {
+    for mirror in [false, true] {
+      for first_even in [false, true] {
+        for gutter in [0.0, 18.0] {
+          let setup = PageSetup {
+            width_pt: 600.0,
+            margin_left_pt: 120.0,
+            margin_right_pt: 60.0,
+            mirror_margins: mirror,
+            gutter_pt: gutter,
+            ..Default::default()
+          };
+          for physical_page in 0..2 {
+            // Section-local zero must not reset facing-page geometry.
+            let mut flow = flow_context(setup, 1, SectionColumns::default(), 0, 0, 36.0);
+            flow.column_page_index = physical_page;
+            flow.repeating_slots.initial_page_is_even = first_even;
+            let odd = (physical_page == 0) != first_even;
+            let (left, right) = if mirror && !odd {
+              (60.0, 120.0 + gutter)
+            } else {
+              (120.0 + gutter, 60.0)
+            };
+            assert_eq!(
+              horizontal_reference_width(HorizontalImageReference::LeftMargin, flow),
+              left
+            );
+            assert_eq!(
+              horizontal_reference_width(HorizontalImageReference::RightMargin, flow),
+              right
+            );
+            assert_eq!(
+              horizontal_reference_width(HorizontalImageReference::Margin, flow),
+              600.0 - left - right
+            );
+            let (inside_size, outside_size) = if odd { (right, left) } else { (left, right) };
+            assert_eq!(
+              horizontal_reference_width(HorizontalImageReference::InsideMargin, flow),
+              inside_size
+            );
+            assert_eq!(
+              horizontal_reference_width(HorizontalImageReference::OutsideMargin, flow),
+              outside_size
+            );
+            let (inside_position, outside_position) = if odd {
+              ((0.0, left), (600.0 - right, right))
+            } else {
+              ((600.0 - right, right), (0.0, left))
+            };
+            assert_eq!(horizontal_inside_outside_base(true, flow), inside_position);
+            assert_eq!(
+              horizontal_inside_outside_base(false, flow),
+              outside_position
+            );
+          }
         }
       }
     }
@@ -93073,6 +99878,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "word ".to_string(),
       style,
@@ -93664,6 +100470,7 @@ mod tests {
       static3d: None,
       width_pt: 63.35,
       height_pt: 27.35,
+      inline_frame_axes_swapped: false,
       inline_offset_x_pt: 0.0,
       inline_offset_y_pt: 0.0,
       effect_left_pt: 0.0,
@@ -93976,6 +100783,91 @@ mod tests {
   }
 
   #[test]
+  fn tab_leader_boundary_uses_completed_native_text_cells_across_runs() {
+    // Native Word GDI/MSLS: frame590 dots, 18X ideal30052/natural61.
+    // The shared balance's accumulator restart leaves1100 dots, so the
+    // first leader is1690, not the next26-dot cell. Neighbouring lengths
+    // and independently split formatting runs retain the same ownership.
+    let mut metrics = TextMetrics::new();
+    for bold in [false, true] {
+      let style = TextStyle {
+        font_family: Some(Arc::from("Arial")),
+        font_size_pt: 11.0,
+        bold,
+        use_windows_font_metrics: true,
+        wordprocessingml_font_slots: true,
+        ..TextStyle::default()
+      };
+      for (length, first, count) in [
+        (17, 1638, 102),
+        (18, 1690, 100),
+        (19, 1768, 97),
+        (20, 1820, 95),
+      ] {
+        for split in [false, true] {
+          let mut page = empty_page(PageSetup::default(), 0);
+          let mut x = 70.85;
+          let lengths = if split {
+            vec![9, length - 9]
+          } else {
+            vec![length]
+          };
+          for length in lengths {
+            let mut text = legacy_effect_test_text(style.clone());
+            text.text = "X".repeat(length);
+            text.x_pt = x;
+            text.pdf_text_segmentation = PdfTextSegmentation::WordLine;
+            text.wordprocessing_line_metrics = Some(common::WordprocessingLineMetrics {
+              frame_origin_offset_x_pt: f64::from(70.85_f32) - f64::from(x),
+              frame_width_pt: 453.1,
+              alignment: None,
+              bottom_offset_pt: 14.0,
+              height_pt: 14.0,
+              baseline_from_bottom_pt: 3.0,
+              spacing_before_pt: 0.0,
+              spacing_after_pt: 0.0,
+            });
+            x += metrics.measure_text(&text.text, &style);
+            page.items.push(PageItem::Text(Box::new(text)));
+          }
+          let index = page.items.len();
+          push_tab_leader(
+            &mut page,
+            TabLeaderPlacement {
+              insert_index: None,
+              leader: TabLeader::Dot,
+              layout: TabLeaderLayout::Office2013PrintGridEnd,
+              reserve_natural_boundary: false,
+              start_x: x,
+              end_x: 517.83234,
+              y: 20.0,
+              line_height: 14.0,
+              paragraph_bidi: false,
+            },
+            &TextStyle {
+              bold: false,
+              ..style.clone()
+            },
+            &mut metrics,
+          );
+          wordprocessing_tab_text::realize_ltr_leaders(&mut page.items, &mut metrics);
+          let PageItem::Text(leader) = &page.items[index] else {
+            panic!("leader")
+          };
+          assert_eq!(leader.text.len(), count, "{length} bold{bold} split{split}");
+          assert!((leader.x_pt - first as f32 * 0.12).abs() < 0.001);
+          let before = leader.text.clone();
+          wordprocessing_tab_text::realize_ltr_leaders(&mut page.items, &mut metrics);
+          let PageItem::Text(leader) = &page.items[index] else {
+            panic!("leader")
+          };
+          assert_eq!(leader.text, before);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn rtl_dot_leader_uses_complex_size_without_changing_run_font_or_weight() {
     // Native independent controls: western Times New Roman10 / complex
     // Traditional Arabic14, with w:rtl absent or false. LTR dots advance
@@ -94046,7 +100938,7 @@ mod tests {
         character_spacing_pt: spacing,
         ..TextStyle::default()
       };
-      let got = metrics.word_dot_leader_advances(&style, true).unwrap();
+      let got = metrics.word_tab_leader_advances('.', &style, true).unwrap();
       assert!(
         (got.0 - source).abs() < 0.001,
         "{spacing} {percent} {got:?}"
@@ -94168,6 +101060,228 @@ mod tests {
   }
 
   #[test]
+  fn centered_picture_numbering_matches_native_grid_thresholds_and_larger_text() {
+    // Captured ordinary body font extents; Office's 8/14/22pt picture
+    // controls keep one/one/two 15.6pt grid cells, for both scripts.
+    for (ascent, centered, descent) in [
+      (8.441_895, 8.294_678, 1.907_226_6),
+      (9.070_312_5, 9.070_312_5, 2.601_562_5),
+    ] {
+      let body = WordLineTextExtents {
+        ascent_pt: ascent,
+        descent_pt: descent,
+        font_ascent_pt: ascent,
+        font_descent_pt: descent,
+        centered_font_ascent_pt: centered,
+        line_spacing_height_pt: ascent + descent,
+        has_text: true,
+        ..Default::default()
+      };
+      for (height, cells) in [(8.0, 1.0), (14.0, 1.0), (22.0, 2.0)] {
+        let number = NumberingLineMetrics {
+          ascent_pt: 0.0,
+          centered_picture_height_pt: Some(height),
+          text_line_spacing_multiple: 1.0,
+          centered_font_gap: false,
+        };
+        let line = (body.height_with_line_spacing(1.0)
+          + (number.ascent_for(&body) - body.font_ascent_pt).max(0.0))
+        .max(15.6);
+        assert_eq!((line / 15.6).ceil(), cells);
+        let larger = WordLineTextExtents {
+          font_ascent_pt: 30.0,
+          centered_font_ascent_pt: 30.0,
+          font_descent_pt: 8.0,
+          ..body
+        };
+        assert!(number.ascent_for(&larger) < larger.font_ascent_pt);
+      }
+      let baseline = NumberingLineMetrics {
+        ascent_pt: 14.0,
+        centered_picture_height_pt: None,
+        text_line_spacing_multiple: 1.0,
+        centered_font_gap: false,
+      };
+      assert_eq!(baseline.ascent_for(&body), 14.0);
+      assert_eq!(((14.0 + descent) / 15.6).ceil(), 2.0);
+    }
+  }
+
+  #[test]
+  fn chapter_page_numbers_use_last_numbered_heading_and_future_initial_value() {
+    use crate::model::PageChapterNumbering;
+    let mut pages = (0..5)
+      .map(|_| {
+        empty_page(
+          PageSetup {
+            page_number_chapter: Some(PageChapterNumbering {
+              heading_level: 1,
+              separator: '-',
+            }),
+            ..Default::default()
+          },
+          0,
+        )
+      })
+      .collect::<Vec<_>>();
+    let heading = |level: u8, number: Option<&str>, y_pt: f32| {
+      let mut text = legacy_effect_test_text(TextStyle::default());
+      text.dynamic_field = None;
+      text.y_pt = y_pt;
+      text.style_ref_keys = vec![Arc::from(format!(
+        "{}{level}",
+        super::super::field_localization::NUMERIC_HEADING_STYLE_REF_KEY_PREFIX
+      ))];
+      text.style_ref_numbering_text = number.map(Arc::from);
+      PageItem::Text(Box::new(text))
+    };
+    pages[1].items.push(heading(1, Some("1"), 100.0));
+    // Paint order is not necessarily reading order. Native same-page controls
+    // select the last heading by physical body position.
+    pages[2].items.push(heading(1, Some("3"), 200.0));
+    pages[2].items.push(heading(1, Some("2"), 100.0));
+    pages[3].section_index = 1;
+    pages[3].items.push(heading(1, None, 100.0));
+    pages[4].setup.page_number_chapter = None;
+    let chapters = chapter_page_numbers::resolve(&pages);
+    let labels = chapters
+      .iter()
+      .enumerate()
+      .map(|(i, ch)| chapter_page_numbers::format(i + 1, FieldNumberFormat::Decimal, ch.as_ref()))
+      .collect::<Vec<_>>();
+    assert_eq!(labels, ["1-1", "1-2", "3-3", "3-4", "5"]);
+    for page in &mut pages {
+      page.setup.page_number_chapter = Some(PageChapterNumbering {
+        heading_level: 3,
+        separator: ':',
+      });
+    }
+    assert!(
+      chapter_page_numbers::resolve(&pages)
+        .iter()
+        .all(Option::is_none)
+    );
+    for page in &mut pages {
+      page.setup.page_number_chapter = None;
+    }
+    assert!(chapter_page_numbers::resolve(&pages).is_empty());
+  }
+
+  #[test]
+  fn chapter_page_numbers_preserve_number_format_and_strip_authored_label_delimiters() {
+    for (separator, expected) in [
+      ('-', "I-iii"),
+      (':', "I:iii"),
+      ('.', "I.iii"),
+      ('—', "I—iii"),
+      ('–', "I–iii"),
+    ] {
+      let chapter = chapter_page_numbers::ChapterNumber {
+        number: Arc::from(" I: "),
+        separator,
+      };
+      assert_eq!(
+        chapter_page_numbers::format(3, FieldNumberFormat::LowerRoman, Some(&chapter)),
+        expected
+      );
+    }
+    let chapter = chapter_page_numbers::ChapterNumber {
+      number: Arc::from("1.1"),
+      separator: '-',
+    };
+    assert_eq!(
+      chapter_page_numbers::format(2, FieldNumberFormat::Decimal, Some(&chapter)),
+      "1.1-2"
+    );
+  }
+
+  #[test]
+  fn chapter_page_fields_and_pagerefs_keep_independent_format_rules() {
+    let target = AnchorPage {
+      name: "Target".into(),
+      page_index: 1,
+      section_index: 0,
+      section_page_index: 1,
+      physical_page_number: 2,
+      virtual_page_number: 3,
+      page_number_format: FieldNumberFormat::Decimal,
+      page_reference: None,
+      x_pt: 72.0,
+      y_pt: 100.0,
+    };
+    let references = [("Target", &target)].into_iter().collect();
+    let chapters = [
+      None,
+      Some(chapter_page_numbers::ChapterNumber {
+        number: Arc::from("2"),
+        separator: '-',
+      }),
+    ];
+    let context = DynamicFieldResolveContext {
+      total_pages: 2,
+      page_index: 0,
+      page_number: 1,
+      page_number_format: FieldNumberFormat::Decimal,
+      page_chapters: &chapters,
+      page_refs: &references,
+      style_ref_candidates: &[],
+      ui_language: Some("en-US"),
+    };
+    let mut metrics = TextMetrics::new();
+    for (format, relative, expected) in [
+      (FieldNumberFormat::PageStyle, false, "2-3"),
+      (FieldNumberFormat::Decimal, false, "3"),
+      (FieldNumberFormat::UpperRoman, false, "III"),
+      (FieldNumberFormat::PageStyle, true, "on page 2-3"),
+    ] {
+      let mut text = legacy_effect_test_text(TextStyle::default());
+      text.dynamic_field = Some(DynamicFieldKind::PageRef {
+        bookmark_name: Arc::from("Target"),
+        number_format: format,
+        relative_position: relative,
+      });
+      resolve_dynamic_field_text(
+        &mut text,
+        &context,
+        false,
+        &mut HashMap::default(),
+        &mut metrics,
+      );
+      assert_eq!(text.text, expected);
+    }
+    let context = DynamicFieldResolveContext {
+      page_index: 1,
+      page_number: 3,
+      ..context
+    };
+    for (kind, expected) in [
+      (
+        DynamicFieldKind::Page {
+          number_format: FieldNumberFormat::UpperRoman,
+        },
+        "2-III",
+      ),
+      (
+        DynamicFieldKind::NumPages {
+          number_format: FieldNumberFormat::Decimal,
+        },
+        "2",
+      ),
+    ] {
+      let mut text = legacy_effect_test_text(TextStyle::default());
+      text.dynamic_field = Some(kind);
+      resolve_dynamic_field_text(
+        &mut text,
+        &context,
+        true,
+        &mut HashMap::default(),
+        &mut metrics,
+      );
+      assert_eq!(text.text, expected);
+    }
+  }
+
+  #[test]
   fn late_dynamic_field_results_apply_caps_before_resolving_their_tab_anchor() {
     let references = HashMap::default();
     let context = DynamicFieldResolveContext {
@@ -94175,6 +101289,7 @@ mod tests {
       page_index: 0,
       page_number: 4,
       page_number_format: FieldNumberFormat::Decimal,
+      page_chapters: &[],
       page_refs: &references,
       style_ref_candidates: &[],
       ui_language: Some("es-MX"),
@@ -94315,6 +101430,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "S".to_string(),
       style: style.clone(),
@@ -94343,6 +101459,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "1".to_string(),
       style,
@@ -94399,6 +101516,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -94699,6 +101817,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "On".to_string(),
         style,
@@ -94789,6 +101908,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "following text".to_string(),
         style: TextStyle::default(),
@@ -94959,6 +102079,7 @@ mod tests {
     ] {
       let ruby = RubyInline {
         fit_text: None,
+        container_font_size_pt: 12.0,
         base: vec![run("担当者", 12.0)],
         guide: vec![run("ふりがな", guide_size)],
         alignment: RubyAlignment::DistributeSpace,
@@ -95389,9 +102510,13 @@ mod tests {
       ..Default::default()
     };
     let section =
-      |break_kind, discarded_carrier_spacing_after_pt, blocks| crate::docx::ImportedSection {
+      |break_kind, discarded_carrier: Option<f32>, blocks| crate::docx::ImportedSection {
+        note_reference_order: Default::default(),
         break_kind,
-        discarded_carrier_spacing_after_pt,
+        discarded_carrier: discarded_carrier.map(|spacing_after_pt| DiscardedSectionCarrier {
+          spacing_after_pt,
+          style_id: None,
+        }),
         section_properties: None,
         page,
         columns: SectionColumns::default(),
@@ -95433,6 +102558,7 @@ mod tests {
                 page,
                 page_background_pattern: None,
                 page_background_texture: None,
+                page_background_gradient: None,
                 line_number_style: TextStyle::default(),
                 note_separator_style: TextStyle::default(),
                 footnote_separator_stories: Default::default(),
@@ -95528,6 +102654,121 @@ mod tests {
         }
       }
     }
+  }
+
+  #[test]
+  fn rtl_section_columns_keep_native_widths_gaps_and_print_edge() {
+    let page = PageSetup {
+      width_pt: 600.0,
+      margin_left_pt: 40.0,
+      margin_right_pt: 60.0,
+      ..PageSetup::default()
+    };
+    // Native Word controls: equal-width remainder, unequal widths/gaps,
+    // single narrow column, and multiple columns narrower than the page.
+    for (widths, gaps, ltr_lefts, rtl_lefts) in [
+      (
+        vec![],
+        vec![20.0, 20.0],
+        vec![40.0, 213.3, 386.6],
+        vec![386.7, 213.4, 40.1],
+      ),
+      (
+        vec![140.0, 330.0],
+        vec![30.0],
+        vec![40.0, 210.0],
+        vec![400.0, 40.0],
+      ),
+      (
+        vec![100.0, 140.0, 210.0],
+        vec![20.0, 30.0],
+        vec![40.0, 160.0, 330.0],
+        vec![440.0, 280.0, 40.0],
+      ),
+      (vec![200.0], vec![], vec![40.0], vec![40.0]),
+      (
+        vec![100.0, 200.0],
+        vec![20.0],
+        vec![40.0, 160.0],
+        vec![440.0, 220.0],
+      ),
+    ] {
+      for (right_to_left, expected) in [(false, &ltr_lefts), (true, &rtl_lefts)] {
+        let mut columns = SectionColumns {
+          count: expected.len(),
+          right_to_left,
+          gap_pt: gaps.first().copied().unwrap_or(20.0),
+          explicit_count: widths.len(),
+          ..Default::default()
+        };
+        columns.explicit_widths_pt[..widths.len()].copy_from_slice(&widths);
+        columns.explicit_gaps_pt[..gaps.len()].copy_from_slice(&gaps);
+        let geometry = column_geometry(page, columns, 0);
+        for (actual, expected) in geometry.lefts.iter().zip(expected) {
+          assert!(
+            (actual - expected).abs() < 0.001,
+            "{right_to_left}: {actual} != {expected}"
+          );
+        }
+        if !widths.is_empty() {
+          assert_eq!(geometry.widths, widths);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn rtl_section_column_breaks_and_separators_share_logical_geometry() {
+    let mut document =
+      early_admission_test_document(300.0, early_admission_test_paragraph("unused"));
+    document.blocks.clear();
+    document.page.width_pt = 600.0;
+    document.page.margin_left_pt = 40.0;
+    document.page.margin_right_pt = 60.0;
+    let mut columns = SectionColumns {
+      count: 3,
+      explicit_count: 3,
+      right_to_left: true,
+      separator: true,
+      unbalanced: true,
+      ..Default::default()
+    };
+    columns.explicit_widths_pt[..3].copy_from_slice(&[100.0, 140.0, 210.0]);
+    columns.explicit_gaps_pt[..2].copy_from_slice(&[20.0, 30.0]);
+    let mut blocks = Vec::new();
+    for (index, label) in ["FIRST", "SECOND", "THIRD"].into_iter().enumerate() {
+      let mut paragraph = early_admission_test_paragraph(label);
+      if index > 0 {
+        paragraph.inlines.insert(0, InlineItem::ColumnBreak);
+      }
+      blocks.push(Block::paragraph(paragraph));
+    }
+    let mut section = crate::docx::default_section(blocks);
+    section.page = document.page;
+    section.columns = columns;
+    document.sections.push(section);
+    let layout = RootFrameLayout::new(&document, &LayoutOptions::default()).format();
+    assert_eq!(layout.pages.len(), 1);
+    for (label, expected_x) in [("FIRST", 440.0), ("SECOND", 280.0), ("THIRD", 40.0)] {
+      let text = layout.pages[0]
+        .items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text == label => Some(text),
+          _ => None,
+        })
+        .unwrap();
+      assert!((text.x_pt - expected_x).abs() < 0.001);
+    }
+    let separators = layout.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Line(line) if line.kind == LineItemKind::FilledRect => Some(line.x1_pt),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(separators, vec![430.0, 265.0]);
   }
 
   #[test]
@@ -95762,6 +103003,54 @@ mod tests {
   }
 
   #[test]
+  fn continuous_section_retains_physical_page_bottom_until_page_advance() {
+    // Native Word's fixed-line controls distinguish both directions of a
+    // margin change, the current sheet, and the new section's physical follow.
+    for (first_bottom, second_bottom) in [(72.0, 144.0), (144.0, 72.0), (72.0, 36.0)] {
+      for balanced in [false, true] {
+        let first = PageSetup {
+          width_pt: 612.0,
+          height_pt: 792.0,
+          margin_top_pt: 72.0,
+          margin_bottom_pt: first_bottom,
+          margin_left_pt: 72.0,
+          margin_right_pt: 72.0,
+          ..PageSetup::default()
+        };
+        let next = PageSetup {
+          margin_bottom_pt: second_bottom,
+          margin_left_pt: 54.0,
+          ..first
+        };
+        let mut document = early_admission_test_document(100.0, early_admission_test_paragraph(""));
+        document.page = first;
+        let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+        let columns = SectionColumns {
+          count: if balanced { 2 } else { 1 },
+          balanced_height_pt: balanced.then_some(24.0),
+          ..SectionColumns::default()
+        };
+        let mut flow = root.body_flow(document_page_frame(next, 1, columns));
+        assert_eq!(flow.body_content_bottom_pt, 792.0 - first_bottom);
+        assert_eq!(flow.setup, next, "the next section still owns future pages");
+        assert_eq!(flow.content_left_pt, next.margin_left_pt);
+        assert_eq!(
+          flow.content_bottom,
+          if balanced { 96.0 } else { 792.0 - first_bottom },
+          "physical-page bounds must not erase column balancing",
+        );
+        for _ in 0..columns.count {
+          (flow, _) = advance_section_flow(flow, &mut root.current, &mut root.pages);
+        }
+        assert_eq!(root.pages.len(), 1);
+        assert_eq!(root.current.setup, next);
+        assert_eq!(flow.body_content_bottom_pt, 792.0 - second_bottom);
+        assert_eq!(flow.content_bottom, flow.body_content_bottom_pt);
+      }
+    }
+  }
+
+  #[test]
   fn final_balanced_column_accepts_the_section_remainder() {
     let setup = PageSetup {
       margin_top_pt: 72.0,
@@ -95918,6 +103207,65 @@ mod tests {
   }
 
   #[test]
+  fn leading_run_page_break_defers_upper_space_to_content_or_split_mark() {
+    // Native Word spacing/flag/prefix controls distinguish the terminal mark
+    // from an absent follow, and before-space from independently owned after-space.
+    // Exercise the complete formatter, including the following paragraph.
+    let inline = |text| early_admission_test_paragraph(text).inlines.remove(0);
+    for split in [false, true] {
+      for suppress in [false, true] {
+        for prefix in [false, true] {
+          for follow in [false, true] {
+            for after in [0.0, 3.0] {
+              let mut positions = Vec::new();
+              for before in [0.0, 3.0, 6.0, 12.0] {
+                let mut paragraph = early_admission_test_paragraph("");
+                paragraph.inlines.clear();
+                if prefix {
+                  paragraph.inlines.push(inline("PREFIX"));
+                }
+                paragraph.inlines.push(InlineItem::PageBreak);
+                if follow {
+                  paragraph.inlines.push(inline("FOLLOW"));
+                }
+                paragraph.format.spacing_before_pt = before;
+                paragraph.format.spacing_before_set = true;
+                paragraph.format.spacing_after_pt = after;
+                paragraph.format.spacing_after_set = true;
+                paragraph.format.suppress_spacing_before_after_page_break = suppress;
+                let mut document = early_admission_test_document(200.0, paragraph);
+                document.split_page_break_and_paragraph_mark = split;
+                let result = layout(&document, &LayoutOptions::default()).unwrap();
+                assert_eq!(result.pages.len(), 2);
+                let tail = result.pages[1]
+                  .items
+                  .iter()
+                  .find_map(|item| match item {
+                    PageItem::Text(text) if text.text == "TAIL" => Some(text),
+                    _ => None,
+                  })
+                  .expect("following paragraph remains on the follow page");
+                positions.push(tail.y_pt);
+              }
+              for (index, before) in [0.0, 3.0, 6.0, 12.0].into_iter().enumerate() {
+                let deferred = if !prefix && (split || follow) && !suppress {
+                  before
+                } else {
+                  0.0
+                };
+                assert!(
+                  (positions[index] - positions[0] - deferred).abs() < 0.001,
+                  "split={split} suppress={suppress} prefix={prefix} follow={follow} before={before} after={after}: {positions:?}",
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn explicit_page_break_detects_content_on_its_paragraph_follow() {
     let text = || {
       InlineItem::Text(TextRun {
@@ -96047,7 +103395,7 @@ mod tests {
       ..exclusion
     };
     let exclusions = [small_picture];
-    let at_baseline = physical_wrap_exclusions_at_baseline(&exclusions, 12.0);
+    let at_baseline = physical_wrap_exclusions_at_baseline(&exclusions, 12.0, 12.0);
     assert_eq!(
       line_bounds_for_y(72.0, 400.0, 112.0, 14.0, &at_baseline),
       (79.0, 400.0)
@@ -96465,8 +103813,183 @@ mod tests {
     let [tight] = page.wrap_exclusions.as_slice() else {
       panic!("one tight paragraph-frame exclusion");
     };
-    assert_eq!((tight.left_pt, tight.right_pt), (200.0, 300.0));
+    // Native Word retains hSpace for tight/through/auto too.
+    assert_eq!((tight.left_pt, tight.right_pt), (190.0, 312.0));
     assert_eq!((tight.top_pt, tight.bottom_pt), (72.0, 136.0));
+  }
+
+  #[test]
+  fn page_body_vertical_alignment_keeps_the_vml_enclosure_and_anchor_together() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let source = w::Paragraph::from_bytes(br#"<w:p
+      xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+      xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w10="urn:schemas-microsoft-com:office:word">
+      <w:pPr><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:pPr>
+      <w:r><w:pict><v:rect id="N30Box" style="position:absolute;margin-left:0;margin-top:0;width:252pt;height:135pt;z-index:1;mso-position-horizontal:left;mso-position-horizontal-relative:margin;mso-position-vertical:top;mso-position-vertical-relative:page">
+      <v:textbox><w:txbxContent><w:p><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr><w:t>Textbox</w:t></w:r></w:p></w:txbxContent></v:textbox>
+      <w10:wrap type="square" anchorx="margin" anchory="page"/></v:rect></w:pict></w:r>
+      <w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr><w:t>How should centering be affected by objects like text frames? Ignore all the floating stuff? Or center in the remaining space?</w:t></w:r></w:p>"#).unwrap();
+    let paragraph = crate::docx::paragraph_model(
+      &source,
+      &crate::docx::StylesCatalog::default(),
+      &mut crate::docx::NumberingCatalog::default(),
+      &crate::docx::ImageCatalog::default(),
+      &crate::docx::HyperlinkCatalog::default(),
+      &crate::docx::CustomXmlBindings::default(),
+      &mut crate::docx::FormWidgetIdAllocator::default(),
+    );
+    fn text_positions(items: &[PageItem], output: &mut Vec<(String, f32)>) {
+      for item in items {
+        match item {
+          PageItem::Text(text) => {
+            output.push((text.text.clone(), text.y_pt));
+            if let Some(clip) = text.paint_clip {
+              output.push((format!("paint_clip:{}", text.text), clip.origin.y.0));
+            }
+            if let Some(bounds) = text.page_culling_bounds {
+              output.push((format!("culling_bounds:{}", text.text), bounds.origin.y.0));
+            }
+          }
+          PageItem::Group(items)
+          | PageItem::InlineObjectGroup(items)
+          | PageItem::CompositingGroup { items, .. }
+          | PageItem::IndependentTextFrame(items)
+          | PageItem::FloatingDrawing { items, .. } => text_positions(items, output),
+          _ => {}
+        }
+      }
+    }
+    let mut reference = None;
+    for (alignment, shift) in [
+      ("top", 0.0),
+      ("center", 291.75),
+      ("bottom", 583.5),
+      ("both", 0.0),
+    ] {
+      let mut document = early_admission_test_document(100.0, paragraph.clone());
+      document.page = PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        margin_top_pt: 72.0,
+        margin_bottom_pt: 72.0,
+        margin_left_pt: 89.85,
+        margin_right_pt: 89.85,
+        ..PageSetup::default()
+      };
+      document.blocks.clear();
+      document.sections = vec![crate::docx::ImportedSection {
+        note_reference_order: Default::default(), break_kind: SectionBreakKind::NextPage,
+        discarded_carrier: None,
+        section_properties: Some(w::SectionProperties::from_bytes(format!(r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:vAlign w:val="{alignment}"/></w:sectPr>"#).as_bytes()).unwrap()),
+        page: document.page, columns: SectionColumns::default(), title_page: false,
+        header_blocks: Vec::new(), footer_blocks: Vec::new(), first_header_blocks: Vec::new(),
+        first_footer_blocks: Vec::new(), even_header_blocks: Vec::new(), even_footer_blocks: Vec::new(),
+        blocks: vec![Block::paragraph(paragraph.clone())],
+      }];
+      let (layout, _) = paginate_document(
+        &document,
+        &LayoutOptions::default(),
+        None,
+        TextMetrics::new(),
+        false,
+      );
+      assert_eq!(layout.pages.len(), 1);
+      let mut positions = Vec::new();
+      text_positions(&layout.pages[0].items, &mut positions);
+      assert!(positions.iter().any(|(text, _)| text == "Textbox"));
+      assert!(
+        positions
+          .iter()
+          .any(|(text, _)| text == "paint_clip:Textbox" || text == "culling_bounds:Textbox"),
+        "the visible text must retain an actual clip/culling owner, not just its extractable position"
+      );
+      assert!(positions.iter().any(|(text, _)| text.starts_with("How")));
+      if let Some(reference) = &reference {
+        let reference: &Vec<(String, f32)> = reference;
+        assert_eq!(positions.len(), reference.len());
+        for ((text, y), (before, old_y)) in positions.iter().zip(reference) {
+          assert_eq!(text, before);
+          assert!(
+            (y - old_y - shift).abs() < 0.001,
+            "{alignment} {text}: {old_y} -> {y}"
+          );
+        }
+      } else {
+        reference = Some(positions);
+      }
+    }
+  }
+
+  #[test]
+  fn paragraph_frame_around_requires_native_one_inch_side_lanes() {
+    let setup = PageSetup {
+      width_pt: 612.0,
+      margin_left_pt: 89.85,
+      margin_right_pt: 89.85,
+      ..PageSetup::default()
+    };
+    let flow = flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let right = flow.content_left_pt + flow.content_width;
+    for (raw_x, width, expected_left, expected_right) in [
+      (flow.content_left_pt + 18.0, 116.5, false, true),
+      (flow.content_left_pt + 72.0, 116.5, false, true),
+      (flow.content_left_pt + 72.05, 116.5, true, true),
+      (220.0, 116.5, true, true),
+      (280.0, 116.5, true, true),
+      (right - 116.5 - 72.0, 116.5, true, true),
+      (right - 116.5 - 56.75, 116.5, true, false),
+      (340.0, 116.5, true, false),
+      (flow.content_left_pt + 26.15, 380.0, false, false),
+    ] {
+      let placement = FloatingFramePlacement {
+        horizontal_anchor: FrameHorizontalAnchor::Page,
+        horizontal_offset_pt: raw_x,
+        wrap: FrameWrapMode::Around,
+        ..FloatingFramePlacement::default()
+      };
+      let (x, _) = paragraph_frame_position(placement, flow, 72.0, width, 120.0);
+      let bounds = FrameBounds {
+        x_pt: x,
+        y_pt: 72.0,
+        width_pt: width,
+        height_pt: 120.0,
+      };
+      let exclusion = paragraph_frame_wrap_exclusion(
+        flow,
+        placement,
+        bounds,
+        HorizontalFrameOutsets::default(),
+        WrapExclusionOwner::ParagraphFrame,
+      )
+      .unwrap();
+      let segments =
+        available_line_segments_for_y(flow.content_left_pt, right, 80.0, 12.0, &[exclusion]);
+      assert_eq!(
+        segments.iter().any(|(_, end)| *end <= x),
+        expected_left,
+        "x={raw_x}"
+      );
+      assert_eq!(
+        segments.iter().any(|(start, _)| *start >= x + width),
+        expected_right,
+        "x={raw_x}"
+      );
+      if !expected_left && !expected_right {
+        assert_eq!(
+          dodge_text_wrap_exclusions(80.0, 12.0, flow.content_left_pt, right, &[exclusion]),
+          192.0
+        );
+      }
+      assert_eq!((exclusion.top_pt, exclusion.bottom_pt), (72.0, 192.0));
+    }
   }
 
   #[test]
@@ -96920,6 +104443,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -97024,7 +104548,7 @@ mod tests {
     );
     assert_eq!(
       paragraph_frame_position(placement, flow, 72.0, 144.0, 36.0),
-      (80.0, 90.0)
+      (79.95, 89.95)
     );
   }
 
@@ -97187,10 +104711,10 @@ mod tests {
 
   #[test]
   fn legacy_inline_canvas_uses_the_paragraph_frame_translation() {
-    fn image_y(items: &[PageItem]) -> Option<f32> {
+    fn image_position(items: &[PageItem]) -> Option<(f32, f32)> {
       for item in items {
         match item {
-          PageItem::Image(image) => return Some(image.y_pt),
+          PageItem::Image(image) => return Some((image.x_pt, image.y_pt)),
           PageItem::Group(children)
           | PageItem::InlineObjectGroup(children)
           | PageItem::IndependentTextFrame(children)
@@ -97200,7 +104724,7 @@ mod tests {
           | PageItem::FloatingDrawing {
             items: children, ..
           } => {
-            if let Some(y) = image_y(children) {
+            if let Some(y) = image_position(children) {
               return Some(y);
             }
           }
@@ -97209,7 +104733,7 @@ mod tests {
       }
       None
     }
-    for mode in [12, 15] {
+    for (mode, decoded) in [(12, false), (15, false), (12, true), (15, true)] {
       let mut shape =
         crate::docx::chart_shape(30.0, 20.0, 0.0, crate::docx::ImagePlacement::Inline, None);
       assert!(!shape.wordprocessing_shape_host);
@@ -97219,7 +104743,9 @@ mod tests {
       let flow = FlowContext {
         compatibility_mode: mode,
         inside_paragraph_frame: true,
-        paragraph_frame_translation_y_pt: Some(22.8),
+        paragraph_frame_translation_y_pt: Some(if decoded { 22.75 } else { 22.8 }),
+        paragraph_frame_numeric_offset_decoded: (decoded, decoded),
+        content_left_pt: if decoded { 71.95 } else { 72.0 },
         ..flow_context(
           PageSetup::default(),
           0,
@@ -97240,12 +104766,16 @@ mod tests {
           anchor_pages: None,
           text_metrics: &mut TextMetrics::new(),
         },
-        49.8,
-        49.8,
+        if decoded { 49.75 } else { 49.8 },
+        if decoded { 49.75 } else { 49.8 },
         0.0,
       );
       assert!(pages.is_empty());
-      let y = image_y(&page.items).expect("canvas child image");
+      let (x, y) = image_position(&page.items).expect("canvas child image");
+      assert!(
+        (x - 71.95).abs() < 0.01,
+        "mode={mode}, decoded={decoded}, x={x}"
+      );
       assert!(
         (y - if mode < 15 { 22.75 } else { 49.75 }).abs() < 0.01,
         "mode={mode}, y={y}"
@@ -97274,8 +104804,9 @@ mod tests {
       flow.compatibility_mode = mode;
       for (offset, expected) in [
         (0.0, if mode < 15 { 27.0 } else { 0.0 }),
-        (0.05, 0.05),
-        (49.8, 49.8),
+        (0.05, 0.0),
+        (49.8, 49.8 - 0.05),
+        (-36.0, -36.05),
       ] {
         let actual = paragraph_frame_position(
           FloatingFramePlacement {
@@ -97287,7 +104818,7 @@ mod tests {
           492.5,
           83.45,
         );
-        assert_eq!(actual, (70.9, expected));
+        assert_eq!(actual, (70.9 - 0.05, expected));
       }
     }
   }
@@ -97353,7 +104884,7 @@ mod tests {
           144.0,
           36.0,
         ),
-        (234.0, offset)
+        (234.0, if offset == 0.0 { 0.0 } else { offset - 0.05 })
       );
     }
     assert_eq!(
@@ -97367,7 +104898,7 @@ mod tests {
         144.0,
         36.0,
       ),
-      (234.0, 162.0)
+      (234.0, 161.95)
     );
   }
 
@@ -97462,6 +104993,7 @@ mod tests {
       page: PageSetup::default(),
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -97603,6 +105135,64 @@ mod tests {
         .insert(0, character_picture(width, height));
     }
     paragraph
+  }
+
+  #[test]
+  fn paragraph_frame_small_heights_retain_their_physical_wrap_edge() {
+    let paragraph = paragraph_frame_picture_control(
+      "Note",
+      r#"<w:framePr w:w="2880" w:hAnchor="page" w:vAnchor="page" w:y="1700" w:wrap="notBeside"/>
+      <w:spacing w:before="0" w:after="0" w:line="160" w:lineRule="exact"/>"#,
+      None,
+    );
+    let original = paragraph_frame(&paragraph).unwrap();
+    let mut metrics = TextMetrics::new();
+    for mode in [12, 14, 15] {
+      let flow = FlowContext {
+        compatibility_mode: mode,
+        ..flow_context(
+          PageSetup::default(),
+          0,
+          SectionColumns::default(),
+          0,
+          0,
+          DEFAULT_TAB_STOP_PT,
+        )
+      };
+      for (rule, authored, expected) in [
+        (FrameHeightRule::Auto, None, 8.0),
+        (FrameHeightRule::AtLeast, Some(6.0), 8.0),
+        (FrameHeightRule::AtLeast, Some(20.0), 20.0),
+        (FrameHeightRule::Exact, Some(1.0), 1.0),
+        (FrameHeightRule::Exact, Some(6.0), 6.0),
+        (FrameHeightRule::Exact, Some(14.0), 14.0),
+      ] {
+        let mut frame = original.clone();
+        frame.height_rule = rule;
+        frame.height_pt = authored;
+        let mut page = empty_page(flow.setup, 0);
+        let (_, cursor) =
+          layout_floating_frame(&frame, flow, &mut page, &mut [], &mut metrics, 72.0);
+        assert_eq!(cursor, 72.0, "a fixed frame does not advance its anchor");
+        let cleared = dodge_text_wrap_exclusions(
+          80.0,
+          40.0,
+          flow.content_left_pt,
+          flow.content_left_pt + flow.content_width,
+          &page.wrap_exclusions,
+        );
+        assert!(
+          (cleared - (84.95 + expected)).abs() < 0.001,
+          "mode={mode} rule={rule:?} height={authored:?}: {cleared}"
+        );
+      }
+      let mut empty = original.clone();
+      empty.blocks.clear();
+      assert_eq!(
+        frame_height_for_width(&empty, flow, &mut metrics, 144.0),
+        DEFAULT_LINE_HEIGHT_PT
+      );
+    }
   }
 
   #[test]
@@ -97878,6 +105468,12 @@ mod tests {
             assert!((text.y_pt - image.y_pt - image.height_pt).abs() < 0.01);
             assert!((text.y_pt - 100.0 - before as f32).abs() < 0.01);
             assert!((next_y - 115.0 - before as f32).abs() < 0.01);
+          } else if segmentation == TextSegmentation::Body {
+            // Explicit body frames reserve their physical exclusion; they
+            // do not advance the body cursor directly. Native independent
+            // frame controls (tdf105035_framePrB) establish this separately
+            // from the shifted frame content and real-cell baseline below.
+            assert_eq!(next_y, 100.0);
           }
           positions.push((text.y_pt, image.y_pt, next_y));
         }
@@ -97885,13 +105481,18 @@ mod tests {
         for delta in [
           positions[1].0 - positions[0].0,
           positions[1].1 - positions[0].1,
-          positions[1].2 - positions[0].2,
         ] {
           assert!(
             (delta - expected_delta).abs() < 0.01,
             "owner={segmentation:?}, horizontal={horizontal_cell}, line_top={line_top_cursor}, before={before}, delta={delta}"
           );
         }
+        let expected_flow_delta = if segmentation == TextSegmentation::Body {
+          0.0
+        } else {
+          expected_delta
+        };
+        assert!((positions[1].2 - positions[0].2 - expected_flow_delta).abs() < 0.01);
       }
     }
   }
@@ -97960,6 +105561,7 @@ mod tests {
         &cell,
         300.0,
         TableCellMeasureContext {
+          in_header_footer: false,
           horizontal_rule_reference_width_pt: None,
           setup,
           default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
@@ -97977,6 +105579,7 @@ mod tests {
         align_retained_master: false,
         separate_borders: false,
         table_following_text_flow: false,
+        in_header_footer: false,
         direct_text_frame_story_owner: false,
         word_floating_table_cell: false,
         ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -98155,7 +105758,11 @@ mod tests {
           &crate::docx::CustomXmlBindings::default(),
           &mut crate::docx::FormWidgetIdAllocator::default(),
         );
-        for rule in [FrameHeightRule::Auto, FrameHeightRule::Exact] {
+        for rule in [
+          FrameHeightRule::Auto,
+          FrameHeightRule::AtLeast,
+          FrameHeightRule::Exact,
+        ] {
           // Exact-frame closure has its own final border owner. Keep that
           // counterexample while extending only unbounded frame paragraphs.
           if rule == FrameHeightRule::Exact && count != 1 {
@@ -98166,7 +105773,7 @@ mod tests {
             blocks: vec![Block::paragraph(paragraph.clone()); count],
             page_break_before: false,
             width_pt: Some(200.0),
-            height_pt: (rule == FrameHeightRule::Exact).then_some(90.0),
+            height_pt: Some(90.0),
             height_rule: rule,
             vertical_text_flow: None,
             placement: FloatingFramePlacement {
@@ -98183,6 +105790,21 @@ mod tests {
             outer_borders: ParagraphBordersModel::default(),
           };
           let expected_height = frame_height_for_width(&frame, flow, &mut metrics, 200.0);
+          if rule == FrameHeightRule::Auto {
+            assert_eq!(
+              expected_height,
+              frame_height_for_width(
+                &FloatingFrame {
+                  height_pt: None,
+                  ..frame.clone()
+                },
+                flow,
+                &mut metrics,
+                200.0,
+              ),
+              "automatic height ignores the authored minimum"
+            );
+          }
           let mut page = empty_page(flow.setup, 0);
           layout_floating_frame(
             &frame,
@@ -98212,7 +105834,7 @@ mod tests {
           }
           let bottom = left.last().unwrap();
           assert!(
-            (bottom.y2_pt + bottom.width_pt / 2.0 - 100.0 - expected_height).abs() < 0.001,
+            (bottom.y2_pt + bottom.width_pt / 2.0 - 99.95 - expected_height).abs() < 0.001,
             "paint must cover the complete physical frame: count={count} after={after} rule={rule:?}"
           );
         }
@@ -98398,6 +106020,81 @@ mod tests {
   }
 
   #[test]
+  fn automatic_table_paragraph_frame_uses_native_containing_width() {
+    let mut metrics = TextMetrics::new();
+    let mut flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    // Native Word: 187pt grid, independent padding/borders and mode 14/15.
+    // Left-aligned sentinel paragraphs expose the automatic frame origin;
+    // explicit 200pt frames retain their width for all table alignments.
+    for (margin, border_width, legacy_width, modern_width) in [
+      (0.0, 0.0, 187.0, 187.0),
+      (0.0, 0.75, 186.25, 187.75),
+      (0.0, 4.0, 183.0, 191.0),
+      (3.55, 0.0, 179.9, 187.0),
+      (3.55, 0.75, 179.9, 187.75),
+      (3.55, 4.0, 179.9, 191.0),
+    ] {
+      for (mode, expected) in [(14, legacy_width), (15, modern_width)] {
+        flow.compatibility_mode = mode;
+        for alignment in [
+          TableAlignment::Left,
+          TableAlignment::Center,
+          TableAlignment::Right,
+        ] {
+          let mut table = native_percentage_autofit_table("Floating Table", [0.0; 3]);
+          table.column_widths_pt = vec![153.0, 17.0, 17.0];
+          table.preferred_width_pt = None;
+          table.layout = TableLayoutMode::Fixed;
+          table.alignment = alignment;
+          table.align_leading_cell_content = mode < 15;
+          table.rows.truncate(1);
+          for cell in &mut table.rows[0].cells {
+            cell.preferred_width_pct = None;
+            cell.margins.left_pt = margin;
+            cell.margins.right_pt = margin;
+          }
+          let border = (border_width > 0.0).then_some(BorderStyle {
+            width_pt: border_width,
+            ..Default::default()
+          });
+          table.borders = Some(TableBordersModel {
+            left: border,
+            right: border,
+            ..Default::default()
+          });
+          let mut frame = FloatingFrame {
+            blocks: vec![Block::Table(table)],
+            drop_cap: false,
+            page_break_before: false,
+            width_pt: None,
+            height_pt: None,
+            height_rule: FrameHeightRule::Auto,
+            vertical_text_flow: None,
+            placement: FloatingFramePlacement::default(),
+            suppress_overlap: false,
+            outer_fill_color: None,
+            outer_borders: ParagraphBordersModel::default(),
+          };
+          let width = floating_frame_width(&frame, flow, &mut metrics);
+          assert!(
+            (width - expected).abs() < 0.001,
+            "mode={mode}, margin={margin}, border={border_width}, alignment={alignment:?}: {width}"
+          );
+          frame.width_pt = Some(200.0);
+          assert_eq!(floating_frame_width(&frame, flow, &mut metrics), 200.0);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn paragraph_border_grouping_compares_the_complete_resolved_border_set() {
     fn paragraph(borders: ParagraphBordersModel) -> Paragraph {
       Paragraph {
@@ -98496,10 +106193,48 @@ mod tests {
       context.bottom(block_paragraph(blocks.get(1)).unwrap()),
       Some(edge)
     );
+    for current_break in [None, Some(false), Some(true)] {
+      for next_break in [None, Some(false), Some(true)] {
+        let make = |leading: Option<bool>| {
+          let mut paragraph = paragraph(borders);
+          paragraph.format.shading = Some(ShadingPaint::Solid(RgbColor {
+            r: 226,
+            g: 239,
+            b: 217,
+          }));
+          if let Some(column) = leading {
+            paragraph.inlines = vec![
+              InlineItem::BookmarkStart("marker".into()),
+              if column {
+                InlineItem::ColumnBreak
+              } else {
+                InlineItem::PageBreak
+              },
+            ];
+          }
+          Block::paragraph(paragraph)
+        };
+        let previous = make(Some(false));
+        let current = make(current_break);
+        let next = make(next_break);
+        let current = block_paragraph(Some(&current)).unwrap();
+        let border = ParagraphBorderContext::for_blocks(Some(&previous), current, Some(&next));
+        let shading = ParagraphShadingContext::for_blocks(
+          Some(&previous),
+          current,
+          Some(&next),
+          &mut TextMetrics::new(),
+        );
+        assert_eq!(border.joins_previous, current_break.is_none());
+        assert_eq!(border.joins_next, next_break.is_none());
+        assert_eq!(shading.joins_previous, border.joins_previous);
+        assert_eq!(shading.joins_next, border.joins_next);
+      }
+    }
   }
 
   #[test]
-  fn table_cell_height_includes_paragraph_border_space() {
+  fn paragraph_border_space_is_reserved_by_cell_and_repeating_stories() {
     let paragraph = Paragraph {
       inlines: Vec::new(),
       field_events: Vec::new(),
@@ -98557,7 +106292,69 @@ mod tests {
       false,
       false,
     );
-    assert!((measured.0 - plain.0 - 10.5).abs() <= LAYOUT_EPSILON_PT);
+    assert!((measured.height - plain.height - 10.5).abs() <= LAYOUT_EPSILON_PT);
+    for story in [
+      TextSegmentation::RepeatingSlot,
+      TextSegmentation::FooterSlot,
+    ] {
+      for mode in [12, 15] {
+        let mut plain = bordered.clone();
+        plain.format.borders = ParagraphBordersModel::default();
+        let measure = |paragraph, metrics: &mut TextMetrics| {
+          measured_repeating_blocks_height_at(
+            &[Block::paragraph(paragraph)],
+            flow.setup,
+            DEFAULT_TAB_STOP_PT,
+            metrics,
+            false,
+            RepeatingStoryMeasurement {
+              origin_y_pt: 20.0,
+              compatibility_mode: mode,
+              text_segmentation: story,
+            },
+          )
+          .flow_pt
+        };
+        let mut metrics = TextMetrics::new();
+        let plain_height = measure(plain, &mut metrics);
+        let bordered_height = measure(bordered.clone(), &mut metrics);
+        assert!((bordered_height - plain_height - 10.5).abs() <= LAYOUT_EPSILON_PT);
+      }
+    }
+  }
+
+  #[test]
+  fn empty_master_shading_replays_the_separately_realized_printer_frame() {
+    let page = empty_page(
+      PageSetup {
+        width_pt: 419.6,
+        height_pt: 297.7,
+        ..Default::default()
+      },
+      0,
+    );
+    // Actual empty-master input frame and native PatBlt endpoints:
+    // [2006,960]..[2909,1065], then the A6 PDF output device. In particular
+    // x=242.1 is realized before applying the twelve-dot brush outset.
+    let actual =
+      word_empty_master_shading_rectangle(&page, (242.1, 347.6, 115.14786, 127.79678)).unwrap();
+    for (actual, expected) in [actual.0, actual.1, actual.2, actual.3]
+      .into_iter()
+      .zip([240.792, 115.248, 108.384, 12.6])
+    {
+      assert!((actual - expected).abs() < 0.0001);
+    }
+    let custom = empty_page(
+      PageSetup {
+        width_pt: 600.0,
+        height_pt: 800.0,
+        ..Default::default()
+      },
+      0,
+    );
+    assert!(
+      word_empty_master_shading_rectangle(&custom, (242.1, 347.6, 115.14786, 127.79678)).is_none()
+    );
   }
 
   #[test]
@@ -98618,8 +106415,17 @@ mod tests {
     for columns in [1, 2] {
       for before in [0.0, 6.0] {
         for after in [0.0, 10.0] {
-          for manual in [false, true] {
-            let inlines = if manual {
+          for break_kind in 0..=3 {
+            let manual = break_kind != 0;
+            let leading = break_kind >= 2;
+            let inlines = if leading {
+              let mut inlines = vec![InlineItem::PageBreak];
+              if break_kind == 3 {
+                inlines.push(InlineItem::PageBreak);
+              }
+              inlines.push(run("C00\nC01\nC02\nC03\nC04\nC05\nC06"));
+              inlines
+            } else if manual {
               vec![
                 run("C00\nC01"),
                 InlineItem::PageBreak,
@@ -98688,17 +106494,38 @@ mod tests {
               .collect::<Vec<_>>();
             assert_eq!(
               fills.len(),
-              2,
+              if break_kind == 3 { 3 } else { 2 },
               "columns={columns}, manual={manual}, before={before}, after={after}"
             );
             // Native16 independent controls: the master owns4/2 lines and
             // the follow owns3/5. Paragraph-after spacing paints no extra band.
-            let master_lines = if manual { 2.0 } else { 4.0 };
-            assert!((fills[0].y_pt - 120.0 - before).abs() < 0.001);
+            let master_lines = if leading {
+              1.0
+            } else if manual {
+              2.0
+            } else {
+              4.0
+            };
+            // Native leading-break controls keep upper spacing on the follow.
+            assert!((fills[0].y_pt - 120.0 - if leading { 0.0 } else { before }).abs() < 0.001);
             assert!((fills[0].height_pt - master_lines * 18.0).abs() < 0.001);
-            assert!((fills[1].y_pt - 36.0).abs() < 0.001);
-            assert!((fills[1].height_pt - (7.0 - master_lines) * 18.0).abs() < 0.001);
-            assert_eq!(pages.len(), if columns == 2 && !manual { 1 } else { 2 });
+            let follow = fills.last().unwrap();
+            assert!((follow.y_pt - 36.0 - if leading { before } else { 0.0 }).abs() < 0.001);
+            let follow_lines = if leading { 7.0 } else { 7.0 - master_lines };
+            assert!((follow.height_pt - follow_lines * 18.0).abs() < 0.001);
+            if break_kind == 3 {
+              assert!((fills[1].height_pt - 18.0).abs() < 0.001);
+            }
+            assert_eq!(
+              pages.len(),
+              if break_kind == 3 {
+                3
+              } else if columns == 2 && !manual {
+                1
+              } else {
+                2
+              }
+            );
             let mut covered_lines = 0;
             for page in &pages {
               for (index, item) in page.items.iter().enumerate() {
@@ -98719,6 +106546,611 @@ mod tests {
             }
             assert_eq!(covered_lines, 7);
           }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn explicit_break_decorations_keep_empty_master_and_content_owners() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 12.0,
+      use_windows_font_metrics: true,
+      ..Default::default()
+    };
+    let run = |text: &str| {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style: style.clone(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    let shade = ShadingPaint::Solid(RgbColor {
+      r: 226,
+      g: 239,
+      b: 217,
+    });
+    let setup = PageSetup {
+      width_pt: 360.0,
+      height_pt: 360.0,
+      margin_top_pt: 36.0,
+      margin_bottom_pt: 36.0,
+      margin_left_pt: 36.0,
+      margin_right_pt: 36.0,
+      ..Default::default()
+    };
+    for numbered in [false, true] {
+      for column in [false, true] {
+        for prefix in [false, true] {
+          for before in [0.0, 6.0] {
+            for width in [0.0, 1.0, 3.0] {
+              let border = (width > 0.0).then_some(BorderStyle {
+                width_pt: width,
+                spacing_pt: 1.0,
+                ..Default::default()
+              });
+              let mut inlines = Vec::new();
+              if prefix {
+                inlines.push(run("PREFIX"));
+              }
+              inlines.push(if column {
+                InlineItem::ColumnBreak
+              } else {
+                InlineItem::PageBreak
+              });
+              inlines.push(run("AFTER"));
+              let block = Block::paragraph(Paragraph {
+                inlines,
+                runs: Vec::new(),
+                field_events: Vec::new(),
+                footnote_reference_ids: Vec::new(),
+                endnote_reference_ids: Vec::new(),
+                starts_after_last_rendered_page_break: false,
+                base_style: style.clone(),
+                format: Box::new(ParagraphFormat {
+                  line_height_rule: LineHeightRule::Exact,
+                  line_height_pt: Some(18.0),
+                  spacing_before_pt: before,
+                  spacing_after_pt: 0.0,
+                  first_line_indent_pt: 12.0,
+                  shading: Some(shade),
+                  borders: ParagraphBordersModel {
+                    top: border,
+                    bottom: border,
+                    left: border,
+                    right: border,
+                    ..Default::default()
+                  },
+                  widow_control: Some(false),
+                  ..Default::default()
+                }),
+                style_ref_keys: Vec::new(),
+                style_ref_text: None,
+                style_ref_numbering_text: None,
+                list_label: numbered.then(|| "1.\t".into()),
+                list_label_image: None,
+                list_label_style: style.clone(),
+                list_label_hyperlink_url: None,
+                list_label_tab_stop_pt: None,
+              });
+              let mut flow = flow_context(
+                setup,
+                0,
+                SectionColumns {
+                  count: 2,
+                  gap_pt: 18.0,
+                  ..Default::default()
+                },
+                0,
+                0,
+                DEFAULT_TAB_STOP_PT,
+              );
+              flow.compatibility_mode = 11;
+              let mut current = empty_page(setup, 0);
+              let mut pages = Vec::new();
+              layout_document_block(
+                BlockNeighbors::direct(None, None),
+                &block,
+                flow,
+                LayoutBlockTarget {
+                  current: &mut current,
+                  pages: &mut pages,
+                  anchor_pages: None,
+                  text_metrics: &mut TextMetrics::new(),
+                  paragraph_decoration_outer_bottom_pt: None,
+                },
+                36.0,
+              );
+              pages.push(current);
+              let fills = pages
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .filter_map(|item| {
+                  if let PageItem::Fill(fill) = item {
+                    Some(fill)
+                  } else {
+                    None
+                  }
+                })
+                .collect::<Vec<_>>();
+              assert_eq!(fills.len(), 2);
+              let labels = pages
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .filter(|item| matches!(item, PageItem::Text(text) if text.text == "1."))
+                .count();
+              assert_eq!(
+                labels,
+                usize::from(numbered),
+                "a split paragraph owns its label once"
+              );
+              let gap = if border.is_some() { 1.0 } else { 0.0 };
+              let follow_top = if prefix { 36.0 } else { 36.0 + before + width };
+              assert!((fills[1].y_pt - follow_top).abs() < 0.001);
+              if !prefix {
+                assert!((fills[0].y_pt - 36.0).abs() < 0.001);
+                assert!((fills[0].height_pt - 18.0).abs() < 0.001);
+                assert!((fills[0].x_pt - 34.5).abs() < 0.001);
+              }
+              assert!(
+                (fills[1].height_pt - 18.0 - gap - if prefix { 0.0 } else { gap }).abs() < 0.001
+              );
+              let strokes = pages
+                .iter()
+                .flat_map(|page| page.items.iter())
+                .filter_map(|item| {
+                  if let PageItem::Line(line) = item {
+                    Some(line)
+                  } else {
+                    None
+                  }
+                })
+                .collect::<Vec<_>>();
+              assert_eq!(
+                strokes.len(),
+                if border.is_none() {
+                  0
+                } else if prefix {
+                  6
+                } else {
+                  4
+                }
+              );
+              let horizontal = strokes
+                .iter()
+                .filter(|line| (line.y1_pt - line.y2_pt).abs() < 0.001)
+                .count();
+              assert_eq!(horizontal, if border.is_some() { 2 } else { 0 });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn joined_paragraph_decorations_keep_suppressed_flow_top_spacing() {
+    let setup = PageSetup {
+      width_pt: 419.6,
+      height_pt: 297.7,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      margin_left_pt: 72.0,
+      margin_right_pt: 72.0,
+      ..Default::default()
+    };
+    let color = RgbColor {
+      r: 251,
+      g: 228,
+      b: 213,
+    };
+    for mode in [14, 15] {
+      for bordered in [false, true] {
+        for previous_shaded in [false, true] {
+          for manual in [false, true] {
+            let mut previous = early_admission_test_paragraph("PRELUDE");
+            previous.format.line_height_rule = LineHeightRule::Exact;
+            previous.format.line_height_pt = Some(if manual { 18.0 } else { 100.0 });
+            if manual {
+              previous.inlines.push(InlineItem::PageBreak);
+            }
+            if previous_shaded {
+              previous.format.shading = Some(ShadingPaint::Solid(RgbColor {
+                r: 0,
+                g: 228,
+                b: 213,
+              }));
+            }
+            let mut target = early_admission_test_paragraph("FOLLOW");
+            target.format.spacing_before_pt = 60.0;
+            target.format.shading = Some(ShadingPaint::Solid(color));
+            for paragraph in [&mut previous, &mut target] {
+              paragraph.format.spacing_after_pt = 8.0;
+              paragraph.format.widow_control = Some(false);
+              if bordered {
+                let border = Some(BorderStyle {
+                  width_pt: 3.0,
+                  spacing_pt: 1.0,
+                  ..Default::default()
+                });
+                paragraph.format.borders = ParagraphBordersModel {
+                  top: border,
+                  bottom: border,
+                  left: border,
+                  right: border,
+                  ..Default::default()
+                };
+              }
+            }
+            let blocks = [Block::paragraph(previous), Block::paragraph(target)];
+            let mut flow = flow_context(
+              setup,
+              0,
+              SectionColumns {
+                count: 2,
+                gap_pt: 35.4,
+                ..Default::default()
+              },
+              0,
+              0,
+              DEFAULT_TAB_STOP_PT,
+            );
+            flow.compatibility_mode = mode;
+            let mut current = empty_page(setup, 0);
+            let mut pages = Vec::new();
+            let mut metrics = TextMetrics::new();
+            let mut y = 72.0;
+            for i in 0..blocks.len() {
+              (flow, y) = layout_document_block(
+                BlockNeighbors::direct(i.checked_sub(1).map(|j| &blocks[j]), blocks.get(i + 1)),
+                &blocks[i],
+                flow,
+                LayoutBlockTarget {
+                  current: &mut current,
+                  pages: &mut pages,
+                  anchor_pages: None,
+                  text_metrics: &mut metrics,
+                  paragraph_decoration_outer_bottom_pt: None,
+                },
+                y,
+              );
+            }
+            pages.push(current);
+            let page = pages.last().unwrap();
+            if previous_shaded {
+              assert!(pages[0].items.iter().any(|item| matches!(item,
+                PageItem::Fill(fill) if fill.paint == ShadingPaint::Solid(RgbColor { r: 0, g: 228, b: 213 })
+              )), "a terminal manual break must leave its single painted prefix on the master");
+            }
+            let text = page
+              .items
+              .iter()
+              .find_map(|item| match item {
+                PageItem::Text(text) if text.text == "FOLLOW" => Some(text),
+                _ => None,
+              })
+              .unwrap();
+            assert_eq!(pages.len(), if manual { 2 } else { 1 });
+            assert_eq!(text.x_pt > 210.0, !manual);
+            assert!(
+              text.y_pt < 76.0,
+              "decoration ownership must not move the text"
+            );
+            let fill = page
+              .items
+              .iter()
+              .find_map(|item| match item {
+                PageItem::Fill(fill) if fill.paint == ShadingPaint::Solid(color) => Some(fill),
+                _ => None,
+              })
+              .unwrap();
+            let expected_top = if previous_shaded || bordered {
+              20.0
+            } else {
+              72.0
+            };
+            assert!(
+              (fill.y_pt - expected_top).abs() < 0.001,
+              "mode={mode} border={bordered} shaded={previous_shaded} manual={manual}"
+            );
+            if bordered {
+              assert!(page.items.iter().any(|item| matches!(item, PageItem::Line(line) if (line.x1_pt-line.x2_pt).abs()<0.001 && (line.y1_pt-20.0).abs()<0.001 && line.y2_pt>86.0)), "joined sides enclose the same upper span");
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn consecutive_empty_breaks_defer_upper_space_and_keep_fragment_edges() {
+    let setup = PageSetup {
+      width_pt: 419.6,
+      height_pt: 297.7,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      margin_left_pt: 72.0,
+      margin_right_pt: 72.0,
+      ..Default::default()
+    };
+    let red = ShadingPaint::Solid(RgbColor { r: 255, g: 0, b: 0 });
+    for column in [false, true] {
+      for repeated in [false, true] {
+        for split in [false, true] {
+          for before in [0.0, 60.0] {
+            let mut previous = early_admission_test_paragraph("PRELUDE");
+            let mut target = early_admission_test_paragraph("");
+            target.inlines.clear();
+            if repeated {
+              target.inlines.push(if column {
+                InlineItem::ColumnBreak
+              } else {
+                InlineItem::PageBreak
+              });
+            }
+            target.inlines.push(InlineItem::PageBreak);
+            target.format.spacing_before_pt = before;
+            target.format.shading = Some(red);
+            for paragraph in [&mut previous, &mut target] {
+              paragraph.format.line_height_rule = LineHeightRule::Exact;
+              paragraph.format.line_height_pt = Some(18.0);
+              let border = Some(BorderStyle {
+                width_pt: 3.0,
+                spacing_pt: 1.0,
+                ..Default::default()
+              });
+              paragraph.format.borders = ParagraphBordersModel {
+                top: border,
+                bottom: border,
+                left: border,
+                right: border,
+                ..Default::default()
+              };
+              paragraph.format.spacing_after_pt = 8.0;
+              paragraph.format.widow_control = Some(false);
+            }
+            let blocks = [Block::paragraph(previous), Block::paragraph(target)];
+            let mut flow = flow_context(
+              setup,
+              0,
+              SectionColumns {
+                count: 2,
+                gap_pt: 35.4,
+                ..Default::default()
+              },
+              0,
+              0,
+              DEFAULT_TAB_STOP_PT,
+            );
+            flow.compatibility_mode = 14;
+            flow.split_page_break_and_paragraph_mark = split;
+            let mut current = empty_page(setup, 0);
+            let mut pages = Vec::new();
+            let mut metrics = TextMetrics::new();
+            let mut y = 72.0;
+            for i in 0..blocks.len() {
+              (flow, y) = layout_document_block(
+                BlockNeighbors::direct(i.checked_sub(1).map(|j| &blocks[j]), blocks.get(i + 1)),
+                &blocks[i],
+                flow,
+                LayoutBlockTarget {
+                  current: &mut current,
+                  pages: &mut pages,
+                  anchor_pages: None,
+                  text_metrics: &mut metrics,
+                  paragraph_decoration_outer_bottom_pt: None,
+                },
+                y,
+              );
+            }
+            pages.push(current);
+            let fills = pages
+              .iter()
+              .enumerate()
+              .flat_map(|(pi, page)| {
+                page.items.iter().filter_map(move |item| match item {
+                  PageItem::Fill(fill) if fill.paint == red => Some((pi, fill)),
+                  _ => None,
+                })
+              })
+              .collect::<Vec<_>>();
+            assert_eq!(fills.len(), 1 + usize::from(repeated) + usize::from(split));
+            let first = fills[0].1;
+            assert!((first.y_pt - 106.0).abs() < 0.001);
+            assert!(
+              (first.height_pt - (18.0 + if !split && !repeated { 8.0 } else { 0.0 })).abs() < 0.01
+            );
+            if repeated {
+              let (pi, fill) = fills[1];
+              assert_eq!(pi, usize::from(!column));
+              assert!(
+                (fill.y_pt - 72.0).abs() < 0.001,
+                "an intermediate empty follow cannot consume the deferred upper space"
+              );
+              assert_eq!(fill.x_pt > 210.0, column);
+              assert!(pages[pi].items.iter().any(|item| matches!(item, PageItem::Line(line) if (line.x1_pt-line.x2_pt).abs()<0.001 && (line.y1_pt-72.0).abs()<0.001)));
+            }
+            if split {
+              let (pi, fill) = *fills.last().unwrap();
+              assert_eq!(pi, 1 + usize::from(repeated && !column));
+              let expected_top = 75.0 + (before - 8.0_f32).max(0.0);
+              assert!((fill.y_pt - expected_top).abs() < 0.001);
+            } else {
+              assert!(
+                (y - 72.0).abs() < 0.001,
+                "the empty target does not own the master's bottom-border strip"
+              );
+              assert!(
+                pages.last().unwrap().items.is_empty(),
+                "no synthetic final mark when split is disabled"
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn repeating_table_cells_keep_natural_lines_and_grid_spacing_units() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      font_size_pt: 16.0,
+      use_windows_font_metrics: true,
+      ..Default::default()
+    };
+    let paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "CELL".into(),
+        style: style.clone(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })],
+      runs: Vec::new(),
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: style.clone(),
+      format: Box::new(ParagraphFormat {
+        spacing_after_pt: 0.0,
+        widow_control: Some(false),
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: style,
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    let cell = TableCell {
+      blocks: vec![Block::paragraph(paragraph)],
+      shading: None,
+      borders: CellBordersModel::default(),
+      border_suppressions: CellBorderSuppressions::default(),
+      margins: CellMargins::zero(),
+      preferred_width_pt: Some(160.0),
+      preferred_width_pct: None,
+      grid_span: 1,
+      vertical_merge_continue: false,
+      no_wrap: false,
+      fit_text: false,
+      hide_end_mark: false,
+      vertical_alignment: TableCellVerticalAlignment::Top,
+      text_rotation_deg: None,
+    };
+    let table = Table {
+      recovered_absolute_grid: false,
+      column_widths_pt: vec![160.0],
+      preferred_width_pt: Some(160.0),
+      preferred_width_pct: None,
+      layout: TableLayoutMode::Fixed,
+      containing_table_layout: None,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      right_to_left: false,
+      align_leading_cell_content: false,
+      in_header_footer: false,
+      placement: None,
+      allow_overlap: true,
+      split_allowed: false,
+      following_text_flow: false,
+      explicit_no_repeat_header: false,
+      page_break_before: false,
+      starts_after_last_rendered_page_break: false,
+      borders: None,
+      cell_spacing: TableCellSpacing::Collapsed,
+      rows: vec![TableRow {
+        cells: vec![cell],
+        height_pt: None,
+        exact_height: false,
+        repeat_header: false,
+        keep_with_next: false,
+        cant_split: false,
+        cell_spacing: None,
+        grid_before: 0,
+        grid_after: 0,
+        alignment: None,
+        width_before_pt: None,
+        width_after_pt: None,
+        layout: None,
+        borders: None,
+        spacing_shading: None,
+        redline_color: None,
+      }],
+    };
+    let mut metrics = TextMetrics::new();
+    for pitch in [24.0, 36.0] {
+      for before_lines in [0.0, 0.5] {
+        let mut table = table.clone();
+        let Block::Paragraph(paragraph) = &mut table.rows[0].cells[0].blocks[0] else {
+          unreachable!()
+        };
+        paragraph.format.spacing_before_lines = Some(before_lines);
+        let measure = |table: &Table, adjust, metrics: &mut TextMetrics| {
+          let setup = PageSetup {
+            doc_grid_line_pitch_pt: Some(pitch),
+            table_cell_doc_grid_line_pitch_pt: Some(pitch),
+            adjust_table_line_heights_to_grid: adjust,
+            ..Default::default()
+          };
+          let flow = flow_context(
+            setup,
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            DEFAULT_TAB_STOP_PT,
+          );
+          let layout =
+            TableFrameLayout::new(table, block_area(flow), false, false, metrics).unwrap();
+          let frame_height = layout.frame.total_height;
+          let cell_height = table_cell_content_height_for_table(
+            &table.rows[0].cells[0],
+            160.0,
+            TableCellMeasureContext {
+              setup,
+              in_header_footer: table.in_header_footer,
+              horizontal_rule_reference_width_pt: None,
+              default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+              horizontal_borders: None,
+            },
+            true,
+            15,
+            metrics,
+          );
+          (frame_height, cell_height)
+        };
+        let natural = measure(&table, false, &mut metrics);
+        let snapped = measure(&table, true, &mut metrics);
+        assert!(snapped.0 > natural.0 + 1.0);
+        assert!(snapped.1 > natural.1 + 1.0);
+        table.in_header_footer = true;
+        for adjust in [false, true] {
+          let repeating = measure(&table, adjust, &mut metrics);
+          assert!((repeating.0 - natural.0).abs() < 0.001);
+          assert!((repeating.1 - natural.1).abs() < 0.001);
+        }
+        if before_lines > 0.0 {
+          let Block::Paragraph(paragraph) = &mut table.rows[0].cells[0].blocks[0] else {
+            unreachable!()
+          };
+          paragraph.format.spacing_before_lines = Some(0.0);
+          let without_before = measure(&table, true, &mut metrics);
+          assert!((natural.1 - without_before.1 - pitch * before_lines).abs() < 0.001);
         }
       }
     }
@@ -99103,6 +107535,105 @@ mod tests {
   }
 
   #[test]
+  fn paragraph_shading_horizontal_gaps_follow_native_border_masks_and_distances() {
+    let border = |spacing_pt| BorderStyle {
+      width_pt: 6.0,
+      spacing_pt,
+      ..Default::default()
+    };
+    let mut paragraph = Paragraph {
+      inlines: Vec::new(),
+      field_events: Vec::new(),
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
+      runs: Vec::new(),
+      format: Box::new(ParagraphFormat {
+        shading: Some(ShadingPaint::Solid(RgbColor {
+          r: 0xcc,
+          g: 0xcc,
+          b: 0xff,
+        })),
+        borders: ParagraphBordersModel {
+          top: Some(border(10.0)),
+          right: Some(border(31.0)),
+          bottom: Some(border(0.0)),
+          left: Some(border(31.0)),
+          between: None,
+          bar: None,
+        },
+        ..Default::default()
+      }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      style_ref_numbering_text: None,
+      list_label: None,
+      list_label_image: None,
+      list_label_style: TextStyle::default(),
+      list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
+    };
+    // Native 16 edge masks and independent L0/9/31 × R0/6/31 controls.
+    // Exercise the actual paint consumer; keep border ink on its own spacing.
+    for mask in 0..16 {
+      for left_space in [0.0, 9.0, 31.0] {
+        for right_space in [0.0, 6.0, 31.0] {
+          paragraph.format.borders = ParagraphBordersModel {
+            top: (mask & 1 != 0).then(|| border(3.0)),
+            right: (mask & 2 != 0).then(|| border(right_space)),
+            bottom: (mask & 4 != 0).then(|| border(17.0)),
+            left: (mask & 8 != 0).then(|| border(left_space)),
+            ..Default::default()
+          };
+          let mut page = empty_page(PageSetup::default(), 0);
+          decorate_paragraph(
+            &mut page,
+            ParagraphDecoration {
+              start_item_index: 0,
+              paragraph: &paragraph,
+              border_context: ParagraphBorderContext::default(),
+              empty_master_device_shading: false,
+              edges: ParagraphDecorationEdges::ALL,
+              x: 127.5,
+              y: 90.0,
+              width: 200.0,
+              height: 40.0,
+              baseline_offset_pt: 0.0,
+              shading_before_pt: 0.0,
+              shading_after_pt: 0.0,
+              border_before_pt: 0.0,
+              border_after_pt: 0.0,
+              outer_bottom_pt: None,
+              cell_inner_horizontal_bounds: None,
+              shading_clip: None,
+            },
+          );
+          let PageItem::Fill(fill) = page.items[0] else {
+            panic!("paragraph fill");
+          };
+          let left_gap = if mask & 10 == 10 { right_space } else { 0.0 };
+          let right_gap = if mask & 2 != 0 { right_space } else { 0.0 };
+          assert_eq!(fill.x_pt, 126.0 - left_gap);
+          assert_eq!(fill.x_pt + fill.width_pt, 329.0 + right_gap);
+          if mask & 8 != 0 {
+            let line = page
+              .items
+              .iter()
+              .rev()
+              .find_map(|item| match item {
+                PageItem::Line(line) => Some(line),
+                _ => None,
+              })
+              .unwrap();
+            assert_eq!(line.x1_pt, 126.0 - left_space - 3.0);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn paragraph_shading_fills_border_space_and_exact_frame_remainder() {
     let border = |spacing_pt| BorderStyle {
       width_pt: 3.0,
@@ -99179,6 +107710,8 @@ mod tests {
         start_item_index: 0,
         paragraph: &paragraph,
         border_context: ParagraphBorderContext::default(),
+        empty_master_device_shading: false,
+        edges: ParagraphDecorationEdges::ALL,
         x: 97.0,
         y: 90.0,
         width: 238.4,
@@ -99186,6 +107719,7 @@ mod tests {
         baseline_offset_pt: 0.0,
         shading_before_pt: 0.0,
         shading_after_pt: 0.0,
+        border_before_pt: 0.0,
         border_after_pt: 0.0,
         outer_bottom_pt: Some(275.0),
         cell_inner_horizontal_bounds: None,
@@ -99235,6 +107769,8 @@ mod tests {
         start_item_index: 0,
         paragraph: &paragraph,
         border_context: ParagraphBorderContext::default(),
+        empty_master_device_shading: false,
+        edges: ParagraphDecorationEdges::ALL,
         x: 97.0,
         y: 90.0,
         width: 238.4,
@@ -99242,6 +107778,7 @@ mod tests {
         baseline_offset_pt: 10.0,
         shading_before_pt: 0.0,
         shading_after_pt: 0.0,
+        border_before_pt: 0.0,
         border_after_pt: 0.0,
         outer_bottom_pt: None,
         cell_inner_horizontal_bounds: None,
@@ -99263,6 +107800,8 @@ mod tests {
         start_item_index: 0,
         paragraph: &cell_paragraph,
         border_context: ParagraphBorderContext::default(),
+        empty_master_device_shading: false,
+        edges: ParagraphDecorationEdges::ALL,
         x: 56.45,
         y: 138.94,
         width: 93.15,
@@ -99270,6 +107809,7 @@ mod tests {
         baseline_offset_pt: 0.0,
         shading_before_pt: 0.0,
         shading_after_pt: 0.0,
+        border_before_pt: 0.0,
         border_after_pt: 0.0,
         outer_bottom_pt: None,
         cell_inner_horizontal_bounds: Some((56.45, 149.35)),
@@ -99387,6 +107927,161 @@ mod tests {
         assert!((fill.x_pt - 98.5).abs() < 0.001);
         assert!((fill.width_pt - 203.0).abs() < 0.001);
       }
+    }
+  }
+
+  #[test]
+  fn separated_table_cells_inherit_internal_borders_before_direct_suppressions() {
+    // Native Word draws insideH/V around every separate cell and retains an
+    // independent table perimeter. Direct cell color/width or nil overrides
+    // only its own edge; dxa0 and a positive gap share this inheritance.
+    let blocks = super::super::html::import_blocks(
+      "<table border='1' cellspacing='0'><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></table>",
+      false,
+    );
+    let Block::Table(mut table) = blocks[0].clone() else {
+      panic!("table")
+    };
+    let horizontal = BorderStyle {
+      width_pt: 0.5,
+      ..Default::default()
+    };
+    let vertical = BorderStyle {
+      width_pt: 0.75,
+      ..Default::default()
+    };
+    let direct = BorderStyle {
+      width_pt: 0.25,
+      ..Default::default()
+    };
+    let outer = BorderStyle {
+      width_pt: 3.0,
+      ..Default::default()
+    };
+    table.borders = Some(TableBordersModel {
+      top: Some(outer),
+      bottom: Some(outer),
+      left: Some(outer),
+      right: Some(outer),
+      inside_horizontal: Some(horizontal),
+      inside_vertical: Some(vertical),
+    });
+    for gap in [0.0, 2.0, 5.0] {
+      table.cell_spacing = TableCellSpacing::Separated(gap);
+      for scenario in 0..3 {
+        for row in &mut table.rows {
+          row.borders = None;
+          row.cell_spacing = None;
+          for cell in &mut row.cells {
+            cell.borders = CellBordersModel::default();
+            cell.border_suppressions = Default::default();
+            if scenario == 1 {
+              cell.borders = CellBordersModel {
+                top: Some(direct),
+                right: Some(direct),
+                bottom: Some(direct),
+                left: Some(direct),
+              };
+            } else if scenario == 2 {
+              cell.border_suppressions.top = true;
+              cell.border_suppressions.right = true;
+              cell.border_suppressions.bottom = true;
+              cell.border_suppressions.left = true;
+            }
+          }
+        }
+        for (row_index, row) in table.rows.iter().enumerate() {
+          for (cell_index, cell) in row.cells.iter().enumerate() {
+            let expected_horizontal = match scenario {
+              0 => Some(horizontal),
+              1 => Some(direct),
+              _ => None,
+            };
+            let expected_vertical = match scenario {
+              0 => Some(vertical),
+              1 => Some(direct),
+              _ => None,
+            };
+            for leading in [false, true] {
+              assert_eq!(
+                cell_horizontal_border(&table, row_index, cell_index, cell, leading),
+                expected_horizontal
+              );
+              assert_eq!(
+                vertical_border(&table, row, cell_index, leading),
+                expected_vertical
+              );
+            }
+          }
+        }
+        assert_eq!(table.borders.unwrap().top, Some(outer));
+        assert_eq!(table.borders.unwrap().left, Some(outer));
+      }
+    }
+  }
+
+  #[test]
+  fn separated_inherited_borders_reach_cell_paint() {
+    let blocks = super::super::html::import_blocks(
+      "<table cellspacing='0' cellpadding='0'><tr><td>A</td><td>B</td></tr><tr><td>C</td><td>D</td></tr></table>",
+      false,
+    );
+    let Block::Table(mut table) = blocks[0].clone() else {
+      panic!("table")
+    };
+    let border = BorderStyle {
+      width_pt: 0.5,
+      ..Default::default()
+    };
+    table.cell_spacing = TableCellSpacing::Separated(0.0);
+    table.borders = Some(TableBordersModel {
+      inside_horizontal: Some(border),
+      inside_vertical: Some(border),
+      ..Default::default()
+    });
+    for nil in [false, true] {
+      for row in &mut table.rows {
+        row.borders = None;
+        row.cell_spacing = None;
+        for cell in &mut row.cells {
+          cell.borders = CellBordersModel::default();
+          cell.border_suppressions.top = nil;
+          cell.border_suppressions.right = nil;
+          cell.border_suppressions.bottom = nil;
+          cell.border_suppressions.left = nil;
+        }
+      }
+      let setup = PageSetup::default();
+      let mut page = empty_page(setup, 0);
+      let mut pages = Vec::new();
+      let mut metrics = TextMetrics::new();
+      layout_table(
+        &table,
+        flow_context(
+          setup,
+          0,
+          SectionColumns::default(),
+          0,
+          0,
+          DEFAULT_TAB_STOP_PT,
+        ),
+        TableLayoutTarget {
+          current: &mut page,
+          pages: &mut pages,
+          text_metrics: &mut metrics,
+        },
+        setup.margin_top_pt,
+        false,
+        0.0,
+        false,
+      );
+      assert!(pages.is_empty());
+      let edges = page.items.iter().filter(|item| {
+        matches!(item, PageItem::Fill(fill) if fill.width_pt < 1.0 || fill.height_pt < 1.0)
+      }).count();
+      // Native inner-only four-cell controls paint four complete edges per
+      // cell; an explicit nil on each cell suppresses all sixteen faces.
+      assert_eq!(edges, if nil { 0 } else { 16 });
     }
   }
 
@@ -101370,6 +110065,113 @@ mod tests {
   }
 
   #[test]
+  fn split_cell_blank_paragraphs_own_space_before_the_first_visible_line() {
+    let blocks = super::super::html::import_blocks(
+      "<table cellpadding='0'><tr><td><p style='font-size:8pt;margin:0'>before</p><p style='font-size:8pt;margin:0'>middle</p><p style='font-size:8pt;margin:0'>lower</p><p style='font-size:8pt;margin:0'>after</p></td></tr></table>",
+      false,
+    );
+    let Block::Table(template) = &blocks[0] else {
+      panic!("table")
+    };
+    // An empty prefix has the same pagination footprint as visible text.
+    // Native source derivatives and isolated cells distinguish the cut from
+    // paint ownership; each unconsumed lower must survive exactly once.
+    for floating in [false, true] {
+      for blank_prefix in [false, true] {
+        for available in [25.0, 30.0, 35.0] {
+          let mut table = template.clone();
+          table.placement = floating.then(FloatingFramePlacement::default);
+          table.split_allowed = true;
+          table.column_widths_pt = vec![100.0];
+          table.preferred_width_pt = Some(100.0);
+          table.layout = TableLayoutMode::Fixed;
+          table.cell_spacing = TableCellSpacing::Collapsed;
+          table.align_leading_cell_content = false;
+          table.borders = None;
+          table.rows[0].borders = None;
+          let cell = &mut table.rows[0].cells[0];
+          cell.borders = CellBordersModel::default();
+          cell.margins = CellMargins::zero();
+          cell.vertical_alignment = TableCellVerticalAlignment::Top;
+          cell.preferred_width_pt = Some(100.0);
+          for (i, block) in cell.blocks.iter_mut().enumerate() {
+            let Block::Paragraph(paragraph) = block else {
+              panic!("paragraph")
+            };
+            paragraph.format.line_height_rule = LineHeightRule::Exact;
+            paragraph.format.line_height_pt = Some(10.0);
+            paragraph.format.spacing_before_pt = 0.0;
+            paragraph.format.spacing_after_pt = 0.0;
+            if blank_prefix && i < 2 {
+              paragraph.inlines.clear();
+            }
+            paragraph.format.keep_with_next = false;
+            paragraph.format.keep_lines = false;
+            paragraph.format.widow_control = Some(false);
+          }
+          let setup = PageSetup {
+            height_pt: available,
+            margin_top_pt: 0.0,
+            margin_bottom_pt: 0.0,
+            ..Default::default()
+          };
+          let flow = flow_context(
+            setup,
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            DEFAULT_TAB_STOP_PT,
+          );
+          let mut current = empty_page(setup, 0);
+          let mut pages = Vec::new();
+          let mut metrics = TextMetrics::new();
+          layout_table(
+            &table,
+            flow,
+            TableLayoutTarget {
+              current: &mut current,
+              pages: &mut pages,
+              text_metrics: &mut metrics,
+            },
+            0.0,
+            false,
+            0.0,
+            false,
+          );
+          pages.push(current);
+          materialize_pending_floating_table_follows(&mut pages);
+          let owners = |label: &str| {
+            pages
+              .iter()
+              .enumerate()
+              .flat_map(|(page, content)| {
+                content.items.iter().filter_map(move |item| match item {
+                  PageItem::Text(text) if text.text == label => Some((page, text.y_pt)),
+                  _ => None,
+                })
+              })
+              .collect::<Vec<_>>()
+          };
+          for label in ["lower", "after"] {
+            assert_eq!(
+              owners(label).len(),
+              1,
+              "{label}, {floating}, {blank_prefix}, {available}"
+            );
+          }
+          assert_eq!(
+            owners("lower")[0].0,
+            usize::from(available < 30.0),
+            "{floating}, {blank_prefix}, {available}"
+          );
+          assert_eq!(owners("after")[0].0, 1);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn split_text_master_closes_at_retained_lowers_and_preserves_follows() {
     let blocks = super::super::html::import_blocks(
       "<table cellpadding='0'><tr><td><p style='font-size:8pt;margin:0'>short</p></td><td><p style='font-size:8pt;margin:0'>first</p><p style='font-size:8pt;margin:0'>second</p></td></tr></table>",
@@ -102288,6 +111090,109 @@ mod tests {
   }
 
   #[test]
+  fn automatic_list_spacing_shares_definitions_but_preserves_explicit_space_and_boundaries() {
+    fn paragraph(instance: Option<i32>, definition: Option<i32>) -> Paragraph {
+      Paragraph {
+        inlines: Vec::new(),
+        field_events: Vec::new(),
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        starts_after_last_rendered_page_break: false,
+        base_style: TextStyle::default(),
+        runs: Vec::new(),
+        format: Box::new(ParagraphFormat {
+          numbering_id: instance,
+          numbering_abstract_id: definition,
+          spacing_before_auto: Some(true),
+          spacing_after_auto: Some(true),
+          spacing_before_auto_pt: Some(14.0),
+          spacing_after_auto_pt: Some(14.0),
+          ..Default::default()
+        }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        list_label: None,
+        list_label_image: None,
+        list_label_style: TextStyle::default(),
+        list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
+      }
+    }
+    let base = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    for segmentation in [TextSegmentation::Body, TextSegmentation::TableCell] {
+      let flow = FlowContext {
+        text_segmentation: segmentation,
+        ..base
+      };
+      for additive in [false, true] {
+        for (instance, definition, shared) in [
+          (Some(1), Some(4), true),
+          (Some(2), Some(4), true),
+          (Some(2), Some(5), false),
+          (None, None, false),
+        ] {
+          let mut first = paragraph(Some(1), Some(4));
+          let mut second = paragraph(instance, definition);
+          // Style identity, label text and level do not own automatic list spacing.
+          first.format.style_id = Some("First".into());
+          second.format.style_id = Some("Second".into());
+          second.format.numbering_level_index = Some(2);
+          first.format.additive_paragraph_spacing = additive;
+          second.format.additive_paragraph_spacing = additive;
+          let gap = |first: &Paragraph, second: &Paragraph| {
+            paragraph_spacing_after(first, Some(&Block::paragraph(second.clone())), flow)
+              + paragraph_spacing_before_after_previous(first, second, None)
+          };
+          assert_eq!(
+            gap(&first, &second),
+            if shared {
+              0.0
+            } else if additive {
+              28.0
+            } else {
+              14.0
+            }
+          );
+          first.format.spacing_after_auto = Some(false);
+          first.format.spacing_after_pt = 6.0;
+          assert_eq!(
+            gap(&first, &second),
+            if shared {
+              6.0
+            } else if additive {
+              20.0
+            } else {
+              14.0
+            }
+          );
+          second.format.spacing_before_auto = Some(false);
+          second.format.spacing_before_pt = 9.0;
+          assert_eq!(gap(&first, &second), if additive { 15.0 } else { 9.0 });
+        }
+      }
+      let numbered = paragraph(Some(1), Some(4));
+      assert_eq!(paragraph_spacing_before(None, &numbered, flow), 0.0);
+      assert_eq!(paragraph_spacing_after(&numbered, None, flow), 14.0);
+      assert_eq!(
+        paragraph_spacing_after(
+          &numbered,
+          Some(&Block::paragraph(paragraph(None, None))),
+          flow
+        ),
+        14.0
+      );
+    }
+  }
+
+  #[test]
   fn non_html_paragraph_spacing_adds_adjacent_margins_without_changing_the_default() {
     fn paragraph(before: f32, after: f32, additive: bool, contextual: bool) -> Paragraph {
       Paragraph {
@@ -102335,7 +111240,7 @@ mod tests {
               (before - after).max(0.0)
             };
             assert_eq!(
-              section_start_spacing_before(&previous, &current, None),
+              section_start_spacing_before(Some(&previous), &current, None, None, None),
               expected
             );
           }
@@ -103317,10 +112222,9 @@ mod tests {
       placement,
       flow,
       ParagraphIndents::default(),
-      70.85,
-      70.85,
-      453.5,
-      97.2,
+      (70.85, 70.85),
+      (453.5, 97.2),
+      false,
     );
     assert!(wrapped.0.abs() < LAYOUT_EPSILON_PT);
     assert!((wrapped.1 - 48.0).abs() < LAYOUT_EPSILON_PT);
@@ -103333,10 +112237,9 @@ mod tests {
       placement,
       flow,
       ParagraphIndents::default(),
-      70.85,
-      70.85,
-      150.0,
-      97.2,
+      (70.85, 70.85),
+      (150.0, 97.2),
+      false,
     );
     assert!((page_fitting.0 - 320.85).abs() < LAYOUT_EPSILON_PT);
     assert!(page_fitting.0 + 150.0 > flow.setup.width_pt);
@@ -103349,10 +112252,9 @@ mod tests {
       placement,
       flow,
       ParagraphIndents::default(),
-      70.85,
-      70.85,
-      453.5,
-      97.2,
+      (70.85, 70.85),
+      (453.5, 97.2),
+      false,
     );
     assert!((through.0 - 70.5).abs() < LAYOUT_EPSILON_PT);
     assert!((through.1 - 48.0).abs() < LAYOUT_EPSILON_PT);
@@ -103757,6 +112659,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -103989,7 +112892,7 @@ mod tests {
     push_word_table_fine_dashed_vertical_border(
       &mut page,
       1309.0 / units::TWIPS_PER_POINT,
-      1425.0 / units::TWIPS_PER_POINT,
+      (1415.0 / units::TWIPS_PER_POINT, 0.5),
       1791.0 / units::TWIPS_PER_POINT,
       true,
       BorderStyle {
@@ -104075,6 +112978,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -104171,6 +113075,34 @@ mod tests {
   }
 
   #[test]
+  fn word_equal_columns_keep_native_integral_twip_widths() {
+    // Independent Word TextColumns.Width readbacks for 32 sections: vary
+    // page width one twip at a time, crossing the remainder in 2–5 columns.
+    for (count, widths_twips) in [
+      (2, [7497, 7498, 7498, 7499, 7499, 7500, 7500, 7501]),
+      (3, [4762, 4762, 4762, 4763, 4763, 4763, 4764, 4764]),
+      (4, [3394, 3394, 3394, 3395, 3395, 3395, 3395, 3396]),
+      (5, [2573, 2573, 2574, 2574, 2574, 2574, 2574, 2575]),
+    ] {
+      for (extra, expected) in widths_twips.into_iter().enumerate() {
+        let setup = PageSetup {
+          width_pt: (16838 + extra) as f32 / 20.0,
+          margin_left_pt: 567.0 / 20.0,
+          margin_right_pt: 567.0 / 20.0,
+          ..Default::default()
+        };
+        let columns = SectionColumns {
+          count,
+          gap_pt: 709.0 / 20.0,
+          ..Default::default()
+        };
+        let geometry = column_geometry(setup, columns, 0);
+        assert_eq!(geometry.widths, vec![expected as f32 / 20.0; count]);
+      }
+    }
+  }
+
+  #[test]
   fn word_table_upper_and_lower_seams_keep_distinct_device_ownership() {
     let setup = PageSetup {
       width_pt: 11906.0 / units::TWIPS_PER_POINT,
@@ -104186,11 +113118,10 @@ mod tests {
     let seam_pt = (1309.0 + 3070.0) / units::TWIPS_PER_POINT;
 
     let mut upper = empty_page(setup, 0);
-    push_word_table_fine_dashed_horizontal_border(
+    push_word_table_patterned_horizontal_border(
       &mut upper,
+      (left_pt, 71.1, seam_pt),
       left_pt,
-      71.1,
-      seam_pt,
       border,
       HorizontalTableBorderEdge::Upper,
       (
@@ -104209,11 +113140,10 @@ mod tests {
     assert_eq!(upper_alpha.get_pixel(0, 0).0[3], 255);
 
     let mut lower = empty_page(setup, 0);
-    push_word_table_fine_dashed_horizontal_border(
+    push_word_table_patterned_horizontal_border(
       &mut lower,
+      (left_pt, 85.1, seam_pt),
       left_pt,
-      85.1,
-      seam_pt,
       border,
       HorizontalTableBorderEdge::Lower,
       (
@@ -105219,6 +114149,7 @@ mod tests {
       table_cell_baseline_offset_pt: None,
       table_cell_line_baseline_reference_pt: None,
       drawing_wrap_baseline_offset_pt: 0.0,
+      following_table_wrap_baseline_offset_pt: 0.0,
       single_body_picture_minimum_pt: None,
       picture_only_cell: false,
     };
@@ -105393,11 +114324,75 @@ mod tests {
       &mut line_text_extents,
       &mut text_metrics,
     );
-    let expected_grid_height = snap_line_height_to_doc_grid(expected, Some(15.6));
+    let body_metrics = text_metrics.line_vertical_metrics_for_text("body", &paragraph.base_style);
+    let number_metrics = text_metrics.line_vertical_metrics_for_text("•", &label_style);
+    let expected_grid_height = snap_line_height_to_doc_grid(
+      body_metrics.line_height_pt()
+        + (number_metrics.directwrite_baseline_offset_pt
+          - body_metrics.directwrite_baseline_offset_pt)
+          .max(0.0),
+      Some(15.6),
+    );
     assert!(
       (grid_height - expected_grid_height.max(frame.base_line_height)).abs() < 0.001,
-      "an active snapped grid disables the independent CJK number-portion adjustment",
+      "a grid snaps the number ascent/body descent union without the legacy 127% adjustment",
     );
+
+    // Word grid controls keep 11pt Latin body text in DengXian at 18.07pt,
+    // while 18/24pt numbers occupy two 15.6pt rows and 36pt occupies three.
+    // The same rule applies with recovered and explicitly authored spacing.
+    let body = TextStyle {
+      font_family: Some(Arc::from("DengXian")),
+      font_size_pt: 11.0,
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    paragraph.base_style = body.clone();
+    let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+      unreachable!();
+    };
+    run.style = body.clone();
+    paragraph.list_label = Some("1.1\t".into());
+    paragraph.format.numbering_level_font_size_set = true;
+    let grid_frame = TextFrame {
+      base_line_height: 18.07,
+      base_content_height: 18.07,
+      ..recovered_frame
+    };
+    for recovered in [false, true] {
+      paragraph.format.office_recovered_line_height = recovered;
+      for (size, expected) in [(11.0, 18.07), (18.0, 31.2), (24.0, 31.2), (36.0, 46.8)] {
+        paragraph.list_label_style = TextStyle {
+          font_size_pt: size,
+          bold: true,
+          italic: true,
+          ..body.clone()
+        };
+        let mut extents = WordLineTextExtents::default();
+        let initial = include_numbering_label_height(
+          &paragraph,
+          grid_frame.base_line_height,
+          flow,
+          grid_frame,
+          &mut extents,
+          &mut text_metrics,
+        );
+        let completed = include_text_height(
+          initial,
+          &paragraph,
+          flow,
+          grid_frame,
+          &mut extents,
+          TextPortion::new(&body, "body"),
+          &mut text_metrics,
+        );
+        assert!((initial - expected).abs() < 0.001, "initial {size}pt");
+        assert!((completed - expected).abs() < 0.001, "completed {size}pt");
+        let body_metrics = text_metrics.line_vertical_metrics_for_text("body", &body);
+        assert!((extents.font_descent_pt - body_metrics.descent_pt).abs() < 0.001);
+      }
+    }
   }
 
   #[test]
@@ -105880,6 +114875,52 @@ mod tests {
   }
 
   #[test]
+  fn top_aligned_font_extents_match_native_design_metrics() {
+    let mut metrics = TextMetrics::new();
+    // Native Word font-cache C8/C4, in 1/4096pt units. Arial has external
+    // leading; Nyala and Calibri distinguish the same top anchor without it.
+    for (family, size, ascent, descent) in [
+      ("Nyala", 11.0, 22, 47058),
+      ("Nyala", 25.0, 50, 106950),
+      ("Arial", 11.0, 1496, 50314),
+      ("Arial", 25.0, 3400, 114350),
+      ("Calibri", 11.0, 22, 54978),
+      ("Calibri", 25.0, 50, 124950),
+    ] {
+      for shift in [-3.0, -0.5, 0.0, 3.0] {
+        let style = TextStyle {
+          font_family: Some(Arc::from(family)),
+          font_size_pt: size,
+          wordprocessingml_font_slots: true,
+          use_windows_font_metrics: true,
+          line_vertical_alignment: common::LineVerticalAlignment::Top,
+          baseline_shift_pt: shift,
+          ..Default::default()
+        };
+        let mut extents = WordLineTextExtents::default();
+        extents.include(
+          TextPortion::new(&style, "Abcd"),
+          true,
+          false,
+          false,
+          15,
+          &mut metrics,
+        );
+        assert!(
+          (extents.ascent_pt - (ascent as f32 / 4096.0 + shift).max(0.0)).abs() < 0.001,
+          "{family} {size} {shift}: ascent={}",
+          extents.ascent_pt
+        );
+        assert!(
+          (extents.descent_pt - (descent as f32 / 4096.0 - shift)).abs() < 0.001,
+          "{family} {size} {shift}: descent={}",
+          extents.descent_pt
+        );
+      }
+    }
+  }
+
+  #[test]
   fn paragraph_mark_shift_normalizes_only_an_all_shifted_text_line() {
     let shifted_style = TextStyle {
       baseline_shift_pt: 3.3,
@@ -105917,6 +114958,11 @@ mod tests {
     assert!(paragraph_uses_only_paragraph_mark_baseline_shift(
       &paragraph
     ));
+    paragraph.base_style.line_vertical_alignment = common::LineVerticalAlignment::Top;
+    assert!(!paragraph_uses_only_paragraph_mark_baseline_shift(
+      &paragraph
+    ));
+    paragraph.base_style.line_vertical_alignment = common::LineVerticalAlignment::Auto;
     paragraph.format.line_height_rule = LineHeightRule::Exact;
     paragraph.format.line_height_pt = Some(39.9);
     assert!(!paragraph_uses_only_paragraph_mark_baseline_shift(
@@ -105968,7 +115014,7 @@ mod tests {
         0,
         &mut text_metrics,
       )
-      .is_some()
+      .is_none()
     );
     paragraph.format.justification.logical_start = false;
     paragraph.format.justification.physical_left = true;
@@ -106108,16 +115154,22 @@ mod tests {
     .expect("direct paragraph-mark formatting must participate in the line box");
     paragraph.format.numbered_paragraph_mark_background = false;
     paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Start;
-    let implicit_height = word_east_asian_paragraph_mark_single_line_height(
-      &paragraph,
-      15,
-      TextSegmentation::Body,
-      false,
-      0,
-      &mut text_metrics,
-    )
-    .expect("modern logical-start paragraph retains the implicit mark metrics");
-    assert!((direct_height - implicit_height * 1.27).abs() < 0.001);
+    assert!(
+      word_east_asian_paragraph_mark_single_line_height(
+        &paragraph,
+        15,
+        TextSegmentation::Body,
+        false,
+        0,
+        &mut text_metrics,
+      )
+      .is_none(),
+      "ordinary empty marks use their realized font"
+    );
+    let direct_base_height = text_metrics
+      .vertical_metrics_for_script(&paragraph.base_style, ooxmlsdk_fonts::TextScript::Han)
+      .line_height_pt();
+    assert!((direct_height - direct_base_height * 1.27).abs() < 0.001);
   }
 
   #[test]
@@ -106639,15 +115691,20 @@ mod tests {
       repeating_slots: RepeatingSlotState::default(),
       text_segmentation: TextSegmentation::TableCell,
       horizontal_table_cell: true,
+      table_cell_in_header_footer: false,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
+      section_carrier_lower_pt: None,
+      section_carrier_style_matches: None,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
       word_floating_table_cell: false,
       floating_table_cell_follow_top_inset_pt: 0.0,
       floating_table_cell_follow_bottom_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
+      note_continuation_bottom_inset_pt: 0.0,
       inside_paragraph_frame: false,
       paragraph_frame_translation_y_pt: None,
+      paragraph_frame_numeric_offset_decoded: (false, false),
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       table_cell_complete_first_line_fit: false,
       table_cell_legacy_nested_row_follow: false,
@@ -106957,15 +116014,20 @@ mod tests {
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::TableCell,
         horizontal_table_cell: true,
+        table_cell_in_header_footer: false,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
+        section_carrier_lower_pt: None,
+        section_carrier_style_matches: None,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
         word_floating_table_cell: false,
         floating_table_cell_follow_top_inset_pt: 0.0,
         floating_table_cell_follow_bottom_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
+        note_continuation_bottom_inset_pt: 0.0,
         inside_paragraph_frame: false,
         paragraph_frame_translation_y_pt: None,
+        paragraph_frame_numeric_offset_decoded: (false, false),
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         table_cell_complete_first_line_fit: false,
         table_cell_legacy_nested_row_follow: false,
@@ -107069,15 +116131,20 @@ mod tests {
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::TableCell,
         horizontal_table_cell: true,
+        table_cell_in_header_footer: false,
         paragraph_spacing_context: ParagraphSpacingContext::Normal,
+        section_carrier_lower_pt: None,
+        section_carrier_style_matches: None,
         preserve_horizontal_on_advance: false,
         script_sensitive_line_height: true,
         word_floating_table_cell: false,
         floating_table_cell_follow_top_inset_pt: 0.0,
         floating_table_cell_follow_bottom_inset_pt: 0.0,
         note_continuation_top_inset_pt: 0.0,
+        note_continuation_bottom_inset_pt: 0.0,
         inside_paragraph_frame: false,
         paragraph_frame_translation_y_pt: None,
+        paragraph_frame_numeric_offset_decoded: (false, false),
         fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
         table_cell_complete_first_line_fit: false,
         table_cell_legacy_nested_row_follow: false,
@@ -107238,6 +116305,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "follow".into(),
         style: TextStyle::default(),
@@ -107652,6 +116720,85 @@ mod tests {
   }
 
   #[test]
+  fn standalone_wordprocessing_table_keeps_vector_borders_outside_its_frame() {
+    use crate::docx::{DrawingMlGroupTransform, DrawingTextBoxImportContext, wpc, wps};
+    use ooxmlsdk::sdk::SdkType;
+    let source = wps::WordprocessingShape::from_bytes(
+      br#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <wps:cNvSpPr txBox="1"/><wps:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1270000" cy="1270000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
+        </wps:spPr><wps:txbx><w:txbxContent>
+          <w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid>
+            <w:tr><w:tc><w:tcPr/><w:p/></w:tc></w:tr></w:tbl>
+        </w:txbxContent></wps:txbx>
+        <wps:bodyPr lIns="0" tIns="0" rIns="0" bIns="0"><a:noAutofit/></wps:bodyPr>
+      </wps:wsp>"#,
+    )
+    .unwrap();
+    for host in ["standalone", "group", "canvas"] {
+      let grouped = host != "standalone";
+      let context = DrawingTextBoxImportContext {
+        styles: &crate::docx::StylesCatalog::default(),
+        images: &crate::docx::ImageCatalog::default(),
+        hyperlinks: &crate::docx::HyperlinkCatalog::default(),
+        inside_wordprocessing_group: host == "group",
+        wordprocessing_canvas_has_background_paint: false,
+      };
+      let shape = if host == "canvas" {
+        crate::docx::wordprocessing_canvas_choice_textbox_frames(
+          &wpc::WordprocessingCanvasChoice::WordprocessingShape(Box::new(source.clone())),
+          crate::docx::ImagePlacement::Inline,
+          DrawingMlGroupTransform::identity(),
+          context,
+        )
+        .pop()
+        .unwrap()
+      } else {
+        crate::docx::wordprocessing_shape_textbox_frame(
+          &source,
+          crate::docx::ImagePlacement::Inline,
+          DrawingMlGroupTransform::identity(),
+          context,
+        )
+        .unwrap()
+      };
+      assert_eq!(shape.wordprocessing_group_textbox, grouped);
+      let mut items = vec![PageItem::Fill(FillItem {
+        x_pt: 4.0,
+        y_pt: 20.0,
+        width_pt: 0.5,
+        height_pt: 30.0,
+        paint: ShadingPaint::Solid(RgbColor { r: 0, g: 0, b: 0 }),
+      })];
+      rasterize_wordprocessing_shape_table_story_paint(
+        &shape,
+        ShapeTextBoxRect {
+          x: 10.0,
+          y: 20.0,
+          width: 100.0,
+          height: 100.0,
+        },
+        &mut items,
+      );
+      assert_eq!(items.len(), 1);
+      if grouped {
+        assert!(matches!(&items[0], PageItem::Image(_)));
+      } else {
+        let PageItem::Fill(fill) = &items[0] else {
+          panic!("standalone border must remain vector paint without a surface clip");
+        };
+        assert_eq!(
+          (fill.x_pt, fill.y_pt, fill.width_pt, fill.height_pt),
+          (4.0, 20.0, 0.5, 30.0)
+        );
+      }
+    }
+  }
+
+  #[test]
   fn fixed_wps_paint_clip_preserves_overflow_text_and_follows_translation() {
     let mut text = legacy_effect_test_text(TextStyle::default());
     text.text = "overflow remains in the PDF".into();
@@ -107698,6 +116845,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "visible".into(),
         style: TextStyle::default(),
@@ -108534,6 +117682,7 @@ mod tests {
           align_retained_master: false,
           separate_borders: false,
           table_following_text_flow: false,
+          in_header_footer: false,
           direct_text_frame_story_owner: false,
           word_floating_table_cell: false,
           ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -108729,6 +117878,7 @@ mod tests {
               align_retained_master: false,
               separate_borders: false,
               table_following_text_flow: false,
+              in_header_footer: false,
               direct_text_frame_story_owner: false,
               word_floating_table_cell: false,
               ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -109060,6 +118210,142 @@ mod tests {
       assert!((anchors[0].y_pt - expected_y).abs() < 0.01);
       assert!(heading.y_pt < expected_y + 18.0);
       assert_eq!(pages.len(), expected_page + 1);
+    }
+  }
+
+  #[test]
+  fn explicit_break_prefix_respects_first_line_admission() {
+    let setup = PageSetup {
+      width_pt: 420.0,
+      height_pt: 300.0,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      margin_left_pt: 72.0,
+      margin_right_pt: 72.0,
+      ..Default::default()
+    };
+    let border = Some(BorderStyle {
+      width_pt: 3.0,
+      spacing_pt: 1.0,
+      ..Default::default()
+    });
+    // Native 60/100pt prelude x before0/60 x leading/visible-prefix x
+    // page/column controls: only the100+60 visible prefix moves first.
+    for prelude_height in [60.0, 100.0] {
+      for before in [0.0, 60.0] {
+        for prefix in [false, true] {
+          for column in [false, true] {
+            let mut prelude = early_admission_test_paragraph("PRELUDE");
+            prelude.format.line_height_rule = LineHeightRule::Exact;
+            prelude.format.line_height_pt = Some(prelude_height);
+            let mut target = early_admission_test_paragraph("FOLLOW");
+            if prefix {
+              target.inlines.insert(
+                0,
+                InlineItem::Text(TextRun {
+                  text: "PREFIX".into(),
+                  ..target.runs[0].clone()
+                }),
+              );
+              target
+                .inlines
+                .insert(0, InlineItem::BookmarkStart("prefix".into()));
+            }
+            target.inlines.insert(
+              if prefix { 2 } else { 0 },
+              if column {
+                InlineItem::ColumnBreak
+              } else {
+                InlineItem::PageBreak
+              },
+            );
+            target.format.spacing_before_pt = before;
+            for paragraph in [&mut prelude, &mut target] {
+              paragraph.format.spacing_after_pt = 0.0;
+              paragraph.format.widow_control = Some(false);
+              paragraph.format.shading = Some(ShadingPaint::Solid(RgbColor {
+                r: 226,
+                g: 239,
+                b: 217,
+              }));
+              paragraph.format.borders = ParagraphBordersModel {
+                top: border,
+                bottom: border,
+                left: border,
+                right: border,
+                ..Default::default()
+              };
+            }
+            let blocks = [Block::paragraph(prelude), Block::paragraph(target)];
+            let mut flow = flow_context(
+              setup,
+              0,
+              SectionColumns {
+                count: 2,
+                gap_pt: 36.0,
+                ..Default::default()
+              },
+              0,
+              0,
+              DEFAULT_TAB_STOP_PT,
+            );
+            flow.compatibility_mode = 14;
+            let mut current = empty_page(setup, 0);
+            let mut pages = Vec::new();
+            let mut anchors = Vec::new();
+            let mut metrics = TextMetrics::new();
+            let mut y = 72.0;
+            for i in 0..blocks.len() {
+              (flow, y) = layout_document_block(
+                BlockNeighbors::direct(i.checked_sub(1).map(|j| &blocks[j]), blocks.get(i + 1)),
+                &blocks[i],
+                flow,
+                LayoutBlockTarget {
+                  current: &mut current,
+                  pages: &mut pages,
+                  anchor_pages: Some(&mut anchors),
+                  text_metrics: &mut metrics,
+                  paragraph_decoration_outer_bottom_pt: None,
+                },
+                y,
+              );
+            }
+            pages.push(current);
+            let overflow = prefix && prelude_height == 100.0 && before == 60.0;
+            let find_text = |label: &str| {
+              let found = pages
+                .iter()
+                .enumerate()
+                .flat_map(|(pi, page)| {
+                  page.items.iter().filter_map(move |item| match item {
+                    PageItem::Text(text) if text.text == label => Some((pi, text)),
+                    _ => None,
+                  })
+                })
+                .collect::<Vec<_>>();
+              assert_eq!(
+                found.len(),
+                1,
+                "each physical text portion must survive once"
+              );
+              found[0]
+            };
+            find_text("PRELUDE");
+            if prefix {
+              let (pi, text) = find_text("PREFIX");
+              assert_eq!(pi, 0);
+              assert_eq!(text.x_pt > 210.0, overflow);
+              assert!(text.y_pt < 228.0);
+              assert_eq!(anchors.len(), 1);
+              assert_eq!(anchors[0].page_index, pi);
+            }
+            let (pi, text) = find_text("FOLLOW");
+            assert_eq!(pi, usize::from(!column || overflow));
+            assert_eq!(text.x_pt > 210.0, column && !overflow);
+            assert_eq!(pages.len(), pi + 1);
+          }
+        }
+      }
     }
   }
 
@@ -109644,15 +118930,20 @@ mod tests {
       repeating_slots: RepeatingSlotState::default(),
       text_segmentation: TextSegmentation::TableCell,
       horizontal_table_cell: true,
+      table_cell_in_header_footer: false,
       paragraph_spacing_context: ParagraphSpacingContext::Normal,
+      section_carrier_lower_pt: None,
+      section_carrier_style_matches: None,
       preserve_horizontal_on_advance: false,
       script_sensitive_line_height: true,
       word_floating_table_cell: false,
       floating_table_cell_follow_top_inset_pt: 0.0,
       floating_table_cell_follow_bottom_inset_pt: 0.0,
       note_continuation_top_inset_pt: 0.0,
+      note_continuation_bottom_inset_pt: 0.0,
       inside_paragraph_frame: false,
       paragraph_frame_translation_y_pt: None,
+      paragraph_frame_numeric_offset_decoded: (false, false),
       fixed_output_raster_dpi: units::OFFICE_FIXED_OUTPUT_RASTER_DPI,
       table_cell_complete_first_line_fit: false,
       table_cell_legacy_nested_row_follow: false,
@@ -109982,6 +119273,133 @@ mod tests {
   }
 
   #[test]
+  fn floating_table_top_distance_reflows_preceding_text_at_the_original_anchor() {
+    // Native Word controls vary topFromText, tblpY and compatibilityMode.
+    // The fly stays at its original position even when earlier text wraps;
+    // only legacy modes include terminal paragraph spacing in the collision.
+    for mode in [14, 15] {
+      for (top, offset) in [(0.0, 0.05), (8.0, 0.05), (28.0, 0.05), (8.0, 20.0)] {
+        let mut before = early_admission_test_paragraph(
+          "Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda",
+        );
+        before.format.line_height_rule = LineHeightRule::Exact;
+        before.format.line_height_pt = Some(14.0);
+        before.format.spacing_before_pt = 0.0;
+        before.format.spacing_after_pt = 10.0;
+        let mut table = native_percentage_autofit_table("TABLE", [100.0]);
+        table.rows.truncate(1);
+        table.rows[0].height_pt = Some(40.0);
+        table.rows[0].cells[0].margins = CellMargins::zero();
+        table.rows[0].cells[0].preferred_width_pct = None;
+        table.borders = None;
+        table.column_widths_pt = vec![300.0];
+        table.preferred_width_pt = Some(300.0);
+        table.layout = TableLayoutMode::Fixed;
+        table.placement = Some(FloatingFramePlacement {
+          horizontal_anchor: FrameHorizontalAnchor::Margin,
+          vertical_anchor: FrameVerticalAnchor::Text,
+          vertical_offset_pt: offset,
+          vertical_offset_explicit: true,
+          margin_top_pt: top,
+          wrap: FrameWrapMode::Around,
+          ..Default::default()
+        });
+        let mut source = early_admission_test_document(200.0, before.clone());
+        source.page.width_pt = 620.0;
+        source.page.height_pt = 800.0;
+        source.page.margin_left_pt = 72.0;
+        source.page.margin_right_pt = 72.0;
+        source.page.margin_top_pt = 72.0;
+        source.compatibility_mode = mode;
+        source.blocks = vec![Block::paragraph(before), Block::Table(table)];
+        let mut unwrapped = source.clone();
+        let Block::Table(table) = &mut unwrapped.blocks[1] else {
+          unreachable!()
+        };
+        table.placement.as_mut().unwrap().margin_top_pt = 0.0;
+        let ordinary = RootFrameLayout::new(&unwrapped, &LayoutOptions::default()).format();
+        let result = RootFrameLayout::new(&source, &LayoutOptions::default()).format();
+        assert_eq!(result.pages.len(), 1);
+        let page = &result.pages[0];
+        assert_eq!(page.floating_table_bounds.len(), 1);
+        assert_eq!(
+          page.floating_table_bounds[0].bounds.y_pt,
+          ordinary.pages[0].floating_table_bounds[0].bounds.y_pt
+        );
+        let first_x = page
+          .items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Text(text) if text.text.starts_with("Alpha") => Some(text.x_pt),
+            _ => None,
+          })
+          .unwrap();
+        let wraps = top == 28.0 || (top == 8.0 && offset < 1.0 && mode < 15);
+        assert_eq!(
+          first_x > 300.0,
+          wraps,
+          "mode={mode}, top={top}, offset={offset}, first_x={first_x}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn negative_floating_table_keeps_its_master_when_anchor_cannot_clear_on_page() {
+    // Word's negative-offset fly can stay on the master when clearing the
+    // preceding line would require a follow. The topFromText replay owner
+    // must not acquire this existing split-anchor policy.
+    let mut prefix = early_admission_test_paragraph("PREFIX");
+    prefix.format.line_height_rule = LineHeightRule::Exact;
+    prefix.format.line_height_pt = Some(368.0);
+    prefix.format.spacing_before_pt = 0.0;
+    prefix.format.spacing_after_pt = 0.0;
+    let mut anchor = early_admission_test_paragraph("ANCHOR");
+    anchor.format.line_height_rule = LineHeightRule::Exact;
+    anchor.format.line_height_pt = Some(14.0);
+    anchor.format.spacing_before_pt = 0.0;
+    anchor.format.spacing_after_pt = 0.0;
+    let mut table = native_percentage_autofit_table("TABLE", [100.0]);
+    table.rows.truncate(1);
+    table.rows[0].height_pt = Some(80.0);
+    table.rows[0].cells[0].margins = CellMargins::zero();
+    table.rows[0].cells[0].preferred_width_pct = None;
+    table.borders = None;
+    table.column_widths_pt = vec![320.0];
+    table.preferred_width_pt = Some(320.0);
+    table.layout = TableLayoutMode::Fixed;
+    table.placement = Some(FloatingFramePlacement {
+      horizontal_anchor: FrameHorizontalAnchor::Margin,
+      vertical_anchor: FrameVerticalAnchor::Text,
+      vertical_offset_pt: -3.65,
+      vertical_offset_explicit: true,
+      wrap: FrameWrapMode::Around,
+      ..Default::default()
+    });
+    let mut source = early_admission_test_document(200.0, anchor.clone());
+    source.page = PageSetup {
+      width_pt: 464.0,
+      height_pt: 608.0,
+      margin_left_pt: 72.0,
+      margin_right_pt: 72.0,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      ..Default::default()
+    };
+    source.compatibility_mode = 15;
+    source.blocks = vec![
+      Block::paragraph(prefix),
+      Block::paragraph(anchor),
+      Block::Table(table),
+    ];
+    let result = RootFrameLayout::new(&source, &LayoutOptions::default()).format();
+    assert_eq!(result.pages.len(), 1);
+    let bounds = &result.pages[0].floating_table_bounds;
+    assert_eq!(bounds.len(), 1);
+    assert!((bounds[0].bounds.y_pt - 450.35).abs() < 0.01);
+  }
+
+  #[test]
   fn negative_floating_table_preseed_keeps_legacy_empty_anchor_lower_space() {
     use ooxmlsdk::sdk::SdkType;
 
@@ -110050,6 +119468,7 @@ mod tests {
           },
           page_background_pattern: None,
           page_background_texture: None,
+          page_background_gradient: None,
           line_number_style: TextStyle::default(),
           note_separator_style: TextStyle::default(),
           footnote_separator_stories: Default::default(),
@@ -110464,6 +119883,7 @@ mod tests {
         static3d: None,
         width_pt,
         height_pt: 32.0,
+        inline_frame_axes_swapped: false,
         inline_offset_x_pt: 0.0,
         inline_offset_y_pt: 0.0,
         effect_left_pt: 0.0,
@@ -110584,6 +120004,639 @@ mod tests {
     assert!((images[2].x_pt - (flow.content_left_pt + flow.content_width - 115.0)).abs() < 0.001);
     assert!((images[0].y_pt - images[1].y_pt).abs() < 0.001);
     assert!((images[1].y_pt - images[2].y_pt).abs() < 0.001);
+  }
+
+  #[test]
+  fn aligned_tabs_keep_inline_shapes_and_group_suffixes_on_one_line() {
+    let mut flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    flow.content_width = 300.0;
+    let mut metrics = TextMetrics::new();
+    for grouped in [false, true] {
+      for suffix in [false, true] {
+        let mut positions = Vec::new();
+        for tab_count in [1, 2] {
+          let mut paragraph = paragraph_frame_picture_control("TAIL", "", None);
+          let InlineItem::Text(tail) = paragraph.inlines[0].clone() else {
+            panic!()
+          };
+          let mut tab = tail.clone();
+          tab.text = "\t".into();
+          paragraph.inlines = vec![InlineItem::Text(tab); tab_count];
+          paragraph.format.tab_stops = vec![
+            TabStop {
+              position_pt: 150.0,
+              alignment: TabStopAlignment::Center,
+              leader: TabLeader::None,
+            },
+            TabStop {
+              position_pt: 300.0,
+              alignment: TabStopAlignment::Right,
+              leader: TabLeader::None,
+            },
+          ];
+          paragraph.format.tab_stops_set = true;
+          let mut shape =
+            crate::docx::chart_shape(80.0, 24.0, 0.0, crate::docx::ImagePlacement::Inline, None);
+          shape.wordprocessing_shape_host = true;
+          if grouped {
+            let mut child = shape.clone();
+            child.width_pt = 10.0;
+            child.height_pt = 10.0;
+            child.offset_x_pt = 5.0;
+            child.fill_color = Some(RgbColor::default());
+            let mut second = child.clone();
+            second.offset_x_pt = 40.0;
+            shape.canvas_children = Some(vec![InlineItem::Shape(child), InlineItem::Shape(second)]);
+          }
+          paragraph.inlines.push(InlineItem::Shape(shape));
+          let tail_width = if suffix {
+            metrics.measure_text(&tail.text, &tail.style)
+          } else {
+            0.0
+          };
+          if suffix {
+            paragraph.inlines.push(InlineItem::Text(tail));
+          }
+          let mut page = empty_page(flow.setup, 0);
+          let mut pages = Vec::new();
+          let (_, bottom) = layout_paragraph(
+            &paragraph,
+            flow,
+            ParagraphLayoutTarget {
+              current: &mut page,
+              pages: &mut pages,
+              anchor_pages: None,
+              text_metrics: &mut metrics,
+            },
+            flow.content_top_pt,
+            flow.content_top_pt,
+            0.0,
+          );
+          assert!(pages.is_empty());
+          let image = page
+            .items
+            .iter()
+            .find_map(inline_alignment_image)
+            .expect("one shape frame");
+          let expected = flow.content_left_pt
+            + if tab_count == 1 {
+              150.0 - (80.0 + tail_width) / 2.0
+            } else {
+              300.0 - 80.0 - tail_width
+            };
+          assert!(
+            (image.x_pt - expected).abs() < 0.01,
+            "grouped={grouped}, suffix={suffix}, tabs={tab_count}"
+          );
+          if suffix {
+            let text = page
+              .items
+              .iter()
+              .find_map(|item| match item {
+                PageItem::Text(text) if text.text == "TAIL" => Some(text),
+                _ => None,
+              })
+              .expect("suffix after the complete shape");
+            assert!((text.x_pt - image.x_pt - 80.0).abs() < 0.01);
+          }
+          positions.push((image.y_pt, bottom));
+        }
+        assert!((positions[0].0 - positions[1].0).abs() < 0.01);
+        assert!((positions[0].1 - positions[1].1).abs() < 0.01);
+      }
+    }
+  }
+
+  #[test]
+  fn automatic_tab_keeps_the_first_following_text_portion_across_runs() {
+    let style = TextStyle {
+      font_family: Some("Arial".into()),
+      font_size_pt: 12.0,
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    // Native Word mode12/15: same-run and separate-run tails wrap with
+    // their automatic tab. The first word fits at488pt, but not485pt.
+    for mode in [12, 15] {
+      for (width, tab_count, expected_advance) in [
+        (467.95, 1, 36.0),
+        (468.0, 1, 36.0),
+        (468.05, 1, 36.0),
+        (468.1, 1, 36.0),
+        (468.15, 1, 36.0),
+        (468.2, 1, 36.0),
+        (468.5, 1, 36.0),
+        (469.0, 1, 36.0),
+        (470.0, 1, 36.0),
+        (471.0, 1, 36.0),
+        (472.0, 1, 36.0),
+        (476.0, 1, 36.0),
+        (480.0, 1, 36.0),
+        (485.0, 1, 36.0),
+        (488.0, 1, 468.0),
+        (490.0, 1, 468.0),
+        (467.95, 2, 72.0),
+        (467.95, 3, 108.0),
+        (467.95, 4, 144.0),
+        (468.0, 2, 36.0),
+        (468.0, 3, 72.0),
+        (468.0, 4, 108.0),
+        (468.05, 2, 36.0),
+        (468.05, 3, 72.0),
+        (468.05, 4, 108.0),
+      ] {
+        for split in [false, true] {
+          let prefix = format!("{}{}", "M".repeat(45), "\t".repeat(tab_count));
+          let Block::Paragraph(mut paragraph) =
+            crate::docx::simple_text_block(format!("{prefix}Tail marker"), style.clone())
+          else {
+            panic!()
+          };
+          if split {
+            let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+              panic!()
+            };
+            let mut tail = run.clone();
+            run.text = prefix;
+            tail.text = "Tail marker".into();
+            paragraph.inlines.push(InlineItem::Text(tail));
+          }
+          paragraph.format.alignment = ParagraphAlignment::Left;
+          paragraph.format.line_height_pt = Some(18.0);
+          paragraph.format.line_height_rule = LineHeightRule::Exact;
+          let base = flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            36.0,
+          );
+          let flow = FlowContext {
+            compatibility_mode: mode,
+            content_width: width,
+            ..base
+          };
+          let mut page = empty_page(flow.setup, 0);
+          let mut pages = Vec::new();
+          layout_paragraph(
+            &paragraph,
+            flow,
+            ParagraphLayoutTarget {
+              current: &mut page,
+              pages: &mut pages,
+              anchor_pages: None,
+              text_metrics: &mut metrics,
+            },
+            flow.content_top_pt,
+            flow.content_top_pt,
+            0.0,
+          );
+          assert!(pages.is_empty());
+          let tail = page
+            .items
+            .iter()
+            .find_map(|item| match item {
+              PageItem::Text(text) if text.text.starts_with("Tail") => Some(text),
+              _ => None,
+            })
+            .expect("following text");
+          let expected = flow.content_left_pt + expected_advance;
+          assert!(
+            (tail.x_pt - expected).abs() < 0.15,
+            "mode={mode},width={width},tabs={tab_count},split={split}:{} versus {expected}",
+            tail.x_pt
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn underscore_leaders_use_the_native_page_device_lattice() {
+    let mut metrics = TextMetrics::new();
+    // Native 128 rows: two fonts/sizes, modes12/15, left/right stops,
+    // fractional endpoints and empty/blank/printed results. Origins below
+    // exclude the common PDF operation's 0.024pt device phase.
+    for layout in [
+      TabLeaderLayout::OfficeLegacyPrintGridEnd,
+      TabLeaderLayout::Office2013PrintGridEnd,
+      TabLeaderLayout::NaturalStart,
+    ] {
+      for (family, size, advance, first, counts) in [
+        ("Times New Roman", 12.0, 6.0, 84.0, [15, 16]),
+        ("Times New Roman", 17.0, 8.52, 85.2, [10, 11]),
+        ("Arial", 12.0, 6.72, 80.64, [14, 14]),
+        ("Arial", 17.0, 9.48, 85.32, [9, 10]),
+      ] {
+        let style = TextStyle {
+          font_family: Some(family.into()),
+          font_size_pt: size,
+          use_windows_font_metrics: true,
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        };
+        let leader = tab_leader_metrics('_', &style, layout, false, &mut metrics);
+        assert!(
+          (leader.logical_repeat_width_pt - advance).abs() < 0.001,
+          "{family}/{size}"
+        );
+        let start = 72.0 + metrics.measure_text("A", &style);
+        for (end, count) in [175.25, 180.75].into_iter().zip(counts) {
+          let (x, n) = word_tab_leader_device_span(start, end, leader.logical_repeat_width_pt);
+          assert!((x - first).abs() < 0.001, "{family}/{size}/{end}: {x}");
+          assert_eq!(n, count, "{family}/{size}/{end}");
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn blank_tab_lines_use_the_last_portion_then_the_paragraph_mark() {
+    let style = TextStyle {
+      font_family: Some("Times New Roman".into()),
+      font_size_pt: 12.0,
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    for mode in [12, 15] {
+      for (last_size, mark_size, first_baseline, last_baseline) in [
+        (12.0, 12.0, 179.09, 195.05),
+        (36.0, 12.0, 201.53, 227.11),
+        (72.0, 12.0, 235.15, 274.99),
+        (72.0, 24.0, 235.15, 286.27),
+      ] {
+        let Block::Paragraph(mut paragraph) =
+          crate::docx::simple_text_block(String::new(), style.clone())
+        else {
+          panic!()
+        };
+        paragraph.base_style.font_size_pt = mark_size;
+        paragraph.format.line_height_pt = Some(278.0 / 240.0);
+        paragraph.format.tab_stops = vec![
+          TabStop {
+            position_pt: 144.0,
+            alignment: TabStopAlignment::Left,
+            leader: TabLeader::Dot,
+          },
+          TabStop {
+            position_pt: 441.0,
+            alignment: TabStopAlignment::Right,
+            leader: TabLeader::Underscore,
+          },
+        ];
+        let InlineItem::Text(template) = &paragraph.inlines[0] else {
+          panic!()
+        };
+        let run = |text: &str, size| {
+          let mut run = template.clone();
+          run.text = text.into();
+          run.style.font_size_pt = size;
+          InlineItem::Text(run)
+        };
+        paragraph.inlines = vec![
+          run(
+            "How do tabstops and spaces affect an empty line in MSO??",
+            36.0,
+          ),
+          run("\t ", 36.0),
+          run("\t", 48.0),
+          // A larger preceding blank must not replace the last portion.
+          run(" ", 96.0),
+          run(" ", last_size),
+          run("\t", 48.0),
+          run("  ", 72.0),
+        ];
+        let flow = FlowContext {
+          compatibility_mode: mode,
+          content_width: 451.3,
+          ..flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            36.0,
+          )
+        };
+        let mut page = empty_page(flow.setup, 0);
+        let mut pages = Vec::new();
+        layout_paragraph(
+          &paragraph,
+          flow,
+          ParagraphLayoutTarget {
+            current: &mut page,
+            pages: &mut pages,
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+          },
+          72.0,
+          72.0,
+          0.0,
+        );
+        assert!(pages.is_empty());
+        let dots = page
+          .items
+          .iter()
+          .filter_map(|item| {
+            let PageItem::Text(text) = item else {
+              return None;
+            };
+            (tab_leader_text_char(text) == Some('.')).then_some(text)
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(
+          dots.len(),
+          2,
+          "mode={mode},size={last_size},mark={mark_size}"
+        );
+        for (dot, expected) in dots.iter().zip([first_baseline, last_baseline]) {
+          let baseline = common::wordprocessing_device::line_baseline(
+            dot
+              .wordprocessing_line_metrics
+              .expect("blank line geometry"),
+            dot.y_pt,
+          )
+          .expect("baseline");
+          assert!(
+            (baseline - expected).abs() < 0.15,
+            "mode={mode},size={last_size},mark={mark_size}: {baseline} vs {expected}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn blank_tab_lines_retain_logical_font_cells_with_multiple_spacing() {
+    use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
+    let mut metrics = TextMetrics::new();
+    // Native Word controls vary charset, automatic spacing and font size.
+    // Observe physical leader baselines, including the second blank line.
+    for (charset, size, multiple, expected) in [
+      (
+        Some(FontCharset::Other(1)),
+        11.0,
+        1.0,
+        [68.42, 84.50, 100.46],
+      ),
+      (
+        Some(FontCharset::Other(1)),
+        11.0,
+        2.0,
+        [68.42, 100.46, 132.41],
+      ),
+      (
+        Some(FontCharset::Other(1)),
+        11.0,
+        3.0,
+        [68.42, 116.42, 164.33],
+      ),
+      (Some(FontCharset::Ansi), 11.0, 1.0, [66.98, 79.70, 92.30]),
+      (Some(FontCharset::Ansi), 11.0, 2.0, [67.10, 92.42, 117.74]),
+      (Some(FontCharset::Ansi), 11.0, 3.0, [66.98, 105.02, 142.97]),
+      (None, 11.0, 1.0, [66.98, 79.70, 92.30]),
+      (None, 11.0, 2.0, [67.10, 92.42, 117.74]),
+      (None, 11.0, 3.0, [66.98, 105.02, 142.97]),
+      (
+        Some(FontCharset::Other(1)),
+        6.0,
+        3.0,
+        [63.14, 89.30, 115.46],
+      ),
+      (
+        Some(FontCharset::Other(1)),
+        18.0,
+        3.0,
+        [75.98, 154.49, 232.87],
+      ),
+    ] {
+      let style = TextStyle {
+        font_family: Some("Liberation Sans".into()),
+        font_family_class: Some(FontFamilyClass::SansSerif),
+        font_pitch: Some(FontPitch::Variable),
+        font_charset: charset,
+        font_size_pt: size,
+        wordprocessingml_font_slots: true,
+        use_windows_font_metrics: true,
+        ..Default::default()
+      };
+      let Block::Paragraph(mut paragraph) =
+        crate::docx::simple_text_block("A\t\t\tB".into(), style)
+      else {
+        panic!()
+      };
+      paragraph.format.line_height_pt = Some(multiple);
+      paragraph.format.widow_control = Some(false);
+      paragraph.format.tab_stops = vec![TabStop {
+        position_pt: 481.9,
+        alignment: TabStopAlignment::Left,
+        leader: TabLeader::Underscore,
+      }];
+      let setup = PageSetup {
+        width_pt: 595.3,
+        height_pt: 419.55,
+        margin_top_pt: 56.7,
+        margin_right_pt: 56.7,
+        margin_bottom_pt: 56.7,
+        margin_left_pt: 56.7,
+        ..Default::default()
+      };
+      let flow = FlowContext {
+        compatibility_mode: 15,
+        ..flow_context(setup, 0, SectionColumns::default(), 0, 0, 36.0)
+      };
+      let mut page = empty_page(setup, 0);
+      let mut pages = Vec::new();
+      layout_paragraph(
+        &paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut page,
+          pages: &mut pages,
+          anchor_pages: None,
+          text_metrics: &mut metrics,
+        },
+        56.7,
+        56.7,
+        0.0,
+      );
+      assert!(pages.is_empty());
+      let baselines = page
+        .items
+        .iter()
+        .filter_map(|item| {
+          let PageItem::Text(text) = item else {
+            return None;
+          };
+          (tab_leader_text_char(text) == Some('_')).then(|| {
+            common::wordprocessing_device::line_baseline(
+              text
+                .wordprocessing_line_metrics
+                .expect("blank line geometry"),
+              text.y_pt,
+            )
+            .expect("baseline")
+          })
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(baselines.len(), expected.len());
+      for (actual, expected) in baselines.into_iter().zip(expected) {
+        assert!(
+          (actual - expected).abs() < 0.15,
+          "charset={charset:?},size={size},multiple={multiple}: {actual} vs {expected}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn terminal_automatic_tabs_preserve_legacy_right_tab_margin_ownership() {
+    let style = TextStyle {
+      font_family: Some("Times New Roman".into()),
+      font_size_pt: 12.0,
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    // Native right-aligned X at -one twip/exact edge in modes12/15,
+    // plus the legacy +one-twip opposite. Compare the following paragraph's
+    // vertical advance, not an implementation-specific tab flag.
+    for (mode, offset, expected_advances) in [
+      (12, -0.05, [0.0, 15.84, 31.8]),
+      (12, 0.0, [0.0, 0.0, 0.0]),
+      (12, 0.05, [0.0, 0.0, 0.0]),
+      (15, -0.05, [0.0, 15.84, 31.8]),
+      (15, 0.0, [0.0, 15.84, 31.8]),
+    ] {
+      let mut baseline_bottom = None;
+      for (tabs, expected_advance) in expected_advances.into_iter().enumerate() {
+        let Block::Paragraph(mut paragraph) =
+          crate::docx::simple_text_block(format!("Start\tX{}", "\t".repeat(tabs)), style.clone())
+        else {
+          panic!()
+        };
+        paragraph.format.line_height_pt = Some(1.15);
+        paragraph.format.tab_stops = vec![TabStop {
+          position_pt: 451.3 + offset,
+          alignment: TabStopAlignment::Right,
+          leader: TabLeader::None,
+        }];
+        let flow = FlowContext {
+          compatibility_mode: mode,
+          content_width: 451.3,
+          ..flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            36.0,
+          )
+        };
+        let mut page = empty_page(flow.setup, 0);
+        let mut pages = Vec::new();
+        let (_, bottom) = layout_paragraph(
+          &paragraph,
+          flow,
+          ParagraphLayoutTarget {
+            current: &mut page,
+            pages: &mut pages,
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+          },
+          flow.content_top_pt,
+          flow.content_top_pt,
+          0.0,
+        );
+        assert!(pages.is_empty());
+        let baseline = *baseline_bottom.get_or_insert(bottom);
+        assert!(
+          (bottom - baseline - expected_advance).abs() < 0.15,
+          "mode={mode},offset={offset},tabs={tabs}: {} vs {expected_advance}",
+          bottom - baseline
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn terminal_automatic_tabs_own_overflow_lines() {
+    let style = TextStyle {
+      font_family: Some("Arial".into()),
+      font_size_pt: 12.0,
+      use_windows_font_metrics: true,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    };
+    let mut metrics = TextMetrics::new();
+    // Native mode12/15 controls: an over-margin tab has its own follow
+    // portion even without text. A terminal tab exactly at the edge fits.
+    for mode in [12, 15] {
+      for (width, tabs, expected_lines) in [
+        (467.95, 0, 1),
+        (467.95, 1, 2),
+        (467.95, 4, 2),
+        (468.0, 1, 1),
+        (468.0, 2, 2),
+        (468.05, 1, 1),
+        (468.05, 4, 2),
+      ] {
+        let Block::Paragraph(mut paragraph) = crate::docx::simple_text_block(
+          format!("{}{}", "M".repeat(45), "\t".repeat(tabs)),
+          style.clone(),
+        ) else {
+          panic!()
+        };
+        paragraph.format.line_height_pt = Some(18.0);
+        paragraph.format.line_height_rule = LineHeightRule::Exact;
+        let flow = FlowContext {
+          compatibility_mode: mode,
+          content_width: width,
+          ..flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            36.0,
+          )
+        };
+        let mut page = empty_page(flow.setup, 0);
+        let mut pages = Vec::new();
+        let (_, bottom) = layout_paragraph(
+          &paragraph,
+          flow,
+          ParagraphLayoutTarget {
+            current: &mut page,
+            pages: &mut pages,
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+          },
+          flow.content_top_pt,
+          flow.content_top_pt,
+          0.0,
+        );
+        assert!(pages.is_empty());
+        let height = bottom - flow.content_top_pt;
+        assert!(
+          (height - 18.0 * expected_lines as f32).abs() < 0.01,
+          "mode={mode},width={width},tabs={tabs}: {height}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -110846,6 +120899,7 @@ mod tests {
           static3d: None,
           width_pt: image_width_pt,
           height_pt: 32.5,
+          inline_frame_axes_swapped: false,
           inline_offset_x_pt: 0.0,
           inline_offset_y_pt: 0.0,
           effect_left_pt: 0.0,
@@ -111018,6 +121072,7 @@ mod tests {
       wordprocessing_shape_id: None,
       text_box_link: None,
       wordprocessing_shape_hyperlink_description: None,
+      wordprocessing_group_textbox: false,
       wordprocessing_shape_outline_text_inset_pt: 0.0,
       wordprocessing_canvas_has_background_paint: false,
       text_upright: false,
@@ -111099,6 +121154,34 @@ mod tests {
       doc_grid_line_pitch_pt: Some(15.6),
       ..Default::default()
     };
+    // Native footnote and endnote controls: absent grid, 15.6pt and 24pt
+    // pitches crossed with inherited/on/off paragraph snapToGrid. Both note
+    // stories keep natural 11.52pt lines only when the grid is absent/off.
+    let mut note = paragraph.clone();
+    note.format.line_height_pt = None;
+    note.format.office_recovered_line_height = false;
+    for pitch in [None, Some(15.6), Some(24.0)] {
+      for snap in [None, Some(false), Some(true)] {
+        note.format.snap_to_grid = snap;
+        let note_setup = PageSetup {
+          doc_grid_line_pitch_pt: pitch,
+          ..setup
+        };
+        let actual = document_grid_line_metrics(11.52, &note, note_setup, TextSegmentation::Notes);
+        let expected =
+          pitch
+            .filter(|_| snap != Some(false))
+            .map(|height_pt| DocumentGridLineMetrics {
+              height_pt,
+              ascent_adjustment_pt: (height_pt - 11.52) / 2.0,
+            });
+        assert_eq!(actual, expected);
+        assert!(
+          document_grid_line_metrics(11.52, &note, note_setup, TextSegmentation::RepeatingSlot)
+            .is_none()
+        );
+      }
+    }
     let mut text_metrics = TextMetrics::new();
     let base_style = paragraph_base_line_style(&paragraph);
     let mut east_asia_hint_style = base_style.clone();
@@ -111435,6 +121518,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -111652,6 +121736,242 @@ mod tests {
   }
 
   #[test]
+  fn repeating_table_page_owned_picture_keeps_cell_text_and_body_wrap_separate() {
+    let setup = PageSetup {
+      width_pt: 500.0,
+      height_pt: 400.0,
+      margin_left_pt: 36.0,
+      margin_right_pt: 36.0,
+      margin_top_pt: 100.0,
+      header_distance_pt: 30.0,
+      ..PageSetup::default()
+    };
+    for image_inline_index in [0, 1] {
+      for mode in [12, 15] {
+        for layout_in_cell in [false, true] {
+          let mut plain_text = None;
+          for wrap in [
+            ImageWrapMode::None,
+            ImageWrapMode::Square,
+            ImageWrapMode::TopBottom,
+          ] {
+            let mut table =
+              native_percentage_autofit_table("Alpha Beta Gamma Delta Epsilon Zeta", [1.0]);
+            table.rows.truncate(1);
+            table.layout = TableLayoutMode::Fixed;
+            table.preferred_width_pct = None;
+            table.preferred_width_pt = Some(200.0);
+            table.column_widths_pt = vec![200.0];
+            table.in_header_footer = true;
+            table.rows[0].cells[0].margins = CellMargins::zero();
+            let Block::Paragraph(paragraph) = &mut table.rows[0].cells[0].blocks[0] else {
+              unreachable!()
+            };
+            let InlineItem::Image(mut image) = character_picture(100.0, 90.0) else {
+              unreachable!()
+            };
+            image.placement = crate::docx::ImagePlacement::Floating(FloatingImagePlacement {
+              horizontal_relative_to: HorizontalImageReference::Page,
+              vertical_relative_to: VerticalImageReference::Page,
+              horizontal_alignment: None,
+              vertical_alignment: None,
+              alignment_extent: None,
+              group_child_offset_x_pt: 0.0,
+              group_child_offset_y_pt: 0.0,
+              horizontal_offset_pt: 120.0,
+              vertical_offset_pt: 30.0,
+              horizontal_offset_pct: None,
+              vertical_offset_pct: None,
+              wrap,
+              wrap_side: ImageWrapSide::BothSides,
+              behind_text: false,
+              layout_in_cell,
+              layout_in_cell_forced: false,
+              allow_overlap: true,
+              paint_order: FloatingPaintOrder::drawing_ml_relative_height(1),
+              relative_width_to: None,
+              relative_width_pct: None,
+              relative_height_to: None,
+              relative_height_pct: None,
+              margin_top_pt: 0.0,
+              margin_right_pt: 0.0,
+              margin_bottom_pt: 0.0,
+              margin_left_pt: 0.0,
+            });
+
+            let InlineItem::Text(head) = &mut paragraph.inlines[0] else {
+              unreachable!()
+            };
+            let mut tail = head.clone();
+            head.text = "Alpha Beta".into();
+            tail.text = " Gamma Delta Epsilon Zeta".into();
+            paragraph.inlines.push(InlineItem::Text(tail));
+            paragraph
+              .inlines
+              .insert(image_inline_index, InlineItem::Image(image));
+            let blocks = vec![Block::Table(table)];
+            let mut page = empty_section_page(setup, 0, 0);
+            let flow = FlowContext {
+              compatibility_mode: mode,
+              text_segmentation: TextSegmentation::RepeatingSlot,
+              content_top_pt: 30.0,
+              content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+              body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+              ..flow_context(
+                setup,
+                0,
+                SectionColumns::default(),
+                0,
+                0,
+                DEFAULT_TAB_STOP_PT,
+              )
+            };
+            layout_repeating_blocks_into_page(
+              &blocks,
+              &mut page,
+              &mut Vec::new(),
+              &mut TextMetrics::new(),
+              30.0,
+              flow,
+            );
+            let text = page
+              .items
+              .iter()
+              .filter_map(|item| match item {
+                PageItem::Text(text) => Some((text.text.clone(), text.x_pt, text.y_pt)),
+                _ => None,
+              })
+              .collect::<Vec<_>>();
+            assert!(!text.is_empty());
+            if wrap == ImageWrapMode::None {
+              plain_text = Some(text.clone());
+            } else if mode == 12 && !layout_in_cell {
+              assert_eq!(text, *plain_text.as_ref().unwrap(), "{wrap:?}");
+            }
+            let mut document =
+              early_admission_test_document(200.0, early_admission_test_paragraph("BODY"));
+            document.page = setup;
+            document.compatibility_mode = mode;
+            document.header_blocks = blocks;
+            let exclusions = repeating_slot_wrap_exclusions_for_page(
+              &document,
+              &page,
+              1,
+              1,
+              &mut TextMetrics::new(),
+            );
+            if mode == 12 && !layout_in_cell && wrap != ImageWrapMode::None {
+              assert_eq!(exclusions.len(), 1);
+              assert_eq!(exclusions[0].blocks_flow, wrap == ImageWrapMode::TopBottom);
+              assert!(paragraph_uses_wrap_exclusion(
+                &exclusions[0],
+                flow_context(
+                  setup,
+                  0,
+                  SectionColumns::default(),
+                  0,
+                  0,
+                  DEFAULT_TAB_STOP_PT
+                )
+              ));
+            } else {
+              assert!(exclusions.is_empty());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn legacy_repeating_paragraph_frames_do_not_wrap_following_text() {
+    // Native around/none PDFs are pixel-identical in repeating mode12/14
+    // stories; mode15 and every body story wrap. Retain frame metadata for
+    // placement instead of removing it or changing ordinary tab behavior.
+    let setup = PageSetup {
+      width_pt: 500.0,
+      margin_left_pt: 36.0,
+      margin_right_pt: 36.0,
+      ..Default::default()
+    };
+    let paragraph = early_admission_test_paragraph(
+      "Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda Mu",
+    );
+    let frame = WrapExclusion {
+      left_pt: 80.0,
+      right_pt: 200.0,
+      top_pt: 60.0,
+      bottom_pt: 200.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+      uses_contour: false,
+      contour_band: None,
+      owner: WrapExclusionOwner::ParagraphFrame,
+    };
+    for compatibility_mode in [12, 14, 15] {
+      for text_segmentation in [
+        TextSegmentation::Body,
+        TextSegmentation::TableCell,
+        TextSegmentation::RepeatingSlot,
+        TextSegmentation::FooterSlot,
+      ] {
+        let flow = FlowContext {
+          compatibility_mode,
+          text_segmentation,
+          ..flow_context(
+            setup,
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            DEFAULT_TAB_STOP_PT,
+          )
+        };
+        let layout = |obstacle: Option<WrapExclusion>| {
+          let mut page = empty_page(setup, 0);
+          page.wrap_exclusions.extend(obstacle);
+          let mut pages = Vec::new();
+          let mut metrics = TextMetrics::new();
+          layout_paragraph(
+            &paragraph,
+            flow,
+            ParagraphLayoutTarget {
+              current: &mut page,
+              pages: &mut pages,
+              anchor_pages: None,
+              text_metrics: &mut metrics,
+            },
+            72.0,
+            72.0,
+            0.0,
+          );
+          assert!(pages.is_empty());
+          assert_eq!(
+            page.wrap_exclusions,
+            obstacle.into_iter().collect::<Vec<_>>()
+          );
+          page
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) => Some((text.text.clone(), text.x_pt, text.y_pt)),
+              _ => None,
+            })
+            .collect::<Vec<_>>()
+        };
+        let plain = layout(None);
+        let wrapped = layout(Some(frame));
+        assert!(!plain.is_empty());
+        if compatibility_mode < 15 && text_segmentation.is_repeating_slot() {
+          assert_eq!(wrapped, plain);
+        } else {
+          assert_ne!(wrapped, plain);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn legacy_repeating_text_ignores_drawing_side_wrap_and_preserves_body_obstacle() {
     let setup = PageSetup {
       width_pt: 500.0,
@@ -111812,6 +122132,7 @@ mod tests {
       },
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -111841,8 +122162,9 @@ mod tests {
       blocks: Vec::new(),
     };
     let section = |title_page| crate::docx::ImportedSection {
+      note_reference_order: Default::default(),
       break_kind: SectionBreakKind::Continuous,
-      discarded_carrier_spacing_after_pt: None,
+      discarded_carrier: None,
       section_properties: None,
       page: document.page,
       columns: SectionColumns::default(),
@@ -111878,13 +122200,50 @@ mod tests {
             } else {
               1
             };
-            let (_, blocks) =
-              repeating_slot_blocks_for_page(&document, &page, physical, virtual_number);
-            assert_eq!(blocks.len(), expected_lines);
             let slots = repeating_slot_state_for_page(&document, &page, physical, &mut metrics);
+            let (_, blocks) =
+              repeating_slot_blocks_for_page(&document, &page, physical, virtual_number, slots);
+            assert_eq!(blocks.len(), expected_lines);
             let height =
               repeating_footer_positioning_height_for_page(slots, virtual_number, section_page);
             assert!((height - expected_lines as f32 * 14.0).abs() < 0.01);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn repeating_story_paint_uses_the_same_activation_as_body_reservation() {
+    for footer in [false, true] {
+      for first in [false, true] {
+        for direct_change in [false, true] {
+          for text in ["", " "] {
+            let mut paragraph = early_admission_test_paragraph(text);
+            paragraph.format.borders.bottom = Some(BorderStyle {
+              width_pt: 0.75,
+              ..Default::default()
+            });
+            paragraph.format.header_layout_differs_from_style = direct_change;
+            let mut document = early_admission_test_document(30.0, paragraph.clone());
+            document.title_page = first;
+            let target = match (footer, first) {
+              (false, false) => &mut document.header_blocks,
+              (false, true) => &mut document.first_header_blocks,
+              (true, false) => &mut document.footer_blocks,
+              (true, true) => &mut document.first_footer_blocks,
+            };
+            target.push(Block::paragraph(paragraph));
+            let mut pages = vec![empty_section_page(document.page, 0, 0)];
+            let mut metrics = TextMetrics::new();
+            apply_headers_and_footers(&document, &mut pages, true, &mut metrics);
+            materialize_repeating_adornments(&mut pages, &mut Vec::new());
+            let active = direct_change || !text.is_empty() || (first && !footer);
+            assert_eq!(
+              !pages[0].items.is_empty(),
+              active,
+              "footer={footer} first={first} direct={direct_change} text={text:?}"
+            );
           }
         }
       }
@@ -111926,6 +122285,7 @@ mod tests {
       },
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -112070,8 +122430,9 @@ mod tests {
             ));
         }
         let section = crate::docx::ImportedSection {
+          note_reference_order: Default::default(),
           break_kind: SectionBreakKind::NextPage,
-          discarded_carrier_spacing_after_pt: None,
+          discarded_carrier: None,
           section_properties: Some(properties),
           page: document.page,
           columns: SectionColumns::default(),
@@ -112463,6 +122824,7 @@ mod tests {
         },
         page_background_pattern: None,
         page_background_texture: None,
+        page_background_gradient: None,
         line_number_style: TextStyle::default(),
         note_separator_style: TextStyle::default(),
         footnote_separator_stories: crate::docx::NoteSeparatorStories {
@@ -113068,6 +123430,7 @@ mod tests {
               cell_spacing: None,
               grid_before: 0,
               grid_after: 0,
+              alignment: None,
               width_before_pt: None,
               width_after_pt: None,
               layout: None,
@@ -113091,6 +123454,7 @@ mod tests {
           },
           page_background_pattern: None,
           page_background_texture: None,
+          page_background_gradient: None,
           line_number_style: TextStyle::default(),
           note_separator_style: TextStyle::default(),
           footnote_separator_stories: crate::docx::NoteSeparatorStories {
@@ -113364,6 +123728,7 @@ mod tests {
               },
               page_background_pattern: None,
               page_background_texture: None,
+              page_background_gradient: None,
               line_number_style: TextStyle::default(),
               note_separator_style: TextStyle::default(),
               footnote_separator_stories: crate::docx::NoteSeparatorStories {
@@ -113572,6 +123937,102 @@ mod tests {
   }
 
   #[test]
+  fn footnote_bodies_follow_reference_order_independent_of_part_ids() {
+    use super::footnote_follow::tests::{document, paragraph};
+    let mut source = document();
+    let mut body = paragraph("BODY", false, false);
+    let Block::Paragraph(p) = &mut body else {
+      unreachable!()
+    };
+    p.footnote_reference_ids = vec![91, 12, 91];
+    source.blocks.push(body);
+    source
+      .footnotes
+      .insert(91, vec![paragraph("FIRST", false, false)]);
+    source
+      .footnotes
+      .insert(12, vec![paragraph("LAST", false, false)]);
+    let actual = RootFrameLayout::new(&source, &LayoutOptions::default()).format();
+    assert_eq!(actual.pages.len(), 1);
+    let notes = actual.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Text(text) if matches!(text.text.as_str(), "FIRST" | "LAST") => {
+          Some((text.text.as_str(), text.y_pt))
+        }
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(notes.len(), 2);
+    assert_eq!(notes[0].0, "FIRST");
+    assert_eq!(notes[1].0, "LAST");
+    assert!(notes[0].1 < notes[1].1);
+  }
+
+  #[test]
+  fn footnote_continuation_notice_reserves_terminal_space_without_painting() {
+    use super::footnote_follow::tests::{document, paragraph};
+    let note_y = |layout: &LayoutDocument| {
+      assert_eq!(layout.pages.len(), 1);
+      layout.pages[0]
+        .items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text == "NOTE2" => Some(text.y_pt),
+          _ => None,
+        })
+        .expect("last note")
+    };
+    for separate in [false, true] {
+      let mut source = document();
+      let mut body = paragraph("BODY", false, false);
+      let Block::Paragraph(p) = &mut body else {
+        unreachable!()
+      };
+      p.footnote_reference_ids = if separate { vec![8] } else { vec![8, 9] };
+      source.blocks.push(body);
+      if separate {
+        let mut body = paragraph("LATER", false, false);
+        let Block::Paragraph(p) = &mut body else {
+          unreachable!()
+        };
+        p.footnote_reference_ids = vec![9];
+        source.blocks.push(body);
+      }
+      source
+        .footnotes
+        .insert(8, vec![paragraph("NOTE1", false, false)]);
+      source
+        .footnotes
+        .insert(9, vec![paragraph("NOTE2", false, false)]);
+      let baseline = RootFrameLayout::new(&source, &LayoutOptions::default()).format();
+      for height in [10.0, 20.0] {
+        for text in ["", "CONTINUATION"] {
+          let mut notice = paragraph(text, false, false);
+          let Block::Paragraph(p) = &mut notice else {
+            unreachable!()
+          };
+          p.format.line_height_rule = LineHeightRule::Exact;
+          p.format.line_height_pt = Some(height);
+          source.footnote_separator_stories.continuation_notice = vec![notice];
+          let actual = RootFrameLayout::new(&source, &LayoutOptions::default()).format();
+          assert!(
+            (note_y(&baseline) - note_y(&actual) - height).abs() < 0.001,
+            "separate={separate} height={height} text={text}"
+          );
+          assert!(
+            !actual.pages[0]
+              .items
+              .iter()
+              .any(|item| matches!(item, PageItem::Text(t) if t.text.contains("CONTINUATION")))
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn endnotes_follow_beneath_text_footnotes_but_precede_page_bottom_footnotes() {
     fn paragraph(text: &str, footnote: bool, endnote: bool) -> Block {
       let run = TextRun {
@@ -113611,6 +124072,7 @@ mod tests {
       page: PageSetup::default(),
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -113692,6 +124154,69 @@ mod tests {
           24.0
         };
         assert!((end_positions[1] - end_positions[0] - expected_growth).abs() < 0.01);
+      }
+    }
+
+    // Word's bounded-note controls keep the separator with the first note,
+    // reserve page-bottom footnotes, and allow an unreserved endnote story
+    // to start on the body page. Exercise several follows so the first
+    // page's reservation cannot accidentally leak into every later page.
+    document.page.height_pt = 200.0;
+    document.page.margin_top_pt = 20.0;
+    document.page.margin_bottom_pt = 20.0;
+    document.endnotes = (1..=30)
+      .map(|id| (id, vec![paragraph(&format!("END{id:02}"), false, false)]))
+      .collect();
+    for endnote_position in [
+      w::EndnotePositionValues::DocumentEnd,
+      w::EndnotePositionValues::SectionEnd,
+    ] {
+      document.endnote_position = endnote_position;
+      for position in [
+        w::FootnotePositionValues::PageBottom,
+        w::FootnotePositionValues::BeneathText,
+      ] {
+        document.footnote_positions = vec![position];
+        for with_footnotes in [false, true] {
+          document.blocks = vec![paragraph("BODY", false, false); 6];
+          let Block::Paragraph(owner) = document.blocks.last_mut().unwrap() else {
+            unreachable!()
+          };
+          owner.endnote_reference_ids = (1..=30).collect();
+          owner.footnote_reference_ids = if with_footnotes { vec![1] } else { Vec::new() };
+          document
+            .footnotes
+            .insert(1, vec![paragraph("FOOT", false, false); 6]);
+          let layout = RootFrameLayout::new(&document, &options).format();
+          let notes = layout
+            .pages
+            .iter()
+            .enumerate()
+            .flat_map(|(page, value)| {
+              value.items.iter().filter_map(move |item| match item {
+                PageItem::Text(text) if text.text.starts_with("END") => {
+                  assert!(text.y_pt >= 20.0 && text.y_pt < 180.0);
+                  Some((page, text.text.as_str()))
+                }
+                _ => None,
+              })
+            })
+            .collect::<Vec<_>>();
+          assert_eq!(notes.len(), 30);
+          for (index, (_, text)) in notes.iter().enumerate() {
+            assert_eq!(*text, format!("END{:02}", index + 1));
+          }
+          assert_eq!(notes[0].0, usize::from(with_footnotes));
+          assert!(notes.last().unwrap().0 >= 2);
+          assert_eq!(
+            layout.pages[0]
+              .items
+              .iter()
+              .filter(|item| matches!(item, PageItem::Text(text) if text.text == "FOOT"))
+              .count(),
+            if with_footnotes { 6 } else { 0 }
+          );
+        }
       }
     }
   }
@@ -113839,6 +124364,153 @@ mod tests {
   }
 
   #[test]
+  fn note_separator_logical_cells_and_shared_baselines_match_native_controls() {
+    use ooxmlsdk_fonts::{FontCharset, FontFamilyClass, FontPitch};
+    let style = |family: &str, size, charset| TextStyle {
+      font_family: Some(Arc::from(family)),
+      font_family_class: Some(if family == "Liberation Serif" {
+        FontFamilyClass::Serif
+      } else {
+        FontFamilyClass::SansSerif
+      }),
+      font_pitch: Some(FontPitch::Variable),
+      font_charset: Some(charset),
+      font_size_pt: size,
+      wordprocessingml_font_slots: true,
+      use_windows_font_metrics: true,
+      ..Default::default()
+    };
+    let setup = PageSetup::default();
+    let flow = FlowContext {
+      text_segmentation: TextSegmentation::Notes,
+      script_sensitive_line_height: true,
+      compatibility_mode: 12,
+      ..flow_context(
+        setup,
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      )
+    };
+    // Observed native story advances and rule tops relative to the separator
+    // line. Literal and paragraph-mark controls independently vary its owners.
+    for (family, size, mark_size, literal_size, height, rule_top) in [
+      ("Liberation Serif", 12.0, 12.0, None, 17.28, 10.06),
+      ("Liberation Serif", 18.0, 12.0, None, 25.92, 15.22),
+      ("Arial", 12.0, 12.0, None, 17.28, 11.50),
+      ("Calibri", 12.0, 12.0, None, 19.08, 10.54),
+      ("Liberation Serif", 12.0, 24.0, None, 34.56, 27.37),
+      ("Liberation Serif", 12.0, 12.0, Some(24.0), 34.56, 22.81),
+      ("Arial", 12.0, 12.0, Some(12.0), 13.80, 8.02),
+    ] {
+      let mut paragraph = early_admission_test_paragraph("");
+      paragraph.base_style = style("Liberation Serif", mark_size, FontCharset::Other(1));
+      *paragraph.format = Default::default();
+      let mark = NoteSeparatorMark {
+        continuation: false,
+        style: style(
+          family,
+          size,
+          if family == "Arial" {
+            FontCharset::Ansi
+          } else {
+            FontCharset::Other(1)
+          },
+        ),
+      };
+      paragraph.inlines = vec![InlineItem::NoteSeparatorMark(mark.clone())];
+      if let Some(literal_size) = literal_size {
+        let mut run = paragraph.runs[0].clone();
+        run.text = "SS".into();
+        run.style = mark.style.clone();
+        run.style.font_size_pt = literal_size;
+        paragraph.inlines.push(InlineItem::Text(run));
+      }
+      let mut metrics = TextMetrics::new();
+      let measured = estimated_paragraph_content_height(&paragraph, flow, &mut metrics);
+      let mut page = empty_page(setup, 0);
+      let mut pages = Vec::new();
+      let start = flow.content_top_pt;
+      let (_, end) = layout_paragraph(
+        &paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut page,
+          pages: &mut pages,
+          anchor_pages: None,
+          text_metrics: &mut metrics,
+        },
+        start,
+        start,
+        0.0,
+      );
+      assert!(pages.is_empty());
+      let rule = page
+        .items
+        .iter()
+        .find_map(|item| {
+          if let PageItem::Rect(r) = item {
+            Some(r)
+          } else {
+            None
+          }
+        })
+        .expect("separator rectangle");
+      assert!(
+        (measured - height).abs() < 0.12,
+        "{family}/{size}/{mark_size}/{literal_size:?}: measured {measured} != {height}"
+      );
+      assert!(
+        (end - start - height).abs() < 0.12,
+        "{family}/{size}/{mark_size}/{literal_size:?}: advance {} != {height}",
+        end - start
+      );
+      assert!(
+        (rule.y_pt - start - rule_top).abs() < 0.18,
+        "{family}/{size}/{mark_size}/{literal_size:?}: rule {} != {rule_top}",
+        rule.y_pt - start
+      );
+      // Native separator stories retain these cells and rule positions even
+      // under a section grid and explicit snapToGrid. Ordinary Notes lines
+      // are covered separately by the document-grid spacing tests.
+      for pitch in [15.6, 24.0] {
+        for snap in [None, Some(false), Some(true)] {
+          paragraph.format.snap_to_grid = snap;
+          let blocks = [Block::paragraph(paragraph.clone())];
+          let grid_flow = FlowContext {
+            setup: PageSetup {
+              doc_grid_line_pitch_pt: Some(pitch),
+              ..setup
+            },
+            ..flow
+          };
+          let reserved =
+            note_separator_story_height(&blocks, grid_flow, &paragraph.base_style, &mut metrics);
+          let mut page = empty_page(setup, 0);
+          let end = layout_note_separator_story_blocks(
+            &blocks,
+            grid_flow,
+            &mut page,
+            &mut pages,
+            &mut metrics,
+            start,
+          );
+          assert!(pages.is_empty());
+          assert!((reserved - measured).abs() < LAYOUT_EPSILON_PT);
+          assert!((end - start - measured).abs() < LAYOUT_EPSILON_PT);
+          let grid_rule = page.items.iter().find_map(|item| match item {
+            PageItem::Rect(rect) => Some(rect),
+            _ => None,
+          });
+          assert!((grid_rule.unwrap().y_pt - rule.y_pt).abs() < LAYOUT_EPSILON_PT);
+        }
+      }
+    }
+  }
+
+  #[test]
   fn note_separator_uses_run_strikeout_metrics_and_fill_color() {
     let mut metrics = TextMetrics::new();
     for (family, size, expected) in [
@@ -113858,7 +124530,7 @@ mod tests {
         },
       };
       let mut page = empty_page(PageSetup::default(), 0);
-      push_note_separator_mark(&mut page, &mark, 42.0, 20.0, 144.0, 14.0, &mut metrics);
+      push_note_separator_mark(&mut page, &mark, 42.0, 20.0, 144.0, &mut metrics);
       let [PageItem::Rect(rule)] = page.items.as_slice() else {
         panic!("a filled separator without an additional perimeter stroke");
       };
@@ -113996,6 +124668,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -114084,6 +124757,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -114971,6 +125645,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -115074,12 +125749,17 @@ mod tests {
       );
     }
     border_only.rows[0].cells[1].margins.right_pt = 0.0;
-    border_only.preferred_width_pct = Some(1.0662);
-    assert!(
-      (table_preferred_width_basis(&border_only, 225.0, 12, false) - 230.4).abs()
-        < LAYOUT_EPSILON_PT,
-      "a 106.62% table must not inherit the measured 100% border allowance"
-    );
+    // Native fixed/AutoFit and reconstructed two-cell controls retain the
+    // same edit-edge basis at 50/100/106.62/120%. The .5pt trailing border
+    // contributes .25pt even above 100%; separator classification is separate.
+    for percentage in [0.5, 1.0, 1.0662, 1.2] {
+      border_only.preferred_width_pct = Some(percentage);
+      assert!(
+        (table_preferred_width_basis(&border_only, 225.0, 12, false) - 230.65).abs()
+          < LAYOUT_EPSILON_PT,
+        "native percentage {percentage} retains the shared margin/border basis"
+      );
+    }
     for percentage in [1.132, 1.2] {
       let overflowing = Table {
         recovered_absolute_grid: false,
@@ -115292,6 +125972,7 @@ mod tests {
           cell_spacing: None,
           grid_before: 0,
           grid_after: 0,
+          alignment: None,
           width_before_pt: None,
           width_after_pt: None,
           layout: None,
@@ -115659,6 +126340,7 @@ mod tests {
         page: setup,
         page_background_pattern: None,
         page_background_texture: None,
+        page_background_gradient: None,
         line_number_style: TextStyle::default(),
         note_separator_style: TextStyle::default(),
         footnote_separator_stories: Default::default(),
@@ -115861,6 +126543,151 @@ mod tests {
   }
 
   #[test]
+  fn nonwrapping_cell_shape_keeps_intrinsic_row_height() {
+    use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp;
+
+    let mut metrics = TextMetrics::new();
+    for mode in [12, 15] {
+      for layout_in_cell in [false, true] {
+        let flow = FlowContext {
+          compatibility_mode: mode,
+          ..flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            36.0,
+          )
+        };
+        let mut plain = native_percentage_autofit_table("Cell text", [100.0]);
+        plain.rows.truncate(1);
+        plain.layout = TableLayoutMode::Fixed;
+        plain.column_widths_pt = vec![113.4];
+        plain.preferred_width_pt = Some(113.4);
+        plain.rows[0].height_pt = Some(94.5);
+        let baseline = estimated_table_height(&plain, flow, &mut metrics);
+        for wrap in [ImageWrapMode::None, ImageWrapMode::TopBottom] {
+          let mut heights = Vec::new();
+          for height in [72.0, 201.0] {
+            let mut table = plain.clone();
+            let mut placement = crate::docx::floating_image_placement(&wp::Anchor::default());
+            placement.horizontal_relative_to = HorizontalImageReference::Column;
+            placement.vertical_relative_to = VerticalImageReference::Paragraph;
+            placement.horizontal_alignment = None;
+            placement.vertical_alignment = None;
+            placement.horizontal_offset_pt = 113.4;
+            placement.vertical_offset_pt = 28.35;
+            placement.layout_in_cell = layout_in_cell;
+            placement.wrap = wrap;
+            placement.behind_text = false;
+            placement.paint_order = FloatingPaintOrder::drawing_ml_relative_height(1);
+            let mut shape = crate::docx::chart_shape(
+              136.9,
+              height,
+              0.0,
+              crate::docx::ImagePlacement::Floating(placement),
+              None,
+            );
+            shape.wordprocessing_shape_host = true;
+            shape.text_box_blocks.push(crate::docx::simple_text_block(
+              "Independent story".into(),
+              TextStyle::default(),
+            ));
+            let Block::Paragraph(paragraph) = &mut table.rows[0].cells[0].blocks[0] else {
+              unreachable!()
+            };
+            paragraph.inlines.insert(0, InlineItem::Shape(shape));
+            heights.push(estimated_table_height(&table, flow, &mut metrics));
+          }
+          // Native 24 controls vary the extent independently from wrap,
+          // compatibility and authored cell ownership. No-wrap geometry does
+          // not consume cell height; in-cell TopBottom remains height-bearing.
+          if wrap == ImageWrapMode::None || (mode < 15 && !layout_in_cell) {
+            for height in heights {
+              assert!(
+                (height - baseline).abs() < 0.001,
+                "mode={mode},cell={layout_in_cell},wrap={wrap:?}: {height} vs {baseline}"
+              );
+            }
+          } else {
+            assert!(heights[1] > heights[0] + 100.0);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn nonwrapping_cell_shapes_have_independent_alignment_extents() {
+    use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp;
+
+    // Office's 24 controls keep short rows independent of the floating
+    // extent, while center/bottom alignment includes the entire shape.
+    // Later ordinary lowers can exceed that extent without adding it twice.
+    let mut metrics = TextMetrics::new();
+    for mode in [12, 15] {
+      for height in [28.35, 72.0] {
+        for (before, after) in [(0, 0), (2, 0), (0, 8), (2, 8)] {
+          let mut cell = native_percentage_autofit_table("Text", [100.0]).rows[0].cells[0].clone();
+          cell.margins = CellMargins::zero();
+          let Block::Paragraph(mut plain) = cell.blocks.remove(0) else {
+            unreachable!()
+          };
+          plain.format.line_height_rule = LineHeightRule::Exact;
+          plain.format.line_height_pt = Some(14.0);
+          plain.format.spacing_before_pt = 0.0;
+          plain.format.spacing_after_pt = 0.0;
+          let mut anchor = plain.clone();
+          let mut placement = crate::docx::floating_image_placement(&wp::Anchor::default());
+          placement.horizontal_relative_to = HorizontalImageReference::Column;
+          placement.vertical_relative_to = VerticalImageReference::Paragraph;
+          placement.horizontal_alignment = None;
+          placement.vertical_alignment = None;
+          placement.horizontal_offset_pt = 14.15;
+          placement.vertical_offset_pt = 14.15;
+          placement.layout_in_cell = true;
+          placement.wrap = ImageWrapMode::None;
+          placement.behind_text = false;
+          placement.paint_order = FloatingPaintOrder::drawing_ml_relative_height(1);
+          let mut shape = crate::docx::chart_shape(
+            141.75,
+            height,
+            0.0,
+            crate::docx::ImagePlacement::Floating(placement),
+            None,
+          );
+          shape.wordprocessing_shape_host = true;
+          anchor.inlines = vec![InlineItem::Shape(shape)];
+          cell.blocks = std::iter::repeat_n(Block::Paragraph(plain.clone()), before)
+            .chain([Block::Paragraph(anchor)])
+            .chain(std::iter::repeat_n(Block::Paragraph(plain), after))
+            .collect();
+          let extents = table_cell_content_extents_with_mode(
+            &cell,
+            200.0,
+            PageSetup::default(),
+            TableCellMeasureMode::WholeCell,
+            true,
+            mode,
+            &mut metrics,
+          );
+          let flow = (before + after + 1) as f32 * 14.0;
+          let aligned = flow.max(before as f32 * 14.0 + 14.15 + height);
+          assert!(
+            (extents.flow_height - flow).abs() < 0.001,
+            "{mode}/{height}/{before}/{after}: {extents:?}"
+          );
+          assert!(
+            (extents.alignment_height - aligned).abs() < 0.001,
+            "{mode}/{height}/{before}/{after}: {extents:?}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
   fn nonwrapping_cell_picture_preserves_the_row_text_follow() {
     // Native wrapNone controls: foreground/background/no-picture keep the
     // same source text on every follow. A picture is not a cantSplit flag.
@@ -115993,6 +126820,332 @@ mod tests {
   }
 
   #[test]
+  fn cell_line_picture_reflows_its_prefix_at_the_settled_source_line() {
+    fn collect(
+      items: &[PageItem],
+      text: &mut Vec<(String, f32, f32)>,
+      image: &mut Option<(f32, f32)>,
+    ) {
+      for item in items {
+        match item {
+          PageItem::Text(run) => text.push((run.text.clone(), run.x_pt, run.y_pt)),
+          PageItem::Image(picture) => *image = Some((picture.x_pt, picture.y_pt)),
+          PageItem::Group(items)
+          | PageItem::InlineObjectGroup(items)
+          | PageItem::IndependentTextFrame(items)
+          | PageItem::CompositingGroup { items, .. }
+          | PageItem::FloatingDrawing { items, .. } => collect(items, text, image),
+          _ => {}
+        }
+      }
+    }
+    let mut metrics = TextMetrics::new();
+    // Native short/medium prefixes stay on the first line before the fly is
+    // encountered. A long prefix first reaches a later line. Both rebreak
+    // around the settled picture, and the row must retain the complete text.
+    for mode in [14, 15] {
+      for prefix in [
+        "BRIEF".to_owned(),
+        "Alpha beta gamma delta epsilon zeta.".to_owned(),
+        "Alpha beta gamma delta epsilon zeta. "
+          .repeat(4)
+          .trim()
+          .to_owned(),
+      ] {
+        let mut table = native_percentage_autofit_table(&prefix, [100.0]);
+        table.rows.truncate(1);
+        table.layout = TableLayoutMode::Fixed;
+        table.column_widths_pt = vec![225.4];
+        table.preferred_width_pt = Some(225.4);
+        table.preferred_width_pct = None;
+        table.borders = None;
+        table.rows[0].cells[0].preferred_width_pct = None;
+        let Block::Paragraph(paragraph) = &mut table.rows[0].cells[0].blocks[0] else {
+          unreachable!()
+        };
+        paragraph.format.spacing_before_pt = 0.0;
+        paragraph.format.spacing_after_pt = 0.0;
+        paragraph.format.line_height_rule = LineHeightRule::Auto;
+        paragraph.format.line_height_pt = Some(1.0);
+        paragraph.format.widow_control = Some(false);
+        let flow = FlowContext {
+          compatibility_mode: mode,
+          ..flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            DEFAULT_TAB_STOP_PT,
+          )
+        };
+        let render = |table: &Table, metrics: &mut TextMetrics| {
+          let frame =
+            TableFrameLayout::new(table, block_area(flow), false, false, metrics).unwrap();
+          let height = frame.frame.row_heights[0];
+          let mut page = empty_page(flow.setup, 0);
+          let mut pages = Vec::new();
+          frame.format(&mut page, &mut pages, metrics, 72.0, false);
+          assert!(pages.is_empty());
+          let mut text = Vec::new();
+          let mut image = None;
+          collect(&page.items, &mut text, &mut image);
+          let joined = text
+            .iter()
+            .map(|(text, _, _)| text.as_str())
+            .collect::<String>();
+          assert_eq!(
+            joined.replace(' ', ""),
+            prefix.replace(' ', ""),
+            "complete text inside measured row"
+          );
+          assert!(
+            text.last().unwrap().2 < 72.0 + height,
+            "terminal line inside measured row"
+          );
+          (height, text, image)
+        };
+        let (_, unwrapped, _) = render(&table, &mut metrics);
+        let source_line_advance = unwrapped.last().unwrap().2 - unwrapped.first().unwrap().2;
+        for (reference, offset) in [
+          (VerticalImageReference::Line, 3.0),
+          (VerticalImageReference::Line, 20.0),
+          (VerticalImageReference::Paragraph, 3.0),
+        ] {
+          let mut results = Vec::new();
+          for before in [true, false] {
+            let mut wrapped = table.clone();
+            let InlineItem::Image(mut image) = character_picture(55.4, 55.4) else {
+              unreachable!()
+            };
+            image.placement = crate::docx::ImagePlacement::Floating(FloatingImagePlacement {
+              horizontal_relative_to: HorizontalImageReference::Column,
+              vertical_relative_to: reference,
+              horizontal_alignment: None,
+              vertical_alignment: None,
+              alignment_extent: None,
+              group_child_offset_x_pt: 0.0,
+              group_child_offset_y_pt: 0.0,
+              horizontal_offset_pt: -5.15,
+              vertical_offset_pt: offset,
+              horizontal_offset_pct: None,
+              vertical_offset_pct: None,
+              wrap: ImageWrapMode::Square,
+              wrap_side: ImageWrapSide::BothSides,
+              behind_text: false,
+              layout_in_cell: true,
+              layout_in_cell_forced: false,
+              allow_overlap: true,
+              paint_order: FloatingPaintOrder::drawing_ml_relative_height(1),
+              relative_width_to: None,
+              relative_width_pct: None,
+              relative_height_to: None,
+              relative_height_pct: None,
+              margin_top_pt: 0.0,
+              margin_right_pt: 9.0,
+              margin_bottom_pt: 0.0,
+              margin_left_pt: 9.0,
+            });
+            let Block::Paragraph(paragraph) = &mut wrapped.rows[0].cells[0].blocks[0] else {
+              unreachable!()
+            };
+            paragraph
+              .inlines
+              .insert(if before { 0 } else { 1 }, InlineItem::Image(image));
+            results.push(render(&wrapped, &mut metrics));
+          }
+          let before = results[0].2.unwrap();
+          let after = results[1].2.unwrap();
+          let expected_advance = if reference == VerticalImageReference::Line {
+            source_line_advance
+          } else {
+            0.0
+          };
+          assert!(
+            (after.1 - before.1 - expected_advance).abs() < 0.01,
+            "mode={mode} reference={reference:?} offset={offset} source line owns picture: {after:?} vs {before:?}"
+          );
+          if source_line_advance == 0.0 || reference == VerticalImageReference::Paragraph {
+            assert_eq!(
+              results[0], results[1],
+              "order-independent first-line/paragraph wrap"
+            );
+          } else if offset == 3.0 {
+            assert!(
+              results[1].1.last().unwrap().2 >= unwrapped.last().unwrap().2,
+              "late wrapping retains every terminal source portion"
+            );
+            assert!(
+              results[1]
+                .1
+                .iter()
+                .any(|(_, x, y)| (*y - unwrapped.last().unwrap().2).abs() < 0.01
+                  && *x >= after.0 + 55.4 + 9.0 - 0.01),
+              "terminal source line wraps to the picture's side"
+            );
+            assert_eq!(
+              results[1].1[0], unwrapped[0],
+              "earlier full-width line retained"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn cell_square_picture_lane_boundary_retains_auto_line_and_baseline() {
+    fn picture(items: &[PageItem]) -> Option<&ImageItem> {
+      items.iter().find_map(|item| match item {
+        PageItem::Image(image) => Some(image),
+        PageItem::Group(items)
+        | PageItem::InlineObjectGroup(items)
+        | PageItem::IndependentTextFrame(items)
+        | PageItem::CompositingGroup { items, .. }
+        | PageItem::FloatingDrawing { items, .. } => picture(items),
+        _ => None,
+      })
+    }
+    let mut metrics = TextMetrics::new();
+    for mode in [14, 15] {
+      for visible in [false, true] {
+        let style = TextStyle {
+          font_family: Some("Liberation Sans".into()),
+          font_size_pt: if visible { 12.0 } else { 36.0 },
+          ..Default::default()
+        };
+        let mut table = native_percentage_autofit_table("X", [100.0]);
+        table.rows.truncate(1);
+        table.layout = TableLayoutMode::Fixed;
+        table.column_widths_pt = vec![111.25];
+        table.preferred_width_pt = Some(111.25);
+        table.preferred_width_pct = None;
+        table.borders = None;
+        table.rows[0].height_pt = None;
+        table.rows[0].exact_height = false;
+        let cell = &mut table.rows[0].cells[0];
+        cell.margins = CellMargins {
+          left_pt: 5.4,
+          right_pt: 5.4,
+          ..CellMargins::zero()
+        };
+        cell.preferred_width_pt = Some(111.25);
+        cell.preferred_width_pct = None;
+        let Block::Paragraph(anchor) = &mut cell.blocks[0] else {
+          unreachable!()
+        };
+        anchor.base_style = style.clone();
+        anchor.format.line_height_rule = LineHeightRule::Auto;
+        anchor.format.line_height_pt = Some(1.15);
+        anchor.format.spacing_before_pt = 0.0;
+        // Isolate the displaced line from the independent paragraph-after
+        // contribution to an otherwise usable picture's intrinsic extent.
+        anchor.format.spacing_after_pt = 0.0;
+        anchor.format.widow_control = Some(false);
+        anchor.inlines.clear();
+        if visible {
+          anchor.inlines.push(InlineItem::Text(TextRun {
+            text: "X".into(),
+            style,
+            hyperlink_url: None,
+            dynamic_field: None,
+            style_ref_keys: Vec::new(),
+            style_ref_text: None,
+            style_ref_numbering_text: None,
+            preserve_text_portion: false,
+          }));
+        }
+        let flow = FlowContext {
+          compatibility_mode: mode,
+          ..flow_context(
+            PageSetup::default(),
+            0,
+            SectionColumns::default(),
+            0,
+            0,
+            DEFAULT_TAB_STOP_PT,
+          )
+        };
+        let render = |table: &Table, metrics: &mut TextMetrics| {
+          let frame = TableFrameLayout::new(table, block_area(flow), false, false, metrics)
+            .expect("one fixed-width cell");
+          let height = frame.frame.row_heights[0];
+          let mut page = empty_page(flow.setup, 0);
+          let mut pages = Vec::new();
+          frame.format(&mut page, &mut pages, metrics, 72.0, false);
+          assert!(pages.is_empty());
+          let text = page.items.iter().find_map(|item| match item {
+            PageItem::Text(text) if text.text == "X" => Some((text.x_pt, text.y_pt)),
+            _ => None,
+          });
+          (height, text, page)
+        };
+        let (reference_height, reference_text, _) = render(&table, &mut metrics);
+        for width in [78.45, 78.5, 81.0] {
+          let mut wrapped = table.clone();
+          let InlineItem::Image(mut image) = character_picture(width, 81.0) else {
+            unreachable!()
+          };
+          let placement = FloatingImagePlacement {
+            horizontal_relative_to: HorizontalImageReference::Column,
+            vertical_relative_to: VerticalImageReference::Paragraph,
+            horizontal_alignment: None,
+            vertical_alignment: None,
+            alignment_extent: None,
+            group_child_offset_x_pt: 0.0,
+            group_child_offset_y_pt: 0.0,
+            horizontal_offset_pt: -5.05,
+            vertical_offset_pt: 1.1,
+            horizontal_offset_pct: None,
+            vertical_offset_pct: None,
+            wrap: ImageWrapMode::Square,
+            wrap_side: ImageWrapSide::BothSides,
+            behind_text: false,
+            layout_in_cell: true,
+            layout_in_cell_forced: false,
+            allow_overlap: true,
+            paint_order: FloatingPaintOrder::drawing_ml_relative_height(1),
+            relative_width_to: None,
+            relative_width_pct: None,
+            relative_height_to: None,
+            relative_height_pct: None,
+            margin_top_pt: 0.0,
+            margin_right_pt: 9.0,
+            margin_bottom_pt: 0.0,
+            margin_left_pt: 9.0,
+          };
+          image.placement = crate::docx::ImagePlacement::Floating(placement);
+          let Block::Paragraph(anchor) = &mut wrapped.rows[0].cells[0].blocks[0] else {
+            unreachable!()
+          };
+          anchor.inlines.insert(0, InlineItem::Image(image));
+          let (height, text, page) = render(&wrapped, &mut metrics);
+          let clears = width >= 78.5;
+          let expected = if clears {
+            82.1 + reference_height
+          } else {
+            82.1_f32.max(reference_height)
+          };
+          assert!(
+            (height - expected).abs() < 0.01,
+            "mode={mode} visible={visible} width={width}: {height} vs {expected}"
+          );
+          let picture = picture(&page.items).expect("the anchor stays painted");
+          assert!((picture.y_pt - 73.1).abs() < 0.01);
+          if let (Some((reference_x, reference_y)), Some((x, y))) = (reference_text, text) {
+            assert!((y - reference_y - if clears { 82.1 } else { 0.0 }).abs() < 0.01);
+            if clears {
+              assert!((x - reference_x).abs() < 0.01);
+            }
+          } else {
+            assert!(!visible, "a real anchor line must remain inside the cell");
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn cell_top_bottom_and_square_picture_retain_their_empty_or_visible_anchor_line() {
     // Native empty/visible+Exact controls retain one14pt mark below a
     //60pt in-cell picture at0/4pt. At20pt the mark precedes the picture;
@@ -116019,6 +127172,8 @@ mod tests {
         (4.0, ImageWrapMode::TopBottom, 360.0, 78.0),
         (20.0, ImageWrapMode::TopBottom, 360.0, 80.0),
         (0.0, ImageWrapMode::Square, 80.0, 60.0),
+        (0.0, ImageWrapMode::Square, 301.95, 60.0),
+        (0.0, ImageWrapMode::Square, 302.0, 74.0),
         (4.0, ImageWrapMode::Square, 80.0, 64.0),
         (20.0, ImageWrapMode::Square, 80.0, 80.0),
         (0.0, ImageWrapMode::Square, 360.0, 74.0),
@@ -116099,7 +127254,11 @@ mod tests {
         let mut metrics = TextMetrics::new();
         let frame =
           TableFrameLayout::new(&table, block_area(flow), false, false, &mut metrics).unwrap();
-        assert!((frame.frame.row_heights[0] - expected_height).abs() < 0.01);
+        assert!(
+          (frame.frame.row_heights[0] - expected_height).abs() < 0.01,
+          "visible={visible} wrap={wrap:?} offset={offset} width={width}: measured={} expected={expected_height}",
+          frame.frame.row_heights[0]
+        );
         let mut current = empty_page(setup, 0);
         let mut pages = Vec::new();
         frame.format(&mut current, &mut pages, &mut metrics, 72.0, false);
@@ -117348,6 +128507,127 @@ mod tests {
               "first={first},following={following},hard={hard},long={long},alignment={alignment:?},label={label},actual={baseline},native={native}"
             );
           }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn table_cell_initial_scripts_keep_the_common_baseline_and_following_line_cells() {
+    // Native literal and footnoteRef controls: super/subscript changes only
+    // the mark's paint baseline. The following Arial text retains the same
+    // baseline relative to the neighboring cell and its own continuation pitch.
+    for family in ["Calibri", "Arial"] {
+      for shift in [0.0, 4.0, -1.0] {
+        let setup = PageSetup::default();
+        let mut table = native_percentage_autofit_table("M", [0.5, 0.5]);
+        table.rows.truncate(1);
+        table.layout = TableLayoutMode::Fixed;
+        table.column_widths_pt = vec![160.0, 160.0];
+        table.borders = None;
+        let regular = TextStyle {
+          font_family: Some(Arc::from("Arial")),
+          high_ansi_font_family: Some(Arc::from("Arial")),
+          font_size_pt: 11.0,
+          wordprocessingml_font_slots: true,
+          use_windows_font_metrics: true,
+          ..Default::default()
+        };
+        for (index, cell) in table.rows[0].cells.iter_mut().enumerate() {
+          let Block::Paragraph(paragraph) = &mut cell.blocks[0] else {
+            unreachable!()
+          };
+          paragraph.base_style = regular.clone();
+          paragraph.format.line_height_rule = LineHeightRule::Auto;
+          paragraph.format.line_height_pt = Some(1.0);
+          let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+            unreachable!()
+          };
+          run.style = regular.clone();
+          run.text = "RIGHT".into();
+          if index == 0 {
+            let mut following = run.clone();
+            following.text = " LEFT\nSECOND\nTHIRD".into();
+            run.text = "M".into();
+            run.style.font_family = Some(Arc::from(family));
+            run.style.high_ansi_font_family = Some(Arc::from(family));
+            if shift != 0.0 {
+              run.style.font_size_pt = 7.0;
+              run.style.automatic_escapement_font_size_pt = Some(11.0);
+              run.style.automatic_escapement_is_subscript = shift < 0.0;
+              run.style.baseline_shift_pt = shift;
+            }
+            paragraph.inlines.push(InlineItem::Text(following));
+          }
+        }
+        let blocks = [Block::Table(table)];
+        let mut flow = flow_context(
+          setup,
+          0,
+          SectionColumns::default(),
+          0,
+          0,
+          DEFAULT_TAB_STOP_PT,
+        );
+        flow.compatibility_mode = 14;
+        let mut current = empty_page(setup, 0);
+        let mut pages = Vec::new();
+        let mut metrics = TextMetrics::new();
+        layout_document_block(
+          BlockNeighbors::for_index(&blocks, 0),
+          &blocks[0],
+          flow,
+          LayoutBlockTarget {
+            current: &mut current,
+            pages: &mut pages,
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+            paragraph_decoration_outer_bottom_pt: None,
+          },
+          setup.margin_top_pt,
+        );
+        assert!(pages.is_empty());
+        let baseline = |label: &str| {
+          current
+            .items
+            .iter()
+            .find_map(|item| {
+              let PageItem::Text(text) = item else {
+                return None;
+              };
+              (text.text.trim() == label).then(|| {
+                common::wordprocessing_device::line_baseline(
+                  text
+                    .wordprocessing_line_metrics
+                    .expect("completed cell line"),
+                  text.y_pt,
+                )
+                .expect("finite cell baseline")
+              })
+            })
+            .unwrap_or_else(|| panic!("missing {label}"))
+        };
+        let native_delta = if family == "Calibri" { 0.12 } else { 0.0 };
+        assert!(
+          (baseline("LEFT") - baseline("RIGHT") - native_delta).abs() < 0.18,
+          "{family}/{shift}: left {}, right {}",
+          baseline("LEFT"),
+          baseline("RIGHT"),
+        );
+        if shift != 0.0 {
+          // Office's wrapped and soft-break controls expose both adjacent
+          // 600-DPI advances for Arial11 (12.60/12.72), depending on the
+          // line origin's printer phase. A different table origin must not
+          // require one phase; the old Calibri floor gave 13.44 instead.
+          let pitch = baseline("THIRD") - baseline("SECOND");
+          assert!(
+            [12.6, 12.72]
+              .iter()
+              .any(|expected| (pitch - expected).abs() < 0.001),
+            "{family}/{shift}: second {}, third {}",
+            baseline("SECOND"),
+            baseline("THIRD"),
+          );
         }
       }
     }
@@ -119177,6 +130457,18 @@ mod tests {
 
   #[test]
   fn collapsed_row_top_exposes_only_edges_not_covered_by_previous_cells() {
+    fn collect_fills<'a>(owner: usize, item: &'a PageItem, fills: &mut Vec<(usize, &'a FillItem)>) {
+      match item {
+        PageItem::Fill(fill) => fills.push((owner, fill)),
+        PageItem::Group(items) => {
+          for item in items {
+            collect_fills(owner, item, fills);
+          }
+        }
+        _ => {}
+      }
+    }
+
     // Native Word gap-edge controls independently vary preceding coverage
     // and nil/.5pt red/2pt blue tops. A spanning cell's covered part must not
     // supply an adjacent bottom for its exposed, explicitly suppressed part.
@@ -119266,14 +130558,16 @@ mod tests {
             let sample = frame.frame.left_pt
               + frame.frame.column_widths[..column].iter().sum::<f32>()
               + frame.frame.column_widths[column] / 2.0;
-            let strips: Vec<_> = page
-              .items
-              .iter()
-              .enumerate()
-              .filter_map(|(index, item)| {
-                let PageItem::Fill(fill) = item else {
-                  return None;
-                };
+            // A shared rule is grouped so a later physical separation can
+            // select the previous row's own stencil. Inspect that group's
+            // paint while retaining its top-level row ownership index.
+            let mut fills = Vec::new();
+            for (index, item) in page.items.iter().enumerate() {
+              collect_fills(index, item, &mut fills);
+            }
+            let strips: Vec<_> = fills
+              .into_iter()
+              .filter_map(|(index, fill)| {
                 // A recovered bottom lies above the grid edge, whereas the
                 // exposed top starts on it. Both meet the same boundary.
                 ((fill.y_pt <= 138.0 + 0.13 && fill.y_pt + fill.height_pt >= 138.0 - 0.13)
@@ -119506,6 +130800,114 @@ mod tests {
   }
 
   #[test]
+  fn empty_autofit_paragraphs_keep_body_indents_out_of_native_column_minima() {
+    // Native opposite controls retain a 19.8pt first column with these
+    // empty numbered/unnumbered paragraphs, including a painted 10000.
+    // label. A bold 9pt "xx" header owns its real 9pt + 10.8pt margin floor.
+    for indent in [0.0, 22.8, 45.6] {
+      for label in [None, Some("1.\t"), Some("10000.\t")] {
+        for empty_run in [false, true] {
+          let mut table = native_percentage_autofit_table("", [1.0]);
+          table.column_widths_pt = vec![19.8];
+          table.preferred_width_pt = Some(19.8);
+          table.borders = None;
+          for (row_index, row) in table.rows.iter_mut().enumerate() {
+            let cell = &mut row.cells[0];
+            cell.preferred_width_pt = Some(16.7);
+            cell.preferred_width_pct = None;
+            let Block::Paragraph(paragraph) = &mut cell.blocks[0] else {
+              unreachable!()
+            };
+            if row_index == 0 {
+              let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+                unreachable!()
+              };
+              run.text = "xx".into();
+              run.style.font_size_pt = 9.0;
+              run.style.bold = true;
+              paragraph.base_style = run.style.clone();
+            } else {
+              if empty_run {
+                let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+                  unreachable!()
+                };
+                run.text.clear();
+              } else {
+                paragraph.inlines.clear();
+              }
+              paragraph.format.indent_left_pt = indent;
+              paragraph.format.first_line_indent_pt = -indent;
+              paragraph.format.indent_right_pt = 1.6;
+              paragraph.list_label = label.map(str::to_owned);
+            }
+          }
+          let actual =
+            table_column_widths(&table, 1, 467.75, false, 15, false, &mut TextMetrics::new());
+          assert!(
+            (actual[0] - 19.8).abs() < 0.001,
+            "indent={indent}, label={label:?}, empty_run={empty_run}: {actual:?}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn numeric_autofit_text_widths_preserve_native_word_minima_beyond_page() {
+    // Native independent layout/grid/tblW/tcW controls: Times New Roman
+    // 11pt, longest words 79/37 x's, 75-twip cell margins, body 467.75pt.
+    // Both repaired and overflowing saved grids resolve to 442/211pt for
+    // numeric tblW; auto/omitted tblW instead resolves to 313.3/150.7pt.
+    for grid in [[442.0, 211.0], [244.35, 219.7]] {
+      for automatic_cells in [false, true] {
+        for width_kind in ["auto", "dxa", "pct"] {
+          let mut table = native_percentage_autofit_table("", [0.5, 0.5]);
+          table.column_widths_pt = grid.into();
+          table.borders = None;
+          table.indent_left_pt = 3.75;
+          table.align_leading_cell_content = true;
+          table.preferred_width_pt = (width_kind == "dxa").then_some(464.05);
+          table.preferred_width_pct = (width_kind == "pct").then_some(1.0);
+          for row in &mut table.rows {
+            for ((cell, length), preferred) in
+              row.cells.iter_mut().zip([79, 37]).zip([244.3, 219.7])
+            {
+              cell.preferred_width_pt = (!automatic_cells).then_some(preferred);
+              cell.preferred_width_pct = None;
+              cell.margins.left_pt = 3.75;
+              cell.margins.right_pt = 3.75;
+              let Block::Paragraph(paragraph) = &mut cell.blocks[0] else {
+                unreachable!()
+              };
+              let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+                unreachable!()
+              };
+              run.text = "x".repeat(length);
+              run.style.font_size_pt = 11.0;
+              run.style.wordprocessingml_font_slots = true;
+              run.style.wordprocessing_legacy_font_measurement = Some(false);
+              paragraph.base_style = run.style.clone();
+            }
+          }
+          let actual =
+            table_column_widths(&table, 2, 467.75, false, 15, false, &mut TextMetrics::new());
+          let expected = if width_kind == "auto" {
+            [313.3, 150.7]
+          } else {
+            [442.0, 211.0]
+          };
+          for (actual, expected) in actual.into_iter().zip(expected) {
+            assert!(
+              (actual - expected).abs() < 0.001,
+              "grid={grid:?}, auto_cells={automatic_cells}, tblW={width_kind}: {actual} vs {expected}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn implicit_autofit_native_text_demands_ignore_saved_grid_and_preserve_word_floors() {
     let mut table = native_percentage_autofit_table("", [0.5, 0.5]);
     table.align_leading_cell_content = true;
@@ -119717,7 +131119,7 @@ mod tests {
       owner: WrapExclusionOwner::FollowingFloatingTable,
     };
     let exclusions = [exclusion];
-    let at_baseline = physical_wrap_exclusions_at_baseline(&exclusions, 12.0);
+    let at_baseline = physical_wrap_exclusions_at_baseline(&exclusions, 12.0, 12.0);
     assert_eq!(
       line_bounds_for_y(72.0, 400.0, 112.0, 14.0, &at_baseline),
       (150.0, 400.0)
@@ -119730,8 +131132,20 @@ mod tests {
       owner: WrapExclusionOwner::FloatingTable,
       ..exclusion
     }];
-    let body_at_baseline = physical_wrap_exclusions_at_baseline(&body_exclusions, 12.0);
+    let body_at_baseline = physical_wrap_exclusions_at_baseline(&body_exclusions, 12.0, 12.0);
     assert_eq!(body_at_baseline.as_ref(), body_exclusions);
+
+    let mixed = [
+      exclusion,
+      WrapExclusion {
+        owner: WrapExclusionOwner::Drawing,
+        ..exclusion
+      },
+    ];
+    let independent = physical_wrap_exclusions_at_baseline(&mixed, 0.0, 12.0);
+    assert_eq!(independent[0].top_pt, 112.0);
+    assert_eq!(independent[0].bottom_pt, 119.0);
+    assert_eq!(independent[1], mixed[1]);
 
     let setup = PageSetup {
       width_pt: 472.0,
@@ -122035,6 +133449,7 @@ mod tests {
               align_retained_master: false,
               separate_borders: false,
               table_following_text_flow: false,
+              in_header_footer: false,
               direct_text_frame_story_owner: false,
               word_floating_table_cell: true,
               ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -122146,6 +133561,7 @@ mod tests {
           align_retained_master: prepared,
           separate_borders: false,
           table_following_text_flow: false,
+          in_header_footer: false,
           direct_text_frame_story_owner: false,
           word_floating_table_cell: floating,
           ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -122500,6 +133916,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -122585,6 +134002,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -122764,6 +134182,7 @@ mod tests {
       cell_spacing: None,
       grid_before: 0,
       grid_after: 0,
+      alignment: None,
       width_before_pt: None,
       width_after_pt: None,
       layout: None,
@@ -122830,6 +134249,50 @@ mod tests {
   }
 
   #[test]
+  fn consistent_spanning_cell_widths_refine_merged_grid_interiors() {
+    let mut table = native_mixed_cell_width_autofit_table();
+    table.column_widths_pt = vec![50.0; 3];
+    table.preferred_width_pt = Some(150.0);
+    let mut cell = table.rows[0].cells[0].clone();
+    cell.blocks.clear();
+    let make_row = |spans: &[(usize, f32)]| {
+      let mut row = table.rows[0].clone();
+      row.cells = spans
+        .iter()
+        .map(|&(grid_span, width)| TableCell {
+          grid_span,
+          preferred_width_pt: Some(width),
+          ..cell.clone()
+        })
+        .collect();
+      row
+    };
+    let merged = make_row(&[(3, 150.0)]);
+    let partial = make_row(&[(1, 50.0), (2, 100.0)]);
+    let later = make_row(&[(2, 110.0), (1, 40.0)]);
+    let conflicting = make_row(&[(1, 50.0), (1, 50.0), (1, 50.0)]);
+    for first in [merged, partial] {
+      table.rows = vec![first, later.clone()];
+      let resolved = consistent_table_cell_widths(&table, &table.column_widths_pt).unwrap();
+      assert!((resolved.iter().sum::<f32>() - 150.0).abs() < 0.0001);
+      assert!((resolved[..2].iter().sum::<f32>() - 110.0).abs() < 0.0001);
+      assert!((resolved[2] - 40.0).abs() < 0.0001);
+    }
+    for (actual, expected) in consistent_table_cell_widths(&table, &table.column_widths_pt)
+      .unwrap()
+      .iter()
+      .zip([50.0, 60.0, 40.0])
+    {
+      assert!((actual - expected).abs() < 0.0001);
+    }
+    table.rows[0] = conflicting;
+    assert!(consistent_table_cell_widths(&table, &table.column_widths_pt).is_none());
+    table.rows.remove(0);
+    table.rows[0].grid_before = 1;
+    assert!(consistent_table_cell_widths(&table, &table.column_widths_pt).is_none());
+  }
+
+  #[test]
   fn later_spanning_cell_width_preserves_first_row_separator() {
     fn cell(width_pt: f32, grid_span: usize) -> TableCell {
       TableCell {
@@ -122865,6 +134328,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 1,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123006,6 +134470,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123158,6 +134623,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123263,6 +134729,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123377,6 +134844,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123673,6 +135141,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123829,6 +135298,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -123889,6 +135359,106 @@ mod tests {
   }
 
   #[test]
+  fn inline_table_row_keep_uses_resolved_frame_splitting() {
+    let setup = PageSetup {
+      height_pt: 254.0,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      ..Default::default()
+    };
+    let flow = flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let area = block_area(flow);
+    let mut metrics = TextMetrics::new();
+    // Native Word controls move the kept heading together with its next row.
+    // Inline tables import split_allowed=false, independently of cantSplit.
+    for (floating, keep, expected_cut) in [(false, false, 2), (false, true, 1), (true, true, 2)] {
+      let mut table = native_percentage_autofit_table("Heading", [1.0]);
+      table.split_allowed = floating;
+      table.placement = floating.then(FloatingFramePlacement::default);
+      table.borders = None;
+      table.rows.push(table.rows[0].clone());
+      for (row, height) in table.rows.iter_mut().zip([80.0, 20.0, 80.0]) {
+        row.height_pt = Some(height);
+        row.exact_height = true;
+        row.cant_split = true;
+        row.keep_with_next = false;
+      }
+      table.rows[1].keep_with_next = keep;
+      let layout = TableFrameLayout::new(&table, area, false, false, &mut metrics).unwrap();
+      let decision = layout
+        .table_split_decision(
+          0,
+          area.content_top_pt,
+          TableSplitPolicy {
+            has_ind_prev: false,
+            try_to_split_row: true,
+            table_row_keep: layout.table_row_keep_enabled(),
+            allow_split_of_keep_row: false,
+          },
+          &mut metrics,
+        )
+        .unwrap();
+      assert_eq!(
+        decision.master_end_row_index, expected_cut,
+        "floating={floating}, keep={keep}"
+      );
+      assert_eq!(decision.follow_start_row_index, Some(expected_cut));
+      assert!(!decision.split_row_allowed);
+    }
+  }
+
+  #[test]
+  fn legacy_overfull_kept_table_retains_its_occupied_master() {
+    let setup = PageSetup {
+      height_pt: 254.0,
+      margin_top_pt: 72.0,
+      margin_bottom_pt: 72.0,
+      ..Default::default()
+    };
+    let mut area = block_area(flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    ));
+    let mut metrics = TextMetrics::new();
+    for (mode, row_height, expected_move) in [
+      (12, 50.0, true),
+      (12, 80.0, false),
+      (14, 80.0, false),
+      (15, 80.0, true),
+    ] {
+      area.compatibility_mode = mode;
+      let mut table = native_percentage_autofit_table("Kept", [1.0]);
+      table.split_allowed = false;
+      table.borders = None;
+      for row in &mut table.rows {
+        row.height_pt = Some(row_height);
+        row.exact_height = true;
+        row.cant_split = true;
+        row.keep_with_next = true;
+      }
+      let layout = TableFrameLayout::new(&table, area, false, false, &mut metrics).unwrap();
+      let keep = layout.table_row_keep_enabled();
+      let allow = layout.allow_split_of_keep_row(0, true, keep);
+      let plan = layout.make_all_split_plan(0, 92.0, true, keep, allow, &mut metrics);
+      assert_eq!(
+        plan.move_forward, expected_move,
+        "mode={mode}, height={row_height}"
+      );
+    }
+  }
+
+  #[test]
   fn table_follow_reuses_master_row_metrics_when_page_geometry_is_unchanged() {
     let table = Table {
       recovered_absolute_grid: false,
@@ -123936,6 +135506,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -124014,6 +135585,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -124347,6 +135919,7 @@ mod tests {
         cell_spacing: None,
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -124482,6 +136055,7 @@ mod tests {
           cell_spacing: None,
           grid_before: 0,
           grid_after: 0,
+          alignment: None,
           width_before_pt: None,
           width_after_pt: None,
           layout: None,
@@ -124499,6 +136073,7 @@ mod tests {
           cell_spacing: None,
           grid_before: 0,
           grid_after: 0,
+          alignment: None,
           width_before_pt: None,
           width_after_pt: None,
           layout: None,
@@ -124516,6 +136091,7 @@ mod tests {
           cell_spacing: None,
           grid_before: 0,
           grid_after: 0,
+          alignment: None,
           width_before_pt: None,
           width_after_pt: None,
           layout: None,
@@ -124564,6 +136140,7 @@ mod tests {
         cell_spacing: spacing_pt.map(TableCellSpacing::Separated),
         grid_before: 0,
         grid_after: 0,
+        alignment: None,
         width_before_pt: None,
         width_after_pt: None,
         layout: None,
@@ -125009,6 +136586,184 @@ mod tests {
     );
   }
 
+  #[test]
+  fn empty_numbering_label_tabs_from_its_first_line_origin() {
+    let setup = PageSetup::default();
+    let flow = flow_context(setup, 0, SectionColumns::default(), 0, 0, 36.0);
+    let mut metrics = TextMetrics::new();
+    for (label, first_indent, explicit_tab, expected_body_indent) in [
+      ("\t", -18.0, None, 36.0),
+      ("\t", 18.0, None, 72.0),
+      ("\t", 18.0, Some(90.0), 90.0),
+      (" \t", 18.0, None, 36.0),
+    ] {
+      let mut paragraph = early_admission_test_paragraph("body");
+      paragraph.list_label = Some(label.into());
+      paragraph.list_label_style = paragraph.base_style.clone();
+      paragraph.format.indent_left_pt = 36.0;
+      paragraph.format.first_line_indent_pt = first_indent;
+      paragraph.format.list_label_uses_explicit_tab_stop = explicit_tab.is_some();
+      paragraph.list_label_tab_stop_pt = Some(explicit_tab.unwrap_or(36.0));
+      let mut current = empty_page(setup, 0);
+      layout_paragraph(
+        &paragraph,
+        flow,
+        ParagraphLayoutTarget {
+          current: &mut current,
+          pages: &mut Vec::new(),
+          anchor_pages: None,
+          text_metrics: &mut metrics,
+        },
+        72.0,
+        72.0,
+        0.0,
+      );
+      let body = current
+        .items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text == "body" => Some(text),
+          _ => None,
+        })
+        .expect("body follows the empty number");
+      assert!(
+        (body.x_pt - flow.content_left_pt - expected_body_indent).abs() < LAYOUT_EPSILON_PT,
+        "label={label:?}, first={first_indent}, explicit={explicit_tab:?}: {}",
+        body.x_pt
+      );
+    }
+  }
+
+  #[test]
+  fn numbering_suffix_tab_occupies_centered_and_right_aligned_empty_lines() {
+    let setup = PageSetup::default();
+    let mut metrics = TextMetrics::new();
+    for width in [13.8_f32, 25.2, 97.2] {
+      for alignment in [
+        ParagraphAlignment::Left,
+        ParagraphAlignment::Center,
+        ParagraphAlignment::Right,
+      ] {
+        for suffix in ["\t", ""] {
+          let mut flow = flow_context(setup, 0, SectionColumns::default(), 0, 0, 36.0);
+          flow.content_width = width;
+          flow.text_segmentation = TextSegmentation::TableCell;
+          let mut paragraph = early_admission_test_paragraph("");
+          paragraph.inlines.clear();
+          paragraph.runs.clear();
+          paragraph.base_style.font_family = Some(Arc::from("Arial"));
+          paragraph.base_style.high_ansi_font_family = Some(Arc::from("Arial"));
+          paragraph.base_style.font_size_pt = 12.0;
+          paragraph.list_label_style = paragraph.base_style.clone();
+          paragraph.list_label = Some(format!("2.{suffix}"));
+          paragraph.format.indent_left_pt = 18.0;
+          paragraph.format.first_line_indent_pt = -18.0;
+          paragraph.format.alignment = alignment;
+          paragraph.list_label_tab_stop_pt = Some(18.0);
+          let glyph_width = metrics.measure_text("2.", &paragraph.list_label_style);
+          // Office's 13.8/25.2/97.2pt cells reserve an 18pt suffix stop.
+          // The suffix=nothing control reserves only the visible number.
+          let occupied_width = if suffix.is_empty() { glyph_width } else { 18.0 };
+          let remaining = (width - occupied_width).max(0.0);
+          let expected = flow.content_left_pt
+            + match alignment {
+              ParagraphAlignment::Center => remaining / 2.0,
+              ParagraphAlignment::Right => remaining,
+              _ => 0.0,
+            };
+          let mut current = empty_page(setup, 0);
+          layout_paragraph(
+            &paragraph,
+            flow,
+            ParagraphLayoutTarget {
+              current: &mut current,
+              pages: &mut Vec::new(),
+              anchor_pages: None,
+              text_metrics: &mut metrics,
+            },
+            72.0,
+            72.0,
+            0.0,
+          );
+          let label = current
+            .items
+            .iter()
+            .find_map(|item| match item {
+              PageItem::Text(text) if text.text == "2." => Some(text),
+              _ => None,
+            })
+            .expect("number survives empty paragraph layout");
+          assert!(
+            (label.x_pt - expected).abs() < LAYOUT_EPSILON_PT,
+            "width={width}, alignment={alignment:?}, suffix={suffix:?}: {} != {expected}",
+            label.x_pt
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn numbering_label_keeps_body_line_ownership_beyond_the_page_edge() {
+    let setup = PageSetup::default();
+    let flow = flow_context(setup, 0, SectionColumns::default(), 0, 0, 36.0);
+    let mut metrics = TextMetrics::new();
+    for shape_story in [false, true] {
+      for indent in [36.0, 663.0] {
+        let mut paragraph = early_admission_test_paragraph("");
+        paragraph.inlines.clear();
+        paragraph.runs.clear();
+        paragraph.list_label = Some("2. §".into());
+        paragraph.list_label_style = paragraph.base_style.clone();
+        paragraph.list_label_style.bold = true;
+        paragraph.format.indent_left_pt = indent;
+        paragraph.format.first_line_indent_pt = -18.0;
+        paragraph.format.alignment = ParagraphAlignment::Center;
+        paragraph.format.wordprocessing_shape_story = shape_story;
+        let mut current = empty_page(setup, 0);
+        layout_paragraph(
+          &paragraph,
+          flow,
+          ParagraphLayoutTarget {
+            current: &mut current,
+            pages: &mut Vec::new(),
+            anchor_pages: None,
+            text_metrics: &mut metrics,
+          },
+          72.0,
+          72.0,
+          0.0,
+        );
+        let label = current
+          .items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Text(text) if text.text == "2. §" => Some(text),
+            _ => None,
+          })
+          .expect("number portion survives paragraph layout");
+        assert!(label.style.bold);
+        assert_eq!(label.x_pt > setup.width_pt, indent > setup.width_pt);
+        if shape_story {
+          assert!(label.page_culling_bounds.is_none());
+        } else {
+          let owner = label
+            .page_culling_bounds
+            .expect("body line owns its number");
+          assert_eq!(owner.origin.x.0, flow.content_left_pt);
+          assert_eq!(owner.size.width.0, flow.content_width);
+          assert!(owner.origin.y.0 < setup.height_pt && owner.size.height.0 > 0.0);
+          if indent > setup.width_pt {
+            assert!(
+              (label.x_pt - (flow.content_left_pt + indent - 18.0)).abs() < LAYOUT_EPSILON_PT,
+              "emergency line-fitting width must not move a centered number"
+            );
+          }
+        }
+      }
+    }
+  }
+
   fn early_admission_test_paragraph(value: &str) -> Paragraph {
     let style = TextStyle {
       font_family: Some(Arc::from("Calibri")),
@@ -125067,6 +136822,7 @@ mod tests {
       },
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: Default::default(),
@@ -125100,6 +136856,321 @@ mod tests {
         Block::paragraph(target),
         Block::paragraph(early_admission_test_paragraph("TAIL")),
       ],
+    }
+  }
+
+  #[test]
+  fn mixed_contour_clearance_retains_line_slots_only_when_it_closes_the_last_lane() {
+    let sidebar = WrapExclusion {
+      left_pt: 0.0,
+      right_pt: 16.7,
+      top_pt: 0.0,
+      bottom_pt: 848.2,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+      uses_contour: true,
+      contour_band: None,
+      owner: WrapExclusionOwner::Drawing,
+    };
+    let table = WrapExclusion {
+      left_pt: 25.5,
+      right_pt: 440.0,
+      top_pt: 60.0,
+      bottom_pt: 190.3,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+      uses_contour: false,
+      contour_band: None,
+      owner: WrapExclusionOwner::FloatingTable,
+    };
+    for contour in [false, true] {
+      let sidebar = WrapExclusion {
+        uses_contour: contour,
+        ..sidebar
+      };
+      let result = dodge_text_wrap_exclusions(74.0, 13.8, 0.0, 425.2, &[sidebar, table]);
+      assert!((result - if contour { 198.2 } else { 190.3 }).abs() < 0.001);
+    }
+    assert_eq!(
+      dodge_text_wrap_exclusions(74.0, 13.8, 0.0, 425.2, &[table]),
+      74.0
+    );
+    let blocking_table = WrapExclusion {
+      left_pt: 0.0,
+      ..table
+    };
+    assert_eq!(
+      dodge_text_wrap_exclusions(74.0, 13.8, 0.0, 425.2, &[sidebar, blocking_table]),
+      190.3
+    );
+    // The Square edge remains half-open even when a contour owns the line
+    // slots; only the contour's own closed bottom needs the extra full step.
+    let boundary = WrapExclusion {
+      bottom_pt: 194.0,
+      ..table
+    };
+    assert_eq!(
+      dodge_text_wrap_exclusions(74.0, 10.0, 0.0, 425.2, &[sidebar, boundary]),
+      194.0
+    );
+    let beyond = WrapExclusion {
+      bottom_pt: 194.05,
+      ..boundary
+    };
+    assert_eq!(
+      dodge_text_wrap_exclusions(74.0, 10.0, 0.0, 425.2, &[sidebar, beyond]),
+      204.0
+    );
+  }
+
+  #[test]
+  fn cell_text_measure_counts_numbered_lines_without_broadening_split_row_rules() {
+    use ooxmlsdk::sdk::SdkType;
+    let setup = PageSetup::default();
+    let flow = FlowContext {
+      compatibility_mode: 15,
+      text_segmentation: TextSegmentation::TableCell,
+      horizontal_table_cell: true,
+      content_width: 393.4,
+      justify_lines_with_shrinking: true,
+      ..flow_context(
+        setup,
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      )
+    };
+    let mut metrics = TextMetrics::new();
+    for (text, expected) in [
+      (
+        "Pilar Jurado, una de las mejores sopranos del mundo, interpretará el papel de la esclava Liu",
+        2,
+      ),
+      ("El aforo es de 4.000 sillas y la entrada es gratuita", 1),
+      (
+        "Dará comienzo a las 20.30 horas y se prevé que finalice a las 22.45",
+        1,
+      ),
+    ] {
+      let source = w::Paragraph::from_bytes(format!(r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:ind w:left="720" w:hanging="360"/><w:jc w:val="both"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="24"/></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="24"/></w:rPr><w:t>{text}</w:t></w:r></w:p>"#).as_bytes()).unwrap();
+      let mut paragraph = crate::docx::paragraph_model(
+        &source,
+        &crate::docx::StylesCatalog::default(),
+        &mut crate::docx::NumberingCatalog::default(),
+        &crate::docx::ImageCatalog::default(),
+        &crate::docx::HyperlinkCatalog::default(),
+        &crate::docx::CustomXmlBindings::default(),
+        &mut crate::docx::FormWidgetIdAllocator::default(),
+      );
+      paragraph.list_label = Some("\u{f0b7}\t".into());
+      paragraph.list_label_tab_stop_pt = Some(36.0);
+      paragraph.list_label_style = TextStyle {
+        font_family: Some("Symbol".into()),
+        high_ansi_font_family: Some("Symbol".into()),
+        ..paragraph.base_style.clone()
+      };
+      paragraph.format.indent_left_pt = 36.0;
+      paragraph.format.first_line_indent_pt = -18.0;
+      paragraph.format.alignment = ParagraphAlignment::Justify;
+      paragraph.format.justification = crate::docx::ParagraphJustification {
+        adjust: crate::docx::ParagraphAdjust::Block,
+        modern_wordprocessing: true,
+        word_spacing: crate::docx::JustificationWordSpacing {
+          desired_pct: 100,
+          minimum_pct: 75,
+          maximum_pct: 150,
+        },
+        ..Default::default()
+      };
+      paragraph.format.justification_set = true;
+      paragraph.format.line_height_pt = None;
+      assert!(
+        !cell_text_measure::supports_paragraph(&paragraph),
+        "numbering keeps its separate split-row/widow gate"
+      );
+      let measured = cell_text_measure::paragraph_extents(&paragraph, flow, &mut metrics)
+        .expect("literal numbering shares the actual intrinsic line formatter");
+      assert_eq!(measured.line_count, expected, "{text}");
+      assert!(measured.flow_height < (expected as f32 + 1.0) * 13.8);
+    }
+  }
+
+  #[test]
+  fn inline_object_wrap_clearance_preserves_native_width_and_story_boundaries() {
+    let setup = PageSetup::default();
+    let mut flow = flow_context(
+      setup,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    flow.compatibility_mode = 15;
+    let mut paragraph = early_admission_test_paragraph("");
+    paragraph.format.line_height_rule = LineHeightRule::AtLeast;
+    paragraph.format.line_height_pt = Some(0.0);
+    let mut metrics = TextMetrics::new();
+    let mut frame = TextFrame::new(&paragraph, flow, &mut metrics);
+    frame.default_line_left = 85.05;
+    frame.default_line_right = 510.25;
+    let obstacle = WrapExclusion {
+      left_pt: 1.192_240_7,
+      right_pt: 101.710_73,
+      top_pt: 0.0,
+      bottom_pt: 199.481_48,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+      uses_contour: true,
+      contour_band: None,
+      owner: WrapExclusionOwner::Drawing,
+    };
+    let y = 84.648_83;
+    for width in [390.0, 408.4] {
+      assert_eq!(
+        inline_object_wrap_clearance_y(y, Some((width, 1.4)), flow, frame, &[obstacle]),
+        y
+      );
+    }
+    for width in [408.6, 425.2, 476.6] {
+      let cleared = inline_object_wrap_clearance_y(y, Some((width, 1.4)), flow, frame, &[obstacle]);
+      assert!((cleared - 200.848_83).abs() < 0.001, "{width}: {cleared}");
+    }
+    assert_eq!(
+      inline_object_wrap_clearance_y(y, Some((476.6, 1.4)), flow, frame, &[]),
+      y
+    );
+    for segmentation in [
+      TextSegmentation::TableCell,
+      TextSegmentation::RepeatingSlot,
+      TextSegmentation::DrawingLayer,
+      TextSegmentation::Notes,
+    ] {
+      let other = FlowContext {
+        text_segmentation: segmentation,
+        ..flow
+      };
+      assert_eq!(
+        inline_object_wrap_clearance_y(y, Some((476.6, 1.4)), other, frame, &[obstacle]),
+        y
+      );
+    }
+    for other in [
+      FlowContext {
+        compatibility_mode: 12,
+        ..flow
+      },
+      FlowContext {
+        inside_paragraph_frame: true,
+        ..flow
+      },
+    ] {
+      assert_eq!(
+        inline_object_wrap_clearance_y(y, Some((476.6, 1.4)), other, frame, &[obstacle]),
+        y
+      );
+    }
+  }
+
+  #[test]
+  fn inline_object_wrap_forces_one_empty_page_without_losing_following_text() {
+    let setup = PageSetup {
+      width_pt: 300.0,
+      height_pt: 300.0,
+      margin_left_pt: 20.0,
+      margin_right_pt: 20.0,
+      margin_top_pt: 20.0,
+      margin_bottom_pt: 20.0,
+      ..Default::default()
+    };
+    // Native first-object/preceding-text, old-mode, narrow-frame, finite
+    // obstacle and non-repeating follow controls have distinct page owners.
+    for (mode, prefix, width, obstacle_bottom, repeats, expected_shape_page, expected_tail_page) in [
+      (15, true, 300.0, 400.0, true, 1, 2),
+      (15, false, 300.0, 400.0, true, 0, 1),
+      (12, true, 300.0, 400.0, true, 0, 0),
+      (15, true, 200.0, 400.0, true, 0, 0),
+      (15, true, 300.0, 120.0, true, 0, 0),
+      (15, true, 300.0, 400.0, false, 1, 1),
+    ] {
+      let mut flow = flow_context(
+        setup,
+        0,
+        SectionColumns::default(),
+        0,
+        0,
+        DEFAULT_TAB_STOP_PT,
+      );
+      flow.compatibility_mode = mode;
+      let obstacle = WrapExclusion {
+        left_pt: 0.0,
+        right_pt: 40.0,
+        top_pt: 0.0,
+        bottom_pt: obstacle_bottom,
+        side: ImageWrapSide::BothSides,
+        blocks_flow: false,
+        uses_contour: true,
+        contour_band: None,
+        owner: WrapExclusionOwner::Drawing,
+      };
+      let mut current = empty_page(setup, 0);
+      current.wrap_exclusions.push(obstacle);
+      current.repeating_wrap_exclusion_catalog = RepeatingWrapExclusionCatalog {
+        first_odd: vec![obstacle],
+        first_even: vec![obstacle],
+        default: if repeats { vec![obstacle] } else { Vec::new() },
+        even: if repeats { vec![obstacle] } else { Vec::new() },
+      };
+      let mut paragraph = early_admission_test_paragraph(if prefix { "PREFIX" } else { "" });
+      paragraph.format.line_height_rule = LineHeightRule::AtLeast;
+      paragraph.format.line_height_pt = Some(0.0);
+      paragraph.format.widow_control = Some(false);
+      let mut shape =
+        crate::docx::chart_shape(width, 1.4, 0.0, crate::docx::ImagePlacement::Inline, None);
+      shape.wordprocessing_shape_host = true;
+      shape.fill_color = Some(RgbColor::default());
+      paragraph.inlines.push(InlineItem::Shape(shape));
+      let mut pages = Vec::new();
+      let mut metrics = TextMetrics::new();
+      let (next_flow, y) = TextFrameLayout::new(&paragraph, flow, 260.0, 0.0, &mut metrics).format(
+        &mut current,
+        &mut pages,
+        None,
+        &mut metrics,
+        20.0,
+        20.0,
+      );
+      assert_eq!(
+        pages.len(),
+        expected_shape_page,
+        "mode={mode}, prefix={prefix}, width={width}, bottom={obstacle_bottom}, repeats={repeats}"
+      );
+      assert!(
+        !current.items.is_empty(),
+        "the inline drawing must really paint"
+      );
+      let tail = early_admission_test_paragraph("TAIL");
+      TextFrameLayout::new(&tail, next_flow, 260.0, 0.0, &mut metrics).format(
+        &mut current,
+        &mut pages,
+        None,
+        &mut metrics,
+        y,
+        y,
+      );
+      assert_eq!(
+        pages.len(),
+        expected_tail_page,
+        "following text after mode={mode}, prefix={prefix}, width={width}, bottom={obstacle_bottom}, repeats={repeats}"
+      );
+      assert!(
+        current
+          .items
+          .iter()
+          .any(|item| matches!(item, PageItem::Text(text) if text.text == "TAIL"))
+      );
     }
   }
 
@@ -126159,6 +138230,7 @@ mod tests {
         align_retained_master: false,
         separate_borders: false,
         table_following_text_flow: false,
+        in_header_footer: false,
         direct_text_frame_story_owner: false,
         word_floating_table_cell: false,
         ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -126388,6 +138460,11 @@ mod tests {
         base_style: TextStyle::default(),
         runs: Vec::new(),
         format: Box::new(ParagraphFormat {
+          shading: Some(ShadingPaint::Solid(RgbColor {
+            r: 255,
+            g: 255,
+            b: 0,
+          })),
           indent_left_pt: 90.0,
           first_line_indent_pt: -54.0,
           indent_left_set: true,
@@ -126421,6 +138498,15 @@ mod tests {
       );
       pages.push(current);
       assert_eq!(pages.len(), 2);
+      for page in &pages {
+        assert!(
+          page
+            .items
+            .iter()
+            .any(|item| matches!(item, PageItem::Fill(fill) if fill.height_pt > 0.0)),
+          "both master and follow own paragraph shading"
+        );
+      }
       let heading = pages[1]
         .items
         .iter()
@@ -127037,6 +139123,60 @@ mod tests {
   }
 
   #[test]
+  fn move_word_fitting_looks_through_cached_but_not_authored_page_boundaries() {
+    fn run(text: &str) -> InlineItem {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    }
+    let mut metrics = TextMetrics::new();
+    for (boundary, joins) in [
+      (InlineItem::LastRenderedPageBreak, true),
+      (InlineItem::PageBreak, false),
+      (InlineItem::ColumnBreak, false),
+    ] {
+      let inlines = vec![run("at"), boundary, run("mosphere")];
+      assert!(cross_run_unbreakable_continuation_width(&inlines, 0, "at", &mut metrics).is_none());
+      let continuation = cross_run_unbreakable_continuation_width_impl(
+        &inlines,
+        0,
+        "at",
+        WordprocessingLineBreakOptions {
+          compatibility_mode: 15,
+          compress_punctuation: false,
+          strict_japanese: false,
+          kashida: false,
+        },
+        None,
+        true,
+        &mut metrics,
+      );
+      assert_eq!(continuation.is_some(), joins);
+      if let Some(continuation) = continuation {
+        assert_eq!(
+          continuation.source_end,
+          InlineCursor {
+            inline_index: 2,
+            text_offset: "mosphere".len(),
+          }
+        );
+        assert!(
+          (continuation.fit_width_pt - metrics.measure_text("mosphere", &TextStyle::default()))
+            .abs()
+            < LAYOUT_EPSILON_PT
+        );
+      }
+    }
+  }
+
+  #[test]
   fn smart_justify_cross_run_continuation_distinguishes_punctuation_words_and_fields() {
     fn run(text: &str, field_group: bool) -> InlineItem {
       InlineItem::Text(TextRun {
@@ -127215,6 +139355,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: style.clone(),
@@ -127251,6 +139392,7 @@ mod tests {
 
     assert!(line_fits_with_word_space_shrink(
       LineShrinkFit {
+        modern_kashida: false,
         x: prefix_width,
         width: candidate_width,
         text: candidate,
@@ -127265,6 +139407,7 @@ mod tests {
     ));
     assert!(!line_fits_with_word_space_shrink(
       LineShrinkFit {
+        modern_kashida: false,
         x: prefix_width,
         width: candidate_width + punctuation_width,
         text: candidate,
@@ -127280,6 +139423,7 @@ mod tests {
     assert_eq!(
       smart_justify_fit_terminal_overhang(
         LineShrinkFit {
+          modern_kashida: false,
           x: prefix_width,
           width: candidate_width + punctuation_width,
           text: candidate,
@@ -127301,6 +139445,7 @@ mod tests {
     assert_eq!(
       smart_justify_fit_terminal_overhang(
         LineShrinkFit {
+          modern_kashida: false,
           x: prefix_width,
           width: candidate_width + punctuation_width,
           text: candidate,
@@ -127346,6 +139491,178 @@ mod tests {
     };
     assert!((word.x_pt + candidate_width - line_right).abs() < LAYOUT_EPSILON_PT);
     assert!((punctuation.x_pt - line_right).abs() < LAYOUT_EPSILON_PT);
+  }
+
+  #[test]
+  fn smart_justify_hangs_at_the_paragraph_margin_but_not_a_wrap_obstacle() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Calibri")),
+      high_ansi_font_family: Some(Arc::from("Calibri")),
+      font_size_pt: 12.0,
+      use_windows_font_metrics: true,
+      ..Default::default()
+    };
+    for obstacle in [false, true] {
+      for split_punctuation in [false, true] {
+        let mut block = crate::docx::simple_text_block(
+          "pharetra nonummy pede. Mauris et orci. Aenean nec lorem.".into(),
+          style.clone(),
+        );
+        let Block::Paragraph(paragraph) = &mut block else {
+          unreachable!()
+        };
+        paragraph.format.alignment = ParagraphAlignment::Justify;
+        paragraph.format.justification = crate::docx::ParagraphJustification {
+          adjust: crate::docx::ParagraphAdjust::Block,
+          word_spacing: crate::docx::JustificationWordSpacing {
+            desired_pct: 100,
+            minimum_pct: 75,
+            maximum_pct: 150,
+          },
+          ..Default::default()
+        };
+        if split_punctuation {
+          let InlineItem::Text(first) = &mut paragraph.inlines[0] else {
+            unreachable!()
+          };
+          let mut second = first.clone();
+          second.text = first.text.split_off("pharetra nonummy pede".len());
+          paragraph.inlines.push(InlineItem::Text(second));
+        }
+        let setup = PageSetup {
+          width_pt: 595.3,
+          margin_left_pt: 70.85,
+          margin_right_pt: if obstacle { 70.85 } else { 595.3 - 192.325 },
+          ..Default::default()
+        };
+        let mut flow = flow_context(
+          setup,
+          0,
+          SectionColumns::default(),
+          0,
+          0,
+          DEFAULT_TAB_STOP_PT,
+        );
+        flow.compatibility_mode = 15;
+        flow.justify_lines_with_shrinking = true;
+        let mut page = empty_page(setup, 0);
+        if obstacle {
+          page.wrap_exclusions.push(WrapExclusion {
+            left_pt: 192.325,
+            right_pt: 402.975,
+            top_pt: flow.content_top_pt,
+            bottom_pt: flow.content_top_pt + 100.0,
+            side: ImageWrapSide::BothSides,
+            blocks_flow: false,
+            uses_contour: false,
+            contour_band: None,
+            owner: WrapExclusionOwner::ParagraphFrame,
+          });
+        }
+        layout_document_block(
+          BlockNeighbors::direct(None, None),
+          &block,
+          flow,
+          LayoutBlockTarget {
+            current: &mut page,
+            pages: &mut Vec::new(),
+            anchor_pages: None,
+            text_metrics: &mut TextMetrics::new(),
+            paragraph_decoration_outer_bottom_pt: None,
+          },
+          flow.content_top_pt,
+        );
+        let first_lane = page
+          .items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text)
+              if (!obstacle || text.x_pt < 192.325)
+                && (text.y_pt - flow.content_top_pt).abs() < 0.01 =>
+            {
+              Some(text.text.as_str())
+            }
+            _ => None,
+          })
+          .collect::<String>();
+        assert_eq!(
+          first_lane.trim_end(),
+          if obstacle {
+            "pharetra nonummy"
+          } else {
+            "pharetra nonummy pede."
+          },
+          "obstacle={obstacle}, split punctuation={split_punctuation}",
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn modern_kashida_fit_compares_connection_capacity_with_space_contraction() {
+    let mut metrics = TextMetrics::new();
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      complex_font_family: Some(Arc::from("Arial")),
+      font_size_pt: 11.0,
+      complex_font_size_pt: Some(11.0),
+      right_to_left: Some(true),
+      resolved_bidi_level: Some(1),
+      wordprocessingml_font_slots: true,
+      wordprocessing_legacy_font_measurement: Some(false),
+      ..Default::default()
+    };
+    // Native independent LS expansion/compression arrays and complete Word
+    // paragraphs establish both sides of this decision. The finite glyph
+    // capacities are not a fitted space-expansion multiplier.
+    for (prefix, candidate, ideal_connection_capacity, expected) in [
+      (
+        "خیلی طولانی و متن فارسی با جملات خیلی طولانی و متن فارسی با جملات خیلی طولانی و متن فارسی با جملات خیلی ",
+        "طولانی ",
+        844965,
+        true,
+      ),
+      (
+        "و متن فارسی با جملات خیلی طولانی و متن فارسی با جملات خیلی طولانی و متن فارسی با جملات خیلی طولانی و متن ",
+        "فارسی ",
+        826188,
+        false,
+      ),
+    ] {
+      assert_eq!(
+        (metrics.modern_kashida_expansion_capacity(prefix, &style) * 4096.0).round() as i32,
+        ideal_connection_capacity
+      );
+      let fit = LineShrinkFit {
+        modern_kashida: true,
+        x: 72.0 + metrics.measure_text(prefix, &style),
+        // The fitting token retains its semantic final blank, while the
+        // candidate's printable width excludes it (the actual GDB contract).
+        width: metrics.measure_text(candidate.trim_end_matches(' '), &style),
+        text: candidate,
+        line_right: 523.3,
+        items: &[],
+        item_start: 0,
+        chunk: prefix,
+        style: &style,
+        word_spacing: crate::docx::JustificationWordSpacing {
+          desired_pct: 100,
+          minimum_pct: 75,
+          maximum_pct: 150,
+        },
+      };
+      assert!(line_fits_with_word_space_shrink(
+        LineShrinkFit {
+          modern_kashida: false,
+          ..fit
+        },
+        &mut metrics,
+      ));
+      assert_eq!(
+        line_fits_with_word_space_shrink(fit, &mut metrics),
+        expected
+      );
+    }
   }
 
   #[test]
@@ -127401,6 +139718,7 @@ mod tests {
     let line_right = prefix_width + candidate_width - full_overflow;
     assert!(!line_fits_with_word_space_shrink(
       LineShrinkFit {
+        modern_kashida: false,
         x: prefix_width,
         width: candidate_width,
         text: candidate,
@@ -127415,6 +139733,7 @@ mod tests {
     ));
     assert!(line_fits_with_word_space_shrink(
       LineShrinkFit {
+        modern_kashida: false,
         x: prefix_width,
         width: candidate_width - punctuation_width,
         text: candidate,
@@ -127485,6 +139804,7 @@ mod tests {
       };
       let justification = JustifiedHyphenation::for_line(
         LineShrinkFit {
+          modern_kashida: false,
           x,
           width: metrics.measure_text(word, &style),
           text: word,
@@ -127506,6 +139826,7 @@ mod tests {
         discretionary: true,
         automatic: true,
         line_has_prefix: true,
+        legacy_character_window: false,
         do_not_hyphenate_caps: false,
         justification: None,
       };
@@ -127554,6 +139875,78 @@ mod tests {
   }
 
   #[test]
+  fn legacy_automatic_hyphenation_keeps_the_source_character_search_window() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("Arial")),
+      high_ansi_font_family: Some(Arc::from("Arial")),
+      font_size_pt: 11.0,
+      language: Some(Arc::from("de-DE")),
+      use_windows_font_metrics: true,
+      ..TextStyle::default()
+    };
+    let mut metrics = TextMetrics::new();
+    let narrow = metrics.measure_text("Deck-", &style) + 0.5;
+    let wide = metrics.measure_text("Deckb", &style) + 0.5;
+    assert!(narrow < wide);
+    let policy = HyphenationBreakPolicy {
+      discretionary: true,
+      automatic: true,
+      line_has_prefix: true,
+      legacy_character_window: true,
+      do_not_hyphenate_caps: false,
+      justification: None,
+    };
+    let segment = TextSegment {
+      text: "Deckblatt".into(),
+      start: 0,
+      end: "Deckblatt".len(),
+    };
+    // Native mode14 both/left controls reject this fitting prefix at the
+    // last searchable character, then accept it after the next character
+    // enters the window. Mode15 left accepts the original fitting prefix.
+    assert!(select_hyphenation_break(&segment, &style, narrow, policy, &mut metrics).is_none());
+    assert_eq!(
+      select_hyphenation_break(&segment, &style, wide, policy, &mut metrics)
+        .expect("the next source character now fits")
+        .prefix,
+      "Deck",
+    );
+    assert_eq!(
+      select_hyphenation_break(
+        &segment,
+        &style,
+        narrow,
+        HyphenationBreakPolicy {
+          legacy_character_window: false,
+          ..policy
+        },
+        &mut metrics,
+      )
+      .expect("modern selection retains its geometric candidate")
+      .prefix,
+      "Deck",
+    );
+    let source = "Deck\u{00ad}blatt";
+    let authored = select_hyphenation_break(
+      &TextSegment {
+        text: source.into(),
+        start: 0,
+        end: source.len(),
+      },
+      &style,
+      narrow,
+      policy,
+      &mut metrics,
+    )
+    .expect("the legacy automatic window must not erase an authored operator");
+    assert_eq!(authored.prefix, "Deck");
+    assert_eq!(
+      authored.kind,
+      super::super::hyphenation::CandidateKind::Explicit
+    );
+  }
+
+  #[test]
   fn smart_justify_terminal_sequences_retain_all_but_one_punctuation_width() {
     // Native Word one/two/three-mark and split-run controls. With the
     // complete final word admitted, only the last ')' may exceed this
@@ -127589,6 +139982,7 @@ mod tests {
         smart_justify_western_terminal_punctuation(prefix, candidate, &style, policy, &mut metrics)
           .unwrap();
       let fit = LineShrinkFit {
+        modern_kashida: false,
         x,
         width: appended_text_width(prefix, candidate, &style, &mut metrics),
         text: candidate,
@@ -127734,6 +140128,7 @@ mod tests {
       for delta in deltas {
         let result = smart_justify_fit_terminal_overhang(
           LineShrinkFit {
+            modern_kashida: false,
             x: prefix_width,
             width: metrics.measure_text("2", &style) + postfix_width,
             text: "2",
@@ -127766,6 +140161,7 @@ mod tests {
       assert_eq!(
         smart_justify_fit_terminal_overhang(
           LineShrinkFit {
+            modern_kashida: false,
             x: prefix_width,
             width,
             text: "2",
@@ -127787,6 +140183,100 @@ mod tests {
   }
 
   #[test]
+  fn legacy_character_compression_fits_western_spaces_before_alignment() {
+    let value = "Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci.";
+    let mut metrics = TextMetrics::new();
+    // Native configured controls: mode14 + compressPunctuation admits Mauris
+    // at517pt but not516pt, for left/center/block alignment. Mode15 applies
+    // only its independently enabled smart block adjustment. Short final
+    // lines retain their natural spaces in both paths.
+    for mode in [12, 14, 15] {
+      for (compression, balanced) in [(false, false), (true, false), (true, true)] {
+        for alignment in [
+          ParagraphAlignment::Left,
+          ParagraphAlignment::Center,
+          ParagraphAlignment::Justify,
+        ] {
+          for width in [516.0, 517.0, 518.4] {
+            let mut paragraph = early_admission_test_paragraph(value);
+            let style = TextStyle {
+              font_family: Some("Times New Roman".into()),
+              high_ansi_font_family: Some("Times New Roman".into()),
+              font_size_pt: 10.0,
+              use_windows_font_metrics: true,
+              wordprocessingml_balance_single_byte_double_byte_width: balanced,
+              cjk_punctuation_compression_ratio: if compression { 1.0 } else { 0.0 },
+              ..Default::default()
+            };
+            paragraph.base_style = style.clone();
+            let InlineItem::Text(run) = &mut paragraph.inlines[0] else {
+              unreachable!()
+            };
+            run.style = style;
+            paragraph.format.alignment = alignment;
+            if alignment == ParagraphAlignment::Justify {
+              paragraph.format.justification.adjust = crate::docx::ParagraphAdjust::Block;
+              paragraph.format.justification.word_spacing = crate::docx::JustificationWordSpacing {
+                desired_pct: 100,
+                minimum_pct: 75,
+                maximum_pct: 150,
+              };
+            }
+            let mut flow = flow_context(
+              PageSetup::default(),
+              0,
+              SectionColumns::default(),
+              0,
+              0,
+              DEFAULT_TAB_STOP_PT,
+            );
+            flow.compatibility_mode = mode;
+            flow.justify_lines_with_shrinking = mode >= 15;
+            flow.content_width = width;
+            let mut current = empty_page(flow.setup, 0);
+            layout_paragraph(
+              &paragraph,
+              flow,
+              ParagraphLayoutTarget {
+                current: &mut current,
+                pages: &mut Vec::new(),
+                anchor_pages: None,
+                text_metrics: &mut metrics,
+              },
+              flow.content_top_pt,
+              flow.content_top_pt,
+              0.0,
+            );
+            let texts: Vec<_> = current
+              .items
+              .iter()
+              .filter_map(|item| match item {
+                PageItem::Text(text) => Some(text),
+                _ => None,
+              })
+              .collect();
+            let first_y = texts[0].y_pt;
+            let first_line: String = texts
+              .iter()
+              .filter(|text| (text.y_pt - first_y).abs() < 0.01)
+              .map(|text| text.text.as_str())
+              .collect();
+            let shrinks = (mode < 15 && compression && !balanced && width >= 517.0)
+              || (mode == 15 && alignment == ParagraphAlignment::Justify);
+            assert_eq!(
+              first_line.contains("Mauris"),
+              shrinks,
+              "mode={mode}, compression={compression}, balanced={balanced}, alignment={alignment:?}, width={width}: {first_line}"
+            );
+            assert_eq!(texts[0].word_spacing_pt < 0.0, shrinks);
+            assert_eq!(texts.last().unwrap().word_spacing_pt, 0.0);
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn word_compat_justified_line_shrink_counts_separator_and_stops_at_twenty_percent() {
     let mut text_metrics = TextMetrics::new();
     let mut style = TextStyle::default();
@@ -127800,6 +140290,7 @@ mod tests {
       maximum_pct: 150,
     };
     let fit = |overflow| LineShrinkFit {
+      modern_kashida: false,
       x: 0.0,
       width: line_right + overflow,
       text: "three",
@@ -128416,6 +140907,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -128512,6 +141004,7 @@ mod tests {
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: text.to_string(),
           style: style.clone(),
@@ -128543,6 +141036,7 @@ mod tests {
           },
           Some(0),
           1,
+          false,
           &mut metrics,
         ));
         let PageItem::Text(item) = &items[0] else {
@@ -128580,6 +141074,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -128686,6 +141181,96 @@ mod tests {
           logical_text,
           format!("وكذلك الأسماء للرحمن{}", " ".repeat(tails))
         );
+      }
+    }
+  }
+
+  #[test]
+  fn legacy_form_checkbox_justification_stretches_interior_spaces_and_keeps_fixed_size() {
+    // Native leading/middle/trailing, preserved-space and alignment controls
+    // distinguish fixed object advance from the adjustable text beside it.
+    for object_index in 0..=2 {
+      for gap in [0, 1, 4] {
+        for extra in [-1.0, 18.0] {
+          let mut metrics = TextMetrics::new();
+          let mut items = Vec::new();
+          let mut x = 0.0;
+          for index in 0..=2 {
+            if index == object_index {
+              items.push(PageItem::LegacyFormCheckBox(Box::new(
+                LegacyFormCheckBoxItem {
+                  x_pt: x,
+                  y_pt: 20.0,
+                  line_height_pt: 14.0,
+                  line_top_offset_pt: 0.0,
+                  size_pt: 10.0,
+                  portion_ascent_pt: 9.0,
+                  table_cell_resolved_baseline: false,
+                  checked: false,
+                  style: TextStyle::default(),
+                  hyperlink_url: None,
+                  rotation_deg: 0.0,
+                  rotation_center_pt: None,
+                },
+              )));
+              x += 10.0;
+            }
+            if let Some(value) = ["alpha beta ", "gamma delta"].get(index) {
+              let mut text = text_warp_bounds_test_item(12.0);
+              text.text = if index == object_index {
+                format!("{}{value}", " ".repeat(gap))
+              } else if index == 1 && object_index == 2 {
+                format!("{value}{}", " ".repeat(gap))
+              } else {
+                (*value).to_owned()
+              };
+              text.x_pt = x;
+              text.style.font_family = Some(Arc::from("Arial"));
+              text.style.bold = false;
+              x += metrics.measure_text(&text.text, &text.style);
+              items.push(PageItem::Text(Box::new(text)));
+            }
+          }
+          let right = x + extra;
+          justify_line_items(
+            &mut items,
+            LineJustificationContext {
+              item_start: 0,
+              y_pt: 20.0,
+              left_pt: 0.0,
+              right_pt: right,
+              terminal_overhang_pt: 0.0,
+              source_frame_right_pt: None,
+              has_character_grid: false,
+              preserve_foreign_tail: false,
+            },
+            crate::docx::ParagraphJustification::default(),
+            &mut metrics,
+          );
+          let bounds = items
+            .iter()
+            .map(|item| item_horizontal_bounds(item, &mut metrics).unwrap())
+            .collect::<Vec<_>>();
+          assert!(bounds[0].0.abs() < 0.001);
+          for pair in bounds.windows(2) {
+            assert!(
+              (pair[0].0 + pair[0].1 - pair[1].0).abs() < 0.001,
+              "object={object_index}, gap={gap}, extra={extra}: {bounds:?}"
+            );
+          }
+          let (last_x, last_width) = bounds.last().copied().unwrap();
+          assert!((last_x + last_width - right).abs() < 0.001);
+          for item in &items {
+            match item {
+              PageItem::LegacyFormCheckBox(check_box) => {
+                assert_eq!(check_box.size_pt, 10.0);
+                assert_eq!(check_box.y_pt, 20.0);
+              }
+              PageItem::Text(text) => assert!(text.word_spacing_pt * extra > 0.0),
+              _ => unreachable!(),
+            }
+          }
+        }
       }
     }
   }
@@ -128897,6 +141482,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -129011,6 +141597,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -129182,6 +141769,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "中".to_string(),
         style: style.clone(),
@@ -129448,6 +142036,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "label".to_string(),
         style: style.clone(),
@@ -130018,6 +142607,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "label".to_string(),
         style: style.clone(),
@@ -130794,6 +143384,7 @@ mod tests {
       paint_order: FloatingPaintOrder::drawing_ml_relative_height(value),
       behind_text,
       table_wrap: None,
+      body_vertical_alignment: None,
     };
     let body = PageItem::Rect(RectItem {
       x_pt: 100.0,
@@ -130854,6 +143445,7 @@ mod tests {
         paint_order: FloatingPaintOrder::drawing_ml_relative_height(2),
         behind_text: true,
         table_wrap: None,
+        body_vertical_alignment: None,
       },
     ];
 
@@ -131176,6 +143768,7 @@ mod tests {
       paint_order: FloatingPaintOrder::drawing_ml_relative_height(2),
       behind_text: false,
       table_wrap: None,
+      body_vertical_alignment: None,
     }];
 
     order_floating_page_items(&mut items, None, false, 12);
@@ -131258,6 +143851,7 @@ mod tests {
       let table_frame = TextFrame {
         table_cell_baseline_offset_pt: Some(baseline),
         drawing_wrap_baseline_offset_pt: baseline,
+        following_table_wrap_baseline_offset_pt: baseline,
         ..frame
       };
       let y = 72.0 + baseline;
@@ -131306,6 +143900,7 @@ mod tests {
         static3d: None,
         width_pt: 4.0,
         height_pt: 4.0,
+        inline_frame_axes_swapped: false,
         inline_offset_x_pt: 0.0,
         inline_offset_y_pt: 0.0,
         effect_left_pt: 0.0,
@@ -131697,6 +144292,7 @@ mod tests {
             &cell,
             100.0,
             TableCellMeasureContext {
+              in_header_footer: false,
               horizontal_rule_reference_width_pt: None,
               setup: legacy_flow.setup,
               default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
@@ -131712,6 +144308,7 @@ mod tests {
             align_retained_master: false,
             separate_borders: false,
             table_following_text_flow: false,
+            in_header_footer: false,
             direct_text_frame_story_owner: false,
             word_floating_table_cell: false,
             ancestor_floating_table_cell_follow_top_inset_pt: 0.0,
@@ -131841,6 +144438,7 @@ mod tests {
       static3d: None,
       width_pt,
       height_pt,
+      inline_frame_axes_swapped: false,
       inline_offset_x_pt: 0.0,
       inline_offset_y_pt: 0.0,
       effect_left_pt: 0.0,
@@ -131869,6 +144467,227 @@ mod tests {
       metafile_fixed_output_profile: common::MetafileFixedOutputProfile::Default,
       placement: crate::docx::ImagePlacement::Inline,
     })
+  }
+
+  #[test]
+  fn inline_picture_rotation_keeps_paint_center_and_character_baseline_separate() {
+    // Native 120x60 and 60x120 pictures with l/t/r/b = 3/5/7/11.
+    // A tall rotated source has a negative paint-to-baseline gap, while its
+    // character frame still has the full 76pt ascent and no extra descent.
+    for (width, height, frame_width, frame_height, x, y, gap) in [
+      (120.0, 60.0, 70.0, 136.0, -27.0, 35.0, 41.0),
+      (60.0, 120.0, 130.0, 76.0, 33.0, -25.0, -19.0),
+    ] {
+      let InlineItem::Image(mut image) = character_picture(width, height) else {
+        unreachable!()
+      };
+      image.inline_frame_axes_swapped = true;
+      image.effect_left_pt = 3.0;
+      image.effect_top_pt = 5.0;
+      image.effect_right_pt = 7.0;
+      image.effect_bottom_pt = 11.0;
+      let metrics = inline_image_metrics(&image);
+      assert_eq!(
+        (metrics.frame_width_pt, metrics.frame_height_pt),
+        (frame_width, frame_height)
+      );
+      assert_eq!(
+        (metrics.content_offset_x_pt, metrics.content_offset_y_pt),
+        (x, y)
+      );
+      assert_eq!(
+        (metrics.content_width_pt, metrics.content_height_pt),
+        (width, height)
+      );
+      assert_eq!(metrics.content_bottom_gap_pt, gap);
+      assert_eq!(inline_image_ascent(metrics), frame_height);
+      assert_eq!(
+        inline_image_vertical_extents(metrics),
+        InlineImageVerticalExtents {
+          ascent_pt: frame_height,
+          descent_pt: 0.0
+        }
+      );
+      let scaled = width_limited_inline_image_metrics(&image, frame_width / 2.0);
+      assert_eq!(inline_image_ascent(scaled), frame_height / 2.0);
+      assert_eq!(
+        (scaled.content_offset_x_pt, scaled.content_offset_y_pt),
+        (x / 2.0, y / 2.0)
+      );
+      image.inline_frame_axes_swapped = false;
+      let ordinary = inline_image_metrics(&image);
+      assert_eq!(
+        (ordinary.frame_width_pt, ordinary.frame_height_pt),
+        (width + 10.0, height + 16.0)
+      );
+      assert_eq!(
+        (ordinary.content_offset_x_pt, ordinary.content_offset_y_pt),
+        (3.0, 5.0)
+      );
+    }
+  }
+
+  #[test]
+  fn modern_nowrap_picture_alignment_keeps_effect_axes_independent() {
+    let mut flow = flow_context(
+      PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        margin_left_pt: 72.0,
+        margin_right_pt: 72.0,
+        margin_top_pt: 72.0,
+        margin_bottom_pt: 72.0,
+        ..PageSetup::default()
+      },
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    flow.compatibility_mode = 15;
+    let InlineItem::Image(mut image) = character_picture(100.0, 60.0) else {
+      unreachable!()
+    };
+    image.effect_left_pt = 3.0;
+    image.effect_right_pt = 7.0;
+    image.effect_top_pt = 5.0;
+    image.effect_bottom_pt = 11.0;
+    let mut placement = wordprocessing_test_relative_shape_placement();
+    placement.relative_width_to = Some(HorizontalImageReference::Page);
+    placement.relative_height_to = Some(VerticalImageReference::Page);
+    placement.vertical_relative_to = VerticalImageReference::Margin;
+    placement.wrap = ImageWrapMode::None;
+    placement.paint_order = FloatingPaintOrder::drawing_ml_relative_height(1);
+    for relative_percentage in [None, Some(0.0)] {
+      placement.relative_width_pct = relative_percentage;
+      placement.relative_height_pct = relative_percentage;
+      for (horizontal, expected_x) in [
+        (None, 72.0),
+        (Some(HorizontalImageAlignment::Left), 75.0),
+        (Some(HorizontalImageAlignment::Right), 433.0),
+        (Some(HorizontalImageAlignment::Center), 254.0),
+      ] {
+        for (vertical, expected_y) in [(None, 72.0), (Some(VerticalImageAlignment::Top), 77.0)] {
+          placement.horizontal_alignment = horizontal;
+          placement.vertical_alignment = vertical;
+          let metrics = floating_image_metrics(&image, placement, flow);
+          let (x, y) = floating_picture_position(
+            placement,
+            flow,
+            ParagraphIndents::default(),
+            (72.0, 72.0),
+            (metrics.frame_width_pt, metrics.frame_height_pt),
+            false,
+          );
+          assert!((x + metrics.content_offset_x_pt - expected_x).abs() < 0.001);
+          assert!((y + metrics.content_offset_y_pt - expected_y).abs() < 0.001);
+          assert_eq!(
+            (metrics.content_width_pt, metrics.content_height_pt),
+            (100.0, 60.0)
+          );
+        }
+      }
+    }
+
+    placement.horizontal_alignment = Some(HorizontalImageAlignment::Left);
+    placement.vertical_alignment = None;
+    placement.relative_width_pct = Some(0.5);
+    placement.relative_height_pct = Some(0.25);
+    let relative = floating_image_metrics(&image, placement, flow);
+    assert_eq!(
+      (relative.content_width_pt, relative.content_height_pt),
+      (306.0, 198.0)
+    );
+    assert_eq!(
+      (relative.content_offset_x_pt, relative.content_offset_y_pt),
+      (3.0, 5.0)
+    );
+    placement.relative_width_pct = Some(0.0);
+    placement.relative_height_pct = Some(0.0);
+    for mode in [12, 14] {
+      flow.compatibility_mode = mode;
+      let metrics = floating_image_metrics(&image, placement, flow);
+      assert_eq!(
+        (metrics.content_offset_x_pt, metrics.content_offset_y_pt),
+        (3.0, 5.0)
+      );
+    }
+    flow.compatibility_mode = 15;
+    image.contour_owned_wrap = Some(ImageWrapMode::Through);
+    let proxy_owned = floating_image_metrics(&image, placement, flow);
+    assert_eq!(
+      (
+        proxy_owned.content_offset_x_pt,
+        proxy_owned.content_offset_y_pt
+      ),
+      (3.0, 5.0)
+    );
+  }
+
+  #[test]
+  fn vml_picture_template_uses_modern_independent_effect_axes() {
+    let mut flow = flow_context(
+      PageSetup::default(),
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let mut image = crate::docx::vml_picture::frame_test_image(0.75, &[]);
+    let crate::docx::ImagePlacement::Floating(mut placement) = image.placement else {
+      unreachable!()
+    };
+    placement.behind_text = true;
+    for (mode, expected) in [
+      (14, [(0.0, 0.0), (0.75, 0.75), (0.75, 0.75), (0.75, 0.75)]),
+      (15, [(0.0, 0.0), (0.75, 0.0), (0.0, 0.75), (0.75, 0.75)]),
+    ] {
+      flow.compatibility_mode = mode;
+      for ((horizontal, vertical), expected) in [
+        (None, None),
+        (Some(HorizontalImageAlignment::Left), None),
+        (None, Some(VerticalImageAlignment::Top)),
+        (
+          Some(HorizontalImageAlignment::Left),
+          Some(VerticalImageAlignment::Top),
+        ),
+      ]
+      .into_iter()
+      .zip(expected)
+      {
+        placement.horizontal_alignment = horizontal;
+        placement.vertical_alignment = vertical;
+        let metrics = floating_image_metrics(&image, placement, flow);
+        assert_eq!(
+          (metrics.content_offset_x_pt, metrics.content_offset_y_pt),
+          expected
+        );
+        assert_eq!(
+          (metrics.content_width_pt, metrics.content_height_pt),
+          (117.75, 117.75)
+        );
+      }
+    }
+    placement.horizontal_alignment = Some(HorizontalImageAlignment::Left);
+    placement.vertical_alignment = None;
+    image.contour_owned_wrap = Some(ImageWrapMode::Through);
+    let contour = floating_image_metrics(&image, placement, flow);
+    assert_eq!(
+      (contour.content_offset_x_pt, contour.content_offset_y_pt),
+      (0.75, 0.75)
+    );
+    image.contour_owned_wrap = None;
+    image.picture_frame = None;
+    let unclassified = floating_image_metrics(&image, placement, flow);
+    assert_eq!(
+      (
+        unclassified.content_offset_x_pt,
+        unclassified.content_offset_y_pt
+      ),
+      (0.75, 0.75)
+    );
   }
 
   #[test]
@@ -132181,6 +145000,7 @@ mod tests {
         static3d: None,
         width_pt,
         height_pt: 16.0,
+        inline_frame_axes_swapped: false,
         inline_offset_x_pt: 0.0,
         inline_offset_y_pt: 0.0,
         effect_left_pt: 0.0,
@@ -132261,6 +145081,7 @@ mod tests {
         wordprocessing_shape_id: None,
         text_box_link: None,
         wordprocessing_shape_hyperlink_description: None,
+        wordprocessing_group_textbox: false,
         wordprocessing_shape_outline_text_inset_pt: 0.0,
         wordprocessing_canvas_has_background_paint: false,
         text_upright: false,
@@ -132651,7 +145472,7 @@ mod tests {
         false,
       );
       assert!(
-        (measured.0 - 16.0).abs() < LAYOUT_EPSILON_PT,
+        (measured.height - 16.0).abs() < LAYOUT_EPSILON_PT,
         "mark={mark_size}, measured={measured:?}"
       );
     }
@@ -132912,6 +145733,7 @@ mod tests {
       static3d: None,
       width_pt: 453.5,
       height_pt: 97.5,
+      inline_frame_axes_swapped: false,
       inline_offset_x_pt: 0.0,
       inline_offset_y_pt: 0.0,
       effect_left_pt: 0.0,
@@ -133105,6 +145927,7 @@ mod tests {
           static3d: None,
           width_pt: 216.0,
           height_pt: 144.0,
+          inline_frame_axes_swapped: false,
           inline_offset_x_pt: 0.0,
           inline_offset_y_pt: 0.0,
           effect_left_pt: 0.0,
@@ -133206,6 +146029,7 @@ mod tests {
         wordprocessing_shape_id: None,
         text_box_link: None,
         wordprocessing_shape_hyperlink_description: None,
+        wordprocessing_group_textbox: false,
         wordprocessing_shape_outline_text_inset_pt: 0.0,
         wordprocessing_canvas_has_background_paint: false,
         text_upright: false,
@@ -133652,6 +146476,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "1".to_string(),
       style: TextStyle::default(),
@@ -133740,6 +146565,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: "cached".to_string(),
         style: TextStyle::default(),
@@ -133842,6 +146668,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "96".to_string(),
       style: TextStyle::default(),
@@ -134036,6 +146863,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: style.clone(),
@@ -135754,6 +148582,7 @@ mod tests {
               x_pt: object_x,
               y_pt: 20.0,
               line_height_pt: 20.0,
+              line_top_offset_pt: 0.0,
               size_pt: 30.0,
               portion_ascent_pt: 24.0,
               table_cell_resolved_baseline: false,
@@ -135906,6 +148735,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),
@@ -136076,6 +148906,7 @@ mod tests {
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: value.to_string(),
           style: style.clone(),
@@ -136215,6 +149046,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "1-".to_string(),
       style,
@@ -136279,6 +149111,7 @@ mod tests {
       paint_clip: None,
       page_culling_bounds: None,
       wordprocessing_effect_host: None,
+      side_ruby: None,
       wordprocessing_terminal_effect_style: None,
       text: "also coordinate with your current document look.".to_string(),
       style: TextStyle::default(),
@@ -136605,6 +149438,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: value.to_string(),
         style: TextStyle {
@@ -136773,6 +149607,71 @@ mod tests {
   }
 
   #[test]
+  fn scoped_bidi_property_regions_preserve_native_bracket_and_arabic_levels() {
+    let scope = Arc::from(vec![crate::model::WordprocessingBidiScope {
+      id: 1,
+      right_to_left: false,
+      override_direction: false,
+    }]);
+    // Native DirectWrite controls: non-RTL PDF is local; RTL PDF closes the
+    // inherited embedding. Repeat the suffix as a new physical line to check
+    // that the consumed prefix has the same owner after wrapping.
+    for control_rtl in [false, true] {
+      for continuation in [false, true] {
+        let portions = if continuation {
+          vec![("Latin", false, true), (") ثالث", true, true)]
+        } else {
+          vec![
+            ("أول", true, false),
+            (" ", false, false),
+            ("\u{202c}", control_rtl, false),
+            ("ثاني (", true, true),
+            ("Latin", false, true),
+            (") ثالث", true, true),
+          ]
+        };
+        let mut logical = String::new();
+        let mut starts = Vec::new();
+        let items = portions
+          .iter()
+          .map(|&(content, rtl, after)| {
+            starts.push(logical.len());
+            logical.push_str(content);
+            let mut text = text_warp_bounds_test_item(12.0);
+            text.text = content.into();
+            text.paragraph_bidi = true;
+            text.style.right_to_left = Some(rtl);
+            text.style.wordprocessing_bidi_scopes = Some(Arc::clone(&scope));
+            text.style.wordprocessing_bidi_prefix =
+              (after && control_rtl).then(|| Arc::from("\u{202c}"));
+            PageItem::Text(Box::new(text))
+          })
+          .collect::<Vec<_>>();
+        let indices = (0..items.len()).collect::<Vec<_>>();
+        let mut levels = vec![Level::rtl(); logical.len()];
+        resolve_scoped_bidi_regions(
+          &items,
+          &indices,
+          &logical,
+          &starts,
+          Level::rtl(),
+          &mut levels,
+        );
+        let latin = logical.find("Latin").unwrap();
+        assert_eq!(levels[latin].number(), 2);
+        let bracket = logical.rfind(')').unwrap();
+        assert_eq!(levels[bracket].number(), if control_rtl { 1 } else { 2 });
+        let arabic = logical.find("ثالث").unwrap();
+        assert_eq!(levels[arabic].number(), if control_rtl { 1 } else { 3 });
+        if !continuation {
+          let bracket = logical.find('(').unwrap();
+          assert_eq!(levels[bracket].number(), if control_rtl { 1 } else { 2 });
+        }
+      }
+    }
+  }
+
+  #[test]
   fn explicit_ltr_portions_keep_their_glyph_direction_inside_an_rtl_override() {
     let mut metrics = TextMetrics::new();
     let outer = crate::model::WordprocessingBidiScope {
@@ -136932,6 +149831,7 @@ mod tests {
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: label.into(),
           style: TextStyle {
@@ -137016,6 +149916,7 @@ mod tests {
           paint_clip: None,
           page_culling_bounds: None,
           wordprocessing_effect_host: None,
+          side_ruby: None,
           wordprocessing_terminal_effect_style: None,
           text: "1-".to_string(),
           style: TextStyle {
@@ -137131,6 +150032,7 @@ mod tests {
       },
       page_background_pattern: None,
       page_background_texture: None,
+      page_background_gradient: None,
       line_number_style: TextStyle::default(),
       note_separator_style: TextStyle::default(),
       footnote_separator_stories: crate::docx::NoteSeparatorStories {
@@ -137255,6 +150157,7 @@ mod tests {
         paint_clip: None,
         page_culling_bounds: None,
         wordprocessing_effect_host: None,
+        side_ruby: None,
         wordprocessing_terminal_effect_style: None,
         text: text.to_string(),
         style: TextStyle::default(),

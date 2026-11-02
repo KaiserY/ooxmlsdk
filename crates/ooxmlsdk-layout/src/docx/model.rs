@@ -21,6 +21,7 @@ use crate::{common, units};
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
+  pub page_background_gradient: Option<super::page_background::LinearGradient>,
   pub page_background_pattern: Option<common::PatternFill>,
   pub page_background_texture: Option<InlineShapeImageFill>,
   pub line_number_style: TextStyle,
@@ -100,6 +101,7 @@ impl Default for HyphenationSettings {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum PageBottomHyphenation {
   Allow,
+  MoveWord,
   #[default]
   MoveLine,
 }
@@ -112,9 +114,16 @@ pub(crate) struct NoteNumberingSpec {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct DiscardedSectionCarrier {
+  pub spacing_after_pt: f32,
+  pub style_id: Option<Arc<str>>,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct ImportedSection {
+  pub(super) note_reference_order: super::note_reference_order::Order,
   pub break_kind: SectionBreakKind,
-  pub discarded_carrier_spacing_after_pt: Option<f32>,
+  pub discarded_carrier: Option<DiscardedSectionCarrier>,
   pub section_properties: Option<w::SectionProperties>,
   pub page: PageSetup,
   pub columns: SectionColumns,
@@ -132,6 +141,8 @@ pub(crate) struct ImportedSection {
 pub(crate) struct SectionColumns {
   pub count: usize,
   pub gap_pt: f32,
+  /// Section-level flow order; independent of paragraph/text bidi direction.
+  pub right_to_left: bool,
   pub separator: bool,
   pub unbalanced: bool,
   /// Unlike final-section balancing, an implicit follow caused by a wrapping
@@ -162,6 +173,7 @@ impl Default for SectionColumns {
     Self {
       count: 1,
       gap_pt: 36.0,
+      right_to_left: false,
       separator: false,
       unbalanced: false,
       balance_on_wrap_follow: true,
@@ -290,6 +302,12 @@ pub(crate) enum ParagraphFieldEvent {
     dirty: bool,
     inserted: bool,
   },
+  /// Regular legacy text input defaults are printed independently of their
+  /// cached, potentially structural result. Only ffData/textInput owns this.
+  FormTextDefault(String),
+  /// A closing marker whose begin is in an earlier paragraph. Keep its
+  /// character properties for a reconstructed block-spanning form result.
+  FieldEndProperties(Box<w::RunProperties>),
   Instruction(String),
   Separate {
     /// Resolved character context for a reconstructed ordinary empty TOC.
@@ -309,6 +327,13 @@ pub(crate) enum ParagraphFieldEvent {
   },
   BookmarkEnd {
     id: String,
+  },
+  /// A closed, text-only bookmark inside one source paragraph. Keep authored
+  /// run properties until REF refresh: copying its computed paragraph style
+  /// would incorrectly transport the source paragraph's font and size.
+  BookmarkTextSource {
+    name: String,
+    paragraph: Box<w::Paragraph>,
   },
   /// The source paragraph delimiter is not part of the imported story.
   ///
@@ -333,6 +358,13 @@ pub(crate) enum ParagraphFieldEvent {
   /// sequence, immediately after the closing field result.
   DeferredParagraphBreak {
     inline_offset: usize,
+  },
+  /// A generated rich field paragraph owns both its delimiter and style.
+  /// The following source paragraph/suffix retains its original formatting.
+  GeneratedParagraphBreak {
+    inline_offset: usize,
+    format: Box<ParagraphFormat>,
+    base_style: Box<TextStyle>,
   },
   /// Cached REF-result delimiter paired with
   /// `SuppressReferenceParagraphBreak` by `field_id`.
@@ -359,6 +391,16 @@ pub(crate) enum ParagraphFieldEvent {
     inline_start: usize,
     inline_end: usize,
     merge_format: bool,
+    copy_text: bool,
+    separator_style: Option<Box<TextStyle>>,
+  },
+  /// An unlocked positional formula's exact cache span. The complete table
+  /// resolves its dependencies before text measurement or story normalization.
+  FormulaResultSpan {
+    formula: super::table_formula::Formula,
+    style: Box<TextStyle>,
+    inline_start: usize,
+    inline_end: usize,
   },
 }
 
@@ -434,6 +476,8 @@ pub(crate) struct TableRow {
   pub cell_spacing: Option<TableCellSpacing>,
   pub grid_before: usize,
   pub grid_after: usize,
+  /// Legacy w:trPr/w:jc; modern Word uses the table alignment.
+  pub alignment: Option<TableAlignment>,
   pub width_before_pt: Option<f32>,
   pub width_after_pt: Option<f32>,
   pub layout: Option<TableLayoutMode>,
@@ -614,6 +658,10 @@ pub(crate) struct ParagraphFormat {
   pub vml_text_path: bool,
   pub style_id: Option<Arc<str>>,
   pub numbering_id: Option<i32>,
+  /// Resolved abstract definition shared by concrete numbering instances.
+  /// Automatic list spacing follows this identity across instance restarts;
+  /// explicit paragraph spacing still retains its ordinary collapse rules.
+  pub numbering_abstract_id: Option<i32>,
   /// Resolved level after style-linked `ilvl` selection and instance overrides.
   /// TOC reconstruction needs its direct symbol properties without consuming
   /// another list counter or copying the heading's inherited run style.
@@ -637,6 +685,10 @@ pub(crate) struct ParagraphFormat {
   /// of collapsing to their maximum; keep the document setting on each
   /// imported paragraph so nested stories use the same rule during layout.
   pub additive_paragraph_spacing: bool,
+  /// Effective w:suppressSpBfAfterPgBrk: a leading authored run break does
+  /// not defer the paragraph's before-space to its first follow line/mark.
+  /// Keep this document policy on nested-story paragraphs after style resolution.
+  pub suppress_spacing_before_after_page_break: bool,
   /// Word repaired an undefined built-in heading through its application
   /// heading-base parent. The recovered upper spacing is real style state,
   /// but Word suppresses that application-supplied value on the first body
@@ -698,6 +750,10 @@ pub(crate) struct ParagraphFormat {
   /// rotating a horizontal shape, grouped drawings, and nested table cells
   /// do not acquire that text-frame owner.
   pub wordprocessing_shape_vertical_text: bool,
+  /// `eaVert`/`mongolianVert` format mixed upright and rotated characters.
+  /// Their rotated font cells participate in line metrics before the final
+  /// column transform; the quarter-turn frame's 125% minimum is independent.
+  pub wordprocessing_shape_mixed_vertical_text: bool,
   /// The WPS text story belongs to a shape nested in `wpg:wgp`. Word realizes
   /// bitmap children of that grouped drawing through the group's bitmap
   /// surface before fixed-output compression. A top-level `wps:wsp` textbox
@@ -992,6 +1048,9 @@ pub(crate) struct ParagraphJustification {
   pub last_line_adjust: ParagraphAdjust,
   pub word_spacing: JustificationWordSpacing,
   pub kashida: Option<KashidaLevel>,
+  /// Compatibility mode 15 uses modern completed-line printer policies.
+  /// Kashida priorities remain independent of useWord97LineBreakRules.
+  pub modern_wordprocessing: bool,
   pub letter_spacing_minimum_pct: i16,
   pub letter_spacing_maximum_pct: i16,
   pub scale_width_minimum_pct: i16,
@@ -1009,6 +1068,7 @@ impl Default for ParagraphJustification {
       last_line_adjust: ParagraphAdjust::Left,
       word_spacing: JustificationWordSpacing::default(),
       kashida: None,
+      modern_wordprocessing: false,
       letter_spacing_minimum_pct: 0,
       letter_spacing_maximum_pct: 0,
       scale_width_minimum_pct: 100,
@@ -1105,6 +1165,10 @@ pub(crate) struct RubyInline {
   /// The enclosing run owns fit-text grouping; nested ruby run properties
   /// do not substitute for that owner.
   pub fit_text: Option<crate::model::WordprocessingFitText>,
+  /// The carrier's nominal cell stays independent of the nested base runs.
+  /// Right-side annotations overlap its trailing fifth before reserving a
+  /// rotated annotation line, even when the base has a different font size.
+  pub container_font_size_pt: f32,
   pub base: Vec<TextRun>,
   pub guide: Vec<TextRun>,
   pub alignment: RubyAlignment,
@@ -1383,6 +1447,9 @@ pub(crate) struct InlineImage {
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub width_pt: f32,
   pub height_pt: f32,
+  /// Word 2010+ exchanges the inline character frame axes near a quarter turn.
+  /// The authored picture dimensions and visual rotation remain independent.
+  pub inline_frame_axes_swapped: bool,
   /// Child-space offset inside an inline DrawingML group or canvas.
   pub inline_offset_x_pt: f32,
   pub inline_offset_y_pt: f32,
@@ -1514,6 +1581,10 @@ pub(crate) struct InlineShape {
   /// quantization contract. Keep that provenance after import instead of
   /// inferring it later from fill, textbox, or effect content.
   pub wordprocessing_shape_host: bool,
+  /// The WPS text frame belongs to a group/canvas drawing renderer. Preserve
+  /// this even for a story containing only tables: its cell paragraphs have
+  /// independent layout provenance, but table paint uses the group surface.
+  pub wordprocessing_group_textbox: bool,
   /// SmartArt uses Word's effect sampling bounds without the WPS canvas's
   /// far-edge transport extension. Preserve this independently of text layout.
   pub wordprocessing_diagram_host: bool,
@@ -1660,6 +1731,7 @@ pub(crate) struct InlineChart {
   pub category_minor_gridline: Option<(RgbColor, f32)>,
   pub value_minor_gridline: Option<crate::common::Stroke<'static>>,
   pub category_major_gridline_stroke: Option<crate::common::Stroke<'static>>,
+  pub series_axis_strokes: Vec<Option<crate::common::Stroke<'static>>>,
   pub series_colors: Vec<RgbColor>,
   pub series_point_colors: Vec<Vec<Option<RgbColor>>>,
   pub series_styles: Vec<common::ShapeStyle<'static>>,
@@ -1681,6 +1753,7 @@ pub(crate) struct InlineChart {
   pub group_decoration_styles: Vec<crate::pptx::chart::CartesianChartGroupDecorationStyle>,
   pub series_point_styles: Vec<Vec<Option<common::ShapeStyle<'static>>>>,
   pub surface_band_colors: Vec<Vec<(u32, RgbColor)>>,
+  pub surface_band_styles: Vec<Vec<(u32, crate::common::ShapeStyle<'static>)>>,
   pub data_label_fill_colors: Vec<Vec<Option<RgbColor>>>,
   pub pie_data_label_shape_styles: Vec<Option<common::ShapeStyle<'static>>>,
   pub pie_data_label_image_effects:

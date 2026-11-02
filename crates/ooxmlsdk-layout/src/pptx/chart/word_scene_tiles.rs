@@ -101,6 +101,26 @@ pub(super) fn rasterize(
   Some(output)
 }
 
+/// A surface mesh shares the native tiled projection with its enclosing
+/// walls. Those walls are behind the bounded surface; the mesh itself owns
+/// per-sample depth testing. Keep resolved labels outside this raster scene.
+pub(super) fn rasterize_with_mesh(
+  items: &[DisplayItem<'static>],
+  viewport: Rect,
+  printer_size: (u32, u32),
+  mapping: PageToRasterMapping,
+  mesh: &super::word_pie_scene::Scene,
+) -> Option<RgbaImage> {
+  let mut output = RgbaImage::new(mapping.width_px, mapping.height_px);
+  for tile in tiles(viewport, printer_size, mapping)? {
+    let mut image = rasterize_vector_scene_at_mapping(items, tile.mapping)?;
+    let foreground = mesh.rasterize(tile.mapping)?;
+    image::imageops::overlay(&mut image, &foreground, 0, 0);
+    image::imageops::replace(&mut output, &image, i64::from(tile.x), i64::from(tile.y));
+  }
+  Some(output)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

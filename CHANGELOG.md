@@ -1,6 +1,6 @@
 # Change Log
 
-## Unreleased
+## 0.15.0
 
 ### Breaking Changes
 
@@ -8,6 +8,9 @@
   `alternate_content_0` for wrapped transitions and add `alternate_content_1`
   for wrapped timing. Update field accesses and struct literals accordingly;
   wrapped timing parsed from XML now belongs to the second field.
+- `Document`, `Worksheet`, and eight PresentationML part roots add
+  `mc_preserve_elements`. Include this field in complete struct literals, or
+  use `..Default::default()`.
 
 ### Added
 
@@ -26,21 +29,36 @@
 - Recognized all six Visio main content types on the document part. Drawing,
   stencil, and template packages, including the macro-enabled forms, open
   without a pages part. Macro-enabled packages keep `vbaProject` bytes.
-- Added `ooxmlsdk-visio` to look up pages, masters, and shapes by id and to read
-  and write stored ShapeSheet values. Formulas are not evaluated. A missing
-  instance cell uses the master shape's stored value. A local value wins. A row
-  or section marked deleted does not inherit. Page, master, and shape ids are
-  allocated from separate counters. Text marks and the character data between
-  them round-trip in order. Package, ShapeSheet, and authoring behavior is
-  described in `docs/specs/visio_parts.md`, `docs/specs/visio_shapesheet.md`,
-  and `docs/specs/visio_authoring.md`.
 
 ### Fixed
 
-- Declare Visio and relationship namespaces on authored part roots and populate
-  the initial page's `Rel/@r:id` in `minimal_drawing()` with its page-part
-  relationship ID. Preserve unrelated imported prefix bindings and reject
-  conflicts with required prefixes before adding pages or masters.
+- Preserve `mc:PreserveElements` on those ten part roots through XML and package
+  save/reopen. With `mce` enabled, the field also supplies the existing
+  preservation rules for modeled children.
+- Preserve zero-offset-first ZIP recovery when upgrading zip, retaining the
+  existing document selection for concatenated packages and automatic offset
+  detection for packages with prepended data.
+- Remove duplicated namespace dispatch from derived open-choice parsers,
+  restoring the previous expansion size and default-stack parsing of nested
+  DrawingML.
+
+### Changed
+
+- Update `zip` to 9.2.2 and `memchr` to 2.8.3 while retaining Rust 1.88 support
+  for the published core and derive crates.
+- Remove the zip `unreserved` workaround: copying existing entries now preserves
+  registered extra fields without enabling it.
+
+### Testing
+
+- Rechecked all 5,477 imported Office corpus cases on the default thread stack:
+  5,366 round-trip candidates, 16 open-only cases, and 95 invalid-package
+  expectations; no new manifest exceptions.
+- Added XML escaping and comparator controls for literal entity-like text,
+  Unicode whitespace, inherited `xml:space`, and empty relationship parts.
+  Source comparisons continue to read the original package bytes.
+- Verified concatenated ZIP recovery against an existing corpus document, with
+  file and memory readers and both lazy and eager package modes.
 
 ## 0.14.0
 

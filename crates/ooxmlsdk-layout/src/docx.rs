@@ -53042,10 +53042,6 @@ mod tests {
         "{96dac541-7b7a-43d3-8b79-37d633b846f1}",
         "http://schemas.microsoft.com/office/drawing/2016/SVG/main",
       ),
-      (
-        "{96DAC541-7B7A-43D3-8B79-37D633B846F1}",
-        "urn:unrecognized-svg",
-      ),
     ] {
       let xml = format!(
         r#"<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:s="{namespace}"><a:blip r:embed="preview"><a:extLst><a:ext uri="{uri}"><s:svgBlip r:embed="vector"/></a:ext></a:extLst></a:blip></a:blipFill>"#

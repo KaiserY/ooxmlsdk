@@ -1,5 +1,4 @@
-//! Visio sheet lookup and stored-value authoring. Formulas stay text. This
-//! crate does not evaluate them or draw pages.
+#![doc = include_str!("../README.md")]
 
 mod cells;
 mod connect;

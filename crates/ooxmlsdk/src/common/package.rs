@@ -1454,9 +1454,8 @@ impl SdkPackageStorage {
 
   fn open_archive(reader: ArchiveReader) -> Result<Self, SdkError> {
     let mut raw_reader = reader.clone();
-    // zip 9's automatic offset detection scans the whole archive. Most OPC
-    // packages start at offset zero; retain lazy reads for them and fall back
-    // to automatic detection for archives with a prepended prefix.
+    // Preserve zero-offset-first recovery when concatenated ZIPs contain
+    // competing documents. Automatic detection handles prepended data.
     let mut archive = zip::ZipArchive::with_config(
       zip::read::Config {
         archive_offset: zip::read::ArchiveOffset::Known(0),

@@ -5,9 +5,9 @@ text, images, groups, connects, layers, comments, hyperlinks, and shape data.
 A later PPTX conversion can call these operations. This note does not define
 that conversion, a formula engine, or a PDF renderer.
 
-**Status:** This is the contract for the next work in `ooxmlsdk-visio`. The
-readers in `visio_shapesheet.md` and the package in `visio_parts.md` are
-already implemented. The writes below are not.
+**Status:** The stored-value reads and writes described here are implemented in
+`ooxmlsdk-visio`. Together with `visio_shapesheet.md` and `visio_parts.md`, this
+is the contract for the current package and authoring API.
 
 **Sources used:** `schemas/VisioXMLSchema/visio-main.xsd` and the generated
 types in `schemas_microsoft_com_office_visio_2012_main`. Examples are original.

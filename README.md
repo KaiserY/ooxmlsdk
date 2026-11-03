@@ -29,6 +29,14 @@ Typed accessors such as `main_document_part`, `workbook_part`, and
 `presentation_part` expose well-known package parts and their generated root
 elements.
 
+## Visio
+
+The experimental workspace crate
+[`ooxmlsdk-visio`](./crates/ooxmlsdk-visio/) provides package authoring, shape
+lookup, and stored ShapeSheet values using the core SDK's types. Real VSDX/VSDM
+import still has schema compatibility gaps, so its publication is deferred.
+See its [usage guide](./crates/ooxmlsdk-visio/README.md) for the current scope.
+
 ## Features
 
 - `parts` (default): package-level OOXML read/write APIs
@@ -65,12 +73,14 @@ and preserves binary package parts while writing XML-safe parts as XML data.
 - [Rust API documentation](https://docs.rs/ooxmlsdk)
 - [Guides and examples](https://github.com/KaiserY/ooxmlsdk-doc)
 - [Microsoft Open XML documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk)
-- [Architecture and contributor map](./ARCHITECTURE.md)
+- [Schema and particle model](./docs/specs/particle.md)
 - [Release notes](./CHANGELOG.md)
 
-Generator metadata under `data/` comes from Open XML SDK. `sdk_data/` and the
-Open Packaging Conventions schemas are checked-in generator inputs; see
-[ARCHITECTURE.md](./ARCHITECTURE.md) for the generation and provenance model.
+Generator metadata under `data/` comes from Open XML SDK. Checked-in overrides
+under `sdk_data/schema_extensions/` and the Open Packaging Conventions schemas
+also supply generation inputs. The generator in
+[`ooxmlsdk-build`](./crates/ooxmlsdk-build/) regenerates the intermediate JSON
+cache and runtime Rust code from those inputs.
 
 ## Round-trip coverage
 
@@ -88,7 +98,7 @@ than skipped files.
 | ClosedXML | 286 | 284 | 0 | 2 | 286 passed / 0 failed |
 | **Total** | **5477** | **5366** | **16** | **95** | **5477 passed / 0 failed** |
 
-Last full run: 2026-10-26. Per-corpus commands, classifications, and run history
+Last full run: 2026-11-03. Per-corpus commands, classifications, and run history
 are maintained in the test-suite documentation.
 
 ## Status

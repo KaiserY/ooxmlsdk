@@ -193,12 +193,11 @@ fn parse_xml_namespace_uri_slow<'xml>(
 
 /// Root namespace aliases used by generated deserializers.
 ///
-/// Closed element dispatch remains local-name based. Open extension choices
-/// also check known namespace bindings before consuming a typed payload.
-/// Attribute dispatch first uses its generated QName and consults this context
-/// only after that exact match misses. OOXML producers conventionally declare
-/// shared namespaces on the part root; local declarations are resolved on the
-/// element carrying the name.
+/// Generated element dispatch is deliberately local-name based. Attribute
+/// dispatch first uses its generated QName and consults this context only after
+/// that exact match misses. OOXML producers conventionally declare shared
+/// namespaces on the part root; a declaration on the attribute's own element
+/// is handled directly by `resolve_attribute_key`.
 #[doc(hidden)]
 #[derive(Debug, Default)]
 pub struct ReadContext {
@@ -344,49 +343,6 @@ impl ReadContext {
 
     crate::namespaces::XmlKnownNamespace::from_prefix_bytes(prefix)
       .map(crate::namespaces::XmlKnownNamespace::schema_namespace)
-  }
-
-  /// Distinguish an unresolved prefix from a declared foreign namespace.
-  ///
-  /// An unresolved binding retains the existing local-name compatibility.
-  /// A declared namespace, including a local default namespace, decides
-  /// whether an open extension can consume the payload as a known type.
-  #[inline]
-  pub(crate) fn known_element_namespace(
-    &self,
-    start: &BytesStart<'_>,
-    decoder: Decoder,
-  ) -> Result<Option<Option<crate::namespaces::XmlKnownNamespace>>, SdkError> {
-    let name = start.name();
-    let prefix =
-      memchr::memchr(b':', name.as_ref()).map_or(&[][..], |separator| &name.as_ref()[..separator]);
-    for attr in start.attributes().with_checks(false) {
-      let attr = attr?;
-      let key = attr.key.as_ref();
-      if (prefix.is_empty() && key == b"xmlns") || key.strip_prefix(b"xmlns:") == Some(prefix) {
-        let (uri, known, _) = parse_xml_namespace_uri(&attr, prefix, decoder)?;
-        return Ok(
-          (!uri.is_empty())
-            .then_some(known.map(crate::namespaces::XmlKnownNamespace::schema_namespace)),
-        );
-      }
-    }
-    if let Some(binding) = self
-      .root_bindings
-      .iter()
-      .rev()
-      .find(|binding| binding.parts().0 == prefix)
-    {
-      let uri = binding.parts().1;
-      return Ok((!uri.is_empty()).then(|| {
-        crate::namespaces::XmlKnownNamespace::from_compatible_uri_bytes(uri)
-          .map(crate::namespaces::XmlKnownNamespace::schema_namespace)
-      }));
-    }
-    Ok(
-      crate::namespaces::XmlKnownNamespace::from_prefix_bytes(prefix)
-        .map(|namespace| Some(namespace.schema_namespace())),
-    )
   }
 
   #[cold]

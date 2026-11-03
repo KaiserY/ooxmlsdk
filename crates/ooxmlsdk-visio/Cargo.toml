@@ -6,11 +6,11 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-documentation.workspace = true
+documentation = "https://docs.rs/ooxmlsdk-visio"
 description = "Visio sheet model for ooxmlsdk"
-keywords.workspace = true
+keywords = ["visio", "vsdx", "shapesheet", "openxml", "office"]
 categories.workspace = true
-readme.workspace = true
+readme = "README.md"
 
 [dependencies]
 ooxmlsdk = { workspace = true, features = ["parts"] }

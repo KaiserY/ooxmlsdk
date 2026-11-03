@@ -197,7 +197,7 @@ fn cell_in_row<'a>(row: &'a RowUnion, cell_name: &str) -> Option<CellRecord<'a>>
   None
 }
 
-fn record(cell: &Cell) -> CellRecord<'_> {
+pub(crate) fn record(cell: &Cell) -> CellRecord<'_> {
   CellRecord {
     value: cell.v.as_deref(),
     formula: cell.f.as_deref(),
@@ -206,8 +206,8 @@ fn record(cell: &Cell) -> CellRecord<'_> {
   }
 }
 
-fn is_deleted(flag: Option<BooleanValue>) -> bool {
-  matches!(flag, Some(BooleanValue::True | BooleanValue::One))
+pub(crate) fn is_deleted(flag: Option<BooleanValue>) -> bool {
+  flag.is_some_and(BooleanValue::as_bool)
 }
 
 enum LocalCell<'a> {

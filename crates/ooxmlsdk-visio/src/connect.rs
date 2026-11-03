@@ -60,9 +60,10 @@ pub fn resolve_connects(page: &PageContents) -> Result<Vec<ResolvedConnect<'_>>,
     return Ok(Vec::new());
   };
   let Some(shapes) = &page.shapes else {
-    return connects.connect.iter().try_fold(Vec::new(), |_, connect| {
-      Err(ConnectError::MissingFrom(connect.from_sheet))
-    });
+    return match connects.connect.first() {
+      Some(connect) => Err(ConnectError::MissingFrom(connect.from_sheet)),
+      None => Ok(Vec::new()),
+    };
   };
   let mut resolved = Vec::with_capacity(connects.connect.len());
   for connect in &connects.connect {

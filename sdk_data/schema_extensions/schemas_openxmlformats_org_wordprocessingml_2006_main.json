@@ -798,6 +798,7 @@
       "ClassName": "Document",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true,
       "HaveMcProcessContent": true,
       "HaveMcMustUnderstand": true,
       "Attributes": [

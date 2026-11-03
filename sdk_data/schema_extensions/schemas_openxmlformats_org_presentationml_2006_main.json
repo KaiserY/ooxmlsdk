@@ -32,12 +32,14 @@
     {
       "ClassName": "Presentation",
       "HaveMcIgnorable": true,
-      "HaveMcPreserveAttributes": true
+      "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true
     },
     {
       "ClassName": "PresentationProperties",
       "HaveMcIgnorable": true,
-      "HaveMcPreserveAttributes": true
+      "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true
     },
     {
       "ClassName": "Shape",
@@ -47,6 +49,7 @@
       "ClassName": "Slide",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true,
       "AlternateContent": [
         {
           "AfterField": "color_map_override",
@@ -66,6 +69,7 @@
       "ClassName": "SlideLayout",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true,
       "AlternateContent": [
         {
           "AfterField": "color_map_override",
@@ -101,6 +105,7 @@
       "ClassName": "SlideMaster",
       "HaveMcIgnorable": true,
       "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true,
       "AlternateContent": [
         {
           "AfterField": "slide_layout_id_list",
@@ -119,12 +124,14 @@
     {
       "ClassName": "NotesMaster",
       "HaveMcIgnorable": true,
-      "HaveMcPreserveAttributes": true
+      "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true
     },
     {
       "ClassName": "NotesSlide",
       "HaveMcIgnorable": true,
-      "HaveMcPreserveAttributes": true
+      "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true
     },
     {
       "ClassName": "SlideMasterExtensionList",
@@ -145,7 +152,8 @@
     {
       "ClassName": "ViewProperties",
       "HaveMcIgnorable": true,
-      "HaveMcPreserveAttributes": true
+      "HaveMcPreserveAttributes": true,
+      "HaveMcPreserveElements": true
     }
   ],
   "ChoiceEnums": [

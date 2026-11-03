@@ -1003,6 +1003,7 @@ pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
   pub server_zoom: Option<crate::simple_type::DrawingmlPercentageValue>,
@@ -1090,6 +1091,7 @@ pub struct PresentationProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// HTML Publishing Properties
   #[sdk(child(qname = "p:htmlPubPr"))]
   pub html_publish_properties: Option<std::boxed::Box<HtmlPublishProperties>>,
@@ -1116,6 +1118,7 @@ pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1154,6 +1157,7 @@ pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1205,6 +1209,7 @@ pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
   pub preserve: Option<crate::simple_type::BooleanValue>,
@@ -1264,6 +1269,7 @@ pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
@@ -1287,6 +1293,7 @@ pub struct NotesSlide {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1337,6 +1344,7 @@ pub struct ViewProperties {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]
   #[sdk(string_format(kind = "token"))]

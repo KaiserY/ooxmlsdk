@@ -10606,6 +10606,7 @@ pub struct Document {
   pub xmlns: Vec<crate::common::XmlNamespace>,
   pub mc_ignorable: Option<Vec<crate::common::XmlNamespace>>,
   pub mc_preserve_attributes: Option<std::boxed::Box<[u8]>>,
+  pub mc_preserve_elements: Option<std::boxed::Box<[u8]>>,
   pub mc_process_content: Option<std::boxed::Box<[u8]>>,
   pub mc_must_understand: Option<Vec<crate::common::XmlNamespace>>,
   /// conformance

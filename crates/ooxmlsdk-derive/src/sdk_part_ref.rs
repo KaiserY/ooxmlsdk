@@ -203,10 +203,65 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
           #( #attrs )*
           PartKind::#variant_ident => {
             let part = <#variant_ty as crate::private::SdkPartHandle>::from_part_key(part_key);
-            Some(Self::#variant_ident(part))
+            Self::#variant_ident(part)
           },
         }
       });
+
+  // Run-time kind support: every list below has one arm per variant, so the
+  // generated code grows linearly in the number of part types. None of them
+  // pairs a parent type with a child type.
+  let part_descriptor_arms = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let variant_ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      PartKind::#variant_ident => crate::sdk::PartDescriptor {
+        kind: PartKind::#variant_ident,
+        relationship_type: <#variant_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE,
+        path_prefix: <#variant_ty as crate::sdk::SdkPartDescriptor>::PATH_PREFIX,
+        content_type: <#variant_ty as crate::sdk::SdkPartDescriptor>::CONTENT_TYPE,
+        target_name: <#variant_ty as crate::sdk::SdkPartDescriptor>::TARGET_NAME,
+        extension: <#variant_ty as crate::sdk::SdkPartDescriptor>::EXTENSION,
+      },
+    }
+  });
+  let part_ref_kind_arms = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(_) => PartKind::#variant_ident,
+    }
+  });
+  let part_ref_child_constraint_arms = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let variant_ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(_) => <#variant_ty as crate::sdk::SdkPart>::child_part_constraint(kind),
+    }
+  });
+  let part_ref_allows_any_child_arms = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ident = &variant.ident;
+    let variant_ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      Self::#variant_ident(_) => <#variant_ty as crate::sdk::SdkPart>::ALLOWS_ANY_CHILD_PART,
+    }
+  });
+
+  let part_kind_check_calls = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let variant_ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      check::<#variant_ty>();
+    }
+  });
 
   let root_variants = variants
     .iter()
@@ -358,13 +413,26 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
   };
 
   Ok(quote! {
-    #[doc(hidden)]
+    /// Identifies a part type at run time.
+    ///
+    /// Each variant corresponds to one `PartRef` variant. Use
+    /// [`PartKind::descriptor`] to read the static facts of a kind, and
+    /// [`PartRef::kind`] to get the kind of an existing part handle.
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     pub enum PartKind {
       #( #part_kind_variants )*
     }
 
     impl PartKind {
+      /// Returns the static descriptor of this kind.
+      ///
+      /// `ExtendedPart` has an empty relationship type and content type.
+      pub const fn descriptor(self) -> crate::sdk::PartDescriptor {
+        match self {
+          #( #part_descriptor_arms )*
+        }
+      }
+
       pub(crate) fn classify(
         relationship_type: Option<&[u8]>,
         content_type: &[u8],
@@ -383,6 +451,37 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
 
     #( #descriptor_impls )*
     #( #root_bridge_impls )*
+
+    #[cfg(test)]
+    mod part_kind_consistency_tests {
+      use super::*;
+
+      fn check<T: crate::sdk::SdkPart>() {
+        let kind = <T as crate::sdk::SdkPartDescriptor>::KIND;
+        let key = crate::common::SdkPackageStorage::create(None)
+          .part_key(crate::common::PartSlot::from_index(0));
+        let part_ref = #ident::from_kind_and_key(kind, key);
+        assert_eq!(part_ref.kind(), kind, "{kind:?}");
+        assert_eq!(part_ref.part_key(), key, "{kind:?}");
+        assert_eq!(
+          kind.descriptor(),
+          crate::sdk::PartDescriptor {
+            kind,
+            relationship_type: <T as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE,
+            path_prefix: <T as crate::sdk::SdkPartDescriptor>::PATH_PREFIX,
+            content_type: <T as crate::sdk::SdkPartDescriptor>::CONTENT_TYPE,
+            target_name: <T as crate::sdk::SdkPartDescriptor>::TARGET_NAME,
+            extension: <T as crate::sdk::SdkPartDescriptor>::EXTENSION,
+          },
+          "{kind:?}"
+        );
+      }
+
+      #[test]
+      fn every_kind_round_trips_through_its_part_ref_and_descriptor() {
+        #( #part_kind_check_calls )*
+      }
+    }
 
     #[derive(Clone, Debug)]
     pub enum PartRootElement {
@@ -499,12 +598,38 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
         part_slot: crate::common::PartSlot,
       ) -> Option<Self> {
         let part = storage.part(part_slot)?;
-        let part_key = storage.part_key(part_slot);
-        match part.kind() {
+        Some(Self::from_kind_and_key(part.kind(), storage.part_key(part_slot)))
+      }
+
+      /// Builds a handle for `part_key` as the given kind, without looking at
+      /// what the storage has classified the part as.
+      pub(crate) fn from_kind_and_key(kind: PartKind, part_key: crate::common::PartKey) -> Self {
+        match kind {
           #( #part_ref_from_kind_arms )*
-          PartKind::#extended_ident => {
-            Some(Self::extended_part(part_key))
-          },
+          PartKind::#extended_ident => Self::extended_part(part_key),
+        }
+      }
+
+      /// Returns the run-time kind of this part handle.
+      pub fn kind(&self) -> PartKind {
+        match self {
+          #( #part_ref_kind_arms )*
+        }
+      }
+
+      /// Looks up how this part, as a parent, constrains a child of `kind`.
+      pub(crate) fn child_part_constraint(
+        &self,
+        kind: PartKind,
+      ) -> Option<crate::sdk::PartConstraint> {
+        match self {
+          #( #part_ref_child_constraint_arms )*
+        }
+      }
+
+      pub(crate) fn allows_any_child_part(&self) -> bool {
+        match self {
+          #( #part_ref_allows_any_child_arms )*
         }
       }
 

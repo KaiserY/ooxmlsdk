@@ -6022,6 +6022,9 @@ where
 #[cfg(all(test, feature = "parts"))]
 mod characterization_tests;
 
+#[cfg(all(test, feature = "parts"))]
+mod part_parent_tests;
+
 #[cfg(all(test, feature = "mce"))]
 mod tests {
   fn split_mce_prefix_list(value: &[u8]) -> Vec<Vec<u8>> {

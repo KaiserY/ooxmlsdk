@@ -180,6 +180,29 @@ impl PartConstraint {
   }
 }
 
+/// Static facts about one part kind: the run-time form of [`SdkPartDescriptor`].
+///
+/// Obtain one with [`PartKind::descriptor`](crate::parts::PartKind::descriptor).
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct PartDescriptor {
+  /// The kind this descriptor belongs to.
+  pub kind: crate::parts::PartKind,
+  /// Relationship type of the kind; empty for `ExtendedPart`.
+  pub relationship_type: &'static str,
+  /// Directory prefix used when a part of this kind gets a new path.
+  pub path_prefix: &'static str,
+  /// Fixed content type of the kind. Empty for `ExtendedPart` and for kinds
+  /// whose content type depends on the package or on the caller, such as
+  /// main parts, `ImagePart` and `ThumbnailPart`.
+  pub content_type: &'static str,
+  /// File name stem used when a part of this kind gets a new path.
+  pub target_name: &'static str,
+  /// Default file extension, with the leading dot; may be empty.
+  pub extension: &'static str,
+}
+
 #[cfg(feature = "parts")]
 impl<T, C> PartChild<T, C> {
   #[inline]
@@ -368,7 +391,15 @@ pub(crate) fn part_from_slot<T: SdkPart>(
 
 #[cfg(feature = "parts")]
 pub fn default_main_part_content_type<T: SdkPart>() -> Option<&'static str> {
-  match (T::RELATIONSHIP_TYPE, T::TARGET_NAME) {
+  default_main_part_content_type_for(T::RELATIONSHIP_TYPE, T::TARGET_NAME)
+}
+
+#[cfg(feature = "parts")]
+fn default_main_part_content_type_for(
+  relationship_type: &str,
+  target_name: &str,
+) -> Option<&'static str> {
+  match (relationship_type, target_name) {
     (
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
       "document",
@@ -389,14 +420,33 @@ pub fn default_main_part_content_type<T: SdkPart>() -> Option<&'static str> {
 pub(crate) fn typed_main_part_content_type<T: SdkPart>(
   storage: &crate::common::SdkPackageStorage,
 ) -> std::borrow::Cow<'static, str> {
-  if T::CONTENT_TYPE.is_empty() {
+  main_part_content_type_for(
+    storage,
+    T::CONTENT_TYPE,
+    T::RELATIONSHIP_TYPE,
+    T::TARGET_NAME,
+  )
+}
+
+/// The body of [`typed_main_part_content_type`], keyed by descriptor values.
+#[cfg(feature = "parts")]
+fn main_part_content_type_for(
+  storage: &crate::common::SdkPackageStorage,
+  content_type: &'static str,
+  relationship_type: &str,
+  target_name: &str,
+) -> std::borrow::Cow<'static, str> {
+  if content_type.is_empty() {
     storage
       .preferred_main_part_content_type()
       .map(|content_type| std::borrow::Cow::Owned(content_type.to_string()))
-      .or_else(|| default_main_part_content_type::<T>().map(std::borrow::Cow::Borrowed))
-      .unwrap_or(std::borrow::Cow::Borrowed(T::CONTENT_TYPE))
+      .or_else(|| {
+        default_main_part_content_type_for(relationship_type, target_name)
+          .map(std::borrow::Cow::Borrowed)
+      })
+      .unwrap_or(std::borrow::Cow::Borrowed(content_type))
   } else {
-    std::borrow::Cow::Borrowed(T::CONTENT_TYPE)
+    std::borrow::Cow::Borrowed(content_type)
   }
 }
 
@@ -2420,6 +2470,491 @@ impl<T> std::ops::Deref for RelatedPart<'_, T> {
   }
 }
 
+/// Options for [`PartParent::add_new_part`].
+///
+/// Each field that is `None` falls back to the value that the typed
+/// `add_new_part*` methods use for the same child kind.
+///
+/// The struct is `#[non_exhaustive]`: start from `NewPartOptions::default()`
+/// and set the fields that differ.
+#[cfg(feature = "parts")]
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct NewPartOptions {
+  /// Content type of the new part. `None` uses the descriptor's content type;
+  /// for a package parent whose descriptor has none (a main part), the
+  /// package's preferred or default main-part content type.
+  ///
+  /// A kind that has no fixed content type and is not a main part under a
+  /// package parent (`ImagePart` and `ThumbnailPart`, for example) needs one,
+  /// whatever the parent. Without it the storage rejects the empty content
+  /// type with a `CommonError`, as the typed methods do.
+  pub content_type: Option<std::borrow::Cow<'static, str>>,
+  /// File extension of the new part, with the leading dot. `None` uses the
+  /// descriptor's extension. It cannot be combined with `path`.
+  pub extension: Option<std::borrow::Cow<'static, str>>,
+  /// Explicit part path. Only a part parent accepts it, and not together with
+  /// `extension`.
+  pub path: Option<String>,
+  /// Target naming mode. Only a package parent accepts `Fixed`.
+  pub target_mode: crate::common::NewPartTargetMode,
+}
+
+/// A package or a part, chosen at run time, that owns child-part relationships.
+///
+/// The typed `SdkPackage` and `SdkPart` methods take the child part type as a
+/// type parameter, and the `SdkPart` ones also depend on the parent's own type.
+/// `PartParent` offers the same child-part operations for a parent and a child
+/// that are known only as values: the parent is `Package` or a [`PartRef`],
+/// and the child is a [`PartRef`] or a [`PartKind`]. Each method has the same
+/// effect as the typed method named in its documentation; where they differ,
+/// that method's documentation says so.
+///
+/// To delete a child, get its relationship id with
+/// [`id_of_part`](Self::id_of_part), then call `delete_part_by_id` on the
+/// parent's concrete type: the package, or the handle inside the [`PartRef`]
+/// variant. `delete_part_by_id` does not take a child type, so one `match` on
+/// the parent is enough. These are the steps of the typed `delete_part`.
+///
+/// [`PartRef`]: crate::parts::PartRef
+/// [`PartKind`]: crate::parts::PartKind
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub enum PartParent<'a> {
+  /// The package itself (its package-level relationships).
+  Package,
+  /// A part inside the package.
+  Part(&'a crate::parts::PartRef),
+}
+
+#[cfg(feature = "parts")]
+impl<'a> From<&'a crate::parts::PartRef> for PartParent<'a> {
+  #[inline]
+  fn from(part: &'a crate::parts::PartRef) -> Self {
+    Self::Part(part)
+  }
+}
+
+#[cfg(feature = "parts")]
+impl<'a> PartParent<'a> {
+  /// The slot of the parent part, or `None` for the package.
+  fn source_slot<P: SdkPackage>(
+    self,
+    package: &P,
+  ) -> Result<Option<crate::common::PartSlot>, crate::common::SdkError> {
+    match self {
+      Self::Package => Ok(None),
+      Self::Part(part) => part
+        .part_key()
+        .resolve(crate::sdk::SdkPackage::storage(package))
+        .map(Some),
+    }
+  }
+
+  /// The relationships this parent owns.
+  fn relationships<P: SdkPackage>(
+    self,
+    package: &P,
+  ) -> Result<&crate::common::RelationshipSet, crate::common::SdkError> {
+    match self {
+      Self::Package => Ok(crate::sdk::SdkPackage::relationships(package)),
+      Self::Part(part) => {
+        let storage = crate::sdk::SdkPackage::storage(package);
+        let part_slot = part.part_key().resolve(storage)?;
+        storage
+          .relationships(part_slot)
+          .ok_or(crate::common::SdkError::StalePart)
+      }
+    }
+  }
+
+  /// The run-time form of `SdkPackage::validate_child_part` and
+  /// `SdkPart::validate_child_part`.
+  fn validate_child<P: SdkPackage>(
+    self,
+    package: &P,
+    child_kind: crate::parts::PartKind,
+    content_type: &str,
+  ) -> Result<PartConstraint, crate::common::SdkError> {
+    let (constraint, allows_any_child_part) = match self {
+      Self::Package => (<P as SdkPackage>::child_part_constraint(child_kind), false),
+      Self::Part(part) => (
+        part.child_part_constraint(child_kind),
+        part.allows_any_child_part(),
+      ),
+    };
+    let descriptor = child_kind.descriptor();
+    validate_child_part_constraint_for_kind(
+      child_kind,
+      descriptor.relationship_type,
+      descriptor.content_type,
+      constraint,
+      allows_any_child_part,
+      self.relationships(package)?,
+      content_type,
+    )
+  }
+
+  fn change_relationship_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    relationship_id: &str,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<(), crate::common::SdkError> {
+    match self {
+      Self::Package => {
+        crate::sdk::SdkPackage::relationships_mut(package)
+          .change_relationship_id(relationship_id, new_relationship_id)?;
+      }
+      Self::Part(part) => {
+        let part_slot = part
+          .part_key()
+          .resolve(crate::sdk::SdkPackage::storage(package))?;
+        crate::sdk::SdkPackage::storage_mut(package)
+          .relationships_mut(part_slot)
+          .ok_or(crate::common::SdkError::StalePart)?
+          .change_relationship_id(relationship_id, new_relationship_id)?;
+      }
+    }
+    Ok(())
+  }
+
+  /// Returns the relationship id that the next added relationship would get.
+  ///
+  /// Typed equivalents: `SdkPart::next_relationship_id`, and
+  /// `SdkPackage::relationships(..).next_relationship_id()` for the package.
+  pub fn next_relationship_id<P: SdkPackage>(
+    self,
+    package: &P,
+  ) -> Result<String, crate::common::SdkError> {
+    Ok(self.relationships(package)?.next_relationship_id())
+  }
+
+  /// Lists the child-part relationships of this parent, with the child as a
+  /// [`PartRef`](crate::parts::PartRef).
+  ///
+  /// `kind` keeps only children of that kind. `relationship_type` keeps only
+  /// relationships whose type matches it, including the strict and Office 2007
+  /// aliases that the typed methods accept. `None` for either disables that
+  /// filter, so `(None, None)` lists every child. A parent that no longer
+  /// resolves has no children.
+  ///
+  /// Typed equivalents, with `d = kind.descriptor()`:
+  ///
+  /// - `get_parts_of_type::<T>`, and `SdkPackage::related_parts_of_type::<T>`:
+  ///   `(Some(kind), None)`.
+  /// - `SdkPart::child_related_parts_of_type::<T>`, `related_part(s)_of_type`:
+  ///   `(Some(kind), Some(d.relationship_type))`.
+  /// - `SdkPart::child_(related_)part(s)_by_relationship_type::<T>(rt)`:
+  ///   `(Some(kind), Some(rt))`.
+  pub fn related_parts<'b, P: SdkPackage>(
+    self,
+    package: &'b P,
+    kind: Option<crate::parts::PartKind>,
+    relationship_type: Option<&'b str>,
+  ) -> impl Iterator<Item = RelatedPart<'b, crate::parts::PartRef>> + use<'b, P> {
+    let storage = crate::sdk::SdkPackage::storage(package);
+    // A parent that no longer resolves has no children, as in the typed
+    // `child_related_parts_of_type` (it uses `part_slot_optional`).
+    let relationships = self.relationships(package).ok();
+    relationships
+      .into_iter()
+      .flat_map(|relationships| relationships.part_relationships())
+      .filter_map(move |relationship| {
+        if let Some(relationship_type) = relationship_type
+          && !crate::common::relationship_type_matches_bytes(
+            relationship.relationship_type_bytes(),
+            relationship_type.as_bytes(),
+          )
+        {
+          return None;
+        }
+        if !relationship.is_child_part_relationship() {
+          return None;
+        }
+        let part_slot = relationship.target_part_slot()?;
+        if let Some(kind) = kind
+          && storage.part(part_slot)?.kind() != kind
+        {
+          return None;
+        }
+        let part = crate::parts::PartRef::from_part_slot(package, part_slot)?;
+        Some(RelatedPart::new(
+          relationship.id(),
+          relationship.relationship_type(),
+          part,
+        ))
+      })
+  }
+
+  /// Returns the first relationship id that points at `part`.
+  ///
+  /// Typed equivalent: `get_id_of_part`.
+  pub fn id_of_part<'b, P: SdkPackage>(
+    self,
+    package: &'b P,
+    part: &crate::parts::PartRef,
+  ) -> Result<&'b str, crate::common::SdkError> {
+    let relationships = self.relationships(package)?;
+    let target_part_slot = part
+      .part_key()
+      .resolve(crate::sdk::SdkPackage::storage(package))?;
+    relationships
+      .part_relationships()
+      .find_map(|relationship| {
+        (relationship.target_part_slot() == Some(target_part_slot)).then_some(relationship.id())
+      })
+      .ok_or(crate::common::SdkError::PartNotReferenced)
+  }
+
+  /// Changes the id of the one relationship that points at `part` and returns
+  /// the old id. Fails with `AmbiguousPartRelationship` if several do.
+  ///
+  /// Typed equivalent: `change_id_of_part`.
+  pub fn change_id_of_part<P: SdkPackage>(
+    self,
+    package: &mut P,
+    part: &crate::parts::PartRef,
+    new_relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    let relationships = self.relationships(package)?;
+    let target_part_slot = part
+      .part_key()
+      .resolve(crate::sdk::SdkPackage::storage(package))?;
+    let old_relationship_id =
+      unique_relationship_id_for_part(relationships, target_part_slot)?.to_string();
+    self.change_relationship_id(package, &old_relationship_id, new_relationship_id)?;
+    Ok(old_relationship_id)
+  }
+
+  /// Adds a relationship from this parent to `part`, which must already be in
+  /// the package, and returns the relationship id.
+  ///
+  /// Typed equivalents: `create_relationship_to_part_with_id` and
+  /// `add_part_with_id`. They differ only in what they return.
+  pub fn create_relationship_to_part_with_id<P: SdkPackage>(
+    self,
+    package: &mut P,
+    part: &crate::parts::PartRef,
+    relationship_id: impl Into<String>,
+  ) -> Result<String, crate::common::SdkError> {
+    let relationship_id = relationship_id.into();
+    let source_part_slot = self.source_slot(package)?;
+    let part_slot = part
+      .part_key()
+      .resolve(crate::sdk::SdkPackage::storage(package))?;
+    let content_type = crate::sdk::SdkPackage::storage(package)
+      .part(part_slot)
+      .ok_or(crate::common::SdkError::StalePart)?
+      .content_type()
+      .to_string();
+    let constraint = self.validate_child(package, part.kind(), &content_type)?;
+    let relationship_type = constrained_relationship_type(
+      constraint,
+      crate::sdk::SdkPackage::storage(package)
+        .part(part_slot)
+        .and_then(crate::common::StoredPart::relationship_type),
+    );
+    let storage = crate::sdk::SdkPackage::storage_mut(package);
+    match source_part_slot {
+      None => storage.add_package_relationship_to_part(
+        relationship_id.clone(),
+        relationship_type.as_ref(),
+        part_slot,
+      )?,
+      Some(source_part_slot) => storage.add_child_relationship_to_part(
+        source_part_slot,
+        relationship_id.clone(),
+        relationship_type.as_ref(),
+        part_slot,
+      )?,
+    };
+    Ok(relationship_id)
+  }
+
+  /// Like [`create_relationship_to_part_with_id`](Self::create_relationship_to_part_with_id),
+  /// but returns the existing relationship id when this parent already points
+  /// at `part`, and otherwise uses the next free id.
+  ///
+  /// Typed equivalents: `create_relationship_to_part` and `add_part`.
+  pub fn create_relationship_to_part<P: SdkPackage>(
+    self,
+    package: &mut P,
+    part: &crate::parts::PartRef,
+  ) -> Result<String, crate::common::SdkError> {
+    let relationships = self.relationships(package)?;
+    let target_part_slot = part
+      .part_key()
+      .resolve(crate::sdk::SdkPackage::storage(package))?;
+    if let Some(relationship_id) = relationships.part_relationships().find_map(|relationship| {
+      (relationship.target_part_slot() == Some(target_part_slot)).then_some(relationship.id())
+    }) {
+      return Ok(relationship_id.to_string());
+    }
+    let relationship_id = self.next_relationship_id(package)?;
+    self.create_relationship_to_part_with_id(package, part, relationship_id)
+  }
+
+  /// Creates a new empty part of `kind` under this parent.
+  ///
+  /// The returned handle has `kind`, even if the package would classify the new
+  /// part differently, as with the typed methods. `ExtendedPart` fails in the
+  /// same way as the typed `add_new_part::<ExtendedPart>`; use
+  /// `add_extended_part` to add one.
+  ///
+  /// Typed equivalents: `add_new_part`, `add_new_part_auto_id`,
+  /// `add_new_part_with_content_type`, `add_new_part_with_content_type_and_extension`,
+  /// `add_new_part_with_content_type_and_path`, `add_new_part_with_target_mode`
+  /// and the `_auto_id` forms (take the id from
+  /// [`next_relationship_id`](Self::next_relationship_id)).
+  ///
+  /// # Errors
+  ///
+  /// These combinations in `options` have no typed counterpart and fail with
+  /// a `CommonError`:
+  ///
+  /// - `path` with a package parent;
+  /// - `target_mode` `Fixed` with a part parent;
+  /// - `path` together with `extension`.
+  ///
+  /// The last check runs before the parent is resolved, so it is reported even
+  /// if the parent part is stale.
+  pub fn add_new_part<P: SdkPackage>(
+    self,
+    package: &mut P,
+    kind: crate::parts::PartKind,
+    relationship_id: impl Into<String>,
+    options: NewPartOptions,
+  ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
+    let relationship_id = relationship_id.into();
+    if options.path.is_some() && options.extension.is_some() {
+      return Err(crate::common::SdkError::CommonError(
+        "an explicit part path cannot be combined with an extension".to_string(),
+      ));
+    }
+    let descriptor = kind.descriptor();
+    let source_part_slot = self.source_slot(package)?;
+    let content_type = match options.content_type {
+      Some(content_type) => content_type,
+      None if source_part_slot.is_none() => main_part_content_type_for(
+        crate::sdk::SdkPackage::storage(package),
+        descriptor.content_type,
+        descriptor.relationship_type,
+        descriptor.target_name,
+      ),
+      None => std::borrow::Cow::Borrowed(descriptor.content_type),
+    };
+    let extension = options
+      .extension
+      .unwrap_or(std::borrow::Cow::Borrowed(descriptor.extension));
+    let constraint = self.validate_child(package, kind, content_type.as_ref())?;
+    let new_part = crate::common::NewPartDescriptor {
+      relationship_type: std::borrow::Cow::Borrowed(constraint.relationship_type),
+      content_type,
+      path_prefix: descriptor.path_prefix,
+      target_name: descriptor.target_name,
+      extension,
+    };
+    let storage = crate::sdk::SdkPackage::storage_mut(package);
+    let part_slot = match (source_part_slot, options.path) {
+      (None, None) => storage.add_package_part(relationship_id, new_part, options.target_mode)?,
+      (None, Some(_)) => {
+        return Err(crate::common::SdkError::CommonError(
+          "an explicit part path is only supported for children of a part".to_string(),
+        ));
+      }
+      (Some(_), _) if options.target_mode == crate::common::NewPartTargetMode::Fixed => {
+        return Err(crate::common::SdkError::CommonError(
+          "the fixed target mode is only supported for children of the package".to_string(),
+        ));
+      }
+      (Some(source_part_slot), None) => {
+        storage.add_child_part(source_part_slot, relationship_id, new_part)?
+      }
+      (Some(source_part_slot), Some(part_path)) => {
+        storage.add_child_part_with_path(source_part_slot, relationship_id, new_part, part_path)?
+      }
+    };
+    crate::sdk::SdkPackage::push_root_element_slot(package);
+    Ok(crate::parts::PartRef::from_kind_and_key(
+      kind,
+      crate::sdk::SdkPackage::storage(package).part_key(part_slot),
+    ))
+  }
+
+  /// Adds `part`, which lives in `source_package`, under this parent and
+  /// returns the handle in `package`. A part from another package is copied
+  /// with the parts it references.
+  ///
+  /// Typed equivalent: `add_part_from_package_with_id`. For the auto-id form
+  /// take the id from [`next_relationship_id`](Self::next_relationship_id).
+  pub fn add_part_from_package_with_id<P: SdkPackage, S: SdkPackage>(
+    self,
+    package: &mut P,
+    source_package: &S,
+    part: &crate::parts::PartRef,
+    relationship_id: impl Into<String>,
+  ) -> Result<crate::parts::PartRef, crate::common::SdkError> {
+    let relationship_id = relationship_id.into();
+    let destination_source_slot = self.source_slot(package)?;
+    let source_part_slot = part
+      .part_key()
+      .resolve(crate::sdk::SdkPackage::storage(source_package))?;
+    let source_content_type = crate::sdk::SdkPackage::storage(source_package)
+      .part(source_part_slot)
+      .ok_or(crate::common::SdkError::StalePart)?
+      .content_type()
+      .to_string();
+    let constraint = self.validate_child(package, part.kind(), &source_content_type)?;
+    let relationship_type = constrained_relationship_type(
+      constraint,
+      crate::sdk::SdkPackage::storage(source_package)
+        .part(source_part_slot)
+        .and_then(crate::common::StoredPart::relationship_type),
+    );
+    if crate::sdk::SdkPackage::storage(package).token()
+      == crate::sdk::SdkPackage::storage(source_package).token()
+    {
+      let storage = crate::sdk::SdkPackage::storage_mut(package);
+      match destination_source_slot {
+        None => storage.add_package_relationship_to_part(
+          relationship_id,
+          relationship_type.as_ref(),
+          source_part_slot,
+        )?,
+        Some(destination_source_slot) => storage.add_child_relationship_to_part(
+          destination_source_slot,
+          relationship_id,
+          relationship_type.as_ref(),
+          source_part_slot,
+        )?,
+      };
+      return Ok(crate::parts::PartRef::from_kind_and_key(
+        part.kind(),
+        crate::sdk::SdkPackage::storage(package).part_key(source_part_slot),
+      ));
+    }
+
+    let (imported_part_id, added_count) = crate::sdk::SdkPackage::storage_mut(package)
+      .import_part_tree_from(
+        crate::sdk::SdkPackage::storage(source_package),
+        source_part_slot,
+        destination_source_slot,
+        relationship_id,
+        relationship_type.as_ref(),
+        |part_id, _| crate::sdk::SdkPackage::part_bytes_for_copy(source_package, part_id),
+      )?;
+    for _ in 0..added_count {
+      crate::sdk::SdkPackage::push_root_element_slot(package);
+    }
+    Ok(crate::parts::PartRef::from_kind_and_key(
+      part.kind(),
+      crate::sdk::SdkPackage::storage(package).part_key(imported_part_id),
+    ))
+  }
+}
+
 #[cfg(feature = "parts")]
 pub trait SdkPartDescriptor {
   #[doc(hidden)]
@@ -2438,22 +2973,52 @@ fn validate_child_part_constraint<T: SdkPart>(
   relationships: &crate::common::RelationshipSet,
   content_type: &str,
 ) -> Result<PartConstraint, crate::common::SdkError> {
+  validate_child_part_constraint_for_kind(
+    T::KIND,
+    T::RELATIONSHIP_TYPE,
+    T::CONTENT_TYPE,
+    constraint,
+    allows_any_child_part,
+    relationships,
+    content_type,
+  )
+}
+
+/// The body of [`validate_child_part_constraint`], keyed by a run-time kind.
+///
+/// `default_relationship_type` and `default_content_type` are the child's
+/// descriptor values. They are used only when the parent has no explicit
+/// constraint but accepts the child anyway.
+#[cfg(feature = "parts")]
+fn validate_child_part_constraint_for_kind(
+  kind: crate::parts::PartKind,
+  default_relationship_type: &'static str,
+  default_content_type: &'static str,
+  constraint: Option<PartConstraint>,
+  allows_any_child_part: bool,
+  relationships: &crate::common::RelationshipSet,
+  content_type: &str,
+) -> Result<PartConstraint, crate::common::SdkError> {
   let constraint = match constraint {
     Some(constraint) => constraint,
-    None if allows_any_child_part || T::KIND == crate::parts::PartKind::ExtendedPart => {
-      PartConstraint::new(T::KIND, T::RELATIONSHIP_TYPE, T::CONTENT_TYPE, false, true)
+    None if allows_any_child_part || kind == crate::parts::PartKind::ExtendedPart => {
+      PartConstraint::new(
+        kind,
+        default_relationship_type,
+        default_content_type,
+        false,
+        true,
+      )
     }
     None => {
       return Err(crate::common::SdkError::CommonError(format!(
-        "part kind {:?} is not allowed as a child",
-        T::KIND
+        "part kind {kind:?} is not allowed as a child"
       )));
     }
   };
   if !constraint.content_type.is_empty() && constraint.content_type != content_type {
     return Err(crate::common::SdkError::CommonError(format!(
-      "part kind {:?} requires content type {}, got {content_type}",
-      T::KIND,
+      "part kind {kind:?} requires content type {}, got {content_type}",
       constraint.content_type
     )));
   }

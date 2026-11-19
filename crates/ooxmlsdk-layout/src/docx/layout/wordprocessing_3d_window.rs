@@ -191,6 +191,11 @@ pub(super) struct Window {
   pub physical_bounds_pt: [f32; 4],
 }
 
+pub(super) fn initialized_pdf_extent(printer_dots: f64, target_dpi: f32) -> f64 {
+  let extent = printer_dots * 72.0 / PRINTER_DPI;
+  ((extent - 36.0 / f64::from(target_dpi)) * 100.0).round() / 100.0
+}
+
 impl Window {
   pub(super) fn pdf_bounds(self, target_dpi: f32) -> [f32; 4] {
     let [left, top, _, _] = self
@@ -201,14 +206,19 @@ impl Window {
     // 2-D graphics context exists. Office writes those extents to 0.01pt.
     // Keep the integer printer rectangle until here: f32 point subtraction
     // can move an exact half-centipoint across the serialization boundary.
-    let extent = |value: f64| ((value - 36.0 / f64::from(target_dpi)) * 100.0).round() / 100.0;
-    let width = f64::from(self.printer_bounds[2] - self.printer_bounds[0]) * 72.0 / PRINTER_DPI;
-    let height = f64::from(self.printer_bounds[3] - self.printer_bounds[1]) * 72.0 / PRINTER_DPI;
+    let width = initialized_pdf_extent(
+      f64::from(self.printer_bounds[2] - self.printer_bounds[0]),
+      target_dpi,
+    );
+    let height = initialized_pdf_extent(
+      f64::from(self.printer_bounds[3] - self.printer_bounds[1]),
+      target_dpi,
+    );
     [
       left as f32,
       top as f32,
-      (left + extent(width)) as f32,
-      (top + extent(height)) as f32,
+      (left + width) as f32,
+      (top + height) as f32,
     ]
   }
 }

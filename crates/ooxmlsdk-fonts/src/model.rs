@@ -141,6 +141,7 @@ struct ShapePlanKey {
   direction: HarfDirection,
   script: HarfScript,
   language: Option<HarfLanguage>,
+  wordprocessingml_arabic_lookup_order: bool,
   features: Vec<ShapeFeatureKey>,
 }
 
@@ -153,11 +154,16 @@ struct ShapeFeatureKey {
 }
 
 impl ShapePlanKey {
-  fn new(buffer: &UnicodeBuffer, features: &[HarfFeature]) -> Self {
+  fn new(
+    buffer: &UnicodeBuffer,
+    features: &[HarfFeature],
+    wordprocessingml_arabic_lookup_order: bool,
+  ) -> Self {
     Self {
       direction: buffer.direction(),
       script: buffer.script(),
       language: buffer.language(),
+      wordprocessingml_arabic_lookup_order,
       features: features
         .iter()
         .map(|feature| ShapeFeatureKey {
@@ -244,13 +250,20 @@ impl RuntimeFace {
       })
   }
 
-  fn shape(&self, buffer: UnicodeBuffer, features: &[HarfFeature]) -> harfrust::GlyphBuffer {
+  fn shape(
+    &self,
+    buffer: UnicodeBuffer,
+    features: &[HarfFeature],
+    wordprocessingml_arabic_lookup_order: bool,
+  ) -> harfrust::GlyphBuffer {
     let shaper = self
       .shaper_data
       .shaper(self.harf())
       .instance(self.shaper_instance.as_ref())
       .build();
-    let key = ShapePlanKey::new(&buffer, features);
+    let wordprocessingml_arabic_lookup_order =
+      wordprocessingml_arabic_lookup_order && buffer.script() == script::ARABIC;
+    let key = ShapePlanKey::new(&buffer, features, wordprocessingml_arabic_lookup_order);
     let cached = self
       .shape_plans
       .read()
@@ -259,13 +272,28 @@ impl RuntimeFace {
       .cloned();
     let plan = cached.unwrap_or_else(|| {
       let language = buffer.language();
-      let candidate = Arc::new(ShapePlan::new(
-        &shaper,
-        buffer.direction(),
-        Some(buffer.script()),
-        language.as_ref(),
-        features,
-      ));
+      let make_plan = |shaper: &harfrust::Shaper<'_>| {
+        ShapePlan::new(
+          shaper,
+          buffer.direction(),
+          Some(buffer.script()),
+          language.as_ref(),
+          features,
+        )
+      };
+      let word_plan = wordprocessingml_arabic_lookup_order
+        .then(|| crate::wordprocessing_arabic_plan::font_for_plan(self.harf()))
+        .flatten()
+        .and_then(|bytes| {
+          let font = HarfFontRef::from_index(&bytes, self.harf().ttc_index().unwrap_or(0)).ok()?;
+          let data = ShaperData::new(&font);
+          let planner = data
+            .shaper(&font)
+            .instance(self.shaper_instance.as_ref())
+            .build();
+          Some(make_plan(&planner))
+        });
+      let candidate = Arc::new(word_plan.unwrap_or_else(|| make_plan(&shaper)));
       self
         .shape_plans
         .write()
@@ -409,6 +437,10 @@ impl<'a> FontRegistry<'a> {
       .as_deref()
       .filter(|family| !family.trim().is_empty())
     {
+      // A document may map the complete authored key before its list policy
+      // selects a primary. Apply the same alias here and during resolution.
+      let full_alias = resolve_family_alias(&self.book, Cow::Borrowed(family));
+      let family = full_alias.as_ref();
       for family in family
         .split(';')
         .take(request.family_selection.limit())
@@ -1523,6 +1555,15 @@ impl<'a> FontBook<'a> {
   ) -> Result<ResolvedFont<'a>> {
     let mut substitution = None;
     let target_family_names = family_override.or(request.family.as_deref()).map(|family| {
+      let authored_family = family;
+      // First-family selection must not discard an explicit alias for the
+      // entire source name. Ordinary names retain the existing single lookup.
+      let full_alias = (family_override.is_none()
+        && request.family_selection == FontFamilySelection::First
+        && family.contains(';'))
+      .then(|| resolve_family_alias(self, Cow::Borrowed(family)));
+      let full_alias_changed = full_alias.as_deref().is_some_and(|alias| alias != family);
+      let family = full_alias.as_deref().unwrap_or(family);
       // A fallback/link has its own family name. The request's primary-name
       // policy governs the authored name only, before aliases/substitution.
       let family = if family_override.is_none() {
@@ -1536,12 +1577,20 @@ impl<'a> FontBook<'a> {
         .map(|rule| rule.substitute_family.as_ref())
         .unwrap_or_else(|| aliased.as_ref());
       if family_override.is_none() {
-        let reason = rule
-          .map(|rule| rule.reason)
-          .or_else(|| (aliased.as_ref() != family).then_some(FontSubstitutionReason::Alias));
+        let reason = rule.map(|rule| rule.reason).or_else(|| {
+          (full_alias_changed || aliased.as_ref() != family)
+            .then_some(FontSubstitutionReason::Alias)
+        });
         if let Some(reason) = reason {
           substitution = Some(FontSubstitution {
-            requested_family: Cow::Owned(family.to_string()),
+            requested_family: Cow::Owned(
+              if full_alias_changed {
+                authored_family
+              } else {
+                family
+              }
+              .to_string(),
+            ),
             substituted_family: Cow::Owned(target.to_string()),
             reason,
           });
@@ -2238,6 +2287,10 @@ pub struct ShapeOptions<'a> {
   /// precomposed input, as in Word's nominal-glyph shaping. Font GSUB ccmp
   /// remains enabled; source text and clusters are never rewritten.
   pub preserve_arabic_mark_components: bool,
+  /// Interleave Arabic calt/liga lookups on their common font order, as Word
+  /// does even in older fonts without rclt. Other consumers retain HarfRust's
+  /// default schedule. The compiled plan is cached separately for each policy.
+  pub wordprocessingml_arabic_lookup_order: bool,
   /// Retain nominal glyph metrics for explicitly measured nonprinting text.
   /// Consumers remain responsible for omitting its ink at output.
   pub preserve_default_ignorables: bool,
@@ -2274,6 +2327,7 @@ impl Default for ShapeOptions<'_> {
       small_caps: false,
       small_caps_size_pt: None,
       preserve_arabic_mark_components: false,
+      wordprocessingml_arabic_lookup_order: false,
       preserve_default_ignorables: false,
       wordprocessingml_blank_separators: false,
       wordprocessingml_no_break_hyphen: false,
@@ -2301,6 +2355,7 @@ impl<'a> ShapeOptions<'a> {
       small_caps: false,
       small_caps_size_pt: None,
       preserve_arabic_mark_components: false,
+      wordprocessingml_arabic_lookup_order: false,
       preserve_default_ignorables: false,
       wordprocessingml_blank_separators: false,
       wordprocessingml_no_break_hyphen: false,
@@ -2450,7 +2505,13 @@ impl<'book> ResolvedFont<'book> {
         suppress_fixed_cjk_kerning(&shaped_text, vertical, &mut features);
       }
     }
-    let output = font_timing("harfrust shape", || runtime_face.shape(buffer, &features));
+    let output = font_timing("harfrust shape", || {
+      runtime_face.shape(
+        buffer,
+        &features,
+        options.wordprocessingml_arabic_lookup_order,
+      )
+    });
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
     let safe_breaks = text_safe_breaks(text);
@@ -2996,6 +3057,21 @@ fn script_direction_runs_for_slot_segment_into(
   let mut pending_weak_start = None::<usize>;
   let mut pending_weak_has_inherited = false;
   for (index, ch) in text.char_indices() {
+    if options.wordprocessingml_font_slots && ch == '\u{7f}' {
+      // Word gives literal DEL its own font realization. Keep its source
+      // range and slot, so a missing regular-face glyph can be linked without
+      // replacing the neighbouring Latin text or changing its shaping.
+      if start < index {
+        push_run(start..index, active.unwrap_or(leading_script));
+      }
+      let end = index + ch.len_utf8();
+      push_run(index..end, TextScript::Common);
+      start = end;
+      active = None;
+      pending_weak_start = None;
+      pending_weak_has_inherited = false;
+      continue;
+    }
     let unicode_script = ch.script();
     if is_nonspacing_mark(ch) {
       // A nonspacing mark belongs to the preceding grapheme. Treating it as
@@ -6036,6 +6112,37 @@ mod tests {
   }
 
   #[test]
+  fn complete_source_alias_precedes_first_family_selection() {
+    let mut registry = FontRegistry::new();
+    for name in ["First", "Second", "Recovered"] {
+      registry.register_face(FontSource::System, FontFaceInfo::synthetic(name, name));
+    }
+    registry.book.family_aliases.push(FontFamilyAlias {
+      from: Cow::Borrowed("First;Second"),
+      to: Cow::Borrowed("Recovered"),
+    });
+    for selection in [FontFamilySelection::List, FontFamilySelection::First] {
+      let request = FontRequest {
+        family: Some(Cow::Borrowed("First;Second")),
+        family_selection: selection,
+        ..Default::default()
+      };
+      let resolved = registry.resolve(&request).unwrap();
+      assert_eq!(resolved.resolved_family, "Recovered");
+      assert_eq!(
+        resolved.substitution.unwrap().requested_family,
+        "First;Second"
+      );
+    }
+    let request = FontRequest {
+      family: Some(Cow::Borrowed("First;Other")),
+      family_selection: FontFamilySelection::First,
+      ..Default::default()
+    };
+    assert_eq!(registry.resolve(&request).unwrap().resolved_family, "First");
+  }
+
+  #[test]
   fn first_family_substitution_does_not_try_later_list_members() {
     let mut registry = FontRegistry::new();
     for name in ["Installed", "Recovered"] {
@@ -6978,6 +7085,93 @@ mod tests {
     for text in ["A-B", "A\u{2010}B", "A\u{2212}B"] {
       assert_eq!(shape(text, &ordinary), shape(text, &control));
     }
+  }
+
+  #[test]
+  fn wordprocessingml_arabic_plan_keeps_native_lookup_order_and_generic_cache_separate() {
+    let mut request = FontRequest {
+      family: Some(Cow::Borrowed("Traditional Arabic")),
+      script: Some(TextScript::Arabic),
+      language: Some(Cow::Borrowed("fa-IR")),
+      size_pt: FontSize(15.0),
+      features: vec![
+        FeatureValue {
+          tag: Cow::Borrowed("calt"),
+          value: 1,
+        },
+        FeatureValue {
+          tag: Cow::Borrowed("liga"),
+          value: 1,
+        },
+      ],
+      ..Default::default()
+    };
+    let mut registry = FontRegistry::new();
+    registry.register_system_query_fonts(&request).unwrap();
+    let resolved = registry.resolve(&request).unwrap();
+    let (data, _) = registry.font_face_binary(&resolved.font_id).unwrap();
+    let original = data.as_slice().to_vec();
+    let shape = |text, options: &ShapeOptions<'_>| {
+      resolved
+        .shape_with_font_bytes(text, data.clone(), options)
+        .unwrap()
+        .glyphs
+        .iter()
+        .map(|glyph| glyph.glyph_id)
+        .collect::<Vec<_>>()
+    };
+    for language in ["fa-IR", "ar-SA", "fa-IR"] {
+      request.language = Some(Cow::Borrowed(language));
+      let ordinary = ShapeOptions::from_request(&request, TextDirection::RightToLeft);
+      let word = ShapeOptions {
+        wordprocessingml_arabic_lookup_order: true,
+        ..ordinary.clone()
+      };
+      let generic_allah = if language == "fa-IR" {
+        vec![589, 166]
+      } else {
+        vec![614]
+      };
+      assert_eq!(shape("الله", &ordinary), generic_allah);
+      for (text, native) in [
+        ("الله", vec![614]),
+        ("لله", vec![389]),
+        ("اللّه", vec![203, 589, 166]),
+        ("يُعَرّف", vec![187, 203, 450, 200, 480, 201, 186, 519]),
+      ] {
+        assert_eq!(shape(text, &word), native, "{language}: {text}");
+      }
+      let mut no_liga = word.clone();
+      no_liga
+        .features
+        .iter_mut()
+        .find(|feature| feature.tag == "liga")
+        .unwrap()
+        .value = 0;
+      assert_eq!(
+        shape("الله", &no_liga),
+        if language == "fa-IR" {
+          vec![589, 166]
+        } else {
+          vec![510, 500, 499, 166]
+        }
+      );
+      assert_eq!(shape("الله", &ordinary), generic_allah);
+    }
+    // The cached plan is executed on this original face. Its bytes also remain
+    // the embedding source; the temporary planning view must never replace it.
+    assert_eq!(data.as_slice(), original);
+    let face = HarfFontRef::from_index(data.as_ref(), resolved.face_index).unwrap();
+    let view = crate::wordprocessing_arabic_plan::font_for_plan(&face).unwrap();
+    let projected = HarfFontRef::from_index(&view, resolved.face_index).unwrap();
+    let original_gsub = face.table_data(HarfTag::new(b"GSUB")).unwrap();
+    let projected_gsub = projected.table_data(HarfTag::new(b"GSUB")).unwrap();
+    let lookup_bytes =
+      |bytes: &[u8]| usize::from(u16::from_be_bytes(bytes[8..10].try_into().unwrap()));
+    assert_eq!(
+      &original_gsub.as_bytes()[lookup_bytes(original_gsub.as_bytes())..],
+      &projected_gsub.as_bytes()[lookup_bytes(projected_gsub.as_bytes())..]
+    );
   }
 
   #[test]
@@ -7941,6 +8135,34 @@ mod tests {
       runs[3].wordprocessingml_font_slot,
       Some(WordprocessingFontSlot::HighAnsi)
     );
+  }
+
+  #[test]
+  fn word_del_control_keeps_its_source_slot_and_neighboring_script_runs() {
+    let text = "AA\u{7f}BB\u{7f}\u{7f}C";
+    let runs = script_direction_runs_with_options(
+      text,
+      FontSize(12.0),
+      ScriptScanOptions {
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      },
+    );
+    let slices = runs
+      .iter()
+      .map(|run| &text[run.text_range.clone()])
+      .collect::<Vec<_>>();
+    assert_eq!(slices, ["AA", "\u{7f}", "BB", "\u{7f}", "\u{7f}", "C"]);
+    assert_eq!(slices.concat(), text);
+    assert!(
+      runs
+        .iter()
+        .all(|run| { run.wordprocessingml_font_slot == Some(WordprocessingFontSlot::Ascii) })
+    );
+    assert_eq!(runs[1].script, TextScript::Common);
+    let ordinary = script_direction_runs_with_options(text, FontSize(12.0), Default::default());
+    assert_eq!(ordinary.len(), 1);
+    assert_eq!(ordinary[0].text_range, 0..text.len());
   }
 
   #[test]

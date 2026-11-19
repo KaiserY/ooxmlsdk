@@ -616,6 +616,97 @@ pub(crate) fn stroke_end_marker_bounds(path: &PathItem<'_>, stroke: &Stroke<'_>)
   bounds
 }
 
+/// Conservative custom-cap range used to fit the legacy OfficeArt canvas.
+/// This is separate from the marker's painted geometry. Word's GFX range
+/// visitor reserves an axis-aligned box at each decorated endpoint, using the
+/// realized pen and the cap constructor's conservative radius. Native captures
+/// of five cap types, three sizes and three widths confirm both the f64 bounds
+/// transform and the f32 cap arithmetic (GFX 16.0.20527.20112).
+pub(crate) fn officeart_stroke_end_bounds(
+  path: &PathItem<'_>,
+  stroke: &Stroke<'_>,
+  dpi: f64,
+) -> Option<Rect> {
+  use super::drawingml_device_stroke::{DeviceStrokeTransform, TransformPrecision};
+
+  if ![stroke.head_end, stroke.tail_end]
+    .into_iter()
+    .flatten()
+    .any(|marker| marker.kind != StrokeEndKind::None)
+  {
+    return None;
+  }
+  let endpoints = path_endpoints(path)?;
+  let source = stroke.drawingml_device.as_ref()?;
+  let transform = DeviceStrokeTransform::new(
+    source.emu_to_points.map(|value| value * (dpi / 72.0)),
+    TransformPrecision::Bounds,
+  )?;
+  let width = transform.realize_width(source.width_emu as f64, source.snap, 1.0, false)?;
+  let [a, b, c, d] = source.emu_to_points;
+  let radius_x = width * (a * a + c * c).sqrt() * 0.5;
+  let radius_y = width * (b * b + d * d).sqrt() * 0.5;
+  // Native IPen retains a two-point minimum in its local EMU frame, before
+  // the group/device transform. It scales the cap, not the painted shaft.
+  let scale = (25_400.0_f32 / width as f32).max(1.0);
+  let mut bounds = None;
+  for (marker, endpoint) in [
+    (stroke.head_end, endpoints.start),
+    (stroke.tail_end, endpoints.end),
+  ] {
+    let Some(marker) = marker.filter(|marker| marker.kind != StrokeEndKind::None) else {
+      continue;
+    };
+    let factor = f64::from(officeart_cap_range_factor(marker, scale));
+    let x = f64::from(endpoint.0);
+    let y = f64::from(endpoint.1);
+    bounds = union_optional_rect(
+      bounds,
+      kurbo_rect(kurbo::Rect::new(
+        x - radius_x * factor,
+        y - radius_y * factor,
+        x + radius_x * factor,
+        y + radius_y * factor,
+      )),
+    );
+  }
+  bounds
+}
+
+fn officeart_cap_range_factor(marker: StrokeEnd, scale: f32) -> f32 {
+  let index = |size| match size {
+    StrokeEndSize::Small => 0,
+    StrokeEndSize::Medium => 1,
+    StrokeEndSize::Large => 2,
+  };
+  let w = index(marker.width);
+  let l = index(marker.length);
+  match marker.kind {
+    StrokeEndKind::None => 1.0,
+    StrokeEndKind::Diamond | StrokeEndKind::Oval => {
+      (scale * [2.0, 3.0, 5.0][w]).max(scale * [2.0, 3.0, 5.0][l])
+    }
+    StrokeEndKind::Triangle | StrokeEndKind::Stealth => {
+      let x = f64::from(scale * [2.0, 3.0, 5.0][w] * 0.5);
+      let y = f64::from(scale * [2.0, 3.0, 5.0][l]);
+      ((x * x + y * y).sqrt() * 1.8) as f32
+    }
+    StrokeEndKind::Arrow => {
+      // GFX's open-cap constructor retains this width/length tip table.
+      // Its range includes a conservative tip allowance; these are native
+      // cap parameters, not measured image padding or painted arrow sizes.
+      let tip = [
+        [0.94_f32, 1.30, 1.87],
+        [0.76, 0.99, 1.38],
+        [0.64, 0.78, 1.03],
+      ][w][l];
+      let x = f64::from(scale * [2.5, 3.5, 5.0][w] * 0.5);
+      let y = f64::from(scale * [2.0, 3.0, 4.5][l] + tip);
+      ((x * x + y * y).sqrt() + f64::from(tip) * 4.6) as f32
+    }
+  }
+}
+
 /// Returns the authored widened geometry of a DrawingML path stroke,
 /// including line-end markers. Paint opacity is deliberately not consulted.
 ///
@@ -1795,6 +1886,70 @@ mod tests {
       expected,
     );
     assert!(path_stroke_bounds(&path, &transparent).is_none());
+  }
+
+  #[test]
+  fn officeart_canvas_caps_match_observed_native_ranges() {
+    use StrokeEndKind::{Arrow, Diamond, Oval, Stealth, Triangle};
+    use StrokeEndSize::{Large, Medium, Small};
+
+    // Actual GFX endpoint range at 600 DPI, in device pixels. These controls
+    // independently vary the authored width, cap kind and size. In particular,
+    // 1.5pt realizes to 13 pixels for bounds, versus 12 for device paint.
+    for (kind, size, width_emu, radius_px) in [
+      (Arrow, Medium, 9_525, 45.205_533_027_648_926),
+      (Arrow, Medium, 19_050, 64.254_038_810_729_98),
+      (Arrow, Medium, 38_100, 111.386_287_212_371_83),
+      (Arrow, Large, 9_525, 59.838_289_260_864_26),
+      (Arrow, Small, 9_525, 35.068_087_577_819_824),
+      (Triangle, Medium, 9_525, 50.311_529_159_545_9),
+      (Stealth, Medium, 9_525, 50.311_529_159_545_9),
+      (Diamond, Medium, 9_525, 24.999_999_046_325_684),
+      (Oval, Medium, 9_525, 24.999_999_046_325_684),
+    ] {
+      let mut path = PathItem {
+        points: vec![
+          Point::default(),
+          Point {
+            x: Pt(73.2),
+            y: Pt(56.28),
+          },
+        ],
+        ..PathItem::default()
+      };
+      let mut stroke = Stroke {
+        width: Pt(width_emu as f32 / 12_700.0),
+        drawingml_device: Some(Box::new(super::super::DrawingMlDeviceStroke {
+          width_emu,
+          emu_to_points: [1.0 / 12_700.0, 0.0, 0.0, 1.0 / 12_700.0],
+          snap: true,
+          realized_width_emu: None,
+        })),
+        tail_end: Some(StrokeEnd {
+          kind,
+          width: size,
+          length: size,
+        }),
+        ..Stroke::default()
+      };
+      let radius_pt = radius_px as f32 * 72.0 / 600.0;
+      for at_head in [false, true] {
+        if at_head {
+          path.points.reverse();
+          stroke.head_end = stroke.tail_end.take();
+        }
+        let bounds = officeart_stroke_end_bounds(&path, &stroke, 600.0).unwrap();
+        assert!((bounds.origin.x.0 - (73.2 - radius_pt)).abs() < 0.000_02);
+        assert!((bounds.origin.y.0 - (56.28 - radius_pt)).abs() < 0.000_02);
+        assert!((bounds.size.width.0 - 2.0 * radius_pt).abs() < 0.000_02);
+        assert!((bounds.size.height.0 - 2.0 * radius_pt).abs() < 0.000_02);
+      }
+      path.closed = true;
+      assert!(officeart_stroke_end_bounds(&path, &stroke, 600.0).is_none());
+      path.closed = false;
+      stroke.head_end = None;
+      assert!(officeart_stroke_end_bounds(&path, &stroke, 600.0).is_none());
+    }
   }
 
   #[test]

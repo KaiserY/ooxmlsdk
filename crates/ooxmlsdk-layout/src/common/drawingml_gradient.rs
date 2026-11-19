@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use kurbo::{PathEl, Point as KurboPoint, flatten};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::simple_type::DrawingmlPercentageValue;
@@ -14,6 +16,59 @@ const OFFICE_DEFAULT_PATH_FOCUS: RelativeRect = RelativeRect {
   right: 0.5,
   bottom: 0.5,
 };
+
+/// Resolves the style-link pass of MS-OI29500 2.1.1284. Gradient properties
+/// merge only with another gradient. Stop lists and present relative rectangles
+/// replace their inherited counterparts as whole elements; shade attributes
+/// inherit only when their linear/path kinds agree.
+pub(crate) fn inherit_properties<'a>(
+  direct: &'a a::GradientFill,
+  inherited: Option<&a::GradientFill>,
+) -> Cow<'a, a::GradientFill> {
+  let Some(inherited) = inherited else {
+    return Cow::Borrowed(direct);
+  };
+  let mut actual = direct.clone();
+  actual.flip = actual.flip.or(inherited.flip);
+  if actual.rotate_with_shape.is_none() {
+    actual.rotate_with_shape = inherited.rotate_with_shape;
+  }
+  if actual.gradient_stop_list.is_none() {
+    actual.gradient_stop_list = inherited.gradient_stop_list.clone();
+  }
+  if actual.tile_rectangle.is_none() {
+    actual.tile_rectangle = inherited.tile_rectangle.clone();
+  }
+  if actual.gradient_fill_choice.is_none() {
+    actual.gradient_fill_choice = inherited.gradient_fill_choice.clone();
+  } else {
+    match (
+      actual.gradient_fill_choice.as_mut(),
+      inherited.gradient_fill_choice.as_ref(),
+    ) {
+      (
+        Some(a::GradientFillChoice::LinearGradientFill(direct)),
+        Some(a::GradientFillChoice::LinearGradientFill(parent)),
+      ) => {
+        direct.angle = direct.angle.or(parent.angle);
+        if direct.scaled.is_none() {
+          direct.scaled = parent.scaled;
+        }
+      }
+      (
+        Some(a::GradientFillChoice::PathGradientFill(direct)),
+        Some(a::GradientFillChoice::PathGradientFill(parent)),
+      ) => {
+        direct.path = direct.path.or(parent.path);
+        if direct.fill_to_rectangle.is_none() {
+          direct.fill_to_rectangle = parent.fill_to_rectangle.clone();
+        }
+      }
+      _ => {}
+    }
+  }
+  Cow::Owned(actual)
+}
 
 /// Resolves shared DrawingML path-gradient defaults and tile geometry.
 ///

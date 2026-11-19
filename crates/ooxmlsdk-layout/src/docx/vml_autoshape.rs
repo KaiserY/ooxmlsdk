@@ -1,6 +1,6 @@
 //! Native Office AutoShape geometry absent from the serialized VML outline.
 //!
-//! The legacy Ribbon2 (spt54) and HorizontalScroll (spt98) definitions serialize
+//! The legacy Cube (spt16), Ribbon2 (spt54) and HorizontalScroll (spt98) definitions serialize
 //! their face boundaries as `nf` paths. Office supplies separate shaded faces
 //! for the recognized AutoShape. Keep the authored outline and recognize the
 //! definition before adding faces: a custom path can retain its original spt.
@@ -10,9 +10,10 @@
 use ooxmlsdk::schemas::{a, v};
 
 use super::{
-  InlineShape, InlineShapeGeometry, vml_adjustment_values, vml_coordinate_pair,
-  vml_path_coordinate_pair, vml_path_tokens, vml_shape_adjustments, vml_shape_formulas,
-  vml_shape_path, vml_shape_type_number, vml_shapetype_formulas, vml_shapetype_path,
+  InlineShape, InlineShapeGeometry, VmlPathGeometryOptions, vml_adjustment_values,
+  vml_coordinate_pair, vml_path_coordinate_pair, vml_path_geometry, vml_path_tokens,
+  vml_shape_adjustments, vml_shape_formulas, vml_shape_path, vml_shape_type_number,
+  vml_shapetype_formulas, vml_shapetype_path,
 };
 use crate::common::{self, DrawingPathFillMode};
 
@@ -102,6 +103,18 @@ const RIBBON_GUIDES: &[&str] = &[
   "val height",
 ];
 
+const CUBE_PATH: &str =
+  "m@0,l0@0,,21600@1,21600,21600@2,21600,xem0@0nfl@1@0,21600,em@1@0nfl@1,21600e";
+const CUBE_GUIDES: &[&str] = &[
+  "val #0",
+  "sum width 0 #0",
+  "sum height 0 #0",
+  "mid height #0",
+  "prod @1 1 2",
+  "prod @2 1 2",
+  "mid width #0",
+];
+
 fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::PresetGeometry> {
   let number = shape_type.optional_number.or_else(|| {
     shape_type
@@ -112,6 +125,7 @@ fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::
       .ok()
   })?;
   let (kind, expected_path, expected_guides) = match number {
+    16 => (a::ShapeTypeValues::Cube, CUBE_PATH, CUBE_GUIDES),
     54 => (a::ShapeTypeValues::Ribbon2, RIBBON_PATH, RIBBON_GUIDES),
     98 => (
       a::ShapeTypeValues::HorizontalScroll,
@@ -119,6 +133,14 @@ fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::
       SCROLL_GUIDES,
     ),
     _ => return None,
+  };
+  // Native Cube controls recognize its shapetype definition. Instance path
+  // and formula overrides are ignored for this native shape; changing the
+  // shapetype path/formulas or removing its limo creates a custom shape.
+  let path = if number == 16 {
+    shape_type.edge_path.as_deref()?
+  } else {
+    path
   };
   if vml_path_tokens(path)? != vml_path_tokens(expected_path)? {
     return None;
@@ -140,7 +162,11 @@ fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::
   {
     return None;
   }
-  let formulas = vml_shape_formulas(shape).or_else(|| vml_shapetype_formulas(shape_type))?;
+  let formulas = if number == 16 {
+    vml_shapetype_formulas(shape_type)
+  } else {
+    vml_shape_formulas(shape).or_else(|| vml_shapetype_formulas(shape_type))
+  }?;
   if formulas.formula.len() != expected_guides.len()
     || !formulas
       .formula
@@ -156,7 +182,11 @@ fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::
   {
     return None;
   }
-  let path_properties = vml_shape_path(shape).or_else(|| vml_shapetype_path(shape_type));
+  let path_properties = if number == 16 {
+    vml_shapetype_path(shape_type)
+  } else {
+    vml_shape_path(shape).or_else(|| vml_shapetype_path(shape_type))
+  };
   if path_properties
     .and_then(|path| path.allow_fill)
     .is_some_and(|allow| !allow.as_bool())
@@ -168,7 +198,9 @@ fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::
     .and_then(vml_path_coordinate_pair);
   // Removing the native scroll's limo changes it into a custom shape, even
   // though its spt and serialized path are retained. It then has no faces.
-  if (number == 98 && limo != Some((10800.0, 10800.0))) || (number == 54 && limo.is_some()) {
+  if (matches!(number, 16 | 98) && limo != Some((10800.0, 10800.0)))
+    || (number == 54 && limo.is_some())
+  {
     return None;
   }
   let adjustment = vml_shape_adjustments(shape, Some(shape_type));
@@ -178,8 +210,9 @@ fn preset(shape: &v::Shape, shape_type: &v::Shapetype, path: &str) -> Option<a::
     name: name.into(),
     formula: format!("val {value}"),
   };
-  let guides = if number == 98 {
-    if !(0..=5400).contains(&first) {
+  let guides = if matches!(number, 16 | 98) {
+    let maximum = if number == 16 { 21_600 } else { 5_400 };
+    if !(0..=maximum).contains(&first) {
       return None;
     }
     vec![guide("adj", f64::from(first) * 100000.0 / 21600.0)]
@@ -213,7 +246,6 @@ pub(super) fn restore_fold_faces(
   filled: bool,
 ) {
   if !filled
-    || inline.fill_image.is_some()
     || inline.fill_pattern.is_some()
     || matches!(
       inline.fill_override.as_deref(),
@@ -225,6 +257,35 @@ pub(super) fn restore_fold_faces(
   let Some(preset) = shape_type.and_then(|shape_type| preset(shape, shape_type, path)) else {
     return;
   };
+  let cube = preset.preset == a::ShapeTypeValues::Cube;
+  if inline.fill_image.is_some() && !cube {
+    return;
+  }
+  if cube {
+    let shape_type = shape_type.expect("recognized native definition");
+    let adjustment = vml_shape_adjustments(shape, Some(shape_type));
+    let Some(geometry) = vml_path_geometry(
+      CUBE_PATH,
+      VmlPathGeometryOptions {
+        coordinate_origin: shape_type.coordinate_origin.as_deref(),
+        coordinate_size: shape_type.coordinate_size.as_deref(),
+        width_pt: inline.width_pt,
+        height_pt: inline.height_pt,
+        adjustment: adjustment.as_deref(),
+        formulas: vml_shapetype_formulas(shape_type),
+        limo: Some("10800,10800"),
+        filled,
+        stroked: inline.stroke.is_some(),
+        stroke_width_pt: inline.stroke.map_or(0.0, |stroke| stroke.width_pt),
+        allow_fill: true,
+        allow_stroke: true,
+        allow_extrusion: false,
+      },
+    ) else {
+      return;
+    };
+    inline.geometry = geometry;
+  }
   let Some(faces) = common::drawingml_preset_geometry::paths(
     Some(&preset),
     0.0,
@@ -247,13 +308,17 @@ pub(super) fn restore_fold_faces(
     }
   }
   paths.retain(|path| path.fill_mode != DrawingPathFillMode::None);
-  // Paint the recognized faces over the primary fill and beneath every
-  // authored outline. Never replace the serialized outer path or its guides.
-  paths.extend(
-    faces
-      .into_iter()
-      .filter(|path| path.fill_mode == DrawingPathFillMode::DarkenLess),
-  );
+  // Paint native faces over the primary/image brush and beneath every
+  // outline. Cube's top precedes its darker right face in native output.
+  for mode in [
+    DrawingPathFillMode::LightenLess,
+    DrawingPathFillMode::DarkenLess,
+  ] {
+    if mode == DrawingPathFillMode::LightenLess && !cube {
+      continue;
+    }
+    paths.extend(faces.iter().filter(|path| path.fill_mode == mode).cloned());
+  }
   paths.extend(strokes);
   inline.vml_autoshape_shaded_faces = true;
 }
@@ -265,7 +330,9 @@ mod tests {
   use ooxmlsdk::sdk::SdkType;
 
   fn shape_type(number: i32) -> v::Shapetype {
-    let (path, guides, adjustment, limo) = if number == 98 {
+    let (path, guides, adjustment, limo) = if number == 16 {
+      (CUBE_PATH, CUBE_GUIDES, "5400", " limo=\"10800,10800\"")
+    } else if number == 98 {
       (SCROLL_PATH, SCROLL_GUIDES, "2700", " limo=\"10800,10800\"")
     } else {
       (RIBBON_PATH, RIBBON_GUIDES, "5400,18900", "")
@@ -279,6 +346,87 @@ mod tests {
   fn shape(number: i32, width: f32, height: f32) -> v::Shape {
     let adjustment = if number == 54 { " adj=\"3366\"" } else { "" };
     v::Shape::from_bytes(format!("<v:shape xmlns:v=\"urn:schemas-microsoft-com:vml\" id=\"native-shape\" type=\"#_x0000_t{number}\" style=\"width:{width}pt;height:{height}pt\" fillcolor=\"white\"{adjustment}/>").as_bytes()).unwrap()
+  }
+
+  #[test]
+  fn native_cube_uses_its_definition_and_retains_three_faces_before_outlines() {
+    for adjustment in [0, 2700, 5400, 10800] {
+      for direct_override in [false, true] {
+        let mut source = shape(16, 139.5, 189.0);
+        source.adjustment = Some(adjustment.to_string());
+        let definition = shape_type(16);
+        if direct_override {
+          source.edge_path = Some("m0,0l21600,0,21600,21600xe".into());
+        }
+        let inline = vml_shape_shape(&source, &ImageCatalog::default(), &[&definition]).unwrap();
+        assert!(inline.vml_autoshape_shaded_faces);
+        let InlineShapeGeometry::Path { paths, .. } = inline.geometry else {
+          panic!("native cube paths");
+        };
+        assert_eq!(paths.len(), 6);
+        assert_eq!(
+          paths[..3]
+            .iter()
+            .map(|path| path.fill_mode)
+            .collect::<Vec<_>>(),
+          [
+            DrawingPathFillMode::Normal,
+            DrawingPathFillMode::LightenLess,
+            DrawingPathFillMode::DarkenLess
+          ]
+        );
+        assert!(paths[..3].iter().all(|path| !path.stroke));
+        assert!(
+          paths[3..]
+            .iter()
+            .all(|path| path.stroke && path.fill_mode == DrawingPathFillMode::None)
+        );
+        assert_eq!(paths[0].commands, paths[3].commands);
+        let common::PathCommand::MoveTo(first) = paths[0].commands[0] else {
+          panic!("native outer path origin");
+        };
+        assert!((first.x.0 - 139.5 * adjustment as f32 / 21600.0).abs() < 0.001);
+        assert_eq!(first.y.0, 0.0);
+      }
+    }
+  }
+
+  #[test]
+  fn native_cube_recognition_keeps_custom_definitions_unshaded() {
+    for variant in ["number", "path", "formula", "limo", "alias", "no-number"] {
+      let mut source = shape(16, 139.5, 189.0);
+      let mut definition = shape_type(16);
+      match variant {
+        "number" => definition.optional_number = Some(17),
+        "path" => definition.edge_path = Some(CUBE_PATH.replace("m@0,", "m@4,")),
+        "formula" => {
+          for choice in &mut definition.shapetype_choice {
+            if let v::ShapetypeChoice::Formulas(formulas) = choice {
+              formulas.formula[1].equation = Some("sum width 0 2700".into());
+            }
+          }
+        }
+        "limo" => {
+          for choice in &mut definition.shapetype_choice {
+            if let v::ShapetypeChoice::Path(path) = choice {
+              path.limo = None;
+            }
+          }
+        }
+        "alias" => {
+          definition.id = Some("custom-type".into());
+          source.r#type = Some("#custom-type".into());
+        }
+        "no-number" => definition.optional_number = None,
+        _ => unreachable!(),
+      }
+      let inline = vml_shape_shape(&source, &ImageCatalog::default(), &[&definition]).unwrap();
+      assert_eq!(
+        inline.vml_autoshape_shaded_faces,
+        matches!(variant, "alias" | "no-number"),
+        "{variant}"
+      );
+    }
   }
 
   #[test]

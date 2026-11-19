@@ -236,6 +236,10 @@ pub struct PdfOptions {
   /// These are not inferred from the name or the rendering host.
   pub field_user_initials: Option<String>,
 
+  /// Explicit attached template path for Word TEMPLATE fields. This input
+  /// is independent of embedded app.xml metadata and the rendering host.
+  pub field_template_path: Option<String>,
+
   /// Resolved OOXML Word template for documents enabling `w:linkStyles`.
   /// The caller supplies the actual attached/default template; the converter
   /// does not locate templates on the rendering host.
@@ -268,7 +272,7 @@ pub struct PdfOptions {
   /// body fields that require a print update; pagination/display fields and
   /// headers/footers retain their independent rules. Locked results stay
   /// protected. `None` preserves the existing behavior. Date/time fields
-  /// still require `field_update_datetime`; this is not an on-open update.
+  /// still require an explicit field clock; this flag does not supply one.
   /// Supported for DOCX only.
   pub update_fields_at_print: Option<bool>,
 
@@ -277,6 +281,9 @@ pub struct PdfOptions {
   /// SpreadsheetML TODAY(). When absent, Word/Presentation cached fields stay
   /// authoritative and spreadsheet TODAY() uses the evaluator's system clock.
   pub field_update_datetime: Option<ooxmlsdk_layout::options::FieldUpdateDateTime>,
+  /// Word DATE/TIME opening snapshot, independent of later print updates.
+  /// None retains the ordinary `field_update_datetime` input.
+  pub field_open_datetime: Option<ooxmlsdk_layout::options::FieldUpdateDateTime>,
 
   /// IANA time-zone name used to convert absolute package-property
   /// timestamps when fields such as WordprocessingML CREATEDATE are
@@ -310,6 +317,7 @@ impl Default for PdfOptions {
       source_file_path: None,
       field_user_name: None,
       field_user_initials: None,
+      field_template_path: None,
       linked_styles_template: None,
       ui_language: None,
       format_locale: None,
@@ -318,6 +326,7 @@ impl Default for PdfOptions {
       english_hyphenation_dictionary: None,
       update_fields_at_print: None,
       field_update_datetime: None,
+      field_open_datetime: None,
       field_update_time_zone: None,
       include_hidden_slides: false,
       general: PdfGeneralOptions::default(),
@@ -389,6 +398,7 @@ impl PdfOptions {
       source_file_path: self.source_file_path.clone(),
       field_user_name: self.field_user_name.clone(),
       field_user_initials: self.field_user_initials.clone(),
+      field_template_path: self.field_template_path.clone(),
       linked_styles_template: self.linked_styles_template.clone(),
       ui_language: self.ui_language.clone(),
       format_locale: self.format_locale.clone(),
@@ -396,6 +406,7 @@ impl PdfOptions {
       automatic_hyphenation_languages: self.automatic_hyphenation_languages.clone(),
       english_hyphenation_dictionary: self.english_hyphenation_dictionary.clone(),
       field_update_datetime: self.field_update_datetime,
+      field_open_datetime: self.field_open_datetime,
       field_update_time_zone: self.field_update_time_zone.clone(),
       update_fields_at_print: self.update_fields_at_print,
       include_hidden_slides: self.include_hidden_slides,
@@ -498,7 +509,10 @@ fn resolve_layout_environment(
     });
   }
 
-  if let Some(value) = options.field_update_datetime {
+  for value in [options.field_update_datetime, options.field_open_datetime]
+    .into_iter()
+    .flatten()
+  {
     let year = i16::try_from(value.year).map_err(|_| {
       PdfError::Options(format!(
         "field update year must be in the supported civil range, got {}",
@@ -1402,6 +1416,7 @@ mod tests {
     let options = PdfOptions {
       field_user_name: Some("Mixed Name".into()),
       field_user_initials: Some(String::new()),
+      field_template_path: Some(r"C:\Templates\Observed.dotm".into()),
       update_fields_at_print: Some(true),
       linked_styles_template: Some(template.clone()),
       ..Default::default()
@@ -1410,6 +1425,10 @@ mod tests {
     let layout = resolved.effective.layout_options();
     assert_eq!(layout.field_user_name.as_deref(), Some("Mixed Name"));
     assert_eq!(layout.field_user_initials.as_deref(), Some(""));
+    assert_eq!(
+      layout.field_template_path.as_deref(),
+      Some(r"C:\Templates\Observed.dotm")
+    );
     assert_eq!(layout.update_fields_at_print, Some(true));
     assert!(Arc::ptr_eq(
       layout.linked_styles_template.as_ref().unwrap(),

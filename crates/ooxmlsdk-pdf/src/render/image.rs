@@ -216,6 +216,8 @@ impl PreparedRasterImage {
 pub(super) struct ImageSet {
   rasters: HashMap<(usize, usize), Vec<CachedRaster>>,
   word_print_jpeg_displays: HashMap<(usize, usize), (f32, f32)>,
+  word_screen_png_displays: HashMap<(usize, usize), Vec<(f32, f32)>>,
+  word_screen_cropped_pngs: HashSet<(usize, usize)>,
   excel_full_resolution_pngs: HashSet<(usize, usize)>,
   svgs: HashMap<(usize, usize), Arc<super::direct_svg::PreparedSvg>>,
   svg_rasters: HashMap<(usize, usize, u32, u32), PreparedRasterImage>,
@@ -753,28 +755,28 @@ impl RasterExportOptions {
     self
   }
 
-  fn retains_word_one_bit_grayscale(self, size: (u32, u32)) -> bool {
-    if !self.profile.is_word() {
-      return false;
-    }
-    let Some(trigger) = self.downsample_trigger_px else {
-      return true;
-    };
-    // Word's monochrome PNG controls retain the original samples below
-    // 450 DPI (Screen) / 750 DPI (Print), independently of pHYs. These are
-    // separate from the ordinary color-image thresholds stored above.
-    // As with color PNGs, native fractional-boundary controls first floor
-    // the displayed extent to twips and test each axis independently.
-    // Above those boundaries Office produces a reduced, still one-bit image;
-    // this native-stream path only handles the unreduced representation.
-    let (color_dpi, monochrome_dpi) = if self.profile.is_office_screen() {
-      (150, 450)
+  fn word_one_bit_grayscale_size(self, source: (u32, u32)) -> Option<(u32, u32)> {
+    // Word independently tests the density of each axis on the layout twip
+    // grid. The reduced monochrome grid has the same inclusive far endpoint
+    // as a color picture, with separate trigger and output resolutions.
+    let (color_dpi, trigger_dpi, output_dpi) = if self.profile.is_office_screen() {
+      (150, 450, 300)
     } else {
-      (300, 750)
+      (300, 750, 600)
     };
-    let (width, height) = trigger.on_floor_twip_display_grid(color_dpi).pixels();
-    let factor = f64::from(monochrome_dpi) / f64::from(color_dpi);
-    f64::from(size.0) < width * factor && f64::from(size.1) < height * factor
+    let (width, height) = self.downsample_trigger_px?.pixels();
+    let axis = |samples: u32, color_extent: f64| {
+      // Recover the twip in layout precision, as for the color target grid.
+      // Widening 9.65pt before flooring would turn its 193 twips into 192.
+      let twips = f64::from(((color_extent * 1440.0 / f64::from(color_dpi)) as f32).floor());
+      if f64::from(samples) * 1440.0 >= twips * f64::from(trigger_dpi) {
+        (((twips * f64::from(output_dpi) / 1440.0).ceil() - 1.0) as u32).clamp(1, samples)
+      } else {
+        samples
+      }
+    };
+    let target = (axis(source.0, width), axis(source.1, height));
+    (target != source).then_some(target)
   }
 
   fn downsample_size(self, size: (u32, u32)) -> Option<(u32, u32)> {
@@ -807,6 +809,36 @@ impl RasterExportOptions {
     } else {
       downsample_size(size, max_size)
     }
+  }
+
+  fn word_screen_source_size(self, size: (u32, u32)) -> Option<(u32, u32)> {
+    // Word tests source PNG/RGB TIFF density against the inline extent after
+    // flooring that extent to its integer-twip layout grid. Unlike the
+    // generic raster-owner path, there is no four-pixel trigger allowance:
+    // a controlled 64px Screen matrix retains 149.0 DPI and reduces at
+    // 149.987/150/151 DPI. This also keeps copy-bookmarks.docx's 146.3-DPI
+    // image at its authored 64x64 sample count.
+    let (target_width, target_height) = self.max_size_px?.pixels();
+    let (trigger_width, trigger_height) = self
+      .downsample_trigger_px?
+      .on_floor_twip_display_grid(150)
+      .pixels();
+    // Native ordinary-picture controls reduce each axis independently,
+    // including sources below 50 pixels. A 64x39 image can become 40x39
+    // or 64x12: neither a short-side exemption nor reducing both axes after
+    // one density test preserves the untouched source samples.
+    let axis = |source: u32, threshold: f64, target: f64| {
+      if f64::from(source) >= threshold {
+        (target.round() as u32).clamp(1, source)
+      } else {
+        source
+      }
+    };
+    let target = (
+      axis(size.0, trigger_width, target_width),
+      axis(size.1, trigger_height, target_height),
+    );
+    (target != size).then_some(target)
   }
 
   fn downsample_source_size(
@@ -843,33 +875,7 @@ impl RasterExportOptions {
       && self.profile.is_office_screen()
       && format == RasterImageFormat::Png
     {
-      // Word tests ordinary source PNG density against the inline extent after
-      // flooring that extent to its integer-twip layout grid. Unlike the
-      // generic raster-owner path, there is no four-pixel trigger allowance:
-      // a controlled 64px Screen matrix retains 149.0 DPI and reduces at
-      // 149.987/150/151 DPI. This also keeps copy-bookmarks.docx's 146.3-DPI
-      // image at its authored 64x64 sample count.
-      let (target_width, target_height) = self.max_size_px?.pixels();
-      let (trigger_width, trigger_height) = self
-        .downsample_trigger_px?
-        .on_floor_twip_display_grid(150)
-        .pixels();
-      // Native ordinary-picture controls reduce each axis independently,
-      // including sources below 50 pixels. A 64x39 image can become 40x39
-      // or 64x12: neither a short-side exemption nor reducing both axes after
-      // one density test preserves the untouched source samples.
-      let axis = |source: u32, threshold: f64, target: f64| {
-        if f64::from(source) >= threshold {
-          (target.round() as u32).clamp(1, source)
-        } else {
-          source
-        }
-      };
-      let target = (
-        axis(size.0, trigger_width, target_width),
-        axis(size.1, trigger_height, target_height),
-      );
-      return (target != size).then_some(target);
+      return self.word_screen_source_size(size);
     }
     if owner != RasterOwner::Source
       || !self.profile.is_power_point_screen()
@@ -984,6 +990,52 @@ impl ImageSet {
         display.1 = display.1.max(height_pt);
       })
       .or_insert(display_size_pt);
+  }
+
+  pub(super) fn observe_word_png_display(
+    &mut self,
+    data: &[u8],
+    content_type: Option<&str>,
+    options: &PdfOptions,
+    display_size_pt: (f32, f32),
+    cropped: bool,
+  ) {
+    let profile = RasterExportProfile::from_options(options);
+    if RasterOwner::from_content_type(content_type) != RasterOwner::Source
+      || !profile.is_word()
+      || !profile.is_office_screen()
+      || raster_format(data, content_type) != Some(RasterImageFormat::Png)
+    {
+      return;
+    }
+    let key = image_data_key(data);
+    // Native image identity includes the source rectangle. Until cropped
+    // references have their own identity here, keep their independent cache.
+    if cropped {
+      self.word_screen_cropped_pngs.insert(key);
+      self.word_screen_png_displays.remove(&key);
+      return;
+    }
+    let (width, height) = display_size_pt;
+    if self.word_screen_cropped_pngs.contains(&key)
+      || !width.is_finite()
+      || !height.is_finite()
+      || width <= 0.0
+      || height <= 0.0
+    {
+      return;
+    }
+    let displays = self.word_screen_png_displays.entry(key).or_default();
+    if displays.iter().any(|&(w, h)| w >= width && h >= height) {
+      return;
+    }
+    // Native Word compares both dimensions: a larger surface replaces a
+    // shared image, whereas opposing width/height changes remain separate.
+    // Plan before emitting PDF objects so earlier references use that same
+    // surface. Its native key also compares uninitialized structure padding;
+    // retain semantic source identity rather than copying those unstable bytes.
+    displays.retain(|&(w, h)| w > width || h > height);
+    displays.push(display_size_pt);
   }
 
   pub(super) fn svg(&mut self, data: &[u8]) -> Result<Arc<super::direct_svg::PreparedSvg>> {
@@ -1123,6 +1175,26 @@ impl ImageSet {
     let (mut display_width_pt, mut display_height_pt) = display_size_pt;
     let owner = RasterOwner::from_content_type(content_type);
     let key = image_data_key(data);
+    if owner == RasterOwner::Source
+      && RasterExportProfile::from_options(options).is_word()
+      && RasterExportProfile::from_options(options).is_office_screen()
+      && raster_format(data, content_type) == Some(RasterImageFormat::Png)
+      && let Some(display) = self
+        .word_screen_png_displays
+        .get(&key)
+        .and_then(|displays| {
+          displays
+            .iter()
+            .filter(|&&(width, height)| width >= display_width_pt && height >= display_height_pt)
+            .min_by(|a, b| {
+              (f64::from(a.0) * f64::from(a.1))
+                .total_cmp(&(f64::from(b.0) * f64::from(b.1)))
+                .then_with(|| a.0.total_cmp(&b.0))
+            })
+        })
+    {
+      (display_width_pt, display_height_pt) = *display;
+    }
     if owner == RasterOwner::Source
       && matches!(
         blip_compression_state,
@@ -1513,18 +1585,26 @@ fn decode_image(
           && format_export_options.profile.is_word_print()
         {
           // Word Print emits decoded source PNG color planes as DeviceRGB,
-          // for RGB/RGBA, partial alpha and both retained/reduced resolution.
+          // for RGB/RGBA/Gray8, partial alpha and retained/reduced resolution.
           // Native profile-only pairs have identical RGB and mask samples;
           // retaining ICCBased would introduce a conversion Word never made.
           raster.icc_profile = None;
         }
+        // PNG grayscale below eight bits also decodes to L8. Keep its
+        // separate monochrome owner by checking the authored sample model.
+        let opaque_gray8_png = raster.image.color() == image::ColorType::L8
+          && metadata.and_then(|value| value.png).is_some_and(|png| {
+            png.color_type == png::ColorType::Grayscale
+              && png.bit_depth == png::BitDepth::Eight
+              && !png.has_transparency
+          });
         if owner == RasterOwner::Source
           && format_export_options.profile.is_word_print()
           && should_try_jpeg(format, format_export_options, owner)
-          && matches!(
+          && (matches!(
             raster.image.color(),
             image::ColorType::Rgb8 | image::ColorType::Rgba8
-          )
+          ) || opaque_gray8_png)
           && metadata.is_some_and(|value| value.orientation == Orientation::NoTransforms)
         {
           let target_size =
@@ -1535,10 +1615,12 @@ fn decode_image(
             // Bitmap(Image,width,height) creates a surface without source
             // properties, so its JPEG trial has no source Exif overhead.
             // Native sRGB/plain PNG pairs retain identical decisions/pixels.
-            (RasterImageFormat::Png, Some(_), image::ColorType::Rgb8 | image::ColorType::Rgba8) => {
-              Some(0)
-            }
-            (_, None, image::ColorType::Rgb8) => {
+            (
+              RasterImageFormat::Png,
+              Some(_),
+              image::ColorType::L8 | image::ColorType::Rgb8 | image::ColorType::Rgba8,
+            ) => Some(0),
+            (_, None, image::ColorType::L8 | image::ColorType::Rgb8) => {
               word_print_codec::trial_metadata_size(data, format)
             }
             _ => None,
@@ -1554,6 +1636,29 @@ fn decode_image(
             );
           }
         }
+        if owner == RasterOwner::Source
+          && format == RasterImageFormat::Tiff
+          && format_export_options.profile.is_word()
+          && format_export_options.profile.is_office_screen()
+          && metadata.is_some_and(|value| {
+            value.original_color_type == image::ExtendedColorType::Rgb8
+              && value.orientation == Orientation::NoTransforms
+          })
+        {
+          // Native same-pixel TIFF/PNG controls share independent 150-DPI
+          // axis triggers, including sources smaller than 50 pixels. TIFF
+          // monochrome controls have a separate density policy; decoded L8
+          // alone cannot distinguish an authored one-bit source from Gray8.
+          let target_size =
+            format_export_options.word_screen_source_size(raster.image.dimensions());
+          return export_decoded_image_with_target_size(
+            raster,
+            format,
+            format_export_options,
+            owner,
+            target_size,
+          );
+        }
         return export_decoded_image(raster, format, format_export_options, owner);
       }
       RasterRealization::NativeJpeg => {
@@ -1564,13 +1669,17 @@ fn decode_image(
           return Ok(image);
         }
       }
-      RasterRealization::NativePng => {
+      RasterRealization::NativePng | RasterRealization::ReducedGrayPng(_) => {
         let native = format_export_options
           .profile
           .is_office_fixed_output()
           .then(|| NativePng::parse(data))
           .flatten();
-        if let Ok(image) = prepare_native_png_image(data.to_vec(), false, native) {
+        let target = match plan.realization {
+          RasterRealization::ReducedGrayPng(size) => Some(size),
+          _ => None,
+        };
+        if let Ok(image) = prepare_native_png_image(data, false, native, target) {
           // Preparation validates the PNG once and carries the original IDAT,
           // palette and component width directly to the image writer.
           return Ok(image);
@@ -1753,6 +1862,7 @@ fn should_try_jpeg(
 
 #[derive(Clone, Copy, Debug)]
 struct RasterMetadata {
+  original_color_type: image::ExtendedColorType,
   size: (u32, u32),
   orientation: Orientation,
   png: Option<PngMetadata>,
@@ -1795,6 +1905,7 @@ impl JpegMetadata {
 enum RasterRealization {
   NativeJpeg,
   NativePng,
+  ReducedGrayPng((u32, u32)),
   Decoded,
 }
 
@@ -1812,6 +1923,25 @@ impl RasterPlan {
   ) -> Self {
     let needs_orientation =
       metadata.is_some_and(|value| value.orientation != Orientation::NoTransforms);
+    if !needs_orientation
+      && owner == RasterOwner::Source
+      && export_options.profile.is_word()
+      && let Some(metadata) = metadata
+      && metadata.png.is_some_and(|png| {
+        png.color_type == png::ColorType::Grayscale
+          && png.bit_depth == png::BitDepth::One
+          && !png.has_transparency
+      })
+    {
+      return Self {
+        realization: export_options
+          .word_one_bit_grayscale_size(metadata.size)
+          .map_or(
+            RasterRealization::NativePng,
+            RasterRealization::ReducedGrayPng,
+          ),
+      };
+    }
     let needs_downsampling = metadata.is_some_and(|value| {
       export_options
         .downsample_source_size(value.size, format, owner)
@@ -1831,10 +1961,6 @@ impl RasterPlan {
         value.png.is_some_and(|png| {
           png.is_proven_office_native_indexed()
             || (export_options.profile.is_word() && png.is_opaque_one_bit_indexed())
-            || (png.color_type == png::ColorType::Grayscale
-              && png.bit_depth == png::BitDepth::One
-              && !png.has_transparency
-              && export_options.retains_word_one_bit_grayscale(value.size))
         })
       });
     let needs_compression_change =
@@ -1882,6 +2008,7 @@ fn raster_metadata(data: &[u8], format: RasterImageFormat) -> Result<Option<Rast
     .then(|| png_metadata(data))
     .flatten();
   Ok(Some(RasterMetadata {
+    original_color_type: decoder.original_color_type(),
     size,
     orientation,
     png,
@@ -2052,32 +2179,90 @@ fn prepare_sampled_image(
   Ok(PreparedRasterImage::new(direct))
 }
 
+fn resample_word_one_bit_png(
+  source: &[u8],
+  source_stride: usize,
+  source_size: (u32, u32),
+  target_size: (u32, u32),
+) -> Result<Vec<u8>> {
+  let (width, height) = target_size;
+  // PDF's PNG predictor accepts an unfiltered row (filter byte zero)
+  // followed by grayscale samples packed most-significant bit first.
+  let stride = 1 + width.div_ceil(8) as usize;
+  let mut rows = vec![0; stride * height as usize];
+  let sample =
+    |x: u32, y: u32| (source[y as usize * source_stride + (x / 8) as usize] >> (7 - x % 8)) & 1;
+  let mut store = |x: u32, y: u32, white: bool| {
+    rows[y as usize * stride + 1 + (x / 8) as usize] |= u8::from(white) << (7 - x % 8);
+  };
+  // Word thresholds the grayscale result of the same GDI+ resampler used
+  // for color images. The source stays packed, including on the area path.
+  if source_size.0.max(source_size.1) < GDIPLUS_BITMAP_AREA_THRESHOLD {
+    let [horizontal, vertical] = gdiplus_bilinear_axes(source_size, target_size);
+    let one = GDIPLUS_BILINEAR_ONE;
+    for (y, &(top, bottom, fy)) in (0..height).zip(&vertical) {
+      for (x, &(left, right, fx)) in (0..width).zip(&horizontal) {
+        let at_top = u32::from(sample(left, top)) * (one - fx) + u32::from(sample(right, top)) * fx;
+        let at_bottom =
+          u32::from(sample(left, bottom)) * (one - fx) + u32::from(sample(right, bottom)) * fx;
+        store(x, y, at_top * (one - fy) + at_bottom * fy >= one * one / 2);
+      }
+    }
+  } else if !gdiplus_filter_area(
+    source_size,
+    target_size,
+    |x, y| [255 * sample(x, y)],
+    |x, y, [value]| store(x, y, value >= 128),
+  ) {
+    return Err(PdfError::Image(
+      "invalid monochrome resampling dimensions".into(),
+    ));
+  }
+  let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+  encoder
+    .write_all(&rows)
+    .and_then(|()| encoder.finish())
+    .map_err(|e| PdfError::Image(format!("failed to encode monochrome image: {e}")))
+}
+
 fn prepare_native_png_image(
-  data: Vec<u8>,
+  data: &[u8],
   interpolate: bool,
   mut native: Option<NativePng>,
+  target: Option<(u32, u32)>,
 ) -> Result<PreparedRasterImage> {
   if let Some(native) = native.take_if(|png| png.color_type == png::ColorType::Grayscale) {
     // Validate the packed stream without expanding a monochrome page to RGB.
     // PDF's PNG predictor consumes the same one-bit, high-bit-first scanlines.
-    let mut reader = png::Decoder::new(Cursor::new(&data))
+    let mut reader = png::Decoder::new(Cursor::new(data))
       .read_info()
       .map_err(|err| PdfError::Image(format!("failed to read grayscale PNG: {err}")))?;
     let size = reader
       .output_buffer_size()
       .ok_or_else(|| PdfError::Image("grayscale PNG output size is unavailable".to_string()))?;
     let mut samples = vec![0; size];
-    reader
+    let frame = reader
       .next_frame(&mut samples)
       .map_err(|err| PdfError::Image(format!("failed to decode grayscale PNG: {err}")))?;
     let icc_profile = reader.info().icc_profile.as_deref().map(Arc::from);
+    let (width, height, idat) = if let Some((width, height)) = target {
+      let data = resample_word_one_bit_png(
+        &samples,
+        frame.line_size,
+        (native.width, native.height),
+        (width, height),
+      )?;
+      (width, height, data)
+    } else {
+      (native.width, native.height, native.idat)
+    };
     return Ok(PreparedRasterImage::new(DirectRasterImage {
-      width: native.width,
-      height: native.height,
+      width,
+      height,
       color_space: DirectRasterColorSpace::Gray,
       bits_per_component: native.bit_depth as u8,
       encoding: DirectRasterEncoding::GrayPng {
-        data: native.idat.into(),
+        data: idat.into(),
         icc_profile,
       },
       interpolate,
@@ -2085,7 +2270,7 @@ fn prepare_native_png_image(
       matte: None,
     }));
   }
-  let decoded = decode_dynamic_image(&data, RasterImageFormat::Png)?;
+  let decoded = decode_dynamic_image(data, RasterImageFormat::Png)?;
   let sampled = PdfRasterImage::from_dynamic_with_icc(decoded.image, decoded.icc_profile);
   let direct = if let Some(indexed) = native {
     DirectRasterImage {
@@ -2314,10 +2499,21 @@ fn export_word_print_rgb_image(
 }
 
 fn export_decoded_image(
+  raster: DecodedRasterImage,
+  format: RasterImageFormat,
+  export_options: RasterExportOptions,
+  owner: RasterOwner,
+) -> Result<PreparedRasterImage> {
+  let target_size = export_options.downsample_source_size(raster.image.dimensions(), format, owner);
+  export_decoded_image_with_target_size(raster, format, export_options, owner, target_size)
+}
+
+fn export_decoded_image_with_target_size(
   mut raster: DecodedRasterImage,
   format: RasterImageFormat,
   export_options: RasterExportOptions,
   owner: RasterOwner,
+  target_size: Option<(u32, u32)>,
 ) -> Result<PreparedRasterImage> {
   let word_drawingml_gif = owner == RasterOwner::Source
     && format == RasterImageFormat::Gif
@@ -2334,9 +2530,7 @@ fn export_decoded_image(
   // surface does not change the source JPEG's component model.
   let office_gray_jpeg = office_source_jpeg && raster.image.color() == image::ColorType::L8;
   let mut resized = false;
-  if let Some(target_size) =
-    export_options.downsample_source_size(raster.image.dimensions(), format, owner)
-  {
+  if let Some(target_size) = target_size {
     raster.image = if export_options.profile.is_office_screen()
       && (matches!(format, RasterImageFormat::Png | RasterImageFormat::Tiff)
         && owner == RasterOwner::Source
@@ -2469,10 +2663,10 @@ fn export_decoded_image(
               && (export_options.profile.is_word_print()
                 || export_options.profile.is_office_screen()
                   && (export_options.profile.is_power_point_screen()
-                    || (resized && export_options.profile.is_word())))
+                    || export_options.profile.is_word()))
           {
-            // Word DrawingML GIFs, Print PNGs, PowerPoint Screen PNGs and
-            // reduced Word Screen PNGs retain associated JPEG plus an independent
+            // Word DrawingML GIFs, Word PNGs and PowerPoint Screen PNGs
+            // retain associated JPEG plus an independent
             // A8 plane. Native output keeps black Matte and interpolates the
             // JPEG color, not SMask. Decode/unassociate/re-encode changes that
             // reconstruction order at transparency edges even without resizing.
@@ -3582,18 +3776,12 @@ fn gdiplus_round_down_f32(value: f64) -> f32 {
   }
 }
 
-fn resize_for_gdiplus_bilinear(source: image::RgbaImage, target_size: (u32, u32)) -> DynamicImage {
-  let (source_width, source_height) = source.dimensions();
-  let (target_width, target_height) = target_size;
-  if source_width == 0
-    || source_height == 0
-    || target_width == 0
-    || target_height == 0
-    || source.dimensions() == target_size
-  {
-    return DynamicImage::ImageRgba8(source);
-  }
+const GDIPLUS_BILINEAR_ONE: u32 = 1 << 11;
 
+fn gdiplus_bilinear_axes(
+  (source_width, source_height): (u32, u32),
+  (target_width, target_height): (u32, u32),
+) -> [Vec<(u32, u32, u32)>; 2] {
   let add = |a: f32, b: f32| gdiplus_round_down_f32(f64::from(a) + f64::from(b));
   let mul = |a: f32, b: f32| gdiplus_round_down_f32(f64::from(a) * f64::from(b));
   let div = |a: f32, b: f32| gdiplus_round_down_f32(f64::from(a) / f64::from(b));
@@ -3619,11 +3807,10 @@ fn resize_for_gdiplus_bilinear(source: image::RgbaImage, target_size: (u32, u32)
   let origin_x = mul(-mul(forward_dx, forward_y), reciprocal_determinant);
   let origin_y = mul(-mul(forward_dy, forward_x), reciprocal_determinant);
 
-  const ONE: u32 = 1 << 11;
   let axis_sample = |position: f32, size: u32| {
     let first = position.floor() as i32;
     let fraction = add(position, -(first as f32));
-    let weight = add(mul(fraction, ONE as f32), 0.5).floor() as u32;
+    let weight = add(mul(fraction, GDIPLUS_BILINEAR_ONE as f32), 0.5).floor() as u32;
     (
       first.clamp(0, size as i32 - 1) as u32,
       (first + 1).clamp(0, size as i32 - 1) as u32,
@@ -3644,6 +3831,23 @@ fn resize_for_gdiplus_bilinear(source: image::RgbaImage, target_size: (u32, u32)
     .map(|y| axis_sample(add(mul(y as f32, scale_y), origin_y), source_height))
     .collect::<Vec<_>>();
 
+  [horizontal, vertical]
+}
+
+fn resize_for_gdiplus_bilinear(source: image::RgbaImage, target_size: (u32, u32)) -> DynamicImage {
+  let (source_width, source_height) = source.dimensions();
+  let (target_width, target_height) = target_size;
+  if source_width == 0
+    || source_height == 0
+    || target_width == 0
+    || target_height == 0
+    || source.dimensions() == target_size
+  {
+    return DynamicImage::ImageRgba8(source);
+  }
+
+  let [horizontal, vertical] = gdiplus_bilinear_axes(source.dimensions(), target_size);
+  let one = GDIPLUS_BILINEAR_ONE;
   // Native bilinear spans retain both Q11 axes until the final rounded Q22
   // result; rounding the horizontal colors first changes otherwise opaque RGB.
   // Partial-alpha callers supply associated RGB and filter A8 in the same pass.
@@ -3660,9 +3864,9 @@ fn resize_for_gdiplus_bilinear(source: image::RgbaImage, target_size: (u32, u32)
         source.get_pixel(right, bottom),
       ];
       let weights = [
-        (ONE - fx) * (ONE - fy),
-        fx * (ONE - fy),
-        (ONE - fx) * fy,
+        (one - fx) * (one - fy),
+        fx * (one - fy),
+        (one - fx) * fy,
         fx * fy,
       ];
       let mut result = [0; 4];
@@ -3707,16 +3911,32 @@ fn resize_for_word_screen_bitmap(image: DynamicImage, target_size: (u32, u32)) -
 }
 
 fn resize_for_gdiplus_fixed_area(image: DynamicImage, target_size: (u32, u32)) -> DynamicImage {
-  let source = image.to_rgba8();
-  let (source_width, source_height) = source.dimensions();
-  let (target_width, target_height) = target_size;
-  let Some(horizontal_axis) = gdiplus_area_axis(source_width, target_width) else {
+  let source = image.into_rgba8();
+  let (width, height) = target_size;
+  let mut output = image::RgbaImage::new(width, height);
+  if !gdiplus_filter_area(
+    source.dimensions(),
+    target_size,
+    |x, y| source.get_pixel(x, y).0,
+    |x, y, sample| output.put_pixel(x, y, Rgba(sample)),
+  ) {
     return DynamicImage::ImageRgba8(source);
+  }
+  DynamicImage::ImageRgba8(output)
+}
+
+fn gdiplus_filter_area<const CHANNELS: usize>(
+  (source_width, source_height): (u32, u32),
+  (target_width, target_height): (u32, u32),
+  source: impl Fn(u32, u32) -> [u8; CHANNELS],
+  mut output: impl FnMut(u32, u32, [u8; CHANNELS]),
+) -> bool {
+  let Some(horizontal_axis) = gdiplus_area_axis(source_width, target_width) else {
+    return false;
   };
   let Some(vertical_axis) = gdiplus_area_axis(source_height, target_height) else {
-    return DynamicImage::ImageRgba8(source);
+    return false;
   };
-
   // `Bitmap(Image, width, height)` is the byte-exact producer for every
   // reduced Word Print JPEG in the controlled host/content/scale matrix. Its
   // large-bitmap path is a separable pixel-area scaler, implemented with two
@@ -3724,48 +3944,38 @@ fn resize_for_gdiplus_fixed_area(image: DynamicImage, target_size: (u32, u32)) -
   // matrix fixes all observable arithmetic below: source coverage uses
   // `floor(src * 2^16 / dst)`, normalization uses
   // `floor(dst * 2^16 / src)`, and each pass rounds the Q32 product once.
-  let mut horizontal = image::RgbaImage::new(target_width, source_height);
+  let mut horizontal = Vec::with_capacity(target_width as usize * source_height as usize);
   for y in 0..source_height {
-    for (x, span) in (0..target_width).zip(&horizontal_axis.spans) {
-      let mut components = [0_u128; 4];
+    for span in &horizontal_axis.spans {
+      let mut components = [0_u128; CHANNELS];
       for source_x in span.first..=span.last {
         let weight = gdiplus_area_overlap(*span, source_x);
-        let pixel = source.get_pixel(source_x, y);
-        for (component, sample) in components.iter_mut().zip(pixel.0) {
+        for (component, sample) in components.iter_mut().zip(source(source_x, y)) {
           *component += u128::from(sample) * u128::from(weight);
         }
       }
-      horizontal.put_pixel(
-        x,
-        y,
-        Rgba(
-          components.map(|component| gdiplus_area_component(component, horizontal_axis.reciprocal)),
-        ),
-      );
+      horizontal
+        .push(components.map(|sum| gdiplus_area_component(sum, horizontal_axis.reciprocal)));
     }
   }
-
-  let mut output = image::RgbaImage::new(target_width, target_height);
   for (y, span) in (0..target_height).zip(&vertical_axis.spans) {
     for x in 0..target_width {
-      let mut components = [0_u128; 4];
+      let mut components = [0_u128; CHANNELS];
       for source_y in span.first..=span.last {
         let weight = gdiplus_area_overlap(*span, source_y);
-        let pixel = horizontal.get_pixel(x, source_y);
-        for (component, sample) in components.iter_mut().zip(pixel.0) {
+        let pixel = horizontal[source_y as usize * target_width as usize + x as usize];
+        for (component, sample) in components.iter_mut().zip(pixel) {
           *component += u128::from(sample) * u128::from(weight);
         }
       }
-      output.put_pixel(
+      output(
         x,
         y,
-        Rgba(
-          components.map(|component| gdiplus_area_component(component, vertical_axis.reciprocal)),
-        ),
+        components.map(|sum| gdiplus_area_component(sum, vertical_axis.reciprocal)),
       );
     }
   }
-  DynamicImage::ImageRgba8(output)
+  true
 }
 
 fn gdiplus_area_axis(source: u32, target: u32) -> Option<GdiplusAreaAxis> {
@@ -4584,6 +4794,55 @@ mod tests {
   }
 
   #[test]
+  fn word_screen_rgb_tiff_reduces_independent_axes_including_small_sources() {
+    let mut encoded = Cursor::new(Vec::new());
+    TiffEncoder::new(&mut encoded)
+      .write_image(&[128; 35 * 38 * 3], 35, 38, ColorType::Rgb8.into())
+      .unwrap();
+    let encoded = encoded.into_inner();
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    // Native same-pixel TIFF/PNG controls: each high-density axis reduces;
+    // the other axis keeps its authored samples. Print has a separate policy.
+    for (dpi, expected) in [
+      ((149.0, 149.0), (35, 38)),
+      ((150.0, 150.0), (22, 24)),
+      ((151.0, 151.0), (22, 24)),
+      ((220.0, 220.0), (15, 16)),
+      ((149.0, 220.0), (35, 16)),
+      ((220.0, 149.0), (15, 38)),
+      ((100.0, 300.0), (35, 12)),
+      ((300.0, 100.0), (11, 38)),
+    ] {
+      let points =
+        |pixels: u32, dpi: f64| ((f64::from(pixels) * 914_400.0 / dpi).round() / 12_700.0) as f32;
+      for optimize_for in [PdfOptimizeFor::Screen, PdfOptimizeFor::Print] {
+        options.optimize_for = optimize_for;
+        let image = decode_image(
+          &encoded,
+          Some("image/tiff"),
+          RasterExportOptions::new(&options, points(35, dpi.0), points(38, dpi.1)),
+          None,
+        )
+        .unwrap();
+        assert_eq!(
+          image.size(),
+          if optimize_for == PdfOptimizeFor::Screen {
+            expected
+          } else {
+            (35, 38)
+          },
+          "{dpi:?}/{optimize_for:?}",
+        );
+      }
+    }
+  }
+
+  #[test]
   fn raster_signature_precedes_a_conflicting_package_media_type() {
     let source = image::RgbImage::from_fn(8, 8, |x, y| {
       image::Rgb([(x * 31) as u8, (y * 31) as u8, ((x + y) * 15) as u8])
@@ -5122,6 +5381,7 @@ mod tests {
   #[test]
   fn word_grayscale_native_plan_respects_monochrome_density_and_alpha() {
     let metadata = RasterMetadata {
+      original_color_type: image::ExtendedColorType::L1,
       size: (900, 900),
       orientation: Orientation::NoTransforms,
       png: Some(PngMetadata {
@@ -5141,33 +5401,34 @@ mod tests {
       };
       options.images.optimization_policy =
         PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
-      for (dpi, expected) in [
-        (
-          (threshold - 1.0, threshold - 1.0),
-          RasterRealization::NativePng,
-        ),
-        ((threshold - 1.0, threshold), RasterRealization::Decoded),
-        ((threshold, threshold - 1.0), RasterRealization::Decoded),
-        (
-          (threshold - 0.01, threshold - 0.01),
-          RasterRealization::Decoded,
-        ),
-        (
-          (threshold + 1.0, threshold + 1.0),
-          RasterRealization::Decoded,
-        ),
+      let fractional = RasterExportOptions::new(&options, 12.05, 9.65);
+      assert_eq!(
+        fractional.word_one_bit_grayscale_size((158, 134)),
+        Some(match optimize_for {
+          PdfOptimizeFor::Screen => (50, 40),
+          PdfOptimizeFor::Print => (100, 80),
+        })
+      );
+      for (dpi, reduced_axes) in [
+        ((threshold - 1.0, threshold - 1.0), [false, false]),
+        ((threshold - 1.0, threshold), [false, true]),
+        ((threshold, threshold - 1.0), [true, false]),
+        ((threshold - 0.01, threshold - 0.01), [true, true]),
+        ((threshold + 1.0, threshold + 1.0), [true, true]),
       ] {
         let export = RasterExportOptions::new(&options, 900.0 * 72.0 / dpi.0, 900.0 * 72.0 / dpi.1);
-        assert_eq!(
-          RasterPlan::new(
-            RasterImageFormat::Png,
-            Some(metadata),
-            RasterOwner::Source,
-            export
-          )
-          .realization,
-          expected
+        let plan = RasterPlan::new(
+          RasterImageFormat::Png,
+          Some(metadata),
+          RasterOwner::Source,
+          export,
         );
+        let axes = match plan.realization {
+          RasterRealization::NativePng => [false, false],
+          RasterRealization::ReducedGrayPng((w, h)) => [w < 900, h < 900],
+          other => panic!("expected one-bit grayscale output, got {other:?}"),
+        };
+        assert_eq!(axes, reduced_axes);
       }
       let export = RasterExportOptions::new(&options, 162.0, 162.0);
       for (depth, transparent) in [(png::BitDepth::Eight, false), (png::BitDepth::One, true)] {
@@ -5312,6 +5573,48 @@ mod tests {
     assert_eq!(gif.direct().alpha(), png.direct().alpha());
     assert_eq!(gif.direct().matte, Some([0.0, 0.0, 0.0]));
     assert!(!gif.direct().soft_mask_interpolate);
+  }
+
+  #[test]
+  fn word_screen_unreduced_transparent_png_retains_jpeg_and_independent_alpha() {
+    let source = image::RgbaImage::from_fn(256, 128, |x, y| {
+      let value = (x + y * 256)
+        .wrapping_mul(1_664_525)
+        .wrapping_add(1_013_904_223);
+      Rgba([
+        value as u8,
+        (value >> 8) as u8,
+        (value >> 16) as u8,
+        [0, 128, 255, 255][((x + y) % 4) as usize],
+      ])
+    });
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    let export_options = RasterExportOptions::new(&options, 200.0, 120.0);
+    assert_eq!(export_options.downsample_size(source.dimensions()), None);
+    let actual = export_decoded_image(
+      DecodedRasterImage {
+        image: DynamicImage::ImageRgba8(source.clone()),
+        icc_profile: None,
+        jpeg_has_real_physical_resolution: false,
+      },
+      RasterImageFormat::Png,
+      export_options,
+      RasterOwner::Source,
+    )
+    .unwrap();
+    let jpeg = encode_office_h2v2_jpeg(&apply_black_matte(&source), 59).unwrap();
+    assert_dct_image(&actual, &jpeg, true);
+    assert_eq!(
+      actual.direct().alpha().unwrap(),
+      source.pixels().map(|p| p[3]).collect::<Vec<_>>()
+    );
+    assert_eq!(actual.direct().matte, Some([0.0; 3]));
+    assert!(!actual.direct().soft_mask_interpolate);
   }
 
   #[test]
@@ -7714,6 +8017,73 @@ mod tests {
         "{dpi} DPI"
       );
     }
+  }
+
+  #[test]
+  fn word_screen_png_references_share_larger_surfaces_in_either_order() {
+    let source = image::RgbaImage::from_fn(313, 375, |x, y| Rgba([x as u8, y as u8, 83, 127]));
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+      .write_image(source.as_raw(), 313, 375, ColorType::Rgba8.into())
+      .unwrap();
+    let mut options = PdfOptions {
+      optimize_for: PdfOptimizeFor::Screen,
+      ..Default::default()
+    };
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+    let small = (7.55, 9.0);
+    let large = (38.4, 45.95);
+    for order in [[small, large], [large, small]] {
+      let mut images = ImageSet::default();
+      for size in order {
+        images.observe_word_png_display(&png, Some("image/png"), &options, size, false);
+      }
+      let first = images
+        .raster_direct(
+          &png,
+          Some("image/png"),
+          &options,
+          None,
+          small,
+          BlipCompressionState::NotApplicable,
+        )
+        .unwrap();
+      let second = images
+        .raster_direct(
+          &png,
+          Some("image/png"),
+          &options,
+          None,
+          large,
+          BlipCompressionState::NotApplicable,
+        )
+        .unwrap();
+      assert_eq!(first.size(), (51, 61));
+      assert_eq!(first.identity(), second.identity());
+
+      // A crop has a distinct native source rectangle; it cannot cause a
+      // full-source occurrence to inherit a different resolution here.
+      images.observe_word_png_display(&png, Some("image/png"), &options, large, true);
+      assert!(
+        !images
+          .word_screen_png_displays
+          .contains_key(&image_data_key(&png))
+      );
+    }
+    let mut images = ImageSet::default();
+    for size in [(72.0, 36.0), (36.0, 72.0)] {
+      images.observe_word_png_display(&png, Some("image/png"), &options, size, false);
+    }
+    assert_eq!(
+      images.word_screen_png_displays[&image_data_key(&png)].len(),
+      2
+    );
+    let mut print = options.clone();
+    print.optimize_for = PdfOptimizeFor::Print;
+    let mut print_images = ImageSet::default();
+    print_images.observe_word_png_display(&png, Some("image/png"), &print, large, false);
+    assert!(print_images.word_screen_png_displays.is_empty());
   }
 
   #[test]

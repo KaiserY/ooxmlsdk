@@ -73,6 +73,25 @@ pub(crate) fn adjustment_name(preset: a::ShapeTypeValues, index: usize) -> Optio
     .map(|guide| guide.name)
 }
 
+/// dgm:adj stores degrees for a polar angle handle and a normalized ratio for
+/// ordinary adjustments. a:gd uses 60000 angle units/degree or a 100000 scale.
+pub(crate) fn diagram_adjustment(
+  preset: a::ShapeTypeValues,
+  index: usize,
+  value: f64,
+) -> Option<a::ShapeGuide> {
+  let name = adjustment_name(preset, index)?;
+  let scale = if generated::adjustment_is_angle(preset, name) {
+    60_000.0
+  } else {
+    100_000.0
+  };
+  Some(a::ShapeGuide {
+    name: name.into(),
+    formula: format!("val {}", (value * scale).round()),
+  })
+}
+
 /// Text layout needs the same adjusted guides, but not allocated path commands.
 pub(super) fn text_geometry(preset: &a::PresetGeometry) -> a::CustomGeometry {
   let definition = generated::definition(preset.preset);

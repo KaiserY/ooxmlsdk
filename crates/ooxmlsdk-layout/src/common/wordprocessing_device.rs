@@ -10,14 +10,14 @@
 pub use super::fixed_output_device::PageCoordinates;
 
 mod line_baseline;
-pub use line_baseline::realize as line_baseline;
+pub use line_baseline::{frame as line_frame, realize as line_baseline};
 
 mod line_advances;
 pub use line_advances::{MAX_IDEAL_ADVANCE, balance_advances, balance_complex_advances};
 
 /// Select a verified standard reference DC without replacing the page viewport.
 /// Word retains that DC when the authored size rounds to the same whole-mm
-/// dimensions. Native controls cover all seven stocks in both orientations.
+/// dimensions. Native controls cover the supported stocks in both orientations.
 /// This conservative recognition does not infer other custom-paper profiles.
 pub fn page_coordinates(width_pt: f32, height_pt: f32) -> Option<PageCoordinates> {
   let size = [width_pt, height_pt];
@@ -27,10 +27,23 @@ pub fn page_coordinates(width_pt: f32, height_pt: f32) -> Option<PageCoordinates
   // own independently verified domain.
   let references = super::fixed_output_device::STANDARD_REFERENCES
     .into_iter()
-    .chain([([2480, 3496], [105, 148])]);
-  for (dots, mm) in references {
-    for (dots, mm) in [(dots, mm), ([dots[1], dots[0]], [mm[1], mm[0]])] {
-      if millimeters == mm {
+    .chain([([2480, 3496], [105, 148])])
+    .map(|(dots, mm)| (dots, mm, mm))
+    // Native Folio PDF EMFs retain the A3 reference DC, independently of
+    // their 8.5x13in viewport. Exact/rounded sizes and both orientations
+    // agree, including absent or conflicting pgSz/@code. Do not manufacture
+    // reference-device pixels or millimeters from the Folio paper size.
+    .chain([([7016, 9921], [297, 420], [216, 330])]);
+  for (dots, mm, paper_mm) in references {
+    for (dots, mm, paper_mm) in [
+      (dots, mm, paper_mm),
+      (
+        [dots[1], dots[0]],
+        [mm[1], mm[0]],
+        [paper_mm[1], paper_mm[0]],
+      ),
+    ] {
+      if millimeters == paper_mm {
         let viewport = size
           .map(|pt| (f64::from(pt) * super::fixed_output_device::SOURCE_DPI / 72.0).round() as i32);
         return Some(PageCoordinates::from_reference(viewport, dots, mm));
@@ -286,6 +299,27 @@ impl MeasurementFont {
 #[cfg(test)]
 mod tests {
   use super::{MeasurementFont, PageCoordinates, page_coordinates};
+
+  #[test]
+  fn folio_word_pages_retain_the_a3_reference_dc_and_their_own_viewport() {
+    // Actual PDF-export EMF BitBlt source rectangle (833,3333,1667,334),
+    // independently replayed against native PDF geometry. Folio uses the
+    // A3 DC (7016x9921 at297x420mm), with landscape axes swapped. Its
+    // rounded viewport remains5100x7800 or5101x7801, not that reference size.
+    for (size, expected) in [
+      ([612.0, 936.0], [99.984, 400.008, 200.064, 40.08]),
+      ([936.0, 612.0], [99.984, 400.032, 200.04, 40.104]),
+      ([612.1, 936.1], [99.984, 400.008, 200.088, 40.08]),
+      ([936.1, 612.1], [99.984, 400.032, 200.064, 40.104]),
+    ] {
+      let device = page_coordinates(size[0], size[1]).unwrap();
+      let (x, y, width, height) = device.map_device_rectangle((833, 3333, 1667, 334));
+      for (actual, expected) in [x, y, width, height].into_iter().zip(expected) {
+        assert!((actual - expected).abs() < 0.0001, "{size:?}: {actual}");
+      }
+      assert!(PageCoordinates::for_standard_size(size[0], size[1]).is_none());
+    }
+  }
 
   #[test]
   fn a6_word_pages_retain_the_native_reference_dc_and_rounded_viewport() {

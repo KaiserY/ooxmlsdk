@@ -3,6 +3,17 @@
 use super::common;
 use crate::common::drawingml_gradient;
 
+pub(super) fn page_aligned_line(
+  angle: Option<f32>,
+  bounds: kurbo::Rect,
+) -> Option<(common::Point, common::Point)> {
+  transformed_line(
+    angle,
+    kurbo::Affine::scale_non_uniform(bounds.width(), bounds.height())
+      .then_translate((bounds.x0, bounds.y0).into()),
+  )
+}
+
 pub(super) fn transformed_line(
   angle: Option<f32>,
   transform: kurbo::Affine,

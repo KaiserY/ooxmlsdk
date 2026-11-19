@@ -191,6 +191,7 @@ impl TableBuilder {
     Self {
       table: Table {
         recovered_absolute_grid: false,
+        wordprocessing_shape_paint_grid: false,
         column_widths_pt: Vec::new(),
         preferred_width_pt: style.width_pt,
         preferred_width_pct: style.width_pct,
@@ -209,6 +210,7 @@ impl TableBuilder {
         allow_overlap: true,
         split_allowed: false,
         following_text_flow: false,
+        wrap_on_all_pages: false,
         explicit_no_repeat_header: false,
         page_break_before: false,
         starts_after_last_rendered_page_break: false,
@@ -261,6 +263,7 @@ impl TableBuilder {
         width_after_pt: None,
         layout: None,
         borders: None,
+        html_division_offset_pt: 0.0,
         spacing_shading: None,
         redline_color: None,
       },

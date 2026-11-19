@@ -45,6 +45,10 @@ pub(super) fn resolve(inlines: &mut Vec<InlineItem>, field_events: &mut [Paragra
     let mut end = start;
     let mut count = 0;
     let mut width = 0.0;
+    let mut pitch_units = 0.0;
+    let mut last_pitch_units = 1.0;
+    let mut authored_width = 0.0;
+    let mut all_balanced = true;
     let mut last = start;
     while end < inlines.len() {
       if matches!(inlines[end], InlineItem::BookmarkStart(_)) {
@@ -59,30 +63,68 @@ pub(super) fn resolve(inlines: &mut Vec<InlineItem>, field_events: &mut [Paragra
       }
       for run in runs {
         let mut style = run.style.clone();
+        let balanced = style.wordprocessingml_balance_single_byte_double_byte_width;
+        all_balanced &= balanced;
+        if balanced {
+          authored_width += metrics.measure_text(&run.text, &style);
+        }
         // MS-OE376 §2.1.79: fitText takes precedence over authored spacing.
         style.character_spacing_pt = 0.0;
-        width += metrics.measure_text(&run.text, &style);
-        let characters = character_boundaries(&run.text).len().saturating_sub(1);
+        let natural_width = metrics.measure_text(&run.text, &style);
+        width += natural_width;
+        let boundaries = character_boundaries(&run.text);
+        let characters = boundaries.len().saturating_sub(1);
         count += characters;
+        let units = if balanced && characters > 0 {
+          style.character_spacing_pt = 1.0;
+          let units = metrics.measure_text(&run.text, &style) - natural_width;
+          if units.is_finite() && units > 0.0 {
+            units
+          } else {
+            characters as f32
+          }
+        } else {
+          characters as f32
+        };
+        pitch_units += units;
         if characters > 0 {
           last = end;
+          last_pitch_units = if balanced {
+            let cluster = &run.text[boundaries[boundaries.len() - 2]..];
+            style.character_spacing_pt = 0.0;
+            let natural = metrics.measure_text(cluster, &style);
+            style.character_spacing_pt = 1.0;
+            let units = metrics.measure_text(cluster, &style) - natural;
+            if units.is_finite() && units > 0.0 {
+              units
+            } else {
+              1.0
+            }
+          } else {
+            1.0
+          };
         }
       }
       end += 1;
     }
     // Native Word treats a zero width as ordinary text, including its
     // original pitch. The first run owns a shared ID's target width.
-    if fit.width_pt > 0.0 && count > 0 {
+    if fit.width_pt > 0.0 && count > 0 && !(all_balanced && authored_width == fit.width_pt) {
       // Word condenses the final character's advance as well. Expansion
       // instead leaves its natural advance after the last glyph. Native
       // fixed-pitch Latin/CJK controls establish both sides of this boundary.
       let expanding = fit.width_pt > width;
+      // The compatibility flag gives wide cells two authored pitch units.
+      // Native mixed Latin/Han controls retain that distinction while fitting:
+      // counting every grapheme once overexpands a wide-only fitted region.
+      // Ask the existing shaper for its pitch response, including the final
+      // cluster's independent weight, rather than inferring from a font name.
       let intervals = if expanding {
-        count.saturating_sub(1).max(1)
+        (pitch_units - last_pitch_units).max(last_pitch_units)
       } else {
-        count
+        pitch_units
       };
-      let pitch = (fit.width_pt - width) / intervals as f32;
+      let pitch = (fit.width_pt - width) / intervals;
       for (index, value) in tracking.iter_mut().enumerate().take(end).skip(start) {
         if fitted_runs(&inlines[index]).is_some() {
           *value = Some(pitch);
@@ -143,6 +185,11 @@ pub(super) fn resolve(inlines: &mut Vec<InlineItem>, field_events: &mut [Paragra
         *inline_offset = offsets[*inline_offset];
       }
       ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      }
+      | ParagraphFieldEvent::ConditionalResultSpan {
         inline_start,
         inline_end,
         ..
@@ -221,6 +268,50 @@ mod tests {
           );
         }
       }
+    }
+  }
+
+  #[test]
+  fn balanced_fit_regions_keep_native_width_and_pitch_weights() {
+    // Word's observed84pt region: five12pt wide characters, with3pt source
+    // pitch expanded to6pt at each of the first four character boundaries.
+    // The source-split opposite already has precisely that final geometry.
+    for split_source in [false, true] {
+      let mut inlines = if split_source {
+        vec![run("所　在　", 1, 84.0, 3.0), run("地", 1, 84.0, 0.0)]
+      } else {
+        vec![run("甲乙丙丁戊", 1, 84.0, 3.0)]
+      };
+      for item in &mut inlines {
+        let InlineItem::Text(run) = item else {
+          unreachable!()
+        };
+        run.style.wordprocessingml_font_slots = true;
+        run
+          .style
+          .wordprocessingml_balance_single_byte_double_byte_width = true;
+      }
+      resolve(&mut inlines, &mut []);
+      let mut metrics = TextMetrics::new();
+      let mut width = 0.0;
+      for item in &inlines {
+        let InlineItem::Text(run) = item else {
+          unreachable!()
+        };
+        width += metrics.measure_text(&run.text, &run.style);
+      }
+      assert!(
+        (width - 84.0).abs() < 0.001,
+        "split={split_source}: {width}"
+      );
+      let InlineItem::Text(first) = &inlines[0] else {
+        unreachable!()
+      };
+      assert_eq!(first.style.character_spacing_pt, 3.0);
+      let InlineItem::Text(last) = inlines.last().unwrap() else {
+        unreachable!()
+      };
+      assert_eq!(last.style.character_spacing_pt, 0.0);
     }
   }
 

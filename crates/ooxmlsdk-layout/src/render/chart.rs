@@ -86,6 +86,25 @@ pub(crate) struct ChartShapeEffects {
   pub(crate) contour_color: Option<crate::common::drawingml_3d::Static3dColor>,
 }
 
+/// DrawingML scene and shape nodes inherit independently of the 2-D effect
+/// container. A present empty sp3d still replaces an inherited shape node.
+pub(crate) fn chart_shape_3d_cascade<'a>(
+  scopes: impl IntoIterator<Item = &'a ChartShapeEffects>,
+) -> crate::common::drawingml_3d::Static3dStyleParts {
+  let mut result = crate::common::drawingml_3d::Static3dStyleParts::default();
+  for scope in scopes {
+    if result.scene.is_none() {
+      result.scene.clone_from(&scope.scene_3d);
+    }
+    if result.shape.is_none() && scope.shape_3d.is_some() {
+      result.shape.clone_from(&scope.shape_3d);
+      result.extrusion_color = scope.extrusion_color;
+      result.contour_color = scope.contour_color;
+    }
+  }
+  result
+}
+
 fn chart_shape_3d_colors(
   shape: Option<&a::Shape3DType>,
   resolver: &impl crate::common::drawingml_image_effects::ImageEffectColorResolver,

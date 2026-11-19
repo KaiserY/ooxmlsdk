@@ -15,8 +15,7 @@ pub(crate) fn is_quarter_turn(rotation: i32) -> bool {
 /// Retains the precision boundary between layout bounds and final device paint.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TransformPrecision {
-  // Bounds precision is a reference control; production realizes paint only.
-  #[cfg(test)]
+  // The legacy canvas fit uses native f64 bounds before f32 device paint.
   Bounds,
   Paint,
 }
@@ -36,7 +35,6 @@ impl DeviceStrokeTransform {
       return None;
     }
     let coefficients = match precision {
-      #[cfg(test)]
       TransformPrecision::Bounds => coefficients,
       TransformPrecision::Paint => coefficients.map(|value| f64::from(value as f32)),
     };

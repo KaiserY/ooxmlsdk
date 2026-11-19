@@ -11,6 +11,7 @@ pub(super) struct Coordinates {
   dotted_first_row: bool,
   dotted_last_row: bool,
   lower_edge: bool,
+  bitmap_story: bool,
 }
 
 fn border_twips(border: Option<BorderStyle>) -> i64 {
@@ -101,7 +102,27 @@ pub(super) fn dotted_row(table: &Table, row: &TableRow) -> bool {
 
 impl Coordinates {
   pub(super) fn for_row(table: &Table, frame: &TableFrame, row: &TableRow) -> Option<Self> {
+    Self::for_owned_row(table, frame, row, false)
+  }
+
+  pub(super) fn for_vertical_row(
+    table: &Table,
+    frame: &TableFrame,
+    row: &TableRow,
+  ) -> Option<Self> {
+    Self::for_owned_row(table, frame, row, table.wordprocessing_shape_paint_grid)
+  }
+
+  fn for_owned_row(
+    table: &Table,
+    frame: &TableFrame,
+    row: &TableRow,
+    bitmap_story: bool,
+  ) -> Option<Self> {
     let dotted = dotted_row(table, row);
+    if bitmap_story && !simple_row(table, row) {
+      return None;
+    }
     // Cell-authored and inherited table edges share the same grid producer
     // (native table-grid controls, two widths across eight frame phases).
     // Legacy content alignment changes the grid origin, not the device
@@ -118,13 +139,28 @@ impl Coordinates {
         frame.block.setup.height_pt,
       )
       .is_some();
+    // Modern percentage widths resolve the column grid without selecting
+    // another rule painter. Native width-type, pen-width and margin-phase
+    // controls retain the same device origins at 80% and 100%. Legacy
+    // percentage frames have an independently positioned grid origin; keep
+    // that producer, nested/overflow stories and non-solid rules separate.
+    let inline_percentage_grid = frame.full_width_horizontal_borders
+      && frame.block.compatibility_mode >= 15
+      && !table.align_leading_cell_content
+      && table.placement.is_none()
+      && table.containing_table_layout.is_none()
+      && table.preferred_width_pct.is_some()
+      && simple_row(table, row);
     if (table.placement.is_some() && !legacy_floating_grid)
       || table.following_text_flow
       || table.right_to_left
-      || table.alignment != TableAlignment::Left
+      || !matches!(table.alignment, TableAlignment::Left | TableAlignment::Center)
       || table.in_header_footer
-      || frame.direct_text_frame_story_owner
-      || (frame.full_width_horizontal_borders && !legacy_floating_grid && !dotted)
+      || (frame.direct_text_frame_story_owner && !bitmap_story)
+      || (frame.full_width_horizontal_borders
+        && !legacy_floating_grid
+        && !inline_percentage_grid
+        && !dotted)
       // Margin-consuming rows partition their print frame before drawing
       // the rule (native table-indent controls). Their vertical parent is
       // not the unpartitioned grid supplied to this primitive.
@@ -144,11 +180,16 @@ impl Coordinates {
     if (!simple(first) || !simple(leading)) && !dotted {
       return None;
     }
-    // A legacy top-level grid already aligns the first cell's print edge.
+    // A legacy left-aligned top-level grid already aligns the first cell's print edge.
     // Its positioned centre converts independently of the row pen. Modern
     // frames instead include the first physical row's leading border half.
     // Native mode12/omitted-mode controls cover three widths and four phases.
-    let first_half = if table.align_leading_cell_content {
+    // Centered tables align the outside frame instead, including in legacy
+    // modes. Native inline/nested controls at .5/1.5pt retain the first
+    // border half; justification changes the frame, not the rule producer.
+    let content_aligned =
+      table.align_leading_cell_content && table.alignment == TableAlignment::Left;
+    let first_half = if content_aligned {
       0.0
     } else {
       first.map_or(0.0, |border| f64::from(border.width_pt) / 2.0)
@@ -162,7 +203,7 @@ impl Coordinates {
       // Native cell coordinates contain the first physical row's leading
       // half in whole twips, including the odd twip. Later rows retain that
       // grid, even when their own leading rule differs or the first is nil.
-      first_grid_twips: if table.align_leading_cell_content {
+      first_grid_twips: if content_aligned {
         0
       } else {
         (border_twips(first) + 1) / 2
@@ -177,6 +218,7 @@ impl Coordinates {
         .last()
         .is_some_and(|last| std::ptr::eq(last, row)),
       lower_edge: false,
+      bitmap_story,
     })
   }
 
@@ -202,11 +244,11 @@ impl Coordinates {
     if (!simple(Some(border)) && !dotted) || border.width_pt <= 0.0 {
       return false;
     }
-    let Some(device) =
-      wordprocessing_table_device::page_coordinates(page.setup.width_pt, page.setup.height_pt)
-    else {
+    let device =
+      wordprocessing_table_device::page_coordinates(page.setup.width_pt, page.setup.height_pt);
+    if !self.bitmap_story && device.is_none() {
       return false;
-    };
+    }
     let (x1, y1, x2, y2) = bounds;
     let thickness = paint_width(Some(border));
     let horizontal = (y2 - y1).abs() <= (x2 - x1).abs();
@@ -220,9 +262,22 @@ impl Coordinates {
     } else {
       let top = wordprocessing_table_device::source_coordinate(y1.min(y2));
       let bottom = wordprocessing_table_device::source_coordinate(y1.max(y2));
-      (self.grid_x(x1), top, thickness, bottom - top)
+      let left = if self.bitmap_story {
+        // The bitmap story resolves each vertical pen around its own grid
+        // coordinate. Page EMF replay instead retains the row's leading half.
+        self.grid_x(x1) + self.leading_half_pixels - thickness / 2
+      } else {
+        // Each physical rule is centred on its own grid edge. The row's
+        // leading pen half only establishes the shared grid origin; reusing
+        // it for a thinner/thicker internal strip shifts that entire face.
+        self.grid_x(x1) + self.leading_half_pixels - (thickness + 1) / 2
+      };
+      (left, top, thickness, bottom - top)
     };
     if dotted {
+      let Some(device) = device else {
+        return false;
+      };
       let (left, top, width, height) = rectangle;
       // Native pens use the integral lower half for odd source widths. The
       // PDF writer's minimum stroked width is .14pt, independently of the
@@ -282,7 +337,22 @@ impl Coordinates {
       }
       return true;
     }
-    let (x_pt, y_pt, width_pt, height_pt) = device.map_device_rectangle(rectangle);
+    let (x_pt, y_pt, width_pt, height_pt) = if self.bitmap_story {
+      // WPG/WPC rules are already on the shape's 600-DPI source plane; they
+      // do not pass through the page EMF's separate 3000-DPI PDF replay grid.
+      let point = |dots: i64| dots as f32 * units::POINTS_PER_INCH / WORD_FIXED_OUTPUT_DPI;
+      (
+        point(rectangle.0),
+        point(rectangle.1),
+        point(rectangle.2),
+        point(rectangle.3),
+      )
+    } else {
+      let Some(device) = device else {
+        return false;
+      };
+      device.map_device_rectangle(rectangle)
+    };
     page.items.push(PageItem::Fill(FillItem {
       x_pt,
       y_pt,
@@ -297,6 +367,41 @@ impl Coordinates {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn unequal_vertical_rules_keep_their_own_pen_half_on_a_shared_grid() {
+    let coordinates = Coordinates {
+      logical_grid_left: 83.825,
+      logical_grid_right: 163.725,
+      body_x: 699,
+      first_grid_twips: 0,
+      leading_half_pixels: 9,
+      dotted_first_row: true,
+      dotted_last_row: true,
+      lower_edge: false,
+      bitmap_story: false,
+    };
+    let mut centres = Vec::new();
+    for width in [0.75, 2.25, 3.0] {
+      let mut page = empty_page(PageSetup::default(), 0);
+      assert!(coordinates.paint(
+        &mut page,
+        (136.375, 100.0, 136.375, 114.0),
+        BorderStyle {
+          width_pt: width,
+          ..Default::default()
+        }
+      ));
+      let [PageItem::Fill(fill)] = page.items.as_slice() else {
+        panic!("one opaque brush")
+      };
+      centres.push(fill.x_pt + fill.width_pt / 2.0);
+    }
+    // Native changing-width controls keep a common physical grid. An odd
+    // printer pen has its lower centre half, at most half a600DPI source dot.
+    assert!((centres[0] - centres[1]).abs() < 0.0241);
+    assert!((centres[0] - centres[2]).abs() <= 0.0721);
+  }
 
   #[test]
   fn dotted_cell_strips_and_corners_match_native_device_paths() {
@@ -317,6 +422,7 @@ mod tests {
       dotted_first_row: true,
       dotted_last_row: false,
       lower_edge: false,
+      bitmap_story: false,
     };
     for (row, top, bottom) in [(0, 221.65, 231.65), (1, 231.65, 241.7)] {
       coordinates.dotted_first_row = row == 0;
@@ -423,6 +529,7 @@ mod tests {
           dotted_first_row: false,
           dotted_last_row: false,
           lower_edge: false,
+          bitmap_story: false,
         };
         for (twips, expected) in [0, 601, 2268, 15138].into_iter().zip(expected_x) {
           let source = (logical_grid_left + twips as f64 / 20.0) as f32;
@@ -443,9 +550,54 @@ mod tests {
       dotted_first_row: false,
       dotted_last_row: false,
       lower_edge: false,
+      bitmap_story: false,
     };
     for (source, expected) in [(56.7, 469), (86.75, 719), (170.1, 1414), (813.6, 6777)] {
       assert_eq!(coordinates.grid_x(source), expected);
+    }
+  }
+
+  #[test]
+  fn grouped_table_vertical_rules_keep_native_source_grid_and_pen_owners() {
+    // Native Screen and Print masks resolve these same five integer source
+    // strips in both group members, independently of the page-frame phase.
+    for (origin, body_x, image_left) in [(28.886614, 241, 153), (447.73383, 3731, 3643)] {
+      let coordinates = Coordinates {
+        logical_grid_left: f64::from(origin),
+        logical_grid_right: f64::from(origin + 382.2),
+        body_x,
+        first_grid_twips: 0,
+        leading_half_pixels: 0,
+        dotted_first_row: true,
+        dotted_last_row: false,
+        lower_edge: false,
+        bitmap_story: true,
+      };
+      let mut page = empty_page(PageSetup::default(), 0);
+      for (twips, width) in [
+        (1275, 0.5),
+        (2548, 1.5),
+        (3823, 0.5),
+        (5097, 1.5),
+        (6370, 0.5),
+      ] {
+        let x = origin + twips as f32 / units::TWIPS_PER_POINT;
+        assert!(coordinates.paint(
+          &mut page,
+          (x, 200.0, x, 300.0),
+          BorderStyle {
+            width_pt: width,
+            ..BorderStyle::default()
+          },
+        ));
+      }
+      for (item, expected) in page.items.iter().zip([617, 1144, 1679, 2206, 2740]) {
+        let PageItem::Fill(fill) = item else {
+          panic!("source-device rule");
+        };
+        let source_x = (f64::from(fill.x_pt) * 600.0 / 72.0).round() as i64;
+        assert_eq!(source_x - image_left, expected);
+      }
     }
   }
 }

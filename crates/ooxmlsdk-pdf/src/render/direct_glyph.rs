@@ -12,14 +12,11 @@ use ooxmlsdk_layout::common;
 use ooxmlsdk_layout::common::text_warp_projection::{
   GlyphOutlinePath as SkrifaGlyphOutline, TextFollowPathFontCell, TextWarpBoundary,
   common_commands_to_bez_path, split_outline_at_warp_seams, text_follow_path_glyph_transform,
-  text_warp_point, text_warp_source_seams,
+  text_warp_point, text_warp_source_seams, vml_fit_path_centerline_offset,
+  vml_fit_path_glyph_point,
 };
 
 const SYNTHETIC_ITALIC_SHEAR: f32 = 1.0 / 3.0;
-// Controlled Word PDF outlines retain this fitpath fraction across three
-// typefaces, four strings, and 100/156/250 pt host widths. Keep it distinct
-// from DrawingML envelope geometry and ordinary text scaling.
-const VML_FIT_PATH_TEXT_SCALE: f64 = 0.9961;
 const GLYPH_STROKE_EXPANSION_TOLERANCE_PT: f64 = 0.02;
 
 #[derive(Clone, Copy, Debug)]
@@ -724,18 +721,13 @@ pub(super) fn build_glyph_outline_path(
     )));
   }
   let design_scale = run.font_size_pt / units_per_em;
-  // VML fitpath places a font-wide vertical anchor on the path, rather than
-  // the bottom of the glyphs actually present (which moves with `g`). The
-  // typographic ascender relative to half the Windows ascent reproduces the
-  // font-dependent offset observed in controlled Word PDF outlines. The
-  // remaining centerline origin is 1/40 em below that metric: the same
-  // offset is visible for Arial Black O/A/I/g across different path widths.
-  let vml_centerline_offset_pt = face.os2().ok().map_or(0.0, |os2| {
-    (f64::from(os2.s_typo_ascender()) - f64::from(os2.us_win_ascent()) / 2.0
-      + f64::from(units_per_em) / 40.0)
-      .max(0.0)
-      * f64::from(design_scale)
-  });
+  let authored_path = warp
+    .and_then(|warp| warp.vml_fit_path.as_ref())
+    .and_then(|fit| fit.authored_path.as_ref());
+  let vml_centerline_offset_pt =
+    vml_fit_path_centerline_offset(&face, units_per_em, design_scale, authored_path.is_some());
+  let glyph_metrics =
+    authored_path.map(|_| face.glyph_metrics(Size::unscaled(), run.font_face.location()));
   let follow_path_cell = warp
     .filter(|warp| warp.follow_path.is_some())
     .and_then(|_| TextFollowPathFontCell::from_font(&face, run.font_size_pt));
@@ -757,7 +749,7 @@ pub(super) fn build_glyph_outline_path(
     ));
   }
   let vml_fit_path = match (warp, warp_boundaries.as_deref()) {
-    (Some(warp), Some([_])) => warp.vml_fit_path,
+    (Some(warp), Some([_])) => warp.vml_fit_path.as_ref(),
     _ => None,
   };
   let source_seams = match (warp, warp_boundaries.as_deref(), vml_fit_path) {
@@ -810,8 +802,25 @@ pub(super) fn build_glyph_outline_path(
       )
     });
     let glyph_center_x = f64::from(origin_x_pt)
-      + f64::from(glyph.x_advance * run.font_size_pt * placement.horizontal_scale) / 2.0;
+      + glyph_metrics
+        .as_ref()
+        .and_then(|metrics| metrics.bounds(GlyphId::new(glyph.glyph_id)))
+        .map_or_else(
+          || f64::from(glyph.x_advance * run.font_size_pt * placement.horizontal_scale) / 2.0,
+          |bounds| {
+            (f64::from(bounds.x_min) + f64::from(bounds.x_max) + 1.0) / 2.0
+              * f64::from(design_scale * placement.horizontal_scale)
+          },
+        );
     let centerline_y = f64::from(origin_y_pt) - vml_centerline_offset_pt;
+    let vml_transform = vml_fit_path.zip(authored_path).and_then(|(fit, path)| {
+      path.glyph_transform(
+        f64::from(fit.start_x.0),
+        f64::from(fit.advance_width.0),
+        glyph_center_x,
+        centerline_y,
+      )
+    });
     let glyph_to_page = |point: kurbo::Point| {
       let design_x = if run.font_face.synthetic_italic {
         point.x + point.y * f64::from(SYNTHETIC_ITALIC_SHEAR)
@@ -825,7 +834,7 @@ pub(super) fn build_glyph_outline_path(
     };
     let map = |point: kurbo::Point| {
       let point = glyph_to_page(point);
-      if let Some(transform) = follow_path_transform {
+      if let Some(transform) = follow_path_transform.or(vml_transform) {
         transform * point
       } else if let (Some(fit), Some([boundary])) = (vml_fit_path, warp_boundaries.as_deref()) {
         vml_fit_path_glyph_point(fit, boundary, glyph_center_x, centerline_y, point)
@@ -985,36 +994,6 @@ fn transform_point(transform: common::Transform, point: kurbo::Point) -> kurbo::
       + f64::from(transform.m22) * point.y
       + f64::from(transform.dy.0),
   )
-}
-
-fn vml_fit_path_glyph_point(
-  fit: common::VmlFitPath,
-  boundary: &TextWarpBoundary,
-  glyph_center_x: f64,
-  centerline_y: f64,
-  point: kurbo::Point,
-) -> kurbo::Point {
-  let width = f64::from(fit.advance_width.0);
-  if width <= f64::EPSILON || boundary.total <= f64::EPSILON {
-    return point;
-  }
-  // fitpath measures the text by its logical advances. Each glyph is scaled
-  // uniformly and rotated at its own advance center, rather than bending its
-  // outline point-by-point like a DrawingML deformation envelope.
-  let logical_u = ((glyph_center_x - f64::from(fit.start_x.0)) / width).clamp(0.0, 1.0);
-  let u = 0.5 + (logical_u - 0.5) * VML_FIT_PATH_TEXT_SCALE;
-  let center = boundary.sample(u);
-  let tangent = boundary.sample((u + 0.001).min(1.0)) - boundary.sample((u - 0.001).max(0.0));
-  let tangent_length = tangent.hypot();
-  if tangent_length <= f64::EPSILON {
-    return center;
-  }
-  let tangent = tangent / tangent_length;
-  let normal = Vec2::new(-tangent.y, tangent.x);
-  let scale = boundary.total / width * VML_FIT_PATH_TEXT_SCALE;
-  center
-    + tangent * ((point.x - glyph_center_x) * scale)
-    + normal * ((point.y - centerline_y) * scale)
 }
 
 #[cfg(test)]

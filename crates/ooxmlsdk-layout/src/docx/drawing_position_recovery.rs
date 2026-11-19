@@ -21,9 +21,15 @@ const DRAWING: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 
 pub(super) fn root<'a, T: SdkType + Clone>(
   xml: &[u8],
+  styles: &super::StylesCatalog,
   original: impl FnOnce() -> std::result::Result<&'a T, SdkError>,
 ) -> crate::Result<Cow<'a, T>> {
-  let indentation = super::indentation_recovery::xml(xml);
+  let note_breaks = super::note_break_recovery::xml(xml);
+  let table_position =
+    super::table_position_recovery::xml(note_breaks.as_deref().unwrap_or(xml), styles)
+      .or(note_breaks);
+  let indentation =
+    super::indentation_recovery::xml(table_position.as_deref().unwrap_or(xml)).or(table_position);
   let numbering =
     super::numbering_recovery::xml(indentation.as_deref().unwrap_or(xml)).or(indentation);
   match recover_xml(numbering.as_deref().unwrap_or(xml)).or(numbering) {
@@ -169,9 +175,11 @@ mod tests {
         r#"<wp:positionV xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" relativeFrom="page"><wp:posOffset>{lexical}</wp:posOffset></wp:positionV>"#
       );
       let original = wp::VerticalPosition::from_bytes(xml.as_bytes()).ok();
-      let result = root(xml.as_bytes(), || {
-        Ok(original.as_ref().expect("unmodified typed root"))
-      })
+      let result = root(
+        xml.as_bytes(),
+        &super::super::StylesCatalog::default(),
+        || Ok(original.as_ref().expect("unmodified typed root")),
+      )
       .unwrap();
       assert!(
         matches!(result.vertical_position_choice.as_ref(), Some(wp::VerticalPositionChoice::PositionOffset(value)) if *value == expected),
@@ -223,9 +231,11 @@ mod tests {
         r#"<a:srcRect xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" l="{lexical}" t="10000"/>"#
       );
       let original = a::SourceRectangle::from_bytes(xml.as_bytes()).ok();
-      let result = root(xml.as_bytes(), || {
-        Ok(original.as_ref().expect("unchanged typed root"))
-      })
+      let result = root(
+        xml.as_bytes(),
+        &super::super::StylesCatalog::default(),
+        || Ok(original.as_ref().expect("unchanged typed root")),
+      )
       .unwrap();
       assert_eq!(
         result.left.unwrap().as_drawingml_percent(),
@@ -250,7 +260,12 @@ mod tests {
       r#"<x:srcRect xmlns:x="http://schemas.openxmlformats.org/drawingml/2006/main" l="20000.5"/>"#,
     ] {
       let original = a::SourceRectangle::from_bytes(xml.as_bytes()).unwrap();
-      let recovered = root(xml.as_bytes(), || Ok(&original)).unwrap();
+      let recovered = root(
+        xml.as_bytes(),
+        &super::super::StylesCatalog::default(),
+        || Ok(&original),
+      )
+      .unwrap();
       assert_eq!(recovered.left.unwrap().as_drawingml_percent(), 0);
     }
   }

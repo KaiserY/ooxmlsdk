@@ -161,15 +161,28 @@ pub(crate) fn group_child_affine(
   child_offset: kurbo::Point,
   child_extents: kurbo::Vec2,
 ) -> Affine {
+  group_child_affine_with_unit_scale(offset, extents, child_offset, child_extents, 1.0)
+}
+
+/// An unspecified child-axis scale retains its coordinate units. Some import
+/// adapters already express the parent frame in points while children remain
+/// in EMU; their unscaled axis still needs that unit conversion.
+pub(crate) fn group_child_affine_with_unit_scale(
+  offset: kurbo::Point,
+  extents: kurbo::Vec2,
+  child_offset: kurbo::Point,
+  child_extents: kurbo::Vec2,
+  unit_scale: f64,
+) -> Affine {
   let scale_x = if child_extents.x != 0.0 {
     extents.x / child_extents.x
   } else {
-    1.0
+    unit_scale
   };
   let scale_y = if child_extents.y != 0.0 {
     extents.y / child_extents.y
   } else {
-    1.0
+    unit_scale
   };
   Affine::translate((-child_offset.x, -child_offset.y))
     .then_scale_non_uniform(scale_x, scale_y)

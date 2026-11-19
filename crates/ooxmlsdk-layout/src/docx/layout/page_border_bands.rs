@@ -1,4 +1,4 @@
-//! Word page-border three-band frames: double and MS-DOC BrcType 0x18/0x19.
+//! Word page-border bands: double, small-gap triple and MS-DOC BrcType 0x18/0x19.
 //! Native width, direction, partial/asymmetric-frame and text-offset controls
 //! distinguish filled printer-grid bands from independent centered strokes.
 use super::{
@@ -9,8 +9,8 @@ use crate::docx::{CellBordersModel, border_3d};
 
 #[derive(Clone, Copy, Default)]
 struct Bands {
-  widths: [f32; 3],
-  colors: [RgbColor; 3],
+  widths: [f32; 5],
+  colors: [RgbColor; 5],
 }
 
 impl Bands {
@@ -18,6 +18,26 @@ impl Bands {
     let Some(border) = border else {
       return Some(Self::default());
     };
+    if border.compound_pattern == BorderCompoundPattern::ThinThickThinSmallGap {
+      if border.shadow
+        || border.relief.is_some()
+        || !border.width_pt.is_finite()
+        || border.width_pt <= 0.0
+      {
+        return None;
+      }
+      let widths = crate::docx::border_bands::device_widths(border)?
+        .map(|dots| dots as f32 * units::POINTS_PER_INCH / super::WORD_FIXED_OUTPUT_DPI);
+      let white = RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      };
+      return Some(Self {
+        widths,
+        colors: [border.color, white, border.color, white, border.color],
+      });
+    }
     if border.compound_pattern == BorderCompoundPattern::Double {
       if !border.compound
         || border.shadow
@@ -35,7 +55,7 @@ impl Bands {
       let dots = (twips * 5.0 / 12.0).trunc().max(1.0);
       let width = dots as f32 * units::POINTS_PER_INCH / super::WORD_FIXED_OUTPUT_DPI;
       return Some(Self {
-        widths: [width; 3],
+        widths: [width, width, width, 0.0, 0.0],
         colors: [
           border.color,
           RgbColor {
@@ -43,6 +63,8 @@ impl Bands {
             g: 255,
             b: 255,
           },
+          border.color,
+          border.color,
           border.color,
         ],
       });
@@ -53,7 +75,11 @@ impl Bands {
     if reverse {
       colors.reverse();
     }
-    Some(Self { widths, colors })
+    let [a, b, c] = widths;
+    Some(Self {
+      widths: [a, b, c, 0.0, 0.0],
+      colors: [colors[0], colors[1], colors[2], border.color, border.color],
+    })
   }
 
   fn extent(self) -> f32 {
@@ -213,7 +239,7 @@ fn corner(
     return;
   }
   let mut offset = 0.0;
-  for index in 0..3 {
+  for index in 0..horizontal_bands.widths.len() {
     let width = horizontal_bands.widths[index];
     let x = if right_corner {
       right - offset - width
@@ -285,6 +311,47 @@ mod tests {
       }
       _ => None,
     })
+  }
+
+  #[test]
+  fn small_gap_triple_page_retains_native_five_bands_and_white_cuts() {
+    let mut page = frame();
+    let border = border(w::BorderValues::ThinThickThinSmallGap, 24);
+    assert!(paint(
+      &mut page,
+      (0.0, 0.0, 612.0, 792.0),
+      CellBordersModel {
+        top: Some(border),
+        left: Some(border),
+        bottom: Some(border),
+        right: Some(border),
+      }
+    ));
+    // Word's actual page control: black24..24.72, white24.72..25.44,
+    // black25.44..28.44, white28.44..29.16, black29.16..29.88pt.
+    for (y, shade) in [
+      (24.36, 0),
+      (25.08, 255),
+      (26.94, 0),
+      (28.8, 255),
+      (29.52, 0),
+    ] {
+      assert_eq!(
+        pixel(&page, 306.0, y),
+        Some(RgbColor {
+          r: shade,
+          g: shade,
+          b: shade
+        })
+      );
+    }
+    assert_eq!(pixel(&page, 306.0, 29.89), None);
+    assert!(
+      page
+        .items
+        .iter()
+        .all(|item| matches!(item, PageItem::Fill(_)))
+    );
   }
 
   #[test]

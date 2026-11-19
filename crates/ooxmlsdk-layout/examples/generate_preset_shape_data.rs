@@ -119,6 +119,36 @@ fn main() {
     .unwrap();
   }
   writeln!(output, "  }}\n}}").unwrap();
+  writeln!(output,
+    "pub(super) fn adjustment_is_angle(preset: a::ShapeTypeValues, name: &str) -> bool {{\n  match preset {{"
+  ).unwrap();
+  for (preset, geometry) in &definitions {
+    let angles: std::collections::BTreeSet<_> = geometry
+      .adjust_handle_list
+      .as_ref()
+      .into_iter()
+      .flat_map(|list| &list.adjust_handle_list_choice)
+      .filter_map(|handle| match handle {
+        a::AdjustHandleListChoice::AdjustHandlePolar(handle) => {
+          handle.angle_adjustment_guide.as_deref()
+        }
+        a::AdjustHandleListChoice::AdjustHandleXy(_) => None,
+      })
+      .collect();
+    if !angles.is_empty() {
+      let patterns = angles
+        .into_iter()
+        .map(|name| format!("{name:?}"))
+        .collect::<Vec<_>>()
+        .join(" | ");
+      writeln!(
+        output,
+        "    a::ShapeTypeValues::{preset:?} => matches!(name, {patterns}),"
+      )
+      .unwrap();
+    }
+  }
+  writeln!(output, "    _ => false,\n  }}\n}}").unwrap();
   fs::write(OUTPUT, output).unwrap_or_else(|error| panic!("failed to write {OUTPUT}: {error}"));
 
   let text_warp_input = env::args()

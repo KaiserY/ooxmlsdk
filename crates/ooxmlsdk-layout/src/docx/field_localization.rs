@@ -20,7 +20,9 @@ pub(super) enum FieldMessage<'a> {
   BookmarkNameNotSpecified,
   UnknownDocumentProperty,
   ScalarError(ScalarFieldError),
+  CalculationError(super::calculation_syntax::Diagnostic),
   MissingStyle(&'a str),
+  NoTextOfStyle,
   EmptyTableOfContents,
   PageRefRelative { bookmark_is_above: bool },
   PageRefOnPage(&'a str),
@@ -32,6 +34,9 @@ pub(super) enum ScalarFieldError {
   DocumentVariableValue,
   AutoTextEntry,
   BarcodeArgument,
+  AuthoritiesCategory,
+  ObjectCreation,
+  ConditionalOperator,
 }
 
 pub(super) fn localized_scalar_field_error(
@@ -51,10 +56,32 @@ pub(super) fn localized_scalar_field_error(
     ("en", DocumentVariableValue) => Some("Error! No document variable supplied."),
     ("en", AutoTextEntry) => Some("Error! AutoText entry not defined."),
     ("en", BarcodeArgument) => Some("Error!"),
+    ("en", AuthoritiesCategory) => Some("Error! Category number not found."),
+    ("en", ObjectCreation) => Some("Error! Objects cannot be created from editing field codes."),
+    ("en", ConditionalOperator) => Some("Error! Unknown op code for conditional."),
     ("de", DocumentVariableArgument) => Some("Fehler! Dokumentvariable nicht definiert."),
     ("de", DocumentVariableValue) => Some("Fehler! Keine Dokumentvariable verfügbar."),
     ("de", AutoTextEntry) => Some("Fehler! AutoText-Eintrag nicht definiert."),
     ("de", BarcodeArgument) => Some("Fehler!"),
+    ("de", AuthoritiesCategory) => Some("Fehler! Kategorienummer nicht gefunden."),
+    ("de", ObjectCreation) => Some(
+      "Fehler! Es ist nicht möglich, durch die Bearbeitung von Feldfunktionen Objekte zu erstellen.",
+    ),
+    ("de", ConditionalOperator) => Some("Fehler! Unbekannter Op-Code für verknüpfte Bedingung."),
+    ("es", ObjectCreation) => {
+      Some("¡Error! No se pueden crear objetos modificando códigos de campo.")
+    }
+    ("fr", ObjectCreation) => Some(
+      "Erreur! Des objets ne peuvent pas être créés à partir des codes de champs de mise en forme.",
+    ),
+    ("ja", ObjectCreation) => {
+      Some("エラー! 編集中のフィールド コードからは、オブジェクトを作成できません。")
+    }
+    ("ko", ObjectCreation) => Some("오류! 편집 중 필드 코드에서는 개체를 만들 수 없습니다."),
+    ("es", AuthoritiesCategory) => Some("¡Error! No se encuentra el número de la categoría."),
+    ("fr", AuthoritiesCategory) => Some("Erreur! Le numéro de la catégorie n'a pas été trouvé."),
+    ("ja", AuthoritiesCategory) => Some("エラー! 項目番号が見つかりません。"),
+    ("ko", AuthoritiesCategory) => Some("오류! 범주 번호를 찾을 수 없습니다."),
     ("zh", message)
       if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
         == OfficeResourceLocale::SimplifiedChinese =>
@@ -64,8 +91,13 @@ pub(super) fn localized_scalar_field_error(
         DocumentVariableValue => "错误!未提供文档变量。",
         AutoTextEntry => "错误!未定义“自动图文集”词条。",
         BarcodeArgument => "错误!",
+        AuthoritiesCategory => "错误!没找到分类编号。",
+        ObjectCreation => "错误!不能通过编辑域代码创建对象。",
+        ConditionalOperator => return None,
       })
     }
+    ("zh", AuthoritiesCategory) => Some("錯誤! 找不到類別編號。"),
+    ("zh", ObjectCreation) => Some("錯誤! 物件無法用編輯功能變數代碼來建立。"),
     _ => None,
   }
 }
@@ -80,6 +112,19 @@ pub(super) fn localized_field_message(
   let reference_message = ui_language
     .and_then(crate::localization::canonical_locale)
     .and_then(|locale| match (locale.id.language.as_str(), message) {
+      ("es", FieldMessage::BookmarkNameNotSpecified) => {
+        Some("¡Error! No se le dio un nombre al marcador.")
+      }
+      ("de", FieldMessage::BookmarkNameNotSpecified) => {
+        Some("Fehler! Es wurde kein Textmarkenname vergeben.")
+      }
+      ("fr", FieldMessage::BookmarkNameNotSpecified) => {
+        Some("Erreur! Aucun nom n'a été donné au signet.")
+      }
+      ("ko", FieldMessage::BookmarkNameNotSpecified) => {
+        Some("오류! 책갈피 이름이 지정되어 있지 않습니다.")
+      }
+      ("fr", FieldMessage::UndefinedBookmark) => Some("Erreur! Signet non défini."),
       ("de", FieldMessage::UndefinedBookmark) => Some("Fehler! Textmarke nicht definiert."),
       ("es", FieldMessage::UndefinedBookmark) => Some("¡Error! Marcador no definido."),
       ("de", FieldMessage::ReferenceSourceNotFound) => {
@@ -119,6 +164,11 @@ pub(super) fn localized_field_message(
     }
     FieldMessage::UndefinedBookmark => strings.field_undefined_bookmark().to_string(),
     FieldMessage::ReferenceSourceNotFound => strings.field_reference_source_not_found().to_string(),
+    FieldMessage::BookmarkNameNotSpecified
+      if strings.resource_locale() == OfficeResourceLocale::TraditionalChinese =>
+    {
+      "錯誤! 尚未指定書籤名稱。".to_string()
+    }
     FieldMessage::BookmarkNameNotSpecified => {
       strings.field_bookmark_name_not_specified().to_string()
     }
@@ -132,6 +182,11 @@ pub(super) fn localized_field_message(
       .or_else(|| localized_scalar_field_error(message, Some("en-US")))
       .expect("English scalar field resources")
       .to_string(),
+    FieldMessage::CalculationError(message) => {
+      localized_calculation_diagnostic(message, ui_language)
+        .or_else(|| localized_calculation_diagnostic(message, Some("en-US")))
+        .expect("English calculation diagnostic resources")
+    }
     FieldMessage::MissingStyle(style_name) if is_japanese_ui_language(ui_language) => {
       format!(
         "エラー! [ホーム] タブを使用して、ここに表示する文字列に {style_name} を適用してください。"
@@ -168,6 +223,7 @@ pub(super) fn localized_field_message(
       )
     }
     FieldMessage::MissingStyle(style_name) => strings.field_missing_style(style_name),
+    FieldMessage::NoTextOfStyle => localized_no_text_of_style(ui_language).to_string(),
     FieldMessage::EmptyTableOfContents => {
       if strings.resource_locale() == OfficeResourceLocale::TraditionalChinese {
         return "找不到目錄項目。".to_string();
@@ -191,6 +247,119 @@ pub(super) fn localized_field_message(
     }
     .to_string(),
     FieldMessage::PageRefOnPage(page_number) => strings.field_on_page(page_number),
+  }
+}
+
+struct CalculationDiagnosticResources {
+  syntax: &'static str,
+  missing_operator: &'static str,
+  unexpected_end: &'static str,
+}
+
+fn calculation_diagnostic_resources(
+  ui_language: Option<&str>,
+) -> Option<CalculationDiagnosticResources> {
+  let locale = ui_language.and_then(crate::localization::canonical_locale);
+  let language = locale
+    .as_ref()
+    .map(|locale| locale.id.language.as_str())
+    .unwrap_or("en");
+  Some(match language {
+    "en" => CalculationDiagnosticResources {
+      syntax: "!Syntax Error, ",
+      missing_operator: "!Missing Operator",
+      unexpected_end: "!Unexpected End of Formula",
+    },
+    "zh"
+      if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
+        == OfficeResourceLocale::TraditionalChinese =>
+    {
+      CalculationDiagnosticResources {
+        syntax: "!語法錯誤, ",
+        missing_operator: "!缺少運算元",
+        unexpected_end: "!非預期之公式結尾",
+      }
+    }
+    "zh" => CalculationDiagnosticResources {
+      syntax: "!语法错误，",
+      missing_operator: "!缺少操作符",
+      unexpected_end: "!异常的公式结尾",
+    },
+    "ja" => CalculationDiagnosticResources {
+      syntax: "!構文エラー ",
+      missing_operator: "!演算子がありません。",
+      unexpected_end: "!式の終わりが正しくありません。",
+    },
+    "ko" => CalculationDiagnosticResources {
+      syntax: "!구문 오류, ",
+      missing_operator: "!연산자가 없습니다.",
+      unexpected_end: "!수식의 끝이 잘못되었습니다.",
+    },
+    "de" => CalculationDiagnosticResources {
+      syntax: "!Syntaxfehler, ",
+      missing_operator: "!Operator fehlt",
+      unexpected_end: "!Unerwartetes Ende des Ausdrucks",
+    },
+    "fr" => CalculationDiagnosticResources {
+      syntax: "!Erreur de syntaxe, ",
+      missing_operator: "!Opérateur manquant",
+      unexpected_end: "!Fin de formule inattendue",
+    },
+    "es" => CalculationDiagnosticResources {
+      syntax: "!Error de sintaxis, ",
+      missing_operator: "!Falta el operador",
+      unexpected_end: "!Final de fórmula inesperado",
+    },
+    _ => return None,
+  })
+}
+
+pub(super) fn calculation_diagnostic_supported(ui_language: Option<&str>) -> bool {
+  calculation_diagnostic_resources(ui_language).is_some()
+}
+
+pub(super) fn missing_table_cell_diagnostic_supported(ui_language: Option<&str>) -> bool {
+  // The controlled German resource has a complete stable token/message.
+  // The English observations contain an extra unresolved suffix; do not
+  // invent that resource from another locale's wording or discard its tail.
+  ui_language
+    .and_then(crate::localization::canonical_locale)
+    .is_some_and(|locale| locale.id.language.as_str() == "de")
+}
+
+fn localized_calculation_diagnostic(
+  diagnostic: super::calculation_syntax::Diagnostic,
+  ui_language: Option<&str>,
+) -> Option<String> {
+  use super::calculation_syntax::Diagnostic;
+  if let Diagnostic::MissingTableCell(cell) = diagnostic {
+    return missing_table_cell_diagnostic_supported(ui_language)
+      .then(|| format!("!{} Nicht in Tabelle vorhanden", cell.display()));
+  }
+  let resources = calculation_diagnostic_resources(ui_language)?;
+  Some(match diagnostic {
+    Diagnostic::Syntax(token) => format!("{}{token}", resources.syntax),
+    Diagnostic::MissingOperator => resources.missing_operator.to_owned(),
+    Diagnostic::UnexpectedEnd => resources.unexpected_end.to_owned(),
+    Diagnostic::MissingTableCell(_) => return None,
+  })
+}
+
+fn localized_no_text_of_style(ui_language: Option<&str>) -> &'static str {
+  // Paired numeric/custom unused, missing, used and locked native controls
+  // distinguish this fixed resource from the Home-tab missing-style message.
+  let locale = ui_language.and_then(crate::localization::canonical_locale);
+  match locale.as_ref().map(|locale| locale.id.language.as_str()) {
+    Some("ko") => "오류! 지정한 스타일은 사용되지 않습니다.",
+    Some("ja") => "エラー! 指定したスタイルは使われていません。",
+    Some("fr") => "Erreur! Il n'y a pas de texte de ce style dans ce document.",
+    Some("de") => "Fehler! Kein Text mit angegebener Formatvorlage im Dokument.",
+    Some("es") => "¡Error! No hay texto con el estilo especificado en el documento.",
+    Some("zh") => match OfficeStringCatalog::for_ui_language(ui_language).resource_locale() {
+      OfficeResourceLocale::TraditionalChinese => "錯誤! 所指定的樣式的文字不存在文件中。",
+      _ => "错误!文档中没有指定样式的文字。",
+    },
+    _ => "Error! No text of specified style in document.",
   }
 }
 
@@ -288,6 +457,11 @@ pub(super) fn localized_greeting_line_placeholder(ui_language: Option<&str>) -> 
   // These are application placeholders, independent of GREETINGLINE's \l
   // switch for formatting actual recipient data. Only established Office
   // resources are supplied here; other UI locales keep the English fallback.
+  match OfficeStringCatalog::for_ui_language(ui_language).resource_locale() {
+    OfficeResourceLocale::SimplifiedChinese => return "«问候语»",
+    OfficeResourceLocale::TraditionalChinese => return "«問候行»",
+    OfficeResourceLocale::English => {}
+  }
   match ui_language
     .and_then(crate::localization::canonical_locale)
     .map(|locale| locale.id.language.to_string())
@@ -353,6 +527,24 @@ pub(super) fn native_builtin_style_ref_name(
   style_type: Option<super::w::StyleValues>,
   ui_language: Option<&str>,
 ) -> Option<NativeBuiltinStyleRef> {
+  if canonical_name.eq_ignore_ascii_case("Date")
+    && style_type == Some(super::w::StyleValues::Paragraph)
+  {
+    let locale = ui_language.and_then(crate::localization::canonical_locale)?;
+    let name = match locale.id.language.as_str() {
+      "en" | "fr" => "Date",
+      "es" => "Fecha",
+      "de" => "Datum",
+      "zh" => "日期",
+      "ja" => "日付",
+      "ko" => "날짜",
+      _ => return None,
+    };
+    return Some(NativeBuiltinStyleRef {
+      name,
+      heading_level: None,
+    });
+  }
   // The styles part stores canonical names, while Word's printed STYLEREF
   // uses Style.NameLocal. Native en/de/zh controls distinguish the display name
   // (including its spaces) from XML ids and from foreign-UI builtin names.
@@ -406,6 +598,31 @@ pub(super) fn native_builtin_style_ref_name(
     name,
     heading_level: *heading_level,
   })
+}
+
+pub(super) fn localized_merge_sequence_placeholder(
+  ui_language: Option<&str>,
+) -> Option<&'static str> {
+  let locale = ui_language.and_then(crate::localization::canonical_locale);
+  match locale
+    .as_ref()
+    .map(|locale| locale.id.language.as_str())
+    .unwrap_or("en")
+  {
+    "en" | "ja" => Some("«Merge Sequence #»"),
+    "zh"
+      if OfficeStringCatalog::for_ui_language(ui_language).resource_locale()
+        == OfficeResourceLocale::TraditionalChinese =>
+    {
+      Some("«Merge Sequence #»")
+    }
+    "zh" => Some("«合并序列编号»"),
+    "es" => Some("«Secuencia de combinación n.º»"),
+    "de" => Some("«Seriendrucksequenz-Nr.»"),
+    "fr" => Some("«Nº séquence de fusion»"),
+    "ko" => Some("«병합 순서 #»"),
+    _ => None,
+  }
 }
 
 pub(super) fn native_style_ref_name_matches(name: &str, requested: &str) -> bool {
@@ -495,7 +712,41 @@ fn apply_generated_field_message_style_with_owner(
       | FieldMessage::BookmarkNameNotSpecified
       | FieldMessage::UnknownDocumentProperty
       | FieldMessage::ScalarError(_)
+      | FieldMessage::CalculationError(_)
   );
+  if matches!(
+    message,
+    FieldMessage::ScalarError(ScalarFieldError::ConditionalOperator)
+  ) {
+    // Native code-bold on/off controls both emit this bold resource. The
+    // condition's ordinary returned text retains its separate code style.
+    style.bold = true;
+    style.complex_bold = Some(true);
+    return;
+  }
+  if matches!(
+    message,
+    FieldMessage::ScalarError(ScalarFieldError::ObjectCreation)
+  ) {
+    // Native CONTROL errors take the separator font/color and toggle its bold,
+    // even with MERGEFORMAT or a stale graphic cache. UI resource faces own
+    // the East Asian slots independently of that Latin code formatting.
+    style.complex_bold = Some(!style.complex_bold.unwrap_or(style.bold));
+    style.bold = !style.bold;
+    if !apply_japanese_diagnostic_font_slots(style, ui_language)
+      && !apply_korean_diagnostic_font_slots(style, ui_language)
+    {
+      apply_chinese_diagnostic_font_slots(style, ui_language);
+    }
+    return;
+  }
+  if matches!(message, FieldMessage::CalculationError(_)) {
+    // Native calculation errors toggle the code's bold while retaining its
+    // other formatting. Explicit b=false becomes bold; b=true becomes regular.
+    style.complex_bold = Some(!style.complex_bold.unwrap_or(style.bold));
+    style.bold = !style.bold;
+    return;
+  }
   if matches!(message, FieldMessage::EmptyTableOfContents) {
     // Writer emits the empty-TOC diagnostic through its generated field error
     // run. Keep it bold independently of the application resource locale.
@@ -522,6 +773,14 @@ fn apply_generated_field_message_style_with_owner(
       style.complex_fallback_font_family = None;
     }
   }
+  if matches!(message, FieldMessage::NoTextOfStyle) {
+    // The Word resource toggles the separator's effective bold, or the
+    // inherited paragraph bold for a simple field. The cached result still
+    // supplies its independent font, size and italic formatting.
+    let bold = !style.wordprocessingml_field_bold_override.unwrap_or(false);
+    style.bold = bold;
+    style.complex_bold = Some(bold);
+  }
   if matches!(
     message,
     FieldMessage::UndefinedBookmark
@@ -547,6 +806,7 @@ fn apply_generated_field_message_style_with_owner(
       | FieldMessage::UnknownDocumentProperty
       | FieldMessage::ScalarError(_)
       | FieldMessage::MissingStyle(_)
+      | FieldMessage::NoTextOfStyle
       | FieldMessage::EmptyTableOfContents
   ) && apply_japanese_diagnostic_font_slots(style, ui_language)
   {
@@ -571,15 +831,19 @@ fn apply_generated_field_message_style_with_owner(
     }
     return;
   }
-  if matches!(message, FieldMessage::MissingStyle(_))
-    && apply_korean_diagnostic_font_slots(style, ui_language)
+  if matches!(
+    message,
+    FieldMessage::MissingStyle(_) | FieldMessage::NoTextOfStyle
+  ) && apply_korean_diagnostic_font_slots(style, ui_language)
   {
     // Word's Korean missing-style resource uses bold Batang for Hangul while
     // retaining the cached result's Latin face for the requested style name
     // and Basic Latin punctuation. Batang has no bold face in the configured
     // Office output, so the ordinary synthetic-bold path supplies its stroke.
-    style.bold = true;
-    style.complex_bold = Some(true);
+    if matches!(message, FieldMessage::MissingStyle(_)) {
+      style.bold = true;
+      style.complex_bold = Some(true);
+    }
     return;
   }
   let resource_locale = OfficeStringCatalog::for_ui_language(ui_language).resource_locale();
@@ -589,6 +853,7 @@ fn apply_generated_field_message_style_with_owner(
       | FieldMessage::UnknownDocumentProperty
       | FieldMessage::ScalarError(_)
       | FieldMessage::EmptyTableOfContents
+      | FieldMessage::NoTextOfStyle
   ) && apply_traditional_chinese_diagnostic_font_slots(style, ui_language)
   {
     return;
@@ -609,6 +874,10 @@ fn apply_generated_field_message_style_with_owner(
   style.wordprocessingml_font_hint = Some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia);
 
   match message {
+    FieldMessage::NoTextOfStyle => {
+      style.east_asia_font_family = Some(Arc::<str>::from("SimSun"));
+      style.east_asia_language = east_asia_language;
+    }
     FieldMessage::UndefinedBookmark
     | FieldMessage::ReferenceSourceNotFound
     | FieldMessage::BookmarkNameNotSpecified
@@ -661,7 +930,9 @@ fn apply_generated_field_message_style_with_owner(
         Some(style.font_size_pt * WORD_ZH_STYLE_REF_ERROR_LINE_HEIGHT_PER_FONT_SIZE);
     }
     FieldMessage::EmptyTableOfContents => {}
-    FieldMessage::PageRefRelative { .. } | FieldMessage::PageRefOnPage(_) => {}
+    FieldMessage::PageRefRelative { .. }
+    | FieldMessage::PageRefOnPage(_)
+    | FieldMessage::CalculationError(_) => {}
   }
 }
 
@@ -716,6 +987,34 @@ pub(super) fn apply_bidi_outline_missing_context_style(style: &mut TextStyle) {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn calculation_diagnostic_toggles_bold_and_preserves_code_font_and_italic() {
+    for bold in [false, true] {
+      for complex_bold in [None, Some(false), Some(true)] {
+        let mut style = TextStyle {
+          font_family: Some(Arc::from("Calibri")),
+          east_asia_font_family: Some(Arc::from("DengXian")),
+          font_size_pt: 11.0,
+          bold,
+          complex_bold,
+          italic: true,
+          ..Default::default()
+        };
+        apply_generated_field_message_style(
+          &mut style,
+          FieldMessage::CalculationError(super::super::calculation_syntax::Diagnostic::Syntax(';')),
+          Some("zh-CN"),
+        );
+        assert_eq!(style.bold, !bold);
+        assert_eq!(style.complex_bold, Some(!complex_bold.unwrap_or(bold)));
+        assert!(style.italic);
+        assert_eq!(style.font_family.as_deref(), Some("Calibri"));
+        assert_eq!(style.east_asia_font_family.as_deref(), Some("DengXian"));
+        assert_eq!(style.font_size_pt, 11.0);
+      }
+    }
+  }
 
   #[test]
   fn bookmark_diagnostics_preserve_office_ui_language_and_field_kind() {
@@ -775,7 +1074,7 @@ mod tests {
       ),
       (
         FieldMessage::BookmarkNameNotSpecified,
-        "錯誤! 未提供書籤名稱。",
+        "錯誤! 尚未指定書籤名稱。",
       ),
       (FieldMessage::EmptyTableOfContents, "找不到目錄項目。"),
     ] {

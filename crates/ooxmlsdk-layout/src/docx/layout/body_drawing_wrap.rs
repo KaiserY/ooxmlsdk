@@ -178,6 +178,13 @@ pub(super) fn capture(
       bounds.y_pt + bounds.height_pt + placement.margin_bottom_pt,
     )?
   };
+  let exclusion = drawingml_square_wrap_exclusion(
+    exclusion,
+    placement,
+    flow,
+    flow.content_left_pt,
+    flow.content_left_pt + flow.content_width,
+  );
   register(page, page_index, anchor, bounds, exclusion, vml_square)
 }
 
@@ -900,6 +907,207 @@ mod tests {
   }
 
   #[test]
+  fn wps_square_replays_previous_paragraphs_and_migrates_with_its_anchor() {
+    // Native Word: a late page-positioned WPS textbox wraps earlier body
+    // lines. With enough preceding text the wrap moves its anchor forward;
+    // the old page then loses that exclusion and keeps its ordinary text.
+    // A no-wrap counterpart retains the original line positions and page.
+    for count in [18, 26] {
+      let mut source = document(0, 612.0, "none");
+      source.compatibility_mode = 15;
+      source.page.width_pt = 792.0;
+      let Block::Paragraph(original_anchor) = source.blocks.last().unwrap() else {
+        unreachable!()
+      };
+      let InlineItem::Image(image) = &original_anchor.inlines[0] else {
+        unreachable!()
+      };
+      let crate::docx::ImagePlacement::Floating(base_placement) = image.placement else {
+        unreachable!()
+      };
+      source.blocks = (0..count)
+        .map(|index| {
+          let mut block = paragraph(format!(
+            "PREFIX {index:02} ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789"
+          ));
+          let Block::Paragraph(p) = &mut block else {
+            unreachable!()
+          };
+          p.format.line_height_pt = Some(16.0);
+          p.base_style.font_family = Some("Calibri".into());
+          for inline in &mut p.inlines {
+            if let InlineItem::Text(run) = inline {
+              run.style.font_family = Some("Calibri".into());
+            }
+          }
+          block
+        })
+        .collect();
+      let placement = FloatingImagePlacement {
+        horizontal_relative_to: HorizontalImageReference::Page,
+        vertical_relative_to: VerticalImageReference::Page,
+        horizontal_offset_pt: 360.36,
+        vertical_offset_pt: 214.2,
+        margin_left_pt: 9.0,
+        margin_right_pt: 9.0,
+        paint_order: FloatingPaintOrder::drawing_ml_relative_height(0),
+        wrap: ImageWrapMode::None,
+        ..base_placement
+      };
+      let mut shape = crate::docx::chart_shape(
+        285.1,
+        88.7,
+        0.0,
+        crate::docx::ImagePlacement::Floating(placement),
+        None,
+      );
+      shape.wordprocessing_shape_host = true;
+      shape.word_text_frame = true;
+      shape.fill_color = Some(RgbColor::default());
+      let mut anchor = paragraph("ANCHOR".into());
+      let Block::Paragraph(p) = &mut anchor else {
+        unreachable!()
+      };
+      p.inlines.insert(0, InlineItem::Shape(shape));
+      source.blocks.push(anchor);
+      let ordinary = layout(&source, &LayoutOptions::default()).unwrap();
+      assert_eq!(text_y(&ordinary, "ANCHOR").0, 0);
+
+      let Block::Paragraph(p) = source.blocks.last_mut().unwrap() else {
+        unreachable!()
+      };
+      let InlineItem::Shape(shape) = &mut p.inlines[0] else {
+        unreachable!()
+      };
+      let crate::docx::ImagePlacement::Floating(placement) = &mut shape.placement else {
+        unreachable!()
+      };
+      placement.wrap = ImageWrapMode::Square;
+      let wrapped = layout(&source, &LayoutOptions::default()).unwrap();
+      let (page, y) = text_y(&wrapped, "ANCHOR");
+      if count == 18 {
+        assert_eq!(page, 0);
+        assert!(y > text_y(&ordinary, "ANCHOR").1 + 48.0);
+      } else {
+        assert_eq!(page, 1);
+        let prefix_text = |document: &LayoutDocument| {
+          document.pages[0]
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) => Some((text.text.clone(), text.x_pt, text.y_pt)),
+              _ => None,
+            })
+            .filter(|(text, _, _)| text != "ANCHOR")
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(prefix_text(&wrapped), prefix_text(&ordinary));
+      }
+    }
+  }
+
+  #[test]
+  fn inline_picture_clears_a_narrow_square_lane_without_an_extra_empty_line() {
+    fn image_origin(items: &[PageItem]) -> Option<(f32, f32)> {
+      items.iter().find_map(|item| match item {
+        PageItem::Image(image) => Some((image.x_pt, image.y_pt)),
+        PageItem::Group(items)
+        | PageItem::InlineObjectGroup(items)
+        | PageItem::IndependentTextFrame(items)
+        | PageItem::CompositingGroup { items, .. }
+        | PageItem::FloatingDrawing { items, .. } => image_origin(items),
+        _ => None,
+      })
+    }
+
+    // Native PNG/OLE controls retain a fitting narrow image beside a WPS
+    // textbox, while a wider image clears its bottom text distance. The
+    // terminal mark stays on the picture's line after that complete-frame
+    // placement; it must not create another empty line in the narrow lane.
+    for width in [180.0, 361.9] {
+      for line_box in [
+        crate::docx::InlineImageLineBox::CharacterLike,
+        crate::docx::InlineImageLineBox::LegacyImageRunPosition,
+      ] {
+        let mut source = document(0, 612.0, "none");
+        source.compatibility_mode = 15;
+        source.page.width_pt = 792.0;
+        let Block::Paragraph(original) = source.blocks.last().unwrap() else {
+          unreachable!()
+        };
+        let InlineItem::Image(original_image) = &original.inlines[0] else {
+          unreachable!()
+        };
+        let crate::docx::ImagePlacement::Floating(base) = original_image.placement else {
+          unreachable!()
+        };
+        let mut image = original_image.clone();
+        image.width_pt = width;
+        image.height_pt = 145.9;
+        image.line_box = line_box;
+        image.placement = crate::docx::ImagePlacement::Inline;
+        let placement = FloatingImagePlacement {
+          horizontal_relative_to: HorizontalImageReference::Page,
+          vertical_relative_to: VerticalImageReference::Page,
+          horizontal_offset_pt: 266.4,
+          vertical_offset_pt: 86.0,
+          margin_left_pt: 9.0,
+          margin_right_pt: 9.0,
+          margin_top_pt: 3.6,
+          margin_bottom_pt: 3.6,
+          paint_order: FloatingPaintOrder::drawing_ml_relative_height(0),
+          wrap: ImageWrapMode::None,
+          ..base
+        };
+        let mut shape = crate::docx::chart_shape(
+          259.2,
+          30.8,
+          0.0,
+          crate::docx::ImagePlacement::Floating(placement),
+          None,
+        );
+        shape.wordprocessing_shape_host = true;
+        shape.word_text_frame = true;
+        shape.fill_color = Some(RgbColor::default());
+        let mut anchor = paragraph(String::new());
+        let Block::Paragraph(p) = &mut anchor else {
+          unreachable!()
+        };
+        p.inlines = vec![InlineItem::Shape(shape)];
+        let mut carrier = paragraph(String::new());
+        let Block::Paragraph(p) = &mut carrier else {
+          unreachable!()
+        };
+        p.format.line_height_rule = LineHeightRule::Auto;
+        p.format.line_height_pt = None;
+        p.inlines = vec![InlineItem::Image(image)];
+        source.blocks = vec![anchor, carrier, paragraph("TAIL".into())];
+        let ordinary = layout(&source, &LayoutOptions::default()).unwrap();
+        let Block::Paragraph(p) = &mut source.blocks[0] else {
+          unreachable!()
+        };
+        let InlineItem::Shape(shape) = &mut p.inlines[0] else {
+          unreachable!()
+        };
+        let crate::docx::ImagePlacement::Floating(placement) = &mut shape.placement else {
+          unreachable!()
+        };
+        placement.wrap = ImageWrapMode::Square;
+        let wrapped = layout(&source, &LayoutOptions::default()).unwrap();
+        assert_eq!(ordinary.pages.len(), 1);
+        assert_eq!(wrapped.pages.len(), 1);
+        let (old_x, old_y) = image_origin(&ordinary.pages[0].items).unwrap();
+        let (x, y) = image_origin(&wrapped.pages[0].items).unwrap();
+        let expected_shift = if width < 200.0 { 0.0 } else { 34.4 };
+        assert!((x - old_x).abs() < 0.001);
+        assert!((y - old_y - expected_shift).abs() < 0.001);
+        let tail_shift = text_y(&wrapped, "TAIL").1 - text_y(&ordinary, "TAIL").1;
+        assert!((tail_shift - expected_shift).abs() < 0.001);
+      }
+    }
+  }
+
+  #[test]
   fn fixed_not_beside_frame_keeps_body_above_its_reserved_band() {
     for vertical_anchor in [FrameVerticalAnchor::Page, FrameVerticalAnchor::Margin] {
       let mut source = document(0, 284.0, "none");
@@ -993,11 +1201,18 @@ mod tests {
             let first = text_y(&result, "FRAME-A").1;
             let second = text_y(&result, "FRAME-B").1;
             let positioned = explicit && (mode >= 15 || offset != 0.0);
+            // Numeric framePr coordinates retain MS-DOC YAS_plusOne: one
+            // encoded twip selects a positioned frame with zero displacement.
+            let decoded_offset = if offset == 0.0 {
+              0.0
+            } else {
+              offset - 1.0 / units::TWIPS_PER_POINT
+            };
             let expected_gap = if positioned {
               if padding == 0.0 {
                 0.0
               } else {
-                lead_height + 14.0 + padding + offset
+                lead_height + 14.0 + padding + decoded_offset
               }
             } else {
               14.0 + padding

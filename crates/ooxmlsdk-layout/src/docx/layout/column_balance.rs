@@ -202,6 +202,325 @@ fn following_column_top(
   Some(following_top)
 }
 
+fn uniform_line_metrics(
+  fragment: &FrameFragment,
+  paragraph: &crate::docx::Paragraph,
+) -> Option<(f32, f32)> {
+  let top = fragment.flow_top_pt?;
+  let height = if let Some(height) = fragment.content_advance_pt {
+    height
+  } else if paragraph_is_effectively_empty(paragraph) {
+    // A real empty body mark owns physical bounds but no painted advance.
+    fragment.bounds?.height_pt
+  } else {
+    return None;
+  };
+  (top.is_finite() && height.is_finite() && height > 0.0).then_some((top, height))
+}
+
+fn format_uniform_paragraphs(
+  blocks: &[Block],
+  mut flow: FlowContext,
+  target: ParagraphLayoutTarget<'_>,
+  mut y: f32,
+  line_height: f32,
+  precision: f32,
+) -> Option<(FlowContext, f32, usize)> {
+  let mut count = 0;
+  for block in blocks {
+    let Block::Paragraph(paragraph) = block else {
+      return None;
+    };
+    let (next_flow, next_y, lines) = format_paragraph_with_left_indent_compat(
+      paragraph,
+      flow,
+      ParagraphLayoutTarget {
+        current: &mut *target.current,
+        pages: &mut *target.pages,
+        anchor_pages: None,
+        text_metrics: &mut *target.text_metrics,
+      },
+      ParagraphLayoutOptions {
+        y,
+        paragraph_anchor_top: y,
+        spacing_after_pt: 0.0,
+        ignore_left_indent: false,
+        border_context: ParagraphBorderContext::default(),
+        shading_context: ParagraphShadingContext::default(),
+        spacing_before_pt: 0.0,
+        suppressed_spacing_before_pt: 0.0,
+        decoration_outer_bottom_pt: None,
+      },
+    );
+    if lines
+      .iter()
+      .any(|line| (line.height_pt - line_height).abs() > precision)
+    {
+      return None;
+    }
+    flow = restore_block_flow_width(flow, next_flow);
+    y = next_y;
+    count += lines.len();
+  }
+  Some((flow, y, count))
+}
+
+pub(super) fn unequal_paragraph_section_heights(
+  root: &mut RootFrameLayout<'_>,
+  section_index: usize,
+  start_y: f32,
+  flow: FlowContext,
+  available_pt: f32,
+) -> Option<BalancedSectionHeights> {
+  let section = root.document.sections.get(section_index)?;
+  let multiple = section.blocks.len() > 1;
+  if section.blocks.is_empty()
+    || section.columns.count < 2
+    || !root.current.wrap_exclusions.is_empty()
+    || root.current.footnote_reserved_height_pt != 0.0
+    || !root
+      .document
+      .sections
+      .get(section_index + 1)
+      .is_some_and(|next| next.break_kind == SectionBreakKind::Continuous)
+    || section
+      .section_properties
+      .as_ref()
+      .and_then(super::super::section_vertical_text_flow)
+      .is_some()
+    || section.blocks.iter().any(|block| {
+      let Block::Paragraph(paragraph) = block else {
+        return true;
+      };
+      !(if multiple {
+        cell_text_measure::supports_master_paragraph(paragraph)
+      } else {
+        cell_text_measure::supports_paragraph(paragraph)
+      }) || !paragraph.footnote_reference_ids.is_empty()
+        || !paragraph.endnote_reference_ids.is_empty()
+        || paragraph.format.keep_lines
+        || paragraph.format.keep_with_next
+        || !paragraph.format.borders.is_empty()
+        || paragraph.format.shading.is_some()
+        || (multiple
+          && (paragraph.format.page_break_before
+            || paragraph.format.spacing_before_pt != 0.0
+            || paragraph.format.spacing_after_pt != 0.0
+            || paragraph.format.spacing_before_lines.is_some()
+            || paragraph.format.spacing_after_lines.is_some()
+            || paragraph.format.spacing_before_auto == Some(true)
+            || paragraph.format.spacing_after_auto == Some(true)))
+    })
+  {
+    return None;
+  }
+  let geometry = column_geometry(flow.setup, section.columns, flow.column_page_index);
+  if geometry.widths.windows(2).all(|pair| pair[0] == pair[1]) {
+    return None;
+  }
+  let checkpoint = root.checkpoints.iter().rev().find(|checkpoint| {
+    checkpoint.section_index == section_index
+      && checkpoint.block_index == 0
+      && checkpoint.flow.column_index == 0
+  })?;
+  let continued = checkpoint.page_index < root.pages.len();
+  let (blocks, frames, initial_flow, baseline) = if continued {
+    // Native 12/14 follow controls retain the earlier page's source prefix.
+    // The diagnostic FrameCursor counts lines, so it cannot identify this
+    // tail. Carry the real formatter's InlineCursor instead, and measure
+    // only the final page's unconsumed source.
+    if multiple || section.columns.count != 2 || !matches!(flow.compatibility_mode, 11 | 12 | 14) {
+      return None;
+    }
+    let follow = flow.column_paragraph_follow?;
+    if follow.page_index != root.pages.len()
+      || follow.start == InlineCursor::default()
+      || (follow.y_pt - start_y).abs() > LAYOUT_EPSILON_PT
+    {
+      return None;
+    }
+    let Block::Paragraph(paragraph) = &section.blocks[0] else {
+      return None;
+    };
+    let suffix = plain_paragraph_measurement_suffix(paragraph, follow.start)?;
+    let first = root
+      .frames
+      .iter()
+      .position(|frame| frame.page_index == root.pages.len())?;
+    let frames = &root.frames[first..];
+    // This single continued paragraph is the first body owner on the page.
+    // Preserve the page/header metadata while removing its original trial
+    // paint and fragments. Obstructions and notes were rejected above.
+    if frames.first()?.item_start != 0 {
+      return None;
+    }
+    let mut baseline = page_checkpoint(&root.current);
+    baseline.items_len = 0;
+    baseline.frame_fragments_len = 0;
+    baseline.frame_influences_len = 0;
+    baseline.body_content_frames = 0;
+    let initial_flow = FlowContext {
+      columns: section.columns,
+      column_index: 0,
+      content_top_pt: start_y,
+      content_left_pt: geometry.lefts[0],
+      content_width: geometry.widths[0],
+      content_bottom: flow.body_content_bottom_pt,
+      ..flow
+    };
+    (
+      std::borrow::Cow::Owned(vec![Block::paragraph(suffix)]),
+      frames,
+      initial_flow,
+      baseline,
+    )
+  } else {
+    if checkpoint.page_index != root.pages.len() {
+      return None;
+    }
+    (
+      std::borrow::Cow::Borrowed(section.blocks.as_slice()),
+      root.frames.get(checkpoint.frames_len..)?,
+      checkpoint.flow,
+      checkpoint.current,
+    )
+  };
+  let first_frame = frames.first()?;
+  let Block::Paragraph(first_paragraph) = section.blocks.get(first_frame.block_index?)? else {
+    return None;
+  };
+  let (first_top, line_height) =
+    uniform_line_metrics(first_frame.fragments.first()?, first_paragraph)?;
+  if first_top != start_y {
+    return None;
+  }
+  let precision = f32::EPSILON * (start_y.abs() + available_pt) * 4.0;
+  for frame in frames {
+    let Block::Paragraph(paragraph) = section.blocks.get(frame.block_index?)? else {
+      return None;
+    };
+    if frame.page_index != root.pages.len()
+      || frame.kind != FollowFrameKind::Paragraph
+      || !frame.influences.is_empty()
+      || frame.fragments.is_empty()
+      || frame.fragments.iter().any(|line| {
+        line.kind != FrameFragmentKind::ParagraphLine
+          || line.paragraph_spacing_after_pt != 0.0
+          || uniform_line_metrics(line, paragraph)
+            .is_none_or(|(_, height)| (height - line_height).abs() > precision)
+      })
+    {
+      return None;
+    }
+  }
+  // Different destination widths change wrapping. Enumerate actual uniform
+  // line endpoints and accept the first complete real-formatter fit; a
+  // balanced mean does not prove the last column fits. Native short blank/
+  // heading sequences and final-page tails pin both owners independently.
+  let mut current = root.current.clone();
+  restore_page_checkpoint(&mut current, baseline);
+  let mut pages = Vec::new();
+  let widest = geometry.widths.iter().copied().reduce(f32::max)?;
+  let single_flow = FlowContext {
+    columns: SectionColumns::default(),
+    column_index: 0,
+    content_width: widest,
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+    ..initial_flow
+  };
+  let (_, _, whole_lines) = format_uniform_paragraphs(
+    &blocks,
+    single_flow,
+    ParagraphLayoutTarget {
+      current: &mut current,
+      pages: &mut pages,
+      anchor_pages: None,
+      text_metrics: &mut root.text_metrics,
+    },
+    start_y,
+    line_height,
+    precision,
+  )?;
+  let narrowing_follow = continued && geometry.widths[0] > geometry.widths[1];
+  let source_widows = narrowing_follow
+    && matches!(&section.blocks[0], Block::Paragraph(paragraph)
+      if paragraph_widow_control_applies(paragraph, initial_flow));
+  let first_rows = whole_lines.div_ceil(section.columns.count).max(1);
+  let last_rows = ((available_pt / line_height).floor() as usize).min(whole_lines);
+  let mut previous_completed_follow_rows = None;
+  for rows in first_rows..=last_rows {
+    if !pages.is_empty() {
+      current = pages.drain(..).next()?;
+    }
+    restore_page_checkpoint(&mut current, baseline);
+    let frame_height = rows as f32 * line_height;
+    let bottom = start_y + frame_height;
+    let layout_height = bottom.next_up() - start_y;
+    let trial_flow = FlowContext {
+      columns: SectionColumns {
+        balanced_height_pt: Some(layout_height),
+        ..initial_flow.columns
+      },
+      content_bottom: bottom,
+      ..initial_flow
+    };
+    let (end_flow, end_y, _) = format_uniform_paragraphs(
+      &blocks,
+      trial_flow,
+      ParagraphLayoutTarget {
+        current: &mut current,
+        pages: &mut pages,
+        anchor_pages: None,
+        text_metrics: &mut root.text_metrics,
+      },
+      start_y,
+      line_height,
+      precision,
+    )?;
+    let followed = end_flow.column_index + 1 == section.columns.count;
+    let previous_rows = previous_completed_follow_rows;
+    previous_completed_follow_rows = (pages.is_empty() && followed).then_some(rows);
+    if pages.is_empty() && end_y <= bottom + precision {
+      let selected_rows = if source_widows && followed {
+        // Widow control belongs to the incoming source width. One remaining
+        // wide line can wrap into two narrow lines without satisfying that
+        // minimum. Native on/off controls distinguish3/4 from4/2. Reuse the
+        // preceding complete physical-page trial when a source line must
+        // transfer; its final column is allowed to exceed the planned height.
+        if rows < DEFAULT_ORPHAN_LINES {
+          continue;
+        }
+        let source_tail = whole_lines.saturating_sub(rows);
+        if source_tail < DEFAULT_WIDOW_LINES {
+          let Some(previous) = previous_rows.filter(|&previous| {
+            previous >= DEFAULT_ORPHAN_LINES && rows - previous == DEFAULT_WIDOW_LINES - source_tail
+          }) else {
+            continue;
+          };
+          previous
+        } else {
+          rows
+        }
+      } else {
+        rows
+      };
+      let selected_height = selected_rows as f32 * line_height;
+      // advance_section_flow releases the final column's provisional bound;
+      // occupied_paragraph_bottom owns its actual physical frame closure.
+      return Some(BalancedSectionHeights {
+        page_index: root.pages.len(),
+        section_page_index: flow.section_page_index,
+        frame_top_pt: start_y,
+        layout_height_pt: (start_y + selected_height).next_up() - start_y,
+        frame_height_pt: selected_height,
+        retained_floating_table: None,
+      });
+    }
+  }
+  None
+}
+
 pub(super) fn measured_section_heights(
   root: &RootFrameLayout<'_>,
   section_index: usize,
@@ -259,6 +578,16 @@ pub(super) fn measured_section_heights(
   if geometry.widths[0] != geometry.widths[1] {
     // A different destination width invalidates the measured line partition.
     return None;
+  }
+  if let Some(heights) = fixed_floating_table_section_heights(
+    root,
+    section_index,
+    start_y,
+    flow,
+    available_pt,
+    &geometry,
+  ) {
+    return Some(heights);
   }
   let following_top = following_column_top(&root.current.wrap_exclusions, &geometry, start_y)?;
   if flow.column_index != 0 && following_top > 0.0 {
@@ -411,11 +740,202 @@ pub(super) fn measured_section_heights(
   }
   Some(BalancedSectionHeights {
     page_index,
-    section_page_index: root.current.section_page_index,
+    section_page_index: flow.section_page_index,
     frame_top_pt: start_y,
     layout_height_pt: layout_height,
     frame_height_pt: heights.frame_pt.max(first_height),
+    retained_floating_table: None,
   })
+}
+
+fn fixed_floating_table_section_heights(
+  root: &RootFrameLayout<'_>,
+  section_index: usize,
+  start_y: f32,
+  flow: FlowContext,
+  available_pt: f32,
+  geometry: &ColumnGeometry,
+) -> Option<BalancedSectionHeights> {
+  if flow.column_index != 0 {
+    return None;
+  }
+  let section = root.document.sections.get(section_index)?;
+  let exclusion = *root.current.wrap_exclusions.first()?;
+  if root
+    .current
+    .wrap_exclusions
+    .iter()
+    .any(|other| *other != exclusion)
+    || exclusion.owner != WrapExclusionOwner::FloatingTable
+    || exclusion.blocks_flow
+    || exclusion.uses_contour
+    || exclusion.side != ImageWrapSide::BothSides
+    || ![exclusion.top_pt, exclusion.bottom_pt]
+      .iter()
+      .all(|v| v.is_finite())
+    || geometry
+      .lefts
+      .iter()
+      .zip(&geometry.widths)
+      .any(|(&left, &width)| exclusion.left_pt > left || exclusion.right_pt < left + width)
+  {
+    // Side lanes, different obstacles and fragmented source columns need
+    // their own line fitting. Duplicate preseed/materialized bounds are OK.
+    return None;
+  }
+  let checkpoint = root.checkpoints.iter().rev().find(|checkpoint| {
+    checkpoint.section_index == section_index
+      && checkpoint.block_index == 0
+      && checkpoint.page_index == root.pages.len()
+  })?;
+  let frames = root.frames.get(checkpoint.frames_len..)?;
+  if frames.len() != section.blocks.len() {
+    return None;
+  }
+  let mut line_height = None;
+  let mut line_count = 0usize;
+  let mut table_count = 0usize;
+  for (index, (frame, block)) in frames.iter().zip(&section.blocks).enumerate() {
+    if frame.block_index != Some(index)
+      || frame.page_index != root.pages.len()
+      || frame.column_index != 0
+      || frame.influences.iter().any(|influence| {
+        influence.kind != FrameInfluenceKind::FlyWrap
+            // Grid spans mark a table as split-sensitive even when its
+            // entire master is present. Verify actual row fragments below.
+            && !(frame.kind == FollowFrameKind::Table
+              && influence.kind == FrameInfluenceKind::TableSplit)
+      })
+    {
+      return None;
+    }
+    match block {
+      Block::Table(table) => {
+        let placement = table.placement?;
+        if frame.kind != FollowFrameKind::Table
+          || !table.split_allowed
+          || table.following_text_flow
+          || placement.vertical_anchor != FrameVerticalAnchor::Text
+          || placement.vertical_offset_pt >= -LAYOUT_EPSILON_PT
+          || placement.horizontal_anchor != FrameHorizontalAnchor::Margin
+          || placement.horizontal_alignment.is_some()
+          || placement.vertical_alignment.is_some()
+          || frame.fragments.iter().any(|fragment| {
+            fragment.kind == FrameFragmentKind::TableRow
+              && fragment.split != FragmentSplitKind::Complete
+          })
+          || frame
+            .fragments
+            .iter()
+            .filter(|f| f.kind == FrameFragmentKind::TableRow)
+            .count()
+            != table.rows.len()
+        {
+          return None;
+        }
+        table_count += 1;
+      }
+      Block::Paragraph(paragraph) => {
+        let format = &paragraph.format;
+        if frame.kind != FollowFrameKind::Paragraph
+          || frame.fragments.len() != 1
+          || format.keep_with_next
+          || format.page_break_before
+          || format.spacing_before_pt != 0.0
+          || format.spacing_before_lines.is_some_and(|v| v != 0.0)
+          || format.spacing_before_auto == Some(true)
+          || paragraph_frame(paragraph).is_some()
+          || !paragraph.footnote_reference_ids.is_empty()
+          || !paragraph.endnote_reference_ids.is_empty()
+          || paragraph.inlines.iter().any(|inline| {
+            !matches!(
+              inline,
+              InlineItem::Text(_)
+                | InlineItem::BookmarkStart(_)
+                | InlineItem::LastRenderedPageBreak
+            )
+          })
+        {
+          return None;
+        }
+        let line = &frame.fragments[0];
+        let height = line.content_advance_pt?;
+        if line.kind != FrameFragmentKind::ParagraphLine
+          || !height.is_finite()
+          || height <= 0.0
+          || line.paragraph_spacing_after_pt != 0.0
+          || frame.flow_bottom_pt? != line.flow_top_pt? + height
+          || line_height.is_some_and(|prior| prior != height)
+        {
+          return None;
+        }
+        line_height = Some(height);
+        line_count += 1;
+      }
+      Block::Frame(_) => return None,
+    }
+  }
+  if table_count != 1 || line_count < 2 {
+    return None;
+  }
+  // Native legacy controls keep the negative fly at its source position,
+  // including when its anchor changes columns or the fly lies below both
+  // balanced columns. Uniform single-line paragraphs divide ceil(N/2)+floor(N/2).
+  // Each column must include its own avoidance gap; averaging the initial
+  // single-column occupied height counts that gap only once. Reuse measured
+  // advances and the ordinary wrap query, without shaping or trial layouts.
+  let endpoint = uniform_wrapped_column_bottom(
+    start_y,
+    line_height?,
+    line_count.div_ceil(2),
+    geometry,
+    exclusion,
+  );
+  let frame_height = endpoint - start_y;
+  if frame_height >= available_pt || frame_height < DEFAULT_LINE_HEIGHT_PT {
+    return None;
+  }
+  // A multi-row master below the new deadline could split on replay. That
+  // independent page-capacity policy needs a separate reservation plan.
+  if exclusion.bottom_pt > endpoint
+    && section
+      .blocks
+      .iter()
+      .any(|block| matches!(block, Block::Table(table) if table.rows.len() > 1))
+  {
+    return None;
+  }
+  let mut layout_height = frame_height;
+  if start_y + layout_height < endpoint {
+    layout_height = layout_height.next_up();
+  }
+  Some(BalancedSectionHeights {
+    page_index: root.pages.len(),
+    section_page_index: flow.section_page_index,
+    frame_top_pt: start_y,
+    layout_height_pt: layout_height,
+    frame_height_pt: frame_height,
+    retained_floating_table: Some(exclusion),
+  })
+}
+
+fn uniform_wrapped_column_bottom(
+  mut y: f32,
+  line_height: f32,
+  rows: usize,
+  geometry: &ColumnGeometry,
+  exclusion: WrapExclusion,
+) -> f32 {
+  for _ in 0..rows {
+    y = dodge_text_wrap_exclusions(
+      y,
+      line_height,
+      geometry.lefts[0],
+      geometry.lefts[0] + geometry.widths[0],
+      &[exclusion],
+    ) + line_height;
+  }
+  y
 }
 
 pub(super) fn occupied_paragraph_bottom(
@@ -517,21 +1037,35 @@ fn uniform_paragraph_section_heights(
       && checkpoint.page_index == root.pages.len()
   })?;
   let frames = root.frames.get(checkpoint.frames_len..)?;
-  if frames.len() < 2 {
+  let line_count = frames
+    .iter()
+    .map(|frame| frame.fragments.len())
+    .sum::<usize>();
+  if line_count < 2 {
     return None;
   }
+  let wrapped_paragraph = section.columns.count > 2 && section.blocks.len() == 1;
   let precision =
-    f64::from(f32::EPSILON) * f64::from(start_y.abs() + end_y.abs()) * (frames.len() + 1) as f64;
+    f64::from(f32::EPSILON) * f64::from(start_y.abs() + end_y.abs()) * (line_count + 1) as f64;
   let mut bottom = f64::from(start_y);
   let mut height = None;
-  let mut endpoints = Vec::with_capacity(frames.len());
+  let mut endpoints = Vec::with_capacity(line_count);
   for frame in frames {
     let Block::Paragraph(paragraph) = section.blocks.get(frame.block_index?)? else {
       return None;
     };
     if frame.kind != FollowFrameKind::Paragraph
       || frame.column_index != 0
-      || frame.fragments.len() != 1
+      || frame.fragments.is_empty()
+      || (frame.fragments.len() != 1
+        && (!wrapped_paragraph
+          || root.current.footnote_reserved_height_pt != 0.0
+          || !cell_text_measure::supports_paragraph(paragraph)
+          || paragraph.format.keep_lines
+          || !paragraph.format.borders.is_empty()
+          || paragraph.format.shading.is_some()
+          || !paragraph.footnote_reference_ids.is_empty()
+          || !paragraph.endnote_reference_ids.is_empty()))
       || frame
         .influences
         .iter()
@@ -547,24 +1081,25 @@ fn uniform_paragraph_section_heights(
     {
       return None;
     }
-    let line = &frame.fragments[0];
-    let top = f64::from(line.flow_top_pt?);
-    let advance = f64::from(line.content_advance_pt?);
-    if line.kind != FrameFragmentKind::ParagraphLine
-      || !advance.is_finite()
-      || advance <= 0.0
-      || line.paragraph_spacing_after_pt != 0.0
-      || (top - bottom).abs() > precision
-      || height.is_some_and(|height: f64| (height - advance).abs() > precision)
-    {
-      return None;
+    for line in &frame.fragments {
+      let top = f64::from(line.flow_top_pt?);
+      let advance = f64::from(line.content_advance_pt?);
+      if line.kind != FrameFragmentKind::ParagraphLine
+        || !advance.is_finite()
+        || advance <= 0.0
+        || line.paragraph_spacing_after_pt != 0.0
+        || (top - bottom).abs() > precision
+        || height.is_some_and(|height: f64| (height - advance).abs() > precision)
+      {
+        return None;
+      }
+      height = Some(advance);
+      bottom = top + advance;
+      endpoints.push(bottom as f32);
     }
-    height = Some(advance);
-    bottom = top + advance;
     if (f64::from(frame.flow_bottom_pt?) - bottom).abs() > precision {
       return None;
     }
-    endpoints.push(bottom as f32);
   }
   if (bottom - f64::from(end_y)).abs() > precision {
     return None;
@@ -573,6 +1108,10 @@ fn uniform_paragraph_section_heights(
   // as 3+3+2 / 3+3+1 / 4+4+2. Both admission and the following continuous
   // section use that complete measured row height. The legacy physical mean
   // and the unrelated default 14.4pt line cannot supply either boundary.
+  // A plain wrapped paragraph has the same measured rows at equal widths:
+  // native Forte/Arial 3-column controls retain 28lines as10/10/8 and32as
+  // 11/11/10 in both legacy and modern modes. Reuse those already formatted
+  // line ends rather than rounding their mean to an unrelated font's height.
   let rows = endpoints.len().div_ceil(section.columns.count);
   let endpoint = endpoints[rows - 1];
   let frame_height = endpoint - start_y;
@@ -585,10 +1124,11 @@ fn uniform_paragraph_section_heights(
   }
   Some(BalancedSectionHeights {
     page_index: root.pages.len(),
-    section_page_index: root.current.section_page_index,
+    section_page_index: flow.section_page_index,
     frame_top_pt: start_y,
     layout_height_pt: layout_height,
     frame_height_pt: frame_height,
+    retained_floating_table: None,
   })
 }
 
@@ -596,6 +1136,549 @@ fn uniform_paragraph_section_heights(
 mod tests {
   use super::*;
   use crate::docx::{Paragraph, ParagraphFormat};
+
+  fn column_test_section(
+    page: PageSetup,
+    widths: &[f32],
+    break_kind: SectionBreakKind,
+    blocks: Vec<Block>,
+  ) -> crate::docx::ImportedSection {
+    let mut columns = SectionColumns {
+      count: widths.len(),
+      explicit_count: widths.len(),
+      ..Default::default()
+    };
+    columns.explicit_widths_pt[..widths.len()].copy_from_slice(widths);
+    columns.explicit_gaps_pt[..widths.len() - 1].fill(36.0);
+    crate::docx::ImportedSection {
+      note_reference_order: Default::default(),
+      page,
+      columns,
+      break_kind,
+      discarded_carrier: None,
+      section_properties: None,
+      title_page: false,
+      header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      even_header_blocks: Vec::new(),
+      even_footer_blocks: Vec::new(),
+      blocks,
+    }
+  }
+
+  fn column_test_text(text: &str, height: f32) -> Block {
+    let mut block = super::super::footnote_follow::tests::paragraph(text, false, false);
+    let Block::Paragraph(paragraph) = &mut block else {
+      unreachable!();
+    };
+    paragraph.format.line_height_pt = Some(height);
+    let style = TextStyle {
+      font_family: Some("Courier New".into()),
+      font_size_pt: 10.0,
+      ..Default::default()
+    };
+    paragraph.base_style = style.clone();
+    for inline in &mut paragraph.inlines {
+      if let InlineItem::Text(run) = inline {
+        run.style = style.clone();
+        run.hyperlink_url = None;
+      }
+    }
+    block
+  }
+
+  #[test]
+  fn an_empty_terminal_mark_keeps_the_taller_columns_occupied_end() {
+    // Native empty/visible-mark opposites retain the same physical column
+    // closure. A mark without painted items still supplies its full advance;
+    // otherwise it invalidates all measured occupied lines and exposes the
+    // shorter geometric mean to the following continuous section.
+    for mode in [12, 15] {
+      for visible in [false, true] {
+        let mut document = super::super::footnote_follow::tests::document();
+        document.compatibility_mode = mode;
+        let mut blocks = vec![
+          column_test_text("A", 18.0),
+          column_test_text("B", 18.0),
+          column_test_text("C", 18.0),
+          column_test_text(if visible { "EMPTY" } else { "" }, 10.0),
+        ];
+        for block in &mut blocks {
+          let Block::Paragraph(paragraph) = block else {
+            unreachable!();
+          };
+          paragraph.format.line_height_rule = LineHeightRule::Exact;
+          paragraph.format.widow_control = Some(false);
+        }
+        let page = document.page;
+        document.sections = vec![
+          column_test_section(
+            page,
+            &[288.0],
+            SectionBreakKind::NextPage,
+            vec![column_test_text("BEFORE", 18.0)],
+          ),
+          column_test_section(page, &[144.0, 144.0], SectionBreakKind::Continuous, blocks),
+          column_test_section(
+            page,
+            &[288.0],
+            SectionBreakKind::Continuous,
+            vec![column_test_text("AFTER", 18.0)],
+          ),
+        ];
+        let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+        root.format_body_frames();
+        let source_frames = root
+          .frames
+          .iter()
+          .filter(|frame| frame.body_section_index == Some(1))
+          .collect::<Vec<_>>();
+        assert_eq!(source_frames.len(), 4);
+        assert_eq!(
+          source_frames
+            .iter()
+            .map(|frame| frame.column_index)
+            .collect::<Vec<_>>(),
+          vec![0, 0, 1, 1],
+          "mode={mode}, visible={visible}"
+        );
+        let mut occupied_bottom = f32::NEG_INFINITY;
+        for frame in &source_frames {
+          for line in &frame.fragments {
+            let advance = line
+              .content_advance_pt
+              .expect("the mark owns a measured flow line");
+            occupied_bottom = occupied_bottom.max(line.flow_top_pt.unwrap() + advance);
+          }
+        }
+        let after = root
+          .frames
+          .iter()
+          .find(|frame| frame.body_section_index == Some(2))
+          .unwrap();
+        assert_eq!(after.fragments[0].flow_top_pt, Some(occupied_bottom));
+      }
+    }
+  }
+
+  #[test]
+  fn unequal_uniform_paragraphs_reflow_before_accepting_a_balanced_height() {
+    // Native short-section opposites vary the blank's visibility and both
+    // width directions. A caption which fits the wide column must not be
+    // accepted as two overflowing lines in the narrow following column.
+    for widths in [[60.0, 120.0], [120.0, 60.0]] {
+      for mode in [12, 15] {
+        for visible in [false, true] {
+          let mut document = super::super::footnote_follow::tests::document();
+          document.compatibility_mode = mode;
+          let page = document.page;
+          document.sections = vec![
+            column_test_section(
+              page,
+              &[288.0],
+              SectionBreakKind::NextPage,
+              vec![column_test_text("BEFORE", 18.0)],
+            ),
+            column_test_section(
+              page,
+              &widths,
+              SectionBreakKind::Continuous,
+              vec![
+                column_test_text(if visible { "BLANK" } else { "" }, 18.0),
+                column_test_text("hello world caption", 18.0),
+              ],
+            ),
+            column_test_section(
+              page,
+              &[288.0],
+              SectionBreakKind::Continuous,
+              vec![column_test_text("AFTER", 18.0)],
+            ),
+          ];
+          let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+          root.format_body_frames();
+          let caption_frames = root
+            .frames
+            .iter()
+            .filter(|frame| frame.body_section_index == Some(1) && frame.block_index == Some(1))
+            .collect::<Vec<_>>();
+          assert!(!caption_frames.is_empty());
+          assert!(
+            caption_frames.iter().all(|frame| {
+              frame
+                .fragments
+                .iter()
+                .all(|line| line.content_advance_pt.is_some())
+            }),
+            "the caption must not inherit the preceding unpainted paragraph mark"
+          );
+          root.finish_current_page();
+          assert_eq!(root.pages.len(), 1);
+          let items = &root.pages[0].items;
+          let marker = |label: &str| {
+            items
+              .iter()
+              .find_map(|item| match item {
+                PageItem::Text(text) if text.text == label => Some(text.y_pt),
+                _ => None,
+              })
+              .expect("source marker")
+          };
+          let wide_first = widths[0] > widths[1];
+          let rows = if wide_first { 2.0 } else { 1.0 };
+          assert!(
+            (marker("AFTER") - marker("BEFORE") - (rows + 1.0) * 18.0).abs() < 0.001,
+            "widths={widths:?},mode={mode},visible={visible}: before={},after={}",
+            marker("BEFORE"),
+            marker("AFTER")
+          );
+          let caption = items
+            .iter()
+            .find_map(|item| match item {
+              PageItem::Text(text) if text.text.contains("hello") => Some(text),
+              _ => None,
+            })
+            .expect("caption retained");
+          let expected_x = page.margin_left_pt + if wide_first { 0.0 } else { widths[0] + 36.0 };
+          assert!(
+            (caption.x_pt - expected_x).abs() < 0.001,
+            "widths={widths:?},mode={mode},visible={visible}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn unequal_final_page_balance_uses_source_suffix_without_moving_the_prefix() {
+    for (widths, words, widow, final_rows, left_words) in [
+      ([60.0, 120.0], 60, false, 2.0, 10),
+      ([120.0, 60.0], 60, false, 2.0, 20),
+      ([120.0, 60.0], 80, true, 4.0, 30),
+      ([120.0, 60.0], 50, true, 2.0, 20),
+      ([120.0, 60.0], 80, false, 4.0, 40),
+      ([120.0, 60.0], 50, false, 2.0, 20),
+    ] {
+      let mut document = super::super::footnote_follow::tests::document();
+      document.compatibility_mode = 12;
+      document.page.height_pt = 792.0;
+      let page = document.page;
+      let prelude = page.height_pt - page.margin_top_pt - page.margin_bottom_pt - 36.0;
+      document.sections = vec![
+        column_test_section(
+          page,
+          &[288.0],
+          SectionBreakKind::NextPage,
+          vec![column_test_text("BEFORE", prelude)],
+        ),
+        column_test_section(
+          page,
+          &widths,
+          SectionBreakKind::Continuous,
+          vec![{
+            let mut block = column_test_text("a ".repeat(words).trim_end(), 18.0);
+            let Block::Paragraph(paragraph) = &mut block else {
+              unreachable!()
+            };
+            paragraph.format.widow_control = Some(widow);
+            block
+          }],
+        ),
+        column_test_section(
+          page,
+          &[288.0],
+          SectionBreakKind::Continuous,
+          vec![column_test_text("AFTER", 18.0)],
+        ),
+      ];
+      let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+      root.format_body_frames();
+      root.finish_current_page();
+      assert_eq!(root.pages.len(), 2);
+      let letters = |items: &[PageItem]| {
+        items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) => Some(text.text.matches('a').count()),
+            _ => None,
+          })
+          .sum::<usize>()
+      };
+      assert_eq!(
+        letters(&root.pages[0].items),
+        30,
+        "original prefix at {widths:?}"
+      );
+      assert_eq!(
+        letters(&root.pages[1].items),
+        words - 30,
+        "source suffix at {widths:?}"
+      );
+      let last = &root.pages[1].items;
+      let split_x = page.margin_left_pt + widths[0] + 36.0;
+      let left = last
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if text.x_pt < split_x => Some(text.text.matches('a').count()),
+          _ => None,
+        })
+        .sum::<usize>();
+      assert_eq!(
+        left, left_words,
+        "source cut at {widths:?},words={words},widow={widow}"
+      );
+      let top = last
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) if text.text.contains('a') => Some(text.y_pt),
+          _ => None,
+        })
+        .reduce(f32::min)
+        .expect("continued body");
+      let after = last
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text == "AFTER" => Some(text.y_pt),
+          _ => None,
+        })
+        .expect("following single-column marker");
+      assert!(
+        (after - top - final_rows * 18.0).abs() < 0.001,
+        "{widths:?}: top={top},after={after}"
+      );
+    }
+  }
+
+  #[test]
+  fn plain_columns_use_real_line_ends_at_equal_and_unequal_widths() {
+    for widths in [
+      &[60.0, 120.0][..],
+      &[120.0, 60.0],
+      &[60.0, 120.0, 36.0],
+      &[72.0, 72.0, 72.0],
+      &[45.0, 45.0, 45.0, 45.0],
+    ] {
+      for mode in [12, 15] {
+        for unbalanced in [false, true] {
+          let mut document = super::super::footnote_follow::tests::document();
+          document.page.height_pt = 792.0;
+          document.compatibility_mode = mode;
+          let page = document.page;
+          let mut columns = column_test_section(
+            page,
+            widths,
+            SectionBreakKind::Continuous,
+            vec![column_test_text("a ".repeat(60).trim_end(), 18.0)],
+          );
+          columns.columns.unbalanced = unbalanced;
+          document.sections = vec![
+            column_test_section(
+              page,
+              &[288.0],
+              SectionBreakKind::NextPage,
+              vec![column_test_text("BEFORE", 18.0)],
+            ),
+            columns,
+            column_test_section(
+              page,
+              &[288.0],
+              SectionBreakKind::Continuous,
+              vec![column_test_text("AFTER", 18.0)],
+            ),
+          ];
+          let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+          root.format_body_frames();
+          root.finish_current_page();
+          assert_eq!(root.pages.len(), 1);
+          let y = |label: &str| {
+            root.pages[0]
+              .items
+              .iter()
+              .find_map(|item| match item {
+                PageItem::Text(text) if text.text == label => Some(text.y_pt),
+                _ => None,
+              })
+              .expect("source marker is present")
+          };
+          // Courier's 6pt advances admit 5/10/3/6/4 words in these widths.
+          // widths. Four complete rows suffice in either column direction;
+          // an authored no-balance keeps the paragraph in its first column.
+          let rows = if unbalanced {
+            if widths[0] == 60.0 {
+              12
+            } else if widths[0] == 120.0 {
+              6
+            } else if widths[0] == 72.0 {
+              10
+            } else {
+              15
+            }
+          } else {
+            4
+          };
+          assert!(
+            (y("AFTER") - y("BEFORE") - (rows + 1) as f32 * 18.0).abs() < 0.001,
+            "widths={widths:?}, mode={mode}, unbalanced={unbalanced}",
+          );
+          let letters = root.pages[0]
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) => Some(text.text.matches('a').count()),
+              _ => None,
+            })
+            .sum::<usize>();
+          assert_eq!(letters, 60, "all source words survive column reflow");
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn balanced_follow_uses_its_physical_page_and_current_section_counter() {
+    for prelude_lines in [13_usize, 26] {
+      for admitted_blank in [false, true] {
+        let mut document = super::super::footnote_follow::tests::document();
+        document.compatibility_mode = 12;
+        document.page = PageSetup {
+          width_pt: 612.0,
+          height_pt: 792.0,
+          margin_top_pt: 72.0,
+          margin_bottom_pt: 72.0,
+          margin_left_pt: 90.0,
+          margin_right_pt: 90.0,
+          ..Default::default()
+        };
+        let page = document.page;
+        let mut prelude = (0..prelude_lines)
+          .map(|index| column_test_text(&format!("PRELUDE{index:02}"), 48.0))
+          .collect::<Vec<_>>();
+        // Leave 8pt on the old physical page. A 6pt blank is a real source
+        // admission; without it the first content follows with counter0.
+        prelude.push(column_test_text("", 16.0));
+        let mut body = Vec::new();
+        if admitted_blank {
+          body.push(column_test_text("", 6.0));
+        }
+        body.push(column_test_text("a ".repeat(30).trim_end(), 18.0));
+        document.sections = vec![
+          column_test_section(page, &[432.0], SectionBreakKind::NextPage, prelude),
+          column_test_section(page, &[264.0, 132.0], SectionBreakKind::Continuous, body),
+          column_test_section(
+            page,
+            &[432.0],
+            SectionBreakKind::Continuous,
+            vec![column_test_text("END", 18.0)],
+          ),
+        ];
+        let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+        root.format_body_frames();
+        root.finish_current_page();
+        assert_eq!(root.pages.len(), prelude_lines / 13 + 1);
+        let last = root.pages.last().expect("physical follow");
+        let mut left = None;
+        let mut right = None;
+        let mut letters = 0;
+        for item in &last.items {
+          if let PageItem::Text(text) = item
+            && text.text.contains('a')
+          {
+            letters += text.text.matches('a').count();
+            if text.x_pt < 390.0 {
+              left.get_or_insert(text.y_pt);
+            } else {
+              right.get_or_insert(text.y_pt);
+            }
+          }
+        }
+        assert_eq!(
+          letters, 30,
+          "all text follows to its selected physical page"
+        );
+        let left = left.expect("first column retains a source line");
+        let right = right.expect("second column receives the balanced suffix");
+        assert!(
+          (left - right).abs() < 0.001,
+          "prelude_lines={prelude_lines}, admitted_blank={admitted_blank}",
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn balanced_uniform_lines_reserve_each_columns_fixed_fly_gap() {
+    let geometry = ColumnGeometry {
+      lefts: vec![36.0, 324.0],
+      widths: vec![252.0, 252.0],
+      gaps: vec![36.0],
+    };
+    let fly = WrapExclusion {
+      left_pt: 26.0,
+      right_pt: 595.0,
+      top_pt: 66.0,
+      bottom_pt: 84.0,
+      side: ImageWrapSide::BothSides,
+      blocks_flow: false,
+      uses_contour: false,
+      contour_band: None,
+      owner: WrapExclusionOwner::FloatingTable,
+    };
+    // Native odd-tail controls keep 3/5/7/9 body paragraphs as 2+1,
+    // 3+2, 4+3 and 5+4, with the same fixed fly avoidance in both columns.
+    for (count, bottom) in [
+      (3usize, 101.0),
+      (4, 101.0),
+      (5, 118.0),
+      (7, 135.0),
+      (9, 152.0),
+    ] {
+      assert_eq!(
+        uniform_wrapped_column_bottom(36.0, 17.0, count.div_ceil(2), &geometry, fly),
+        bottom
+      );
+    }
+    // A larger negative offset reaches the first line; a later source
+    // anchor can put the table entirely below the balanced text frame.
+    assert_eq!(
+      uniform_wrapped_column_bottom(
+        36.0,
+        17.0,
+        2,
+        &geometry,
+        WrapExclusion {
+          top_pt: 50.0,
+          bottom_pt: 68.0,
+          ..fly
+        }
+      ),
+      102.0
+    );
+    assert_eq!(
+      uniform_wrapped_column_bottom(
+        36.0,
+        17.0,
+        2,
+        &geometry,
+        WrapExclusion {
+          top_pt: 100.0,
+          bottom_pt: 118.0,
+          ..fly
+        }
+      ),
+      70.0
+    );
+    // Exact line heights use their real advances, not the default-font slot.
+    assert_eq!(
+      uniform_wrapped_column_bottom(36.0, 12.0, 3, &geometry, fly),
+      96.0
+    );
+    assert_eq!(
+      uniform_wrapped_column_bottom(36.0, 24.0, 3, &geometry, fly),
+      132.0
+    );
+  }
 
   #[test]
   fn continuous_columns_preserve_tallest_text_and_authored_lower_spacing() {

@@ -219,6 +219,22 @@ fn variable_numbering(text: &PaintText<'_>) -> bool {
     })
 }
 
+fn ordinary_wordprocessing_outline(style: &super::TextStyle<'_>) -> bool {
+  style
+    .pdf_glyph_outline_options
+    .as_ref()
+    .is_some_and(|options| {
+      options.wordprocessing_outline
+        && !options.vml_fitted_text
+        && options.transform.is_none()
+        && options.text_warp.is_none()
+    })
+}
+
+fn independent_outline_geometry(style: &super::TextStyle<'_>) -> bool {
+  style.pdf_glyph_outline_options.is_some() && !ordinary_wordprocessing_outline(style)
+}
+
 fn collect_text<'a, 'doc>(
   items: &'a mut [PaintItem<'doc>],
   transformed: bool,
@@ -233,10 +249,11 @@ fn collect_text<'a, 'doc>(
         let owner = match (text.source_frame_index, text.source_line_index) {
           (Some(frame), Some(line)) => Some(LineOwner::Frame { frame, line }),
           (None, None)
-            if text.item.origin_is_baseline
+            if (text.item.origin_is_baseline
+              || ordinary_wordprocessing_outline(&text.item.style))
               && text.item.style.use_windows_font_metrics
               && text.item.style.wordprocessingml_font_slots
-              && text.item.pdf_text_segmentation == common::PdfTextSegmentation::WordLine =>
+              && text.item.pdf_text_segmentation.is_word_line() =>
           {
             Some(LineOwner::Detached {
               group,
@@ -328,10 +345,58 @@ pub(super) fn realize(items: &mut [PaintItem<'_>], cache: &mut NaturalMetricsCac
     let Some(advances) =
       measured.or_else(|| measure_line(&texts, indices, cache, key.variable_numbering))
     else {
+      // Ordinary source tabs have already become positioned text segments;
+      // unlike leaders they need not leave a Tab paint portion or style flag.
+      // An explicit line owner can partition its valid positive gaps into the
+      // same independent LS batches. Detached cells still require continuity.
+      if matches!(key.owner, LineOwner::Frame { .. })
+        && has_positioned_spans(&texts, indices, cache, key.variable_numbering)
+      {
+        realize_tab_line(&mut texts, indices, cache, key.variable_numbering);
+      }
       continue;
     };
     apply_line_advances(&mut texts, indices, anchor, &advances);
   }
+}
+
+fn has_positioned_spans(
+  texts: &[(bool, &mut PaintText<'_>)],
+  indices: &[usize],
+  cache: &mut NaturalMetricsCache,
+  variable_numbering: bool,
+) -> bool {
+  let mut expected = None;
+  let mut has_gap = false;
+  let mut count = 0;
+  let mut magnitude = 1.0_f32;
+  for &index in indices {
+    let Some(values) = measure_line(
+      texts,
+      std::slice::from_ref(&index),
+      cache,
+      variable_numbering,
+    ) else {
+      return false;
+    };
+    let x = texts[index].1.item.x_pt;
+    magnitude = magnitude.max(x.abs());
+    if let Some(end) = expected {
+      let error = f32::EPSILON * (count + 8) as f32 * magnitude;
+      if x < end - error {
+        return false;
+      }
+      has_gap |= x > end + error;
+    }
+    let width = values
+      .iter()
+      .map(|&(ideal, _)| f64::from(ideal))
+      .sum::<f64>()
+      / 4096.0;
+    expected = Some(x + width as f32);
+    count += values.len();
+  }
+  has_gap
 }
 
 /// Native tab portions separate otherwise contiguous Line Services batches.
@@ -416,11 +481,10 @@ fn realize_text_baseline(
 ) {
   let style = &text.item.style;
   if transformed
-    || text.item.paragraph_bidi
     || style.rotation_deg != 0.0
     || style.semantic_only
     || style.horizontal_scale.unwrap_or(1.0) != 1.0
-    || style.pdf_glyph_outline_options.is_some()
+    || independent_outline_geometry(style)
     // Native tab leaders carry explicit horizontal advances, but still
     // share the completed Word line's baseline (including blank-only lines).
     || (style.semantic_character_advances_pt.is_some()
@@ -428,6 +492,9 @@ fn realize_text_baseline(
   {
     return;
   }
+  // Native crossed RTL/LTR, alignment and spacing controls share the same
+  // completed line baseline. Bidi still owns horizontal realization below;
+  // excluding it here leaves proportional leading centered above the text.
   let Some(baseline) = text
     .item
     .wordprocessing_line_metrics
@@ -494,13 +561,12 @@ fn realize_line_origin(
     let (transformed, text) = &texts[index];
     let style = &text.item.style;
     if *transformed
-      || (text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
-        && !variable_numbering)
+      || (!text.item.pdf_text_segmentation.is_word_line() && !variable_numbering)
       || text.item.paragraph_bidi
       || style.rotation_deg != 0.0
       || style.semantic_only
       || style.horizontal_scale.unwrap_or(1.0) != 1.0
-      || style.pdf_glyph_outline_options.is_some()
+      || independent_outline_geometry(style)
       || style.semantic_character_advances_pt.is_some()
     {
       return None;
@@ -542,8 +608,7 @@ fn measure_line(
     let style = &text.item.style;
     let adjustments = style.wordprocessing_justification_expansion_pt.as_deref();
     if *transformed
-      || (text.item.pdf_text_segmentation != common::PdfTextSegmentation::WordLine
-        && !variable_numbering)
+      || (!text.item.pdf_text_segmentation.is_word_line() && !variable_numbering)
       || text.item.paragraph_bidi
       || style.wordprocessing_kashida.is_some()
       || style.rotation_deg != 0.0
@@ -555,7 +620,7 @@ fn measure_line(
       || !text.item.word_spacing_pt.is_finite()
       || (text.item.word_spacing_pt != 0.0
         && (style.character_spacing_pt == 0.0 || text.item.word_spacing_pt < 0.0))
-      || style.pdf_glyph_outline_options.is_some()
+      || independent_outline_geometry(style)
       || style.semantic_character_advances_pt.is_some()
       || ooxmlsdk_layout::fonts::wordprocessingml_punctuation_affects_advances(
         &text.item.text,
@@ -637,28 +702,65 @@ fn measure_line(
           if !ideal.is_finite() || ideal < 0.0 || ideal > MAX_IDEAL_ADVANCE as f32 {
             return None;
           }
+          let balanced_space = style.wordprocessingml_balance_single_byte_double_byte_width
+            && cluster == " "
+            && (style.wordprocessingml_balanced_space_portion
+              || text
+                .item
+                .text
+                .as_bytes()
+                .get(glyph.text_range.start.wrapping_sub(1))
+                == Some(&b' ')
+              || text.item.text.as_bytes().get(glyph.text_range.end) == Some(&b' '));
+          let pitch_units = if style.wordprocessingml_balance_single_byte_double_byte_width
+            && style.character_spacing_pt != 0.0
+          {
+            if balanced_space {
+              2
+            } else {
+              run
+                .font_face
+                .wordprocessingml_balanced_pitch_units(cluster.chars().next()?)
+            }
+          } else {
+            1
+          };
+          let source_pitch = style.character_spacing_pt * pitch_units as f32;
           let kerning_advance_em = style.kerning_enabled().then(|| {
             if logical_spacing {
               // A completed-line correction is normalized by the PDF em.
               // Recover its unadjusted logical design advance; the existing
               // independent device correction below still owns compression.
-              (ideal_pt - adjustment - style.character_spacing_pt) / logical_size
+              (ideal_pt - adjustment - source_pitch) / logical_size
             } else {
               glyph.x_advance
             }
           });
-          let mut natural = cache.device_advance(
-            &run.font_face,
-            run.font_size_pt,
-            glyph.glyph_id,
-            cluster,
-            kerning_advance_em,
-          )?;
+          let mut natural = if balanced_space {
+            // Native balanced-space arrays replace the font's ordinary space
+            // with the resolved reference width before source tracking. The
+            // logical glyph already retains that width and its separate line
+            // adjustment, including source-portion qualification.
+            i32::try_from(common::wordprocessing_device::source_coordinate(
+              ideal_pt - adjustment - source_pitch,
+            ))
+            .ok()?
+          } else {
+            cache.device_advance(
+              &run.font_face,
+              run.font_size_pt,
+              glyph.glyph_id,
+              cluster,
+              kerning_advance_em,
+            )?
+          };
           // Word adds authored tracking after realizing the natural font.
           // Native +/-2-twip controls retain +/-410 ideal units but +/-1
           // printer dot. Neither the logical em nor the font's rounding owns
           // this independent source-device contribution.
-          natural = natural.checked_add(tracking_pixels)?;
+          // MSLS adds each source pitch unit after rounding it to a printer
+          // dot. Two0.75pt units add12dots, not round(1.5/0.12)=13dots.
+          natural = natural.checked_add(tracking_pixels.checked_mul(pitch_units)?)?;
           if adjustment != 0.0 {
             // Line Services compresses the realized trailing bearing before
             // balancing ideal/device widths; the quarter-em comma keeps its
@@ -717,6 +819,39 @@ mod tests {
           "{family} {bold} {size}"
         );
       }
+    }
+  }
+
+  #[test]
+  fn balanced_source_pitch_matches_native_device_input_units() {
+    let mut cache = NaturalMetricsCache::default();
+    for (family, character, pitch, native) in [
+      ("SimSun", '甲', -0.25, 88),
+      ("SimSun", '甲', 0.75, 104),
+      ("MS Mincho", 'あ', 0.75, 104),
+      ("Malgun Gothic", '甲', 0.75, 104),
+      ("Malgun Gothic", 'あ', 0.75, 98),
+      ("Malgun Gothic", '한', 0.75, 98),
+      ("Malgun Gothic", 'Ａ', 0.75, 104),
+    ] {
+      let style = super::super::TextStyle {
+        font_family: Some(family.into()),
+        font_size_pt: 11.04,
+        ..Default::default()
+      };
+      let face = ooxmlsdk_layout::fonts::load_text_face(&style).expect("native control font");
+      let font = skrifa::FontRef::from_index(face.data.as_slice(), face.index).unwrap();
+      let glyph = font.charmap().map(character).unwrap().to_u32();
+      let natural = cache
+        .device_advance(&face, 11.04, glyph, &character.to_string(), None)
+        .unwrap();
+      let units = face.wordprocessingml_balanced_pitch_units(character);
+      let source_pitch = common::wordprocessing_device::source_coordinate(pitch) as i32;
+      assert_eq!(
+        natural + units * source_pitch,
+        native,
+        "{family}/{character}/{pitch}"
+      );
     }
   }
 

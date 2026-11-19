@@ -161,17 +161,38 @@ fn png_trial_metadata_size(data: &[u8]) -> Option<usize> {
     return None;
   }
   let mut position = 8_usize;
+  let mut compatible_header = false;
+  let mut gamma = false;
+  let mut srgb = false;
   loop {
     let header = data.get(position..position.checked_add(8)?)?;
     let length = u32::from_be_bytes(header[..4].try_into().ok()?) as usize;
     let end = position.checked_add(12)?.checked_add(length)?;
     let chunk = data.get(position..end)?;
     match &header[4..8] {
-      b"IHDR" if length == 13 && chunk[16] == 8 && chunk[17] == 2 => {}
-      b"IDAT" | b"pHYs" => {}
+      b"IHDR"
+        if length == 13
+          && ((chunk[16] == 8 && matches!(chunk[17], 0 | 2))
+            || (matches!(chunk[16], 1 | 2 | 4 | 8) && chunk[17] == 3)) =>
+      {
+        compatible_header = true;
+      }
+      // The decoded opaque palette has the same Print decision as its RGB
+      // counterpart. The palette itself is not a GDI+ JPEG property item.
+      b"PLTE" if length > 0 && length <= 768 && length.is_multiple_of(3) => {}
+      b"IDAT" => {}
+      b"pHYs" if length == 9 => {}
+      b"gAMA" if length == 4 => gamma = true,
+      b"sRGB" if length == 1 && chunk[8] <= 3 => srgb = true,
       // GDI+ supplies pixel-unit and X/Y density properties even when pHYs is
       // absent. Their three inline IFD values form a 60-byte Exif segment.
-      b"IEND" => return Some(60),
+      b"IEND" if compatible_header && length == 0 => {
+        // Gamma adds an IFD entry and an external eight-byte rational.
+        // GDI+ also synthesizes that gamma property from sRGB alone; the
+        // rendering-intent byte adds one further inline IFD entry. Native
+        // PNG/property/JPEG trials therefore cost60/80/92, not60/80/72.
+        return Some(60 + usize::from(gamma || srgb) * 20 + usize::from(srgb) * 12);
+      }
       _ => return None,
     }
     position = end;
@@ -332,6 +353,169 @@ mod tests {
         };
         assert_eq!(pixels.rgb.as_slice(), source.as_raw().as_slice());
         assert!(!actual.direct().interpolate);
+      }
+    }
+  }
+
+  #[test]
+  fn print_palette_and_rgb_metadata_keep_native_codec_and_trial_properties() {
+    // Native same-pixel PNG quartets retain the photo/line-art decision
+    // independently of PLTE, gAMA and sRGB. Public GDI+ trials retain an
+    // implicit gamma property for sRGB, including without an authored gAMA.
+    let palette: Vec<u8> = (0_u8..=255)
+      .flat_map(|value| [value, value.wrapping_mul(73), value.wrapping_mul(151)])
+      .collect();
+    for photograph in [false, true] {
+      let indices: Vec<u8> = (0..64 * 64)
+        .map(|index| {
+          if photograph {
+            ((index % 64 + 31 * (index / 64)) % 256) as u8
+          } else {
+            ((index / 8) % 2) as u8
+          }
+        })
+        .collect();
+      let rgb: Vec<u8> = indices
+        .iter()
+        .flat_map(|&index| {
+          palette[usize::from(index) * 3..usize::from(index) * 3 + 3]
+            .iter()
+            .copied()
+        })
+        .collect();
+      for indexed in [false, true] {
+        for (gamma, srgb, property_bytes) in [
+          (false, false, 60),
+          (true, false, 80),
+          (false, true, 92),
+          (true, true, 92),
+        ] {
+          let mut encoded = Vec::new();
+          {
+            let mut encoder = png::Encoder::new(&mut encoded, 64, 64);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder.set_color(if indexed {
+              png::ColorType::Indexed
+            } else {
+              png::ColorType::Rgb
+            });
+            if indexed {
+              encoder.set_palette(palette.clone());
+            }
+            if gamma {
+              encoder.set_source_gamma(png::ScaledFloat::from_scaled(45_455));
+            }
+            if srgb {
+              encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
+            }
+            encoder
+              .write_header()
+              .unwrap()
+              .write_image_data(if indexed { &indices } else { &rgb })
+              .unwrap();
+          }
+          assert_eq!(
+            trial_metadata_size(&encoded, RasterImageFormat::Png),
+            Some(property_bytes)
+          );
+          let mut options = PdfOptions::default();
+          options.images.optimization_policy =
+            PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+          let actual = decode_image(
+            &encoded,
+            Some("image/png"),
+            RasterExportOptions::new(&options, 64.0 * 72.0 / 220.0, 64.0 * 72.0 / 220.0),
+            None,
+          )
+          .unwrap();
+          assert_eq!(actual.size(), (64, 64));
+          if photograph {
+            assert!(matches!(
+              actual.direct().encoding,
+              DirectRasterEncoding::Dct { .. }
+            ));
+          } else {
+            let DirectRasterEncoding::Sampled { pixels } = &actual.direct().encoding else {
+              panic!("line art must preserve exact RGB samples");
+            };
+            assert_eq!(pixels.rgb.as_slice(), rgb.as_slice());
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn print_gray8_and_rgb_use_the_same_retained_and_reduced_codec_surface() {
+    // Native unreduced Gray8/RGB pairs retain lossless RGB; reduced pairs
+    // select JPEG. Route the actual realized samples through one classifier,
+    // retaining its photographic and line-art opposites.
+    for photograph in [false, true] {
+      let gray: Vec<u8> = (0..64 * 64)
+        .map(|index| {
+          if photograph {
+            ((index % 64 + 31 * (index / 64)) % 256) as u8
+          } else if (index / 8) % 2 == 0 {
+            0
+          } else {
+            255
+          }
+        })
+        .collect();
+      let rgb: Vec<u8> = gray.iter().flat_map(|&value| [value; 3]).collect();
+      let mut sources = Vec::new();
+      for (color, data) in [
+        (png::ColorType::Grayscale, gray.as_slice()),
+        (png::ColorType::Rgb, rgb.as_slice()),
+      ] {
+        let mut encoded = Vec::new();
+        {
+          let mut encoder = png::Encoder::new(&mut encoded, 64, 64);
+          encoder.set_depth(png::BitDepth::Eight);
+          encoder.set_color(color);
+          encoder.set_source_gamma(png::ScaledFloat::from_scaled(45_000));
+          encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(data)
+            .unwrap();
+        }
+        assert_eq!(
+          trial_metadata_size(&encoded, RasterImageFormat::Png),
+          Some(80)
+        );
+        sources.push(encoded);
+      }
+      for dpi in [220.0, 440.0] {
+        let mut options = PdfOptions::default();
+        options.images.optimization_policy =
+          PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(PdfDocumentKind::Docx);
+        let export = RasterExportOptions::new(&options, 64.0 * 72.0 / dpi, 64.0 * 72.0 / dpi);
+        let results: Vec<_> = sources
+          .iter()
+          .map(|data| decode_image(data, Some("image/png"), export, None).unwrap())
+          .collect();
+        assert_eq!(results[0].size(), results[1].size());
+        match (&results[0].direct().encoding, &results[1].direct().encoding) {
+          (
+            DirectRasterEncoding::Dct { data: left, .. },
+            DirectRasterEncoding::Dct { data: right, .. },
+          ) => {
+            assert!(photograph, "line art must keep its lossless color samples");
+            assert_eq!(left, right);
+          }
+          (
+            DirectRasterEncoding::Sampled { pixels: left },
+            DirectRasterEncoding::Sampled { pixels: right },
+          ) => {
+            assert_eq!(left.rgb, right.rgb);
+            assert!(
+              !photograph,
+              "photographic samples must enter the common JPEG owner"
+            );
+          }
+          _ => panic!("Gray8 and equal RGB must have the same codec and color samples"),
+        }
       }
     }
   }

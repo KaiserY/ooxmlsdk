@@ -11,6 +11,10 @@ pub struct LayoutOptions {
   /// Explicit application initials for Word USERINITIALS fields. Initials
   /// are independent of the name and are never inferred from the host.
   pub field_user_initials: Option<String>,
+  /// Explicit attached template path for Word TEMPLATE fields. The final
+  /// component owns bare TEMPLATE; \\p retains the full supplied path.
+  /// No template or host filesystem is accessed. None preserves the cache.
+  pub field_template_path: Option<String>,
   /// Resolved Word document template, as an OOXML package. When the document
   /// enables `w:linkStyles`, import its style definitions on open. The caller
   /// resolves either the attached template or its application Normal template;
@@ -60,6 +64,10 @@ pub struct LayoutOptions {
   /// Leaving this unset preserves Word/Presentation cached field results;
   /// spreadsheet TODAY() retains the formula evaluator's system-clock fallback.
   pub field_update_datetime: Option<FieldUpdateDateTime>,
+  /// Word DATE/TIME snapshot established while opening the document.
+  /// Headless Word retains it through later explicit field updates.
+  /// None uses `field_update_datetime`, preserving existing caller behavior.
+  pub field_open_datetime: Option<FieldUpdateDateTime>,
   /// IANA time-zone name used to convert absolute package-property
   /// timestamps, such as `dcterms:created`, when fields are refreshed.
   ///

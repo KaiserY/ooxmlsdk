@@ -12,22 +12,23 @@ use quick_xml::{
 };
 
 use super::{RunStyleOverrides, StylesCatalog, TextStyle, field_instruction_tokens};
+use std::sync::Arc;
 
 const WORD: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-struct Characters {
-  without_spaces: usize,
-  with_spaces: usize,
+pub(super) struct Characters {
+  pub without_spaces: usize,
+  pub with_spaces: usize,
 }
 
 impl Characters {
-  fn add(&mut self, other: Self) {
+  pub(super) fn add(&mut self, other: Self) {
     self.without_spaces += other.without_spaces;
     self.with_spaces += other.with_spaces;
   }
 
-  fn text(text: &str) -> Option<Self> {
+  pub(super) fn text(text: &str) -> Option<Self> {
     let mut result = Self::default();
     for character in text.chars() {
       // Default-ignorable characters depend on Word's text realization (e.g.
@@ -64,6 +65,24 @@ struct Field {
   instruction: String,
   in_result: bool,
   result: Characters,
+  import_id: Option<u64>,
+  locked: bool,
+  result_text: String,
+  language: Option<Arc<str>>,
+}
+
+pub(super) enum CachedPiece {
+  Text(String),
+  Paragraph,
+  Field(Box<CachedField>),
+}
+
+pub(super) struct CachedField {
+  pub import_id: Option<u64>,
+  pub instruction: String,
+  pub locked: bool,
+  pub result: String,
+  pub style: TextStyle,
 }
 
 #[derive(Default)]
@@ -76,8 +95,14 @@ struct Story {
   in_run: bool,
   text_is_instruction: Option<bool>,
   default_hidden: bool,
+  default_language: Option<Arc<str>>,
   paragraph_hidden: bool,
   run_hidden: bool,
+  pieces: Option<Vec<CachedPiece>>,
+  next_complex_id: u64,
+  container_depth: usize,
+  paragraph_language: Option<Arc<str>>,
+  run_language: Option<Arc<str>>,
 }
 
 impl Story {
@@ -90,9 +115,26 @@ impl Story {
       && let Some(field) = self.fields.last_mut()
       && !field.in_result
     {
+      if field.instruction.trim().is_empty() && !text.trim().is_empty() {
+        field.language = self.run_language.clone();
+      }
       field.instruction.push_str(text);
     } else if !self.run_hidden {
-      self.add(Characters::text(text)?)?;
+      self.add_text(text)?;
+    }
+    Some(())
+  }
+
+  fn add_text(&mut self, text: &str) -> Option<()> {
+    self.add(Characters::text(text)?)?;
+    if let Some(pieces) = &mut self.pieces {
+      if let Some(field) = self.fields.last_mut() {
+        field.result_text.push_str(text);
+      } else if let Some(CachedPiece::Text(previous)) = pieces.last_mut() {
+        previous.push_str(text);
+      } else {
+        pieces.push(CachedPiece::Text(text.to_string()));
+      }
     }
     Some(())
   }
@@ -131,11 +173,31 @@ impl Story {
         without_spaces: 1,
         with_spaces: 1,
       },
-      // EQ's internal display text, cold fields and assignments need their
-      // own representation. Keep the authored NUMCHARS cache for such stories.
-      "EQ" | "TC" | "XE" | "PRIVATE" | "ASK" | "SET" => return None,
+      // Cold metadata and SET do not contribute visible story characters.
+      // Native paragraph statistics establish this independently of caches.
+      "TC" | "XE" | "PRIVATE" | "RD" | "TA" | "SET" => Characters::default(),
+      // Equation display and ASK assignment need separate representations.
+      "EQ" | "ASK" => return None,
       _ => field.result,
     };
+    if let Some(pieces) = &mut self.pieces {
+      let result = match name.as_str() {
+        "GOTOBUTTON" | "MACROBUTTON" => button_display_tail(&field.instruction)?.to_string(),
+        "PRINT" | "BARCODE" => "\u{15}".to_string(),
+        "TC" | "XE" | "PRIVATE" | "RD" | "TA" | "SET" => String::new(),
+        _ => field.result_text,
+      };
+      pieces.push(CachedPiece::Field(Box::new(CachedField {
+        import_id: field.import_id,
+        instruction: field.instruction,
+        locked: field.locked,
+        result,
+        style: TextStyle {
+          language: field.language,
+          ..Default::default()
+        },
+      })));
+    }
     self.add(characters)
   }
 
@@ -148,35 +210,44 @@ impl Story {
     match element.local_name().as_ref() {
       b"body" => self.in_body = true,
       _ if !self.in_body => return Some(()),
-      b"p" => self.paragraph_hidden = self.default_hidden,
+      b"p" => {
+        self.paragraph_hidden = self.default_hidden;
+        self.paragraph_language = self.default_language.clone();
+      }
       b"pStyle" => {
         let id = word_attribute(element, b"val", reader)?;
         if styles.paragraph_numbering_reference(Some(&id)).is_some() {
           return None;
         }
-        self.paragraph_hidden = styles
-          .run_style_with_base(
-            Some(&id),
-            TextStyle::default(),
-            RunStyleOverrides::default(),
-          )
-          .hidden;
+        let style = styles.run_style_with_base(
+          Some(&id),
+          TextStyle::default(),
+          RunStyleOverrides::default(),
+        );
+        self.paragraph_hidden = style.hidden;
+        self.paragraph_language = style.language;
       }
       b"r" => {
         self.in_run = true;
         self.run_hidden = self.paragraph_hidden;
+        self.run_language = self.paragraph_language.clone();
       }
       b"rStyle" if self.in_run => {
         let id = word_attribute(element, b"val", reader)?;
-        self.run_hidden = styles
-          .character_run_style(
-            Some(&id),
-            TextStyle {
-              hidden: self.paragraph_hidden,
-              ..Default::default()
-            },
-          )
-          .hidden;
+        let style = styles.character_run_style(
+          Some(&id),
+          TextStyle {
+            hidden: self.paragraph_hidden,
+            ..Default::default()
+          },
+        );
+        self.run_hidden = style.hidden;
+        self.run_language = style.language.or_else(|| self.paragraph_language.clone());
+      }
+      b"lang" if self.in_run => {
+        if let Some(language) = word_attribute(element, b"val", reader) {
+          self.run_language = Some(Arc::from(language));
+        }
       }
       b"vanish" if self.in_run => {
         self.run_hidden = !word_attribute(element, b"val", reader)
@@ -184,19 +255,41 @@ impl Story {
       }
       b"t" => self.text_is_instruction = Some(false),
       b"instrText" => self.text_is_instruction = Some(true),
-      b"fldSimple" => self.fields.push(Field {
-        source: FieldSource::Simple,
-        instruction: word_attribute(element, b"instr", reader)?,
-        in_result: true,
-        result: Characters::default(),
-      }),
-      b"fldChar" => match word_attribute(element, b"fldCharType", reader)?.as_str() {
-        "begin" => self.fields.push(Field {
-          source: FieldSource::Complex,
-          instruction: String::new(),
-          in_result: false,
+      b"fldSimple" => {
+        if !self.fields.is_empty() || self.container_depth > 0 {
+          self.pieces = None;
+        }
+        self.fields.push(Field {
+          source: FieldSource::Simple,
+          instruction: word_attribute(element, b"instr", reader)?,
+          in_result: true,
           result: Characters::default(),
-        }),
+          import_id: None,
+          locked: word_attribute(element, b"fldLock", reader)
+            .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "on")),
+          result_text: String::new(),
+          language: self.run_language.clone(),
+        });
+      }
+      b"fldChar" => match word_attribute(element, b"fldCharType", reader)?.as_str() {
+        "begin" => {
+          if !self.fields.is_empty() || self.container_depth > 0 {
+            self.pieces = None;
+          }
+          let import_id = self.next_complex_id;
+          self.next_complex_id = self.next_complex_id.checked_add(1)?;
+          self.fields.push(Field {
+            source: FieldSource::Complex,
+            instruction: String::new(),
+            in_result: false,
+            result: Characters::default(),
+            import_id: Some(import_id),
+            locked: word_attribute(element, b"fldLock", reader)
+              .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "on")),
+            result_text: String::new(),
+            language: self.run_language.clone(),
+          });
+        }
         "separate" => {
           let field = self.fields.last_mut()?;
           if field.source != FieldSource::Complex || field.in_result {
@@ -209,7 +302,7 @@ impl Story {
       },
       b"tab" => {
         if !self.run_hidden {
-          self.add(Characters::text("\t")?)?;
+          self.add_text("\t")?;
         }
       }
       b"br" | b"cr" => {
@@ -217,17 +310,23 @@ impl Story {
           return None;
         }
         if !self.run_hidden {
-          self.add(Characters::text("\u{b}")?)?;
+          self.add_text("\u{b}")?;
         }
       }
       b"softHyphen" => {} // Word's optional-hyphen control is not counted.
       b"noBreakHyphen" => {
         if !self.run_hidden {
-          self.add(Characters::text("-")?)?;
+          self.add_text("-")?;
         }
       }
+      b"sym" => {
+        if !self.run_hidden {
+          self.add_text("(")?;
+        }
+      }
+      b"sdt" | b"customXml" => self.container_depth += 1,
       // These structures can add or suppress story characters beyond w:t.
-      b"drawing" | b"pict" | b"object" | b"sym" | b"altChunk" | b"numPr" | b"footnoteReference"
+      b"drawing" | b"pict" | b"object" | b"altChunk" | b"numPr" | b"footnoteReference"
       | b"endnoteReference" | b"del" | b"ins" | b"moveFrom" | b"moveTo" => return None,
       _ => {}
     }
@@ -242,6 +341,15 @@ impl Story {
       b"fldSimple" => self.finish_field(FieldSource::Simple)?,
       b"t" | b"instrText" => self.text_is_instruction = None,
       b"r" => self.in_run = false,
+      b"sdt" | b"customXml" => self.container_depth = self.container_depth.checked_sub(1)?,
+      b"p" => {
+        if !self.fields.is_empty() {
+          self.pieces = None;
+        }
+        if let Some(pieces) = &mut self.pieces {
+          pieces.push(CachedPiece::Paragraph);
+        }
+      }
       b"body" => {
         self.in_body = false;
         self.body_complete = true;
@@ -289,17 +397,18 @@ fn word_attribute(
   })
 }
 
-fn statistics(xml: &str, styles: &StylesCatalog) -> Option<(Characters, bool)> {
+fn read_story(xml: &str, styles: &StylesCatalog, capture: bool) -> Option<Story> {
   let mut reader = NsReader::from_str(xml);
   reader.config_mut().expand_empty_elements = true;
-  let default_hidden = styles
-    .run_style_with_base(None, TextStyle::default(), RunStyleOverrides::default())
-    .hidden;
+  let default_style =
+    styles.run_style_with_base(None, TextStyle::default(), RunStyleOverrides::default());
   if styles.paragraph_numbering_reference(None).is_some() {
     return None;
   }
   let mut story = Story {
-    default_hidden,
+    default_hidden: default_style.hidden,
+    default_language: default_style.language,
+    pieces: capture.then(Vec::new),
     ..Default::default()
   };
   loop {
@@ -334,7 +443,19 @@ fn statistics(xml: &str, styles: &StylesCatalog) -> Option<(Characters, bool)> {
       _ => {}
     }
   }
-  (story.body_complete && story.fields.is_empty()).then_some((story.characters, story.requested))
+  (story.body_complete && story.fields.is_empty()).then_some(story)
+}
+
+fn statistics(xml: &str, styles: &StylesCatalog) -> Option<(Characters, bool)> {
+  let story = read_story(xml, styles, false)?;
+  Some((story.characters, story.requested))
+}
+
+pub(super) fn cached_pieces(xml: &str, styles: &StylesCatalog) -> Option<Vec<CachedPiece>> {
+  if !xml.contains("instrText") && !xml.contains("fldSimple") {
+    return None;
+  }
+  read_story(xml, styles, true)?.pieces
 }
 
 pub(super) fn character_count(xml: &str, styles: &StylesCatalog) -> Option<usize> {
@@ -355,6 +476,20 @@ mod tests {
     format!(
       r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}</w:body></w:document>"#
     )
+  }
+
+  #[test]
+  fn cached_statistics_ignore_cold_results_and_count_a_symbol_once() {
+    for name in ["TC", "XE", "TA", "RD", "PRIVATE", "SET"] {
+      let text = xml(&format!(
+        r#"<w:p><w:fldSimple w:instr="NUMCHARS"><w:r><w:t>737</w:t></w:r></w:fldSimple><w:fldSimple w:instr="{name}"><w:r><w:t>STALE DISPLAY</w:t></w:r></w:fldSimple><w:r><w:sym w:font="Calibri" w:char="F026"/></w:r></w:p>"#
+      ));
+      assert_eq!(
+        character_count(&text, &StylesCatalog::default()),
+        Some(4),
+        "{name}"
+      );
+    }
   }
 
   #[test]
@@ -501,7 +636,6 @@ mod tests {
     );
     for unsupported in [
       r#"<w:fldSimple w:instr="EQ \o(A,B)"/>"#,
-      r#"<w:fldSimple w:instr="TC Entry"/>"#,
       "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>",
       "<w:r><w:drawing/></w:r>",
       "<w:r><w:footnoteReference w:id=\"1\"/></w:r>",

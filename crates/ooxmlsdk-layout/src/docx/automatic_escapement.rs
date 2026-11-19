@@ -156,6 +156,11 @@ impl Fonts {
           inline_start,
           inline_end,
           ..
+        }
+        | ParagraphFieldEvent::ConditionalResultSpan {
+          inline_start,
+          inline_end,
+          ..
         } => {
           *inline_start = offsets[*inline_start];
           *inline_end = offsets[*inline_end];
@@ -1092,12 +1097,14 @@ mod tests {
           inline_offset: 2,
         },
         ParagraphFieldEvent::ReferenceResultSpan {
+          reference_kind: crate::docx::field_reference::Kind::Explicit,
           field_id: 2,
           bookmark_name: "source".into(),
           inline_start: 0,
           inline_end: 2,
           merge_format: true,
           copy_text: true,
+          numbering_only: false,
           separator_style: None,
         },
       ];

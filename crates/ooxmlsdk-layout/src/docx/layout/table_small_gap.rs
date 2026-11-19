@@ -3,8 +3,27 @@ use super::*;
 
 #[derive(Clone, Copy, Default)]
 struct Bands {
-  widths: [i64; 3],
-  colors: [Option<RgbColor>; 3],
+  widths: [i64; 5],
+  colors: [Option<RgbColor>; 5],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ConnectionKind {
+  Corner,
+  Tee,
+  Crossing,
+}
+
+impl From<HorizontalTableBorderJunction> for ConnectionKind {
+  fn from(junction: HorizontalTableBorderJunction) -> Self {
+    if junction.is_horizontal_outer {
+      Self::Corner
+    } else if junction.has_horizontal_continuation {
+      Self::Crossing
+    } else {
+      Self::Tee
+    }
+  }
 }
 
 pub(super) fn is_style(border: BorderStyle) -> bool {
@@ -12,7 +31,9 @@ pub(super) fn is_style(border: BorderStyle) -> bool {
     && border.dash_pattern == BorderDashPattern::Solid
     && matches!(
       border.compound_pattern,
-      BorderCompoundPattern::ThinThickSmallGap | BorderCompoundPattern::ThickThinSmallGap
+      BorderCompoundPattern::ThinThickSmallGap
+        | BorderCompoundPattern::ThickThinSmallGap
+        | BorderCompoundPattern::ThinThickThinSmallGap
     )
 }
 
@@ -24,7 +45,13 @@ impl Bands {
     let mut bands = if is_style(border) {
       Self {
         widths: word_table_compound_rails(border)?,
-        colors: [Some(border.color), None, Some(border.color)],
+        colors: [
+          Some(border.color),
+          None,
+          Some(border.color),
+          None,
+          Some(border.color),
+        ],
       }
     } else if !border.compound
       && border.relief.is_none()
@@ -32,8 +59,8 @@ impl Bands {
     {
       let twips = (f64::from(border.width_pt) * 20.0).floor() as i64;
       Self {
-        widths: [(twips * 5 / 12).max(1), 0, 0],
-        colors: [Some(border.color), None, None],
+        widths: [(twips * 5 / 12).max(1), 0, 0, 0, 0],
+        colors: [Some(border.color), None, None, None, None],
       }
     } else {
       return None;
@@ -57,10 +84,18 @@ pub(super) fn paint_horizontal(
   edge: HorizontalTableBorderEdge,
   (leading, trailing): (HorizontalTableBorderJunction, HorizontalTableBorderJunction),
 ) -> bool {
-  if !is_style(border) || !leading.is_horizontal_outer || !trailing.is_horizontal_outer {
+  if !is_style(border)
+    || (border.compound_pattern != BorderCompoundPattern::ThinThickThinSmallGap
+      && (!leading.is_horizontal_outer || !trailing.is_horizontal_outer))
+  {
     return false;
   }
-  let lower = matches!(edge, HorizontalTableBorderEdge::Lower);
+  // An internal row separator uses its near source edge even when emitted
+  // as the preceding row's Lower border. Only the table's outside lower
+  // frame anchors to the far edge; its truncated paint has another owner.
+  let lower = matches!(edge, HorizontalTableBorderEdge::Lower)
+    && leading.is_horizontal_outer
+    && trailing.is_horizontal_outer;
   let left_border = stronger_border(leading.above, leading.below);
   let right_border = stronger_border(trailing.above, trailing.below);
   let Some(horizontal) = Bands::from_border(Some(border), lower) else {
@@ -82,34 +117,34 @@ pub(super) fn paint_horizontal(
   let inner_right = origin(right, right_border);
   let outer_right = inner_right + vertical_right.extent();
   let top = wordprocessing_table_device::source_coordinate(y - border.width_pt / 2.0);
-  let bottom = if lower {
-    top + horizontal.extent()
-  } else {
-    // The top connector reaches the row's layout inset, independently of
-    // the component-wise truncated paint extent (native 50 vs 49 dots).
-    wordprocessing_table_device::source_coordinate(y + border.width_pt / 2.0)
-  };
+  // Both edges retain the layout interval independently of the truncated
+  // component extent (native50vs49dots). The lower strip anchors its bands
+  // to the far edge; its leading residual belongs to the perpendicular
+  // connector. Reconstructing that far edge from the paint extent loses it.
+  let bottom = wordprocessing_table_device::source_coordinate(y + border.width_pt / 2.0);
   horizontal_strip(
     page,
     horizontal,
     (inner_left, top, inner_right, bottom),
     lower,
   );
-  corner(
+  connection(
     page,
     horizontal,
     vertical_left,
     (outer_left, top, inner_left, bottom),
     false,
     lower,
+    ConnectionKind::from(leading),
   );
-  corner(
+  connection(
     page,
     horizontal,
     vertical_right,
     (inner_right, top, outer_right, bottom),
     true,
     lower,
+    ConnectionKind::from(trailing),
   );
   true
 }
@@ -190,7 +225,7 @@ fn corner(
     return;
   }
   let (mut x_offset, mut y_offset) = (0, 0);
-  for index in 0..3 {
+  for index in 0..horizontal.widths.len() {
     let x_width = vertical.widths[index];
     let y_width = horizontal.widths[index];
     let x = if trailing {
@@ -228,6 +263,78 @@ fn corner(
   }
 }
 
+fn connection(
+  page: &mut Page,
+  horizontal: Bands,
+  vertical: Bands,
+  bounds: (i64, i64, i64, i64),
+  trailing: bool,
+  lower: bool,
+  kind: ConnectionKind,
+) {
+  if kind == ConnectionKind::Corner
+    || horizontal.widths != vertical.widths
+    || horizontal.widths[4] == 0
+  {
+    corner(page, horizontal, vertical, bounds, trailing, lower);
+    return;
+  }
+  let (left, top, right, bottom) = bounds;
+  let (paint_top, paint_bottom) = if lower {
+    (bottom - horizontal.extent(), bottom)
+  } else {
+    (top, top + horizontal.extent())
+  };
+  // Native three-rail T joins retain the outer and middle vertical rails.
+  // The two thin horizontal rails meet the innermost vertical rail; the
+  // central horizontal rail meets the middle one. The horizontal border
+  // owns the connector's ink, including when the adjoining row rails differ
+  // in color. Do not substitute an outside L corner or a solid square.
+  let mut offset = 0;
+  for index in 0..horizontal.widths.len() {
+    let width = horizontal.widths[index];
+    if index % 2 == 0 {
+      // A four-way crossing leaves the two thin vertical rails open in
+      // the horizontal gaps. Paired facing caps supply only their four
+      // corner patches; the thick middle rail continues through the join.
+      if index == 2 || (kind == ConnectionKind::Tee && index == 0) {
+        let x = if trailing {
+          right - offset - width
+        } else {
+          left + offset
+        };
+        fill(
+          page,
+          (x, paint_top, x + width, paint_bottom),
+          horizontal.colors[index],
+        );
+      }
+      let target = if index == 2 { 2 } else { 4 };
+      let inset = vertical.widths[..target].iter().sum::<i64>();
+      let y = if lower {
+        paint_bottom - offset - width
+      } else {
+        paint_top + offset
+      };
+      let (x1, x2) = if trailing {
+        (left, right - inset)
+      } else {
+        (left + inset, right)
+      };
+      fill(page, (x1, y, x2, y + width), horizontal.colors[index]);
+    }
+    offset += width;
+  }
+  // Layout can retain a final source dot beyond the truncated paint bands.
+  // That row-inset residual remains owned by the perpendicular border.
+  let residual = if lower {
+    (left, top, right, paint_top)
+  } else {
+    (left, paint_bottom, right, bottom)
+  };
+  vertical_strip(page, vertical, residual, trailing);
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -250,6 +357,219 @@ mod tests {
       }
       _ => None,
     })
+  }
+
+  #[test]
+  fn triple_small_gap_internal_t_join_matches_native_colored_bands() {
+    let horizontal = BorderStyle {
+      width_pt: 6.0,
+      compound: true,
+      compound_pattern: BorderCompoundPattern::ThinThickThinSmallGap,
+      color: RED,
+      ..Default::default()
+    };
+    let vertical = BorderStyle {
+      color: BLUE,
+      ..horizontal
+    };
+    let native = [
+      [Some(RED), None, Some(RED), None, Some(RED)],
+      [Some(RED), None, Some(RED), None, None],
+      [Some(RED), None, Some(RED), Some(RED), Some(RED)],
+      [Some(RED), None, Some(RED), None, None],
+      [Some(RED), None, Some(RED), None, Some(RED)],
+    ];
+    for trailing in [false, true] {
+      let mut page = empty_page(
+        PageSetup {
+          width_pt: 612.0,
+          height_pt: 792.0,
+          ..Default::default()
+        },
+        0,
+      );
+      connection(
+        &mut page,
+        Bands::from_border(Some(horizontal), false).unwrap(),
+        Bands::from_border(Some(vertical), trailing).unwrap(),
+        (530, 762, 579, 812),
+        trailing,
+        false,
+        ConnectionKind::Tee,
+      );
+      // Actual Word red/blue control: left sourceX530, first internal row
+      // sourceY762; 49 painted dots plus one blue row-inset residual.
+      for (row, dy) in [3, 9, 24, 40, 46].into_iter().enumerate() {
+        for (column, dx) in [3, 9, 24, 40, 46].into_iter().enumerate() {
+          let (x, y, w, h) =
+            word_table_device_rectangle(&page, (530 + dx, 762 + dy, 531 + dx, 763 + dy));
+          assert_eq!(
+            color_at(&page, x + w / 2.0, y + h / 2.0),
+            native[row][if trailing { 4 - column } else { column }]
+          );
+        }
+      }
+      let (x, y, w, h) = word_table_device_rectangle(&page, (533, 811, 534, 812));
+      assert_eq!(color_at(&page, x + w / 2.0, y + h / 2.0), Some(BLUE));
+      assert!(paint_horizontal(
+        &mut page,
+        (66.6, 94.427_734, 226.2),
+        horizontal,
+        HorizontalTableBorderEdge::Upper,
+        (
+          HorizontalTableBorderJunction::internal(Some(vertical), Some(vertical)),
+          HorizontalTableBorderJunction::internal(Some(vertical), Some(vertical))
+        ),
+      ));
+      let mut lower_page = empty_page(
+        PageSetup {
+          width_pt: 612.0,
+          height_pt: 792.0,
+          ..Default::default()
+        },
+        0,
+      );
+      assert!(paint_horizontal(
+        &mut lower_page,
+        (66.6, 94.427_734, 226.2),
+        horizontal,
+        HorizontalTableBorderEdge::Lower,
+        (
+          HorizontalTableBorderJunction::internal(Some(vertical), Some(vertical)),
+          HorizontalTableBorderJunction::internal(Some(vertical), Some(vertical))
+        ),
+      ));
+      let mut rails = lower_page
+        .items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Fill(fill) if fill.x_pt < 100.0 && fill.x_pt + fill.width_pt > 100.0 => {
+            Some((fill.y_pt, fill.height_pt))
+          }
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      rails.sort_by(|a, b| a.0.total_cmp(&b.0));
+      assert_eq!(rails.len(), 3);
+      for ((y, height), (native_y, native_height)) in
+        rails
+          .into_iter()
+          .zip([(91.46, 0.72), (92.9, 3.0), (96.62, 0.72)])
+      {
+        assert!((y - native_y).abs() < 0.01, "{y} versus {native_y}");
+        assert!((height - native_height).abs() < 0.01);
+      }
+    }
+  }
+
+  #[test]
+  fn triple_small_gap_four_way_crossing_keeps_native_thin_rail_gaps() {
+    let border = BorderStyle {
+      width_pt: 6.0,
+      compound: true,
+      compound_pattern: BorderCompoundPattern::ThinThickThinSmallGap,
+      color: RED,
+      ..Default::default()
+    };
+    let vertical = BorderStyle {
+      color: BLUE,
+      ..border
+    };
+    let native = [
+      [Some(RED), None, Some(RED), None, Some(RED)],
+      [None, None, Some(RED), None, None],
+      [Some(RED); 5],
+      [None, None, Some(RED), None, None],
+      [Some(RED), None, Some(RED), None, Some(RED)],
+    ];
+    let mut page = empty_page(
+      PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        ..Default::default()
+      },
+      0,
+    );
+    for trailing in [false, true] {
+      connection(
+        &mut page,
+        Bands::from_border(Some(border), false).unwrap(),
+        Bands::from_border(Some(vertical), trailing).unwrap(),
+        (530, 762, 579, 812),
+        trailing,
+        false,
+        ConnectionKind::Crossing,
+      );
+    }
+    for (row, dy) in [3, 9, 24, 40, 46].into_iter().enumerate() {
+      for (column, dx) in [3, 9, 24, 40, 46].into_iter().enumerate() {
+        let (x, y, w, h) =
+          word_table_device_rectangle(&page, (530 + dx, 762 + dy, 531 + dx, 763 + dy));
+        assert_eq!(
+          color_at(&page, x + w / 2.0, y + h / 2.0),
+          native[row][column]
+        );
+      }
+    }
+    let mut junction = HorizontalTableBorderJunction::internal(Some(vertical), Some(vertical));
+    assert_eq!(ConnectionKind::from(junction), ConnectionKind::Tee);
+    junction.has_horizontal_continuation = true;
+    assert_eq!(ConnectionKind::from(junction), ConnectionKind::Crossing);
+  }
+
+  #[test]
+  fn lower_small_gap_uses_native_far_edge_across_row_height_phases() {
+    let border = BorderStyle {
+      width_pt: 6.0,
+      compound: true,
+      compound_pattern: BorderCompoundPattern::ThickThinSmallGap,
+      color: RED,
+      ..Default::default()
+    };
+    for (phase, expected_top, expected_bottom) in [
+      (-0.05, 343.13, 349.01),
+      (0.0, 343.13, 349.01),
+      (0.05, 343.13, 349.01),
+      (0.10, 343.25, 349.13),
+    ] {
+      let mut page = empty_page(
+        PageSetup {
+          width_pt: 595.3,
+          height_pt: 841.9,
+          ..Default::default()
+        },
+        0,
+      );
+      assert!(paint_horizontal(
+        &mut page,
+        (134.8, 345.955_96 + phase, 460.45),
+        border,
+        HorizontalTableBorderEdge::Lower,
+        (
+          HorizontalTableBorderJunction::horizontal_outer(None, None),
+          HorizontalTableBorderJunction::horizontal_outer(None, None),
+        ),
+      ));
+      let fills = page
+        .items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Fill(fill) => Some(fill),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(fills.len(), 2);
+      let top = fills
+        .iter()
+        .map(|fill| fill.y_pt)
+        .fold(f32::INFINITY, f32::min);
+      let bottom = fills
+        .iter()
+        .map(|fill| fill.y_pt + fill.height_pt)
+        .fold(f32::NEG_INFINITY, f32::max);
+      assert!((top - expected_top).abs() < 0.0052);
+      assert!((bottom - expected_bottom).abs() < 0.0052);
+    }
   }
 
   #[test]

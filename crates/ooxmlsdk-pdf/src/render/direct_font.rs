@@ -17,6 +17,8 @@ use crate::error::{PdfError, Result};
 use ooxmlsdk_fonts::FontBytes;
 use ooxmlsdk_layout::fonts::FontFaceData;
 
+mod winansi;
+
 const IDENTITY_H: &[u8] = b"Identity-H";
 const SUBSET_TAG_LEN: usize = 6;
 const PDF_UNITS_PER_EM: f32 = 1000.0;
@@ -55,6 +57,7 @@ struct DirectFont {
   glyphs: GlyphRemapper,
   codepoints: HashMap<u16, String>,
   advance_widths: HashMap<u16, f32>,
+  word_winansi: Option<winansi::WordWinAnsiFont>,
 }
 
 // Word preserves these legacy PostScript family names while embedding their
@@ -65,6 +68,8 @@ struct DirectFont {
 enum WordFontAlias {
   Helvetica,
   Times,
+  BitmapCalibri,
+  MetafileSystem,
 }
 
 impl WordFontAlias {
@@ -88,6 +93,8 @@ impl WordFontAlias {
       (Self::Times, "TimesNewRomanPS-ItalicMT") => Some("Times,Italic"),
       (Self::Times, "TimesNewRomanPS-BoldMT") => Some("Times,Bold"),
       (Self::Times, "TimesNewRomanPS-BoldItalicMT") => Some("Times,BoldItalic"),
+      (Self::BitmapCalibri, "MingLiU-ExtB" | "SimSun") => Some("Calibri"),
+      (Self::MetafileSystem, "SimSun") => Some("Arial"),
       _ => None,
     }
   }
@@ -277,6 +284,34 @@ impl DirectFontSet {
     let mut direct_face = DirectFontFace::from_layout(face);
     direct_face.word_alias = word_family.and_then(WordFontAlias::from_family);
     direct_face.word_names = true;
+    self.register_direct_face(direct_face, integer_widths, alloc)
+  }
+
+  pub(super) fn register_bitmap_semantic_face(
+    &mut self,
+    face: &FontFaceData,
+    integer_widths: bool,
+    alloc: impl FnMut() -> Result<Ref>,
+  ) -> Result<FontHandle> {
+    let mut direct_face = DirectFontFace::from_layout(face);
+    // Native CFF bitmap carriers keep the requested Calibri resource name
+    // while embedding the physical GDI charset/family substitute. Keep this
+    // alias in the resource key; ordinary text in that face is independent.
+    direct_face.word_alias = Some(WordFontAlias::BitmapCalibri);
+    self.register_direct_face(direct_face, integer_widths, alloc)
+  }
+
+  pub(super) fn register_metafile_system_face(
+    &mut self,
+    face: &FontFaceData,
+    integer_widths: bool,
+    alloc: impl FnMut() -> Result<Ref>,
+  ) -> Result<FontHandle> {
+    let mut direct_face = DirectFontFace::from_layout(face);
+    // Native Word labels the stock System font's SimSun outline substitute
+    // Arial. Keep its actual program/metrics and an independent resource key;
+    // ordinary SimSun text must retain its own name and glyph registration.
+    direct_face.word_alias = Some(WordFontAlias::MetafileSystem);
     self.register_direct_face(direct_face, integer_widths, alloc)
   }
 
@@ -500,6 +535,7 @@ impl DirectFontSet {
       glyphs: GlyphRemapper::new(),
       codepoints: HashMap::default(),
       advance_widths: HashMap::default(),
+      word_winansi: None,
     });
     self.by_face.insert(key.clone(), index);
     self.last_face = Some((key, index));
@@ -580,6 +616,55 @@ impl DirectFontSet {
     Ok((&font.resource_name, font.objects.type0))
   }
 
+  pub(super) fn enable_word_winansi(
+    &mut self,
+    handle: FontHandle,
+    alloc: impl FnMut() -> Result<Ref>,
+  ) -> Result<bool> {
+    let font = self
+      .fonts
+      .get_mut(handle.0)
+      .ok_or_else(|| PdfError::Writer("direct font handle is out of range".to_string()))?;
+    if font.metadata.is_cff {
+      return Ok(false);
+    }
+    if font.word_winansi.is_none() {
+      font.word_winansi = Some(winansi::WordWinAnsiFont::new(
+        format!("F{}W", handle.0).into_bytes(),
+        alloc,
+      )?);
+    }
+    Ok(true)
+  }
+
+  pub(super) fn word_winansi_resource(&self, handle: FontHandle) -> Result<(&[u8], Ref)> {
+    self
+      .fonts
+      .get(handle.0)
+      .and_then(|font| font.word_winansi.as_ref())
+      .map(winansi::WordWinAnsiFont::resource)
+      .ok_or_else(|| PdfError::Writer("Word WinAnsi font has not been registered".into()))
+  }
+
+  pub(super) fn register_word_winansi_control(
+    &mut self,
+    handle: FontHandle,
+    code: u8,
+  ) -> Result<RegisteredGlyph> {
+    // Preserve the source .notdef advance. WinAnsi's character name chooses
+    // paint/extraction independently through the shared subset's cmap.
+    let registered = self.register_glyph(handle, 0, None)?;
+    self.fonts[handle.0]
+      .word_winansi
+      .as_mut()
+      .ok_or_else(|| PdfError::Writer("Word WinAnsi font has not been registered".into()))?
+      .register_width(code, registered.natural_advance_pdf_units)?;
+    Ok(RegisteredGlyph {
+      cid: u16::from(code),
+      ..registered
+    })
+  }
+
   pub(super) fn word_synthetic_bold_stroke(&self, handle: FontHandle) -> bool {
     self
       .fonts
@@ -603,7 +688,7 @@ impl DirectFont {
       .iter()
       .map(|variation| (subsetter::Tag::new(&variation.tag), variation.value))
       .collect::<Vec<_>>();
-    let subset = subsetter::subset_with_variations(
+    let mut subset = subsetter::subset_with_variations(
       self.face.data.as_slice(),
       self.face.index,
       &variation_coordinates,
@@ -616,6 +701,9 @@ impl DirectFont {
         self.face.index
       ))
     })?;
+    if self.word_winansi.is_some() {
+      subset = winansi::with_subset_cmap(&subset, &self.face, &self.glyphs)?;
+    }
     let embedded = if self.metadata.is_cff {
       let subset_face = FontRef::new(&subset)
         .map_err(|error| PdfError::Writer(format!("failed to parse CFF font subset: {error}")))?;
@@ -680,28 +768,16 @@ impl DirectFont {
     cid.widths().consecutive(0, widths).finish();
     cid.finish();
 
-    let flags = font_descriptor_flags(&self.metadata);
-    let mut descriptor = pdf.font_descriptor(self.objects.descriptor);
-    descriptor
-      .name(Name(base_name.as_bytes()))
-      .flags(flags)
-      .bbox(Rect::new(
-        self.metadata.bbox[0],
-        self.metadata.bbox[1],
-        self.metadata.bbox[2],
-        self.metadata.bbox[3],
-      ))
-      .italic_angle(self.metadata.italic_angle)
-      .ascent(self.metadata.ascent)
-      .descent(self.metadata.descent)
-      .cap_height(self.metadata.cap_height)
-      .stem_v(self.metadata.stem_v);
-    if self.metadata.is_cff {
-      descriptor.font_file3(self.objects.data);
-    } else {
-      descriptor.font_file2(self.objects.data);
+    self.metadata.write_descriptor(
+      pdf,
+      self.objects.descriptor,
+      self.objects.data,
+      &base_name,
+      font_descriptor_flags(&self.metadata),
+    );
+    if let Some(winansi) = &self.word_winansi {
+      winansi.write(pdf, &base_name, &self.metadata, self.objects.data)?;
     }
-    descriptor.finish();
 
     let mut cmap = UnicodeCmap::new(Name(b"Custom"), SYSTEM_INFO);
     for cid in 0..self.glyphs.num_gids() {
@@ -763,6 +839,37 @@ fn font_descriptor_flags(metadata: &FontMetadata) -> FontFlags {
 }
 
 impl FontMetadata {
+  fn write_descriptor(
+    &self,
+    pdf: &mut Pdf,
+    reference: Ref,
+    data: Ref,
+    name: &str,
+    flags: FontFlags,
+  ) {
+    let mut descriptor = pdf.font_descriptor(reference);
+    descriptor
+      .name(Name(name.as_bytes()))
+      .flags(flags)
+      .bbox(Rect::new(
+        self.bbox[0],
+        self.bbox[1],
+        self.bbox[2],
+        self.bbox[3],
+      ))
+      .italic_angle(self.italic_angle)
+      .ascent(self.ascent)
+      .descent(self.descent)
+      .cap_height(self.cap_height)
+      .stem_v(self.stem_v);
+    if self.is_cff {
+      descriptor.font_file3(data);
+    } else {
+      descriptor.font_file2(data);
+    }
+    descriptor.finish();
+  }
+
   fn from_face(face_data: &DirectFontFace) -> Result<Self> {
     let face =
       FontRef::from_index(face_data.data.as_slice(), face_data.index).map_err(|error| {
@@ -1012,6 +1119,70 @@ mod tests {
             physical
           );
         }
+      }
+    }
+  }
+
+  #[test]
+  fn bitmap_carrier_alias_keeps_physical_metrics_and_separate_resources() {
+    let mut resolver = ooxmlsdk_layout::fonts::FontResolver::default();
+    let mut fonts = super::DirectFontSet::default();
+    let mut next = 1;
+    let mut allocate = || {
+      let reference = pdf_writer::Ref::new(next);
+      next += 1;
+      Ok(reference)
+    };
+    for family in ["MingLiU-ExtB", "SimSun", "Calibri"] {
+      let face = resolver
+        .cached_text_face(&ooxmlsdk_layout::common::TextStyle {
+          font_family: Some(family.into()),
+          ..Default::default()
+        })
+        .unwrap();
+      let ordinary = fonts.register_face(&face, &mut allocate).unwrap();
+      let carrier = fonts
+        .register_bitmap_semantic_face(&face, false, &mut allocate)
+        .unwrap();
+      assert_ne!(ordinary, carrier);
+      assert_eq!(fonts.fonts[carrier.0].metadata.postscript_name, "Calibri");
+      assert_eq!(
+        fonts.fonts[ordinary.0].metadata.bbox,
+        fonts.fonts[carrier.0].metadata.bbox
+      );
+      assert_eq!(
+        fonts.fonts[ordinary.0].face.id,
+        fonts.fonts[carrier.0].face.id
+      );
+      assert_eq!(
+        fonts
+          .register_bitmap_semantic_face(&face, false, &mut allocate)
+          .unwrap(),
+        carrier
+      );
+      assert_eq!(fonts.register_face(&face, &mut allocate).unwrap(), ordinary);
+      if family == "SimSun" {
+        let stock = fonts
+          .register_metafile_system_face(&face, false, &mut allocate)
+          .unwrap();
+        assert_ne!(stock, ordinary);
+        assert_ne!(stock, carrier);
+        assert_eq!(fonts.fonts[stock.0].metadata.postscript_name, "Arial");
+        assert_eq!(fonts.fonts[ordinary.0].metadata.postscript_name, "SimSun");
+        assert_eq!(
+          fonts.fonts[stock.0].metadata.bbox,
+          fonts.fonts[ordinary.0].metadata.bbox
+        );
+        assert_eq!(
+          fonts.fonts[stock.0].face.id,
+          fonts.fonts[ordinary.0].face.id
+        );
+        assert_eq!(
+          fonts
+            .register_metafile_system_face(&face, false, &mut allocate)
+            .unwrap(),
+          stock
+        );
       }
     }
   }

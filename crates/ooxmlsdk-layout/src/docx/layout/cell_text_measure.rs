@@ -7,8 +7,9 @@
 use super::{
   BlockArea, DEFAULT_ORPHAN_LINES, DEFAULT_TAB_STOP_PT, EstimatedParagraphContentExtents,
   FlowContext, FrameFragmentKind, InlineItem, PageSetup, TextFrameLayout, TextMetrics,
-  TextSegmentation, UNBOUNDED_LAYOUT_EXTENT_PT, cell_horizontal_border_widths, empty_section_page,
-  paragraph_content_width, paragraph_frame, resolved_paragraph_indents, row_has_separate_borders,
+  TextSegmentation, UNBOUNDED_LAYOUT_EXTENT_PT, cell_horizontal_border_widths,
+  cell_physical_horizontal_border_widths, empty_section_page, paragraph_content_width,
+  paragraph_frame, resolved_paragraph_indents, row_has_separate_borders,
   wordprocessing_line_geometry,
 };
 
@@ -19,6 +20,7 @@ pub(super) struct TableCellMeasureContext {
   pub horizontal_rule_reference_width_pt: Option<f32>,
   pub default_tab_stop_pt: f32,
   pub horizontal_borders: Option<(f32, f32, bool)>,
+  pub text_horizontal_borders: Option<(f32, f32)>,
 }
 
 impl TableCellMeasureContext {
@@ -28,8 +30,9 @@ impl TableCellMeasureContext {
     row: &crate::docx::TableRow,
     cell: &crate::docx::TableCell,
   ) -> Self {
-    let (left, right) = cell_horizontal_border_widths(table, row, cell);
+    let (left, right) = cell_physical_horizontal_border_widths(table, row, cell);
     self.horizontal_borders = Some((left, right, row_has_separate_borders(table, row)));
+    self.text_horizontal_borders = Some(cell_horizontal_border_widths(table, row, cell));
     self.in_header_footer = table.in_header_footer;
     self.setup = super::table_story_setup(self.setup, self.in_header_footer);
     self
@@ -44,6 +47,7 @@ impl From<PageSetup> for TableCellMeasureContext {
       horizontal_rule_reference_width_pt: None,
       default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
       horizontal_borders: None,
+      text_horizontal_borders: None,
     }
   }
 }
@@ -56,6 +60,7 @@ impl From<BlockArea> for TableCellMeasureContext {
       horizontal_rule_reference_width_pt: area.horizontal_rule_reference_width_pt,
       default_tab_stop_pt: area.default_tab_stop_pt,
       horizontal_borders: None,
+      text_horizontal_borders: None,
     }
   }
 }
@@ -122,21 +127,30 @@ pub(super) fn supports_paragraph(paragraph: &crate::docx::Paragraph) -> bool {
 }
 
 fn supports_measurement(paragraph: &crate::docx::Paragraph) -> bool {
+  !paragraph.inlines.is_empty() && supports_ordinary_content(paragraph)
+}
+
+pub(super) fn supports_master_paragraph(paragraph: &crate::docx::Paragraph) -> bool {
+  // A blank paragraph is still a physical lower. In particular, a blank on
+  // the follow must not prevent the master from shrinking to its retained
+  // lines. Keep whole-cell measurement and column-widow eligibility separate.
+  paragraph.list_label.is_none() && supports_ordinary_content(paragraph)
+}
+
+fn supports_ordinary_content(paragraph: &crate::docx::Paragraph) -> bool {
   // Bookmarks carry source anchors, not text advances. Native joined,
   // split and bookmarked controls retain the same physical cell lines.
   // Let their ordinary text use this formatter too: the fallback estimate
   // can count a separate trailing-blank portion as an additional line.
   // Real field instructions/results keep their existing independent owner.
-  !(paragraph.inlines.is_empty()
-    || paragraph.field_events.iter().any(|event| {
-      !matches!(
-        event,
-        crate::docx::ParagraphFieldEvent::Content
-          | crate::docx::ParagraphFieldEvent::BookmarkStart { .. }
-          | crate::docx::ParagraphFieldEvent::BookmarkEnd { .. }
-      )
-    })
-    || paragraph_frame(paragraph).is_some()
+  !(paragraph.field_events.iter().any(|event| {
+    !matches!(
+      event,
+      crate::docx::ParagraphFieldEvent::Content
+        | crate::docx::ParagraphFieldEvent::BookmarkStart { .. }
+        | crate::docx::ParagraphFieldEvent::BookmarkEnd { .. }
+    )
+  }) || paragraph_frame(paragraph).is_some()
     || paragraph.format.word_text_frame_story
     || paragraph.format.wordprocessing_shape_story
     || paragraph.list_label_image.is_some()
@@ -157,6 +171,30 @@ mod tests {
   use super::*;
   use crate::docx::layout::BlockNeighbors;
   use crate::docx::{ParagraphFormat, TextRun, TextStyle};
+
+  #[test]
+  fn blank_master_lowers_keep_fields_and_numbering_with_their_owners() {
+    let mut blocks = crate::docx::html::import_blocks("<p>text</p>", false);
+    let super::super::Block::Paragraph(mut paragraph) = blocks.remove(0) else {
+      panic!("paragraph")
+    };
+    paragraph.inlines.clear();
+    assert!(supports_master_paragraph(&paragraph));
+    assert!(!supports_paragraph(&paragraph));
+    assert!(!supports_measurement(&paragraph));
+    paragraph.list_label = Some("1.".into());
+    assert!(!supports_master_paragraph(&paragraph));
+    paragraph.list_label = None;
+    paragraph
+      .field_events
+      .push(crate::docx::ParagraphFieldEvent::Instruction(
+        " PAGE ".into(),
+      ));
+    assert!(!supports_master_paragraph(&paragraph));
+    paragraph.field_events.clear();
+    paragraph.format.wordprocessing_shape_story = true;
+    assert!(!supports_master_paragraph(&paragraph));
+  }
 
   #[test]
   fn cell_text_measure_owns_lines_but_not_surrounding_paragraph_spacing() {

@@ -9,7 +9,7 @@ use super::*;
 #[derive(Clone, Debug)]
 pub(super) struct FootnotePlan {
   pub ids: Vec<i64>,
-  pub master: Arc<FootnotePage>,
+  pub master: Rc<FootnotePage>,
 }
 
 #[derive(Clone, Debug)]
@@ -20,7 +20,7 @@ pub(super) struct FootnotePage {
   items: Vec<PageItem>,
   fragments: Vec<FrameFragment>,
   influences: Vec<FrameInfluence>,
-  follow: Option<Arc<FootnotePage>>,
+  follow: Option<Rc<FootnotePage>>,
 }
 
 pub(super) fn plan_for_block<'a>(
@@ -202,7 +202,7 @@ fn format_pages<'a>(
   flow: FlowContext,
   space: FootnoteMasterSpace,
   metrics: &mut TextMetrics,
-) -> Option<Arc<FootnotePage>> {
+) -> Option<Rc<FootnotePage>> {
   let FootnoteMasterSpace {
     page_index,
     available,
@@ -290,6 +290,30 @@ fn format_pages<'a>(
           // consuming flow. Keep the allocated line advances as the cursor.
           page.footnote_flow_bottom_pt = Some(top + advance);
         }
+      } else if matches!(block, Block::Table(_)) {
+        for (index, page) in pages.iter_mut().enumerate().skip(first_page) {
+          let fragment_start = if index == first_page {
+            first_fragment
+          } else {
+            0
+          };
+          // A split table commits its page before returning its final cursor.
+          // The preceding paragraph's recorded bottom cannot describe that
+          // committed page. The last outer row is recorded after its cell
+          // lowers; use its allocated advance, not an overflowing glyph box.
+          if let Some(bottom) = page.frame_fragments[fragment_start..]
+            .iter()
+            .rev()
+            .find(|fragment| fragment.kind == FrameFragmentKind::TableRow)
+            .and_then(|fragment| {
+              fragment
+                .bounds
+                .map(|bounds| bounds.y_pt + fragment.content_advance_pt.unwrap_or(bounds.height_pt))
+            })
+          {
+            page.footnote_flow_bottom_pt = Some(bottom);
+          }
+        }
       }
       note_flow = FlowContext {
         content_left_pt: left,
@@ -368,7 +392,7 @@ fn format_pages<'a>(
     if i == 0 && height > available + LAYOUT_EPSILON_PT {
       return None;
     }
-    follow = Some(Arc::new(FootnotePage {
+    follow = Some(Rc::new(FootnotePage {
       height_pt: height,
       top_pt: top,
       body_bottom_pt: page_flow.body_content_bottom_pt,
@@ -413,7 +437,7 @@ pub(super) fn append_page(current: &mut Page, note: &FootnotePage, bottom: f32) 
     let offset = current.items.len();
     let dy = top - note.top_pt;
     for mut item in note.items.clone() {
-      shift_page_item_y(&mut item, dy);
+      translate_page_item_in_place(&mut item, 0.0, dy);
       current.items.push(item);
     }
     current
@@ -474,7 +498,7 @@ pub(super) fn finish_pending_pages(pages: &mut Vec<Page>) {
 #[cfg(test)]
 pub(super) mod tests {
   use super::*;
-  use crate::docx::{Paragraph, ParagraphFormat};
+  use crate::docx::{CellMargins, Paragraph, ParagraphFormat};
 
   pub(in crate::docx::layout) fn paragraph(text: &str, keep: bool, widow: bool) -> Block {
     let run = TextRun {
@@ -708,6 +732,75 @@ pub(super) mod tests {
   }
 
   #[test]
+  fn footnote_follow_starts_the_next_body_block_above_its_reserved_master() {
+    let mut document = document();
+    document.blocks = vec![paragraph("BODY", false, false)];
+    let flow = flow_context(
+      document.page,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let story = [paragraph("MASTER\nFOLLOW", false, false)];
+    let plan = format_pages(
+      &document,
+      &[&story],
+      None,
+      flow,
+      FootnoteMasterSpace {
+        page_index: 0,
+        available: 27.0,
+        include_separator: false,
+      },
+      &mut TextMetrics::new(),
+    )
+    .expect("one note line on each page");
+    for gap in [9.0, 22.0] {
+      for line_height in [6.0, 18.0] {
+        let mut next = paragraph("NEXT", false, false);
+        let Block::Paragraph(p) = &mut next else {
+          unreachable!();
+        };
+        p.format.line_height_pt = Some(line_height);
+        let mut root = RootFrameLayout::new(&document, &LayoutOptions::default());
+        layout_document_block(
+          BlockNeighbors::for_index(&document.blocks, 0),
+          &document.blocks[0],
+          flow,
+          LayoutBlockTarget {
+            current: &mut root.current,
+            pages: &mut root.pages,
+            anchor_pages: None,
+            text_metrics: &mut root.text_metrics,
+            paragraph_decoration_outer_bottom_pt: None,
+          },
+          flow.content_top_pt,
+        );
+        append_page(&mut root.current, &plan, flow.body_content_bottom_pt);
+        root.y = flow.body_content_bottom_pt - plan.height_pt - gap;
+        let next_flow = root.advance_if_past_body(flow, Some(&next));
+        if line_height > gap {
+          assert_eq!(root.pages.len(), 1, "the source block starts on the follow");
+          assert_eq!(text(&root.pages[0].items), "BODYMASTER");
+          assert_eq!(text(&root.current.items), "FOLLOWSEP");
+          assert_eq!(root.y, next_flow.content_top_pt);
+          let follow = plan.follow.as_ref().expect("allocated continuation");
+          assert!(
+            (next_flow.content_bottom - next_flow.body_content_bottom_pt + follow.height_pt).abs()
+              < 0.01
+          );
+        } else {
+          assert!(root.pages.is_empty(), "a fitting small line keeps its page");
+          assert_eq!(root.current.pending_footnote_follows.len(), 1);
+          assert_eq!(text(&root.current.items), "BODYMASTER");
+        }
+      }
+    }
+  }
+
+  #[test]
   fn footnote_follow_survives_body_replay_and_terminal_page_materialization() {
     let document = document();
     let flow = flow_context(
@@ -754,5 +847,137 @@ pub(super) mod tests {
     assert_eq!(text(&terminal[1].items), expected);
     finish_pending_pages(&mut terminal);
     assert_eq!(terminal.len(), 2);
+  }
+
+  #[test]
+  fn footnote_table_follows_reserve_rows_separators_and_translate_paint_owners() {
+    let document = document();
+    let flow = flow_context(
+      document.page,
+      0,
+      SectionColumns::default(),
+      0,
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let mut metrics = TextMetrics::new();
+    for row_count in [4, 9] {
+      let mut table = crate::docx::layout::tests::native_percentage_autofit_table("ROW", [1.0]);
+      table.layout = TableLayoutMode::Fixed;
+      table.column_widths_pt = vec![200.0];
+      table.preferred_width_pt = Some(200.0);
+      table.borders = None;
+      table.rows = (0..row_count)
+        .map(|index| {
+          let mut row = table.rows[0].clone();
+          row.height_pt = Some(24.0);
+          row.exact_height = true;
+          row.cant_split = true;
+          row.cells[0].margins = CellMargins::zero();
+          row.cells[0].blocks = vec![paragraph(&format!("ROW{index}"), false, false)];
+          row
+        })
+        .collect();
+      let story = [paragraph("LABEL", false, false), Block::Table(table)];
+      for include_separator in [false, true] {
+        for master_rows in [0, 1, 2] {
+          let expected_master =
+            18.0 + if include_separator { 18.0 } else { 0.0 } + master_rows as f32 * 24.0;
+          let plan = format_pages(
+            &document,
+            &[&story],
+            None,
+            flow,
+            FootnoteMasterSpace {
+              page_index: 0,
+              available: expected_master,
+              include_separator,
+            },
+            &mut metrics,
+          )
+          .expect("note table must continue after its legal master rows");
+          assert!(
+            (plan.height_pt - expected_master).abs() < 0.01,
+            "rows={row_count}/{master_rows}, separator={include_separator}: {}",
+            plan.height_pt
+          );
+          let mut page = Some(plan.as_ref());
+          let mut index = 0;
+          let mut source_rows = Vec::new();
+          while let Some(note) = page {
+            let rows = note
+              .fragments
+              .iter()
+              .filter(|f| f.kind == FrameFragmentKind::TableRow);
+            let mut count = 0;
+            for row in rows {
+              source_rows.push(row.row_index);
+              count += 1;
+              let bounds = row.bounds.expect("allocated row frame");
+              assert!(bounds.y_pt >= note.top_pt - LAYOUT_EPSILON_PT);
+              assert!(
+                bounds.y_pt + bounds.height_pt <= note.top_pt + note.height_pt + LAYOUT_EPSILON_PT
+              );
+              if index > 0 {
+                assert!(
+                  bounds.y_pt >= note.top_pt + 18.0 - LAYOUT_EPSILON_PT,
+                  "follow table must leave its separator space"
+                );
+              }
+            }
+            if index == 0 {
+              assert_eq!(count, master_rows);
+            }
+            index += 1;
+            page = note.follow.as_deref();
+          }
+          assert_eq!(source_rows, (0..row_count).collect::<Vec<_>>());
+          assert!(index >= 2);
+
+          if master_rows > 0 {
+            fn paint_owners(items: &[PageItem], out: &mut Vec<(f32, f32, Option<f32>)>) {
+              for item in items {
+                match item {
+                  PageItem::Text(text) => {
+                    if let Some(clip) = text.paint_clip {
+                      out.push((
+                        text.y_pt,
+                        clip.origin.y.0,
+                        text.page_culling_bounds.map(|b| b.origin.y.0),
+                      ));
+                    }
+                  }
+                  PageItem::Group(items)
+                  | PageItem::InlineObjectGroup(items)
+                  | PageItem::IndependentTextFrame(items)
+                  | PageItem::CompositingGroup { items, .. } => paint_owners(items, out),
+                  _ => {}
+                }
+              }
+            }
+            let mut before = Vec::new();
+            paint_owners(&plan.items, &mut before);
+            assert!(
+              !before.is_empty(),
+              "table text must have actual paint clips"
+            );
+            let mut committed = empty_page(document.page, 0);
+            append_page(&mut committed, &plan, flow.body_content_bottom_pt);
+            let mut after = Vec::new();
+            paint_owners(&committed.items, &mut after);
+            assert_eq!(before.len(), after.len());
+            let dy = flow.body_content_bottom_pt - plan.height_pt - plan.top_pt;
+            for (before, after) in before.into_iter().zip(after) {
+              assert!((after.0 - before.0 - dy).abs() < 0.001);
+              assert!((after.1 - before.1 - dy).abs() < 0.001);
+              assert_eq!(before.2.is_some(), after.2.is_some());
+              if let (Some(before), Some(after)) = (before.2, after.2) {
+                assert!((after - before - dy).abs() < 0.001);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

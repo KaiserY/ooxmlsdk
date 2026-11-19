@@ -25,6 +25,9 @@ pub(super) struct ParagraphImportState<'a> {
   pub(super) form_widget_ids: &'a mut FormWidgetIdAllocator,
   pub(super) complex_fields: Option<&'a mut ComplexFieldImportState>,
   pub(super) table_depth: usize,
+  /// A deleted terminal cell mark supplies default run formatting, but does
+  /// not import the Normal paragraph's spacing, line height or numbering.
+  pub(super) implicit_cell_end: bool,
 }
 
 impl<'a> ParagraphImportState<'a> {
@@ -34,6 +37,7 @@ impl<'a> ParagraphImportState<'a> {
       form_widget_ids,
       complex_fields: None,
       table_depth: 0,
+      implicit_cell_end: false,
     }
   }
 
@@ -46,6 +50,7 @@ impl<'a> ParagraphImportState<'a> {
       form_widget_ids,
       complex_fields: Some(complex_fields),
       table_depth,
+      implicit_cell_end: false,
     }
   }
 }
@@ -145,6 +150,7 @@ fn paragraph_model_with_base_impl<'a>(
     form_widget_ids,
     mut complex_fields,
     table_depth,
+    implicit_cell_end,
   } = state;
   let default_custom_xml_bindings;
   let custom_xml_bindings = if let Some(custom_xml_bindings) = base.custom_xml_bindings {
@@ -195,10 +201,25 @@ fn paragraph_model_with_base_impl<'a>(
   let has_direct_justification = direct_paragraph_properties
     .as_ref()
     .is_some_and(|properties| properties.justification().is_some());
-  let inherited_format = styles.paragraph_format_with_base(style_id, base.format.clone());
+  let inherited_format = if implicit_cell_end {
+    base.format.clone()
+  } else {
+    styles.paragraph_format_with_base(style_id, base.format.clone())
+  };
   let style_outline_level = inherited_format.outline_level;
-  let mut format =
-    properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
+  let mut format = if implicit_cell_end {
+    base.format
+  } else {
+    properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties)
+  };
+  let division = match direct_paragraph_properties {
+    Some(ParagraphProps::Direct(pr)) => pr.div_id.as_ref(),
+    Some(ParagraphProps::Extended(pr)) => pr.div_id.as_ref(),
+    _ => None,
+  };
+  (format.html_division_left_pt, format.html_division_right_pt) = styles
+    .html_divisions
+    .paragraph_margins(division, table_depth);
   if format.outline_level != style_outline_level
     && let Some(level) = styles.builtin_heading_outline_level(style_id)
   {
@@ -243,7 +264,11 @@ fn paragraph_model_with_base_impl<'a>(
     .as_ref()
     .and_then(|properties| properties.numbering_properties())
     .map(NumberingReference::from_properties);
-  let style_numbering = styles.paragraph_numbering_properties(style_id);
+  let style_numbering = if implicit_cell_end {
+    None
+  } else {
+    styles.paragraph_numbering_properties(style_id)
+  };
   let (numbering_reference, style_numbering_applies) =
     select_paragraph_numbering(direct_numbering, style_numbering);
   format.numbering_id = numbering_reference.map(NumberingReference::num_id);
@@ -418,6 +443,9 @@ fn paragraph_model_with_base_impl<'a>(
   if list_label.as_deref() == Some("\t") && style_tab_stop_pt.is_some() && !has_direct_indentation {
     list_label = Some(" \t".to_string());
   }
+  if has_numbering_label && let Some(fields) = complex_fields.as_deref_mut() {
+    fields.listnum_fields.numbered_paragraph();
+  }
   let mut inlines = paragraph_inlines_with_policy(
     paragraph,
     run_style.clone(),
@@ -505,6 +533,31 @@ fn paragraph_model_with_base_impl<'a>(
           apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
         }
       }
+      super::InlineItem::EqArray(array) => {
+        array.style.line_vertical_alignment = line_vertical_alignment;
+        array.style.use_windows_font_metrics = use_windows_font_metrics;
+        for run in array.cells.iter_mut().flatten() {
+          run.style.line_vertical_alignment = line_vertical_alignment;
+          run.style.use_windows_font_metrics = use_windows_font_metrics;
+          apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
+        }
+      }
+      super::InlineItem::LegacyEquation(equation) => {
+        equation.style.line_vertical_alignment = line_vertical_alignment;
+        equation.style.use_windows_font_metrics = use_windows_font_metrics;
+        for run in &mut equation.runs {
+          run.style.line_vertical_alignment = line_vertical_alignment;
+          run.style.use_windows_font_metrics = use_windows_font_metrics;
+          apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
+        }
+      }
+      super::InlineItem::TwoLines(combined) => {
+        for run in &mut combined.runs {
+          run.style.line_vertical_alignment = line_vertical_alignment;
+          run.style.use_windows_font_metrics = use_windows_font_metrics;
+          apply_wordprocessingml_cjk_text_metrics(&run.text, &mut run.style);
+        }
+      }
       super::InlineItem::NoteReferenceMark(mark) => {
         mark.style.use_windows_font_metrics = use_windows_font_metrics;
       }
@@ -571,7 +624,7 @@ fn paragraph_model_with_base_impl<'a>(
       &mut paragraph_mark_style,
       &mut list_label_style,
       &mut inlines,
-      super::automatic_text_color_for_background(background),
+      super::AutomaticTextColor::ShadedText(super::automatic_text_color_for_background(background)),
     );
   }
   if !format.bidi
@@ -579,25 +632,34 @@ fn paragraph_model_with_base_impl<'a>(
       .first_line_indent_character_units
       .is_some_and(|units| units != 0.0)
   {
-    // Native Word uses the initial text's em for firstLineChars/hangingChars,
+    // Native Word uses the initial text's character unit for firstLineChars/hangingChars,
     // unlike leftChars/rightChars. A leading space owns this size too; the
     // paragraph mark and a later larger run do not replace it. Native inline
-    // picture controls use the owning drawing run's em for positive indents;
-    // floating pictures and other object kinds keep their existing owner.
+    // picture and VML shape controls use the owning drawing run's unit for
+    // positive indents. A floating VML line/rectangle retains that owner;
+    // its following text and painted extent do not replace the source unit.
     let first = inlines.iter().find(|inline| match inline {
       super::InlineItem::BookmarkStart(_) | super::InlineItem::LastRenderedPageBreak => false,
       super::InlineItem::Text(run) => !run.text.is_empty(),
       _ => true,
     });
     if let Some(super::InlineItem::Text(run)) = first {
-      format.first_line_character_indent_unit_pt = Some(effective_font_size_pt(&run.style, None));
+      format.first_line_character_indent_unit_pt = Some(
+        crate::fonts::wordprocessingml_character_indent_unit_pt(&run.style),
+      );
     } else if let Some(super::InlineItem::Image(image)) = first
       && matches!(image.placement, super::ImagePlacement::Inline)
       && format
         .first_line_indent_character_units
         .is_some_and(|units| units > 0.0)
     {
-      format.first_line_character_indent_unit_pt = image.source_run_font_size_pt;
+      format.first_line_character_indent_unit_pt = image.source_run_character_indent_unit_pt;
+    } else if let Some(super::InlineItem::Shape(shape)) = first
+      && format
+        .first_line_indent_character_units
+        .is_some_and(|units| units > 0.0)
+    {
+      format.first_line_character_indent_unit_pt = shape.source_run_character_indent_unit_pt;
     }
   }
   super::fit_text::resolve(&mut inlines, &mut field_events);
@@ -610,10 +672,24 @@ fn paragraph_model_with_base_impl<'a>(
   if format.bidi {
     inherit_scoped_rtl_controls(&mut inlines);
   }
+  // Group the authored runs before ordinary blank qualification can split
+  // one no-ID source run or lose an adjacent-space neighbour. The miniature
+  // formatter owns that source context inside the atomic two-line box.
+  super::two_lines::resolve(
+    &mut inlines,
+    &mut field_events,
+    &format,
+    styles.import_settings.compatibility_mode,
+  );
   if !format.bidi {
     resolve_balanced_space_portions(&mut inlines, &mut field_events);
   }
   attach_arabic_leading_mark_context(&mut inlines);
+  // Ordinary equal-format runs still share their shaping context. Word's
+  // recovery of repeated sz can retain source-fetch boundaries independently
+  // of that context; retain the offsets before the source paragraph is lost.
+  // Always replace this import-only state, including inherited empty values.
+  format.complex_source_restarts = complex_source_restarts(paragraph, &inlines);
   if let Some(background) = format.shading.and_then(super::ShadingPaint::solid_color) {
     super::apply_legacy_text_effect_background_to_paragraph_parts(
       &mut paragraph_mark_style,
@@ -626,11 +702,16 @@ fn paragraph_model_with_base_impl<'a>(
   let runs = inlines
     .iter()
     .filter_map(|item| match item {
+      super::InlineItem::SequenceCounter(_) => None,
       super::InlineItem::Text(run) => Some(run.clone()),
       super::InlineItem::NoteReferenceMark(_) => None,
       super::InlineItem::NoteSeparatorMark(_) => None,
       super::InlineItem::PositionalTab(_) => None,
-      super::InlineItem::Ruby(_) | super::InlineItem::Overstrike(_) => None,
+      super::InlineItem::Ruby(_)
+      | super::InlineItem::Overstrike(_)
+      | super::InlineItem::EqArray(_)
+      | super::InlineItem::LegacyEquation(_)
+      | super::InlineItem::TwoLines(_) => None,
       super::InlineItem::LegacyFormCheckBox(_) => None,
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,
@@ -683,12 +764,26 @@ fn resolve_balanced_space_portions(
       && !run.preserve_text_portion
       && run.dynamic_field.is_none()
   }
-  // No new storage on the ordinary document path. Only a single edge blank
-  // needs source context; adjacent blanks inside a portion already balance.
+  fn beside_wide_character(text: &str, offset: usize, style: &TextStyle) -> bool {
+    text[..offset]
+      .chars()
+      .next_back()
+      .is_some_and(|ch| crate::fonts::wordprocessingml_balanced_space_neighbor(ch, style))
+      || text[offset + 1..]
+        .chars()
+        .next()
+        .is_some_and(|ch| crate::fonts::wordprocessingml_balanced_space_neighbor(ch, style))
+  }
+  // Preserve source context before script/line fitting splits a Latin token
+  // such as "15 年". An authored blank beside a wide character balances even
+  // when neither source neighbor is another blank. No storage on the ordinary
+  // path; already adjacent blanks retain their shaping-time owner.
   if !inlines.iter().any(|item| {
     matches!(item, InlineItem::Text(run) if eligible(run)
       && ((run.text.starts_with(' ') && !run.text.starts_with("  "))
-        || (run.text.ends_with(' ') && !run.text.ends_with("  "))))
+        || (run.text.ends_with(' ') && !run.text.ends_with("  "))
+        || run.text.char_indices().any(|(offset, character)|
+          character == ' ' && beside_wide_character(&run.text, offset, &run.style))))
   }) {
     return;
   }
@@ -700,87 +795,106 @@ fn resolve_balanced_space_portions(
   let mut previous = None;
   for (item, edge) in inlines.iter().zip(&mut edges) {
     match item {
-      item if is_office_math_boundary(item) => previous = Some(b' '),
+      item if is_office_math_boundary(item) => previous = Some(true),
       InlineItem::BookmarkStart(_) | InlineItem::LastRenderedPageBreak => {}
       InlineItem::Text(run) if run.text.is_empty() && eligible(run) => {}
       InlineItem::Text(run) => {
         edge.0 = eligible(run)
           && run.text.starts_with(' ')
           && !run.text.starts_with("  ")
-          && previous.is_none_or(|byte| byte == b' ');
+          && previous.is_none_or(|qualifies| qualifies);
         previous = if eligible(run) {
-          run.text.as_bytes().last().copied()
+          run.text.chars().next_back().map(|ch| {
+            ch == ' ' || crate::fonts::wordprocessingml_balanced_space_neighbor(ch, &run.style)
+          })
         } else {
-          Some(0)
+          Some(false)
         };
       }
-      _ => previous = Some(0),
+      _ => previous = Some(false),
     }
   }
   let mut next = None;
   for (item, edge) in inlines.iter().zip(&mut edges).rev() {
     match item {
-      item if is_office_math_boundary(item) => next = Some(b' '),
+      item if is_office_math_boundary(item) => next = Some(true),
       InlineItem::BookmarkStart(_) | InlineItem::LastRenderedPageBreak => {}
       InlineItem::Text(run) if run.text.is_empty() && eligible(run) => {}
       InlineItem::Text(run) => {
         edge.1 = eligible(run)
           && run.text.ends_with(' ')
           && !run.text.ends_with("  ")
-          && next == Some(b' ');
+          && next.is_some_and(|qualifies| qualifies);
         next = if eligible(run) {
-          run.text.as_bytes().first().copied()
+          run.text.chars().next().map(|ch| {
+            ch == ' ' || crate::fonts::wordprocessingml_balanced_space_neighbor(ch, &run.style)
+          })
         } else {
-          Some(0)
+          Some(false)
         };
       }
-      _ => next = Some(0),
+      _ => next = Some(false),
     }
   }
   if edges
     .iter()
     .all(|&(leading, trailing)| !leading && !trailing)
+    && !inlines.iter().any(|item| {
+      matches!(item, InlineItem::Text(run) if eligible(run)
+        && run.text.char_indices().any(|(offset, character)|
+          character == ' ' && beside_wide_character(&run.text, offset, &run.style)))
+    })
   {
     return;
   }
 
   let mut output = Vec::with_capacity(inlines.len());
   let mut offsets = Vec::with_capacity(inlines.len() + 1);
-  for (mut item, (leading, trailing)) in inlines.drain(..).zip(edges) {
+  for (item, (leading, trailing)) in inlines.drain(..).zip(edges) {
     offsets.push(output.len());
-    if !leading && !trailing {
+    let InlineItem::Text(run) = &item else {
       output.push(item);
       continue;
-    }
-    let InlineItem::Text(run) = &mut item else {
-      unreachable!("only source text owns a balanced blank")
     };
-    if run.text == " " {
-      run.style.wordprocessingml_balanced_space_portion = true;
+    if !eligible(run) {
       output.push(item);
       continue;
     }
-    let end = run.text.len() - usize::from(trailing);
-    if leading {
+    let mut start = 0;
+    let mut spaces = run.text.match_indices(' ').peekable();
+    while let Some((offset, _)) = spaces.next() {
+      // Adjacent source blanks share the balanced reference width. Isolating
+      // just the blank touching Han would turn its neighbor into a lone
+      // Western space when the prefix is shaped.
+      let mut end = offset + 1;
+      while spaces.next_if(|&(next, _)| next == end).is_some() {
+        end += 1;
+      }
+      if !((leading && offset == 0)
+        || (trailing && end == run.text.len())
+        || beside_wide_character(&run.text, offset, &run.style)
+        || (end > offset + 1 && beside_wide_character(&run.text, end - 1, &run.style)))
+      {
+        continue;
+      }
+      if start < offset {
+        let mut prefix = run.clone();
+        prefix.text = run.text[start..offset].to_owned();
+        output.push(InlineItem::Text(prefix));
+      }
       let mut blank = run.clone();
-      blank.text = " ".to_owned();
+      blank.text = run.text[offset..end].to_owned();
       blank.style.wordprocessingml_balanced_space_portion = true;
       output.push(InlineItem::Text(blank));
+      start = end;
     }
-    let terminal = trailing.then(|| {
-      let mut blank = run.clone();
-      blank.text = " ".to_owned();
-      blank.style.wordprocessingml_balanced_space_portion = true;
-      InlineItem::Text(blank)
-    });
-    run.text.truncate(end);
-    if leading {
-      run.text.remove(0);
-    }
-    if !run.text.is_empty() {
+    if start == 0 {
       output.push(item);
+    } else if start < run.text.len() {
+      let mut tail = run.clone();
+      tail.text = run.text[start..].to_owned();
+      output.push(InlineItem::Text(tail));
     }
-    output.extend(terminal);
   }
   offsets.push(output.len());
   for event in field_events {
@@ -792,6 +906,11 @@ fn resolve_balanced_space_portions(
         *inline_offset = offsets[*inline_offset];
       }
       ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      }
+      | ParagraphFieldEvent::ConditionalResultSpan {
         inline_start,
         inline_end,
         ..
@@ -986,6 +1105,11 @@ fn preserve_interior_direction_control_metrics(
         inline_start,
         inline_end,
         ..
+      }
+      | ParagraphFieldEvent::ConditionalResultSpan {
+        inline_start,
+        inline_end,
+        ..
       } => {
         *inline_start = offsets[*inline_start];
         *inline_end = offsets[*inline_end];
@@ -1079,6 +1203,93 @@ fn inherit_scoped_rtl_controls(inlines: &mut [super::InlineItem]) {
   }
 }
 
+fn complex_source_restarts(paragraph: &w::Paragraph, inlines: &[super::InlineItem]) -> Vec<usize> {
+  if !inlines.iter().any(|inline| {
+    matches!(inline, super::InlineItem::Text(run)
+      if run.style.right_to_left == Some(true) && run.hyperlink_url.is_none())
+  }) {
+    return Vec::new();
+  }
+  let mut restarts = Vec::new();
+  let mut inline_index = 0;
+  let mut byte_offset = 0;
+  let mut character_offset = 0;
+  for choice in &paragraph.paragraph_choice {
+    let w::ParagraphChoice::WRun(run) = choice else {
+      return Vec::new();
+    };
+    let mut sizes = run
+      .run_properties
+      .as_deref()
+      .into_iter()
+      .flat_map(|properties| {
+        properties
+          .run_properties_choice
+          .iter()
+          .filter_map(|property| {
+            if let w::RunPropertiesChoice::FontSize(size) = property {
+              Some(size.val)
+            } else {
+              None
+            }
+          })
+      });
+    if let Some(first) = sizes.next()
+      && sizes.next().is_some_and(|next| next == first)
+      && sizes.all(|next| next == first)
+      && character_offset != 0
+    {
+      restarts.push(character_offset);
+    }
+    for choice in &run.run_choice {
+      let Some(super::InlineItem::Text(visible)) = inlines.get(inline_index) else {
+        return Vec::new();
+      };
+      match choice {
+        w::RunChoice::Text(text) => {
+          let text = text.xml_content.as_deref().unwrap_or_default();
+          let end = byte_offset + text.len();
+          if visible.style.right_to_left != Some(true)
+            || visible.hyperlink_url.is_some()
+            || visible.text.get(byte_offset..end) != Some(text)
+          {
+            return Vec::new();
+          }
+          byte_offset = end;
+          character_offset += text.chars().count();
+          if byte_offset == visible.text.len() {
+            inline_index += 1;
+            byte_offset = 0;
+          }
+        }
+        _ => {
+          let (kind, id) = match choice {
+            w::RunChoice::FootnoteReference(reference) => ("footnote", reference.id),
+            w::RunChoice::EndnoteReference(reference) => ("endnote", reference.id),
+            _ => return Vec::new(),
+          };
+          if byte_offset != 0
+            || visible.hyperlink_url.as_deref()
+              != Some(super::note_reference_url(kind, id).as_str())
+          {
+            return Vec::new();
+          }
+          // The generated label may have several printed characters. The
+          // source reference, and therefore every following fetch offset,
+          // still occupies exactly one CP.
+          character_offset += 1;
+          inline_index += 1;
+        }
+      }
+    }
+  }
+  if inline_index == inlines.len() && byte_offset == 0 {
+    restarts
+  } else {
+    Vec::new()
+  }
+}
+
 fn merge_adjacent_continuous_text_runs(
   inlines: &mut Vec<super::InlineItem>,
   field_events: &mut [super::ParagraphFieldEvent],
@@ -1159,6 +1370,8 @@ fn merge_adjacent_continuous_text_runs(
         && right.text.chars().next().is_some_and(|c| c.is_ascii_alphabetic())))
       && !left.text.is_empty()
       && !right.text.is_empty()
+      // Without a shared ID, identical source runs own separate boxes.
+      && left.style.wordprocessingml_two_lines.is_none_or(|settings| settings.id.is_some())
       && !left.preserve_text_portion
       && !right.preserve_text_portion
       && !left.style.wordprocessingml_field_group
@@ -1196,6 +1409,11 @@ fn merge_adjacent_continuous_text_runs(
           }
         }
         ParagraphFieldEvent::ReferenceResultSpan {
+          inline_start,
+          inline_end,
+          ..
+        }
+        | ParagraphFieldEvent::ConditionalResultSpan {
           inline_start,
           inline_end,
           ..
@@ -1238,6 +1456,11 @@ fn merge_adjacent_continuous_text_runs(
           *inline_offset = offsets[*inline_offset];
         }
         ParagraphFieldEvent::ReferenceResultSpan {
+          inline_start,
+          inline_end,
+          ..
+        }
+        | ParagraphFieldEvent::ConditionalResultSpan {
           inline_start,
           inline_end,
           ..
@@ -1324,6 +1547,11 @@ fn resolve_wordprocessingml_rtl_font_portions(
         *inline_offset = offsets[*inline_offset];
       }
       ParagraphFieldEvent::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      }
+      | ParagraphFieldEvent::ConditionalResultSpan {
         inline_start,
         inline_end,
         ..
@@ -1495,6 +1723,87 @@ mod tests {
   };
 
   #[test]
+  fn recovered_size_source_offsets_do_not_separate_arabic_joining() {
+    use ooxmlsdk::sdk::SdkType;
+
+    for (sizes, expected) in [
+      (r#"<w:sz w:val="30"/>"#, Vec::new()),
+      (r#"<w:sz w:val="30"/><w:sz w:val="30"/>"#, vec![2]),
+    ] {
+      let source = w::Paragraph::from_bytes(
+        format!(
+          r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:rPr><w:sz w:val="30"/></w:rPr><w:t>اب</w:t></w:r><w:r><w:rPr>{sizes}</w:rPr><w:t>جد</w:t></w:r></w:p>"#
+        )
+        .as_bytes(),
+      )
+      .unwrap();
+      let mut inlines = super::super::paragraph_inlines(
+        &source,
+        TextStyle {
+          font_size_pt: 15.0,
+          right_to_left: Some(true),
+          wordprocessingml_font_slots: true,
+          ..Default::default()
+        },
+        &StylesCatalog::default(),
+        &ImageCatalog::default(),
+        &HyperlinkCatalog::default(),
+        &CustomXmlBindings::default(),
+        &mut FormWidgetIdAllocator::default(),
+      );
+      merge_adjacent_continuous_text_runs(&mut inlines, &mut []);
+      let [super::super::InlineItem::Text(run)] = &inlines[..] else {
+        panic!("equal-format Arabic source must keep one joining context");
+      };
+      assert_eq!(run.text, "ابجد");
+      assert_eq!(complex_source_restarts(&source, &inlines), expected);
+      // A field or another import adapter may have replaced visible text.
+      // Source offsets must not be applied to that different stream.
+      let super::super::InlineItem::Text(run) = &mut inlines[0] else {
+        unreachable!();
+      };
+      run.text.push('ه');
+      assert!(complex_source_restarts(&source, &inlines).is_empty());
+    }
+  }
+
+  #[test]
+  fn recovered_size_offsets_count_a_generated_note_once() {
+    use ooxmlsdk::sdk::SdkType;
+
+    let source = w::Paragraph::from_bytes(
+      r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>اب</w:t></w:r><w:r><w:footnoteReference w:id="9"/></w:r><w:r><w:rPr><w:sz w:val="30"/><w:sz w:val="30"/></w:rPr><w:t>جد</w:t></w:r></w:p>"#.as_bytes(),
+    )
+    .unwrap();
+    let mut inlines = super::super::paragraph_inlines(
+      &source,
+      TextStyle {
+        font_size_pt: 15.0,
+        right_to_left: Some(true),
+        wordprocessingml_font_slots: true,
+        ..Default::default()
+      },
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
+      &mut FormWidgetIdAllocator::default(),
+    );
+    for label in ["1", "17", "101"] {
+      let super::super::InlineItem::Text(mark) = &mut inlines[1] else {
+        panic!("generated reference must retain its typed text owner");
+      };
+      mark.text = label.into();
+      assert_eq!(complex_source_restarts(&source, &inlines), [3]);
+    }
+    let super::super::InlineItem::Text(mark) = &mut inlines[1] else {
+      unreachable!();
+    };
+    mark.hyperlink_url = Some(super::super::note_reference_url("footnote", 8));
+    assert!(complex_source_restarts(&source, &inlines).is_empty());
+  }
+
+  #[test]
   fn variable_font_bitmap_portions_follow_effective_run_revisions() {
     use ooxmlsdk::sdk::SdkType;
 
@@ -1576,7 +1885,7 @@ mod tests {
           let super::super::InlineItem::Image(image) = &paragraph.inlines[0] else {
             panic!("leading picture")
           };
-          assert_eq!(image.source_run_font_size_pt, Some(size));
+          assert_eq!(image.source_run_character_indent_unit_pt, Some(size));
           assert_eq!(
             paragraph.format.first_line_character_indent_unit_pt,
             (units > 0.0).then_some(size)
@@ -1585,6 +1894,53 @@ mod tests {
             paragraph.format.character_indent_unit_pt,
             (units != 0.0).then_some(default_size)
           );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn initial_vml_shape_character_indent_preserves_its_source_run_em() {
+    use ooxmlsdk::sdk::SdkType;
+
+    for default_size in [10.0, 16.0] {
+      let mut styles = StylesCatalog::default();
+      styles.doc_default_run.font_size_pt = default_size;
+      for drawing_size in [6.0, 24.0] {
+        for following_size in [10.0, 18.0] {
+          for (shape, positioning) in [
+            ("line", "position:absolute;left:0"),
+            ("line", ""),
+            ("rect", "position:absolute;left:0"),
+          ] {
+            let geometry = if shape == "line" {
+              format!(
+                r#"<v:line id="shape" style="{positioning}" from="300pt,0pt" to="310pt,0pt"/>"#
+              )
+            } else {
+              format!(r#"<v:rect id="shape" style="{positioning};width:10pt;height:10pt"/>"#)
+            };
+            let xml = format!(
+              r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml"><w:pPr><w:ind w:firstLineChars="300" w:firstLine="600"/></w:pPr><w:r><w:rPr><w:sz w:val="{}"/></w:rPr><w:pict>{geometry}</w:pict></w:r><w:r><w:rPr><w:sz w:val="{}"/></w:rPr><w:t>XYZ</w:t></w:r></w:p>"#,
+              (drawing_size * 2.0) as i32,
+              (following_size * 2.0) as i32,
+            );
+            let source = w::Paragraph::from_bytes(xml.as_bytes()).expect("VML paragraph");
+            let paragraph = paragraph_model(
+              &source,
+              &styles,
+              &mut NumberingCatalog::default(),
+              &ImageCatalog::default(),
+              &HyperlinkCatalog::default(),
+              &CustomXmlBindings::default(),
+              &mut FormWidgetIdAllocator::default(),
+            );
+            assert_eq!(
+              paragraph.format.first_line_character_indent_unit_pt,
+              Some(drawing_size),
+              "{shape}, drawing {drawing_size}, following {following_size}, default {default_size}"
+            );
+          }
         }
       }
     }
@@ -1652,6 +2008,85 @@ mod tests {
   }
 
   #[test]
+  fn balanced_source_spaces_use_the_ambiguous_neighbors_own_font_slot() {
+    use crate::docx::InlineItem;
+    let run = |text: &str, hint: bool, language: &str| {
+      InlineItem::Text(TextRun {
+        text: text.into(),
+        style: TextStyle {
+          font_family: Some("Calibri".into()),
+          east_asia_font_family: Some("宋体".into()),
+          east_asia_language: Some(language.into()),
+          wordprocessingml_font_slots: true,
+          wordprocessingml_font_hint: hint
+            .then_some(ooxmlsdk_fonts::WordprocessingFontTypeHint::EastAsia),
+          wordprocessingml_balance_single_byte_double_byte_width: true,
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
+        style_ref_numbering_text: None,
+        preserve_text_portion: false,
+      })
+    };
+    for ch in ['“', 'Ω', '•', 'é'] {
+      for language in ["en-US", "zh-CN"] {
+        for hint in [false, true] {
+          let qualifies = hint && (ch != 'é' || language == "zh-CN");
+          for split in [false, true] {
+            for before in [false, true] {
+              let text = if before {
+                format!("A {ch}B")
+              } else {
+                format!("A{ch} B")
+              };
+              let mut inlines = if !split {
+                vec![run(&text, hint, language)]
+              } else if before {
+                vec![
+                  run("A ", !hint, language),
+                  InlineItem::BookmarkStart("edge".into()),
+                  run(&format!("{ch}B"), hint, language),
+                ]
+              } else {
+                vec![
+                  run(&format!("A{ch}"), hint, language),
+                  InlineItem::BookmarkStart("edge".into()),
+                  run(" B", !hint, language),
+                ]
+              };
+              resolve_balanced_space_portions(&mut inlines, &mut []);
+              let actual = inlines
+                .iter()
+                .filter_map(|item| match item {
+                  InlineItem::Text(run) => Some(run),
+                  _ => None,
+                })
+                .collect::<Vec<_>>();
+              assert_eq!(
+                actual
+                  .iter()
+                  .map(|run| run.text.as_str())
+                  .collect::<String>(),
+                text
+              );
+              assert_eq!(
+                actual
+                  .iter()
+                  .any(|run| run.style.wordprocessingml_balanced_space_portion),
+                qualifies,
+                "{ch}/{language}/{hint}/{split}/{before}"
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
   fn balanced_source_spaces_keep_text_bookmarks_and_field_offsets() {
     use crate::docx::{InlineItem, ParagraphFieldEvent};
     let run = |text: &str| {
@@ -1672,6 +2107,17 @@ mod tests {
     };
     for (parts, expected) in [
       (vec![" A B "], vec![(" ", true), ("A B ", false)]),
+      (
+        vec!["15 年"],
+        vec![("15", false), (" ", true), ("年", false)],
+      ),
+      (
+        vec!["15 ", "年"],
+        vec![("15", false), (" ", true), ("年", false)],
+      ),
+      (vec!["甲 A"], vec![("甲", false), (" ", true), ("A", false)]),
+      (vec!["Ａ B"], vec![("Ａ", false), (" ", true), ("B", false)]),
+      (vec!["甲\u{00a0}A"], vec![("甲\u{00a0}A", false)]),
       (
         vec!["A ", " B"],
         vec![("A", false), (" ", true), (" ", true), ("B", false)],
@@ -1702,12 +2148,14 @@ mod tests {
             inline_offset: old_end,
           },
           ParagraphFieldEvent::ReferenceResultSpan {
+            reference_kind: crate::docx::field_reference::Kind::Explicit,
             field_id: 7,
             bookmark_name: "target".into(),
             inline_start: 0,
             inline_end: old_end,
             merge_format: false,
             copy_text: true,
+            numbering_only: false,
             separator_style: None,
           },
         ];
@@ -1755,12 +2203,14 @@ mod tests {
     let mut events = vec![
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 },
       ParagraphFieldEvent::ReferenceResultSpan {
+        reference_kind: crate::docx::field_reference::Kind::Explicit,
         field_id: 3,
         bookmark_name: "anchor".into(),
         inline_start: 1,
         inline_end: 2,
         merge_format: false,
         copy_text: true,
+        numbering_only: false,
         separator_style: None,
       },
     ];
@@ -1853,12 +2303,14 @@ mod tests {
       let mut events = vec![
         ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 1 },
         ParagraphFieldEvent::ReferenceResultSpan {
+          reference_kind: crate::docx::field_reference::Kind::Explicit,
           field_id: 7,
           bookmark_name: "target".to_owned(),
           inline_start: 0,
           inline_end: 1,
           merge_format: false,
           copy_text: true,
+          numbering_only: false,
           separator_style: None,
         },
       ];
@@ -2478,12 +2930,14 @@ mod tests {
     let mut inlines = vec![run("کتاب‌های"), run("ی"), run("آن"), run("‌ها"), run("پس")];
     let mut events = vec![
       ParagraphFieldEvent::ReferenceResultSpan {
+        reference_kind: crate::docx::field_reference::Kind::Explicit,
         field_id: 1,
         bookmark_name: "target".into(),
         inline_start: 2,
         inline_end: 4,
         merge_format: false,
         copy_text: true,
+        numbering_only: false,
         separator_style: None,
       },
       ParagraphFieldEvent::DeferredParagraphBreak { inline_offset: 4 },
@@ -2617,12 +3071,14 @@ mod tests {
     };
     let mut field_inlines = vec![run("Associate WID F"), run("o"), run("cal Point")];
     let mut events = vec![ParagraphFieldEvent::ReferenceResultSpan {
+      reference_kind: crate::docx::field_reference::Kind::Explicit,
       field_id: 1,
       bookmark_name: "target".into(),
       inline_start: 2,
       inline_end: 3,
       merge_format: false,
       copy_text: true,
+      numbering_only: false,
       separator_style: None,
     }];
     merge_adjacent_continuous_text_runs(&mut field_inlines, &mut events);

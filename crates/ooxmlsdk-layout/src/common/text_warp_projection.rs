@@ -5,13 +5,78 @@ use kurbo::{BezPath, CubicBez, ParamCurve, ParamCurveArclen, PathEl, PathSeg, Po
 use super::{PathCommand, Point as LayoutPoint, Pt, TextWarp};
 
 mod follow_path;
+mod vml_path;
 mod word_envelope;
 pub use follow_path::{
   TextFollowPathFontCell, TextFollowPathSampler, text_follow_path_glyph_transform,
 };
+pub use vml_path::{VmlPathProjection, VmlPathSampler, VmlPathSource, vml_arc_cubics};
 pub use word_envelope::append_word_envelope_outline;
 
 const TEXT_WARP_ARCLEN_ACCURACY_PT: f64 = 0.0001;
+
+// Controlled Word PDF outlines retain this fitpath fraction across three
+// typefaces, four strings, and 100/156/250 pt host widths. Keep it distinct
+// from DrawingML envelope geometry and ordinary text scaling.
+const VML_FIT_PATH_TEXT_SCALE: f64 = 0.9961;
+
+pub fn vml_fit_path_centerline_offset(
+  face: &skrifa::FontRef<'_>,
+  units_per_em: f32,
+  design_scale: f32,
+  authored_path: bool,
+) -> f64 {
+  use skrifa::raw::TableProvider;
+  if authored_path {
+    // Native single-path glyph-affine observations for Arial Black, Arial,
+    // Times New Roman and Calibri retain this font-wide design-space anchor.
+    return face.os2().ok().map_or(0.0, |os2| {
+      (f64::from(units_per_em) / 2.0 - f64::from(os2.us_win_descent())) * f64::from(design_scale)
+    });
+  }
+  // VML fitpath places a font-wide vertical anchor on the path, rather than
+  // the bottom of the glyphs actually present (which moves with `g`). The
+  // typographic ascender relative to half the Windows ascent reproduces the
+  // font-dependent offset observed in controlled Word PDF outlines. The
+  // remaining centerline origin is 1/40 em below that metric: the same
+  // offset is visible for Arial Black O/A/I/g across different path widths.
+  face.os2().ok().map_or(0.0, |os2| {
+    (f64::from(os2.s_typo_ascender()) - f64::from(os2.us_win_ascent()) / 2.0
+      + f64::from(units_per_em) / 40.0)
+      .max(0.0)
+      * f64::from(design_scale)
+  })
+}
+
+pub fn vml_fit_path_glyph_point(
+  fit: &super::VmlFitPath,
+  boundary: &TextWarpBoundary,
+  glyph_center_x: f64,
+  centerline_y: f64,
+  point: kurbo::Point,
+) -> kurbo::Point {
+  let width = f64::from(fit.advance_width.0);
+  if width <= f64::EPSILON || boundary.total <= f64::EPSILON {
+    return point;
+  }
+  // fitpath measures the text by its logical advances. Each glyph is scaled
+  // uniformly and rotated at its own advance center, rather than bending its
+  // outline point-by-point like a DrawingML deformation envelope.
+  let logical_u = ((glyph_center_x - f64::from(fit.start_x.0)) / width).clamp(0.0, 1.0);
+  let u = 0.5 + (logical_u - 0.5) * VML_FIT_PATH_TEXT_SCALE;
+  let center = boundary.sample(u);
+  let tangent = boundary.sample((u + 0.001).min(1.0)) - boundary.sample((u - 0.001).max(0.0));
+  let tangent_length = tangent.hypot();
+  if tangent_length <= f64::EPSILON {
+    return center;
+  }
+  let tangent = tangent / tangent_length;
+  let normal = kurbo::Vec2::new(-tangent.y, tangent.x);
+  let scale = boundary.total / width * VML_FIT_PATH_TEXT_SCALE;
+  center
+    + tangent * ((point.x - glyph_center_x) * scale)
+    + normal * ((point.y - centerline_y) * scale)
+}
 
 pub fn common_commands_to_bez_path(commands: &[PathCommand]) -> BezPath {
   let mut path = BezPath::new();

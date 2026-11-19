@@ -1,4 +1,4 @@
-//! Word's colored three-band table and page rules (MS-DOC BrcType 0x18/0x19).
+//! Word's colored three-band rules (MS-DOC BrcType 0x18/0x19).
 use crate::common::color_math::HslColor;
 use crate::model::{BorderCompoundPattern, BorderStyle, RgbColor};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
@@ -30,7 +30,7 @@ pub(super) fn band_widths(border: BorderStyle) -> Option<[f32; 3]> {
   Some([rail, (border.width_pt - 2.0 * rail).max(0.0), rail])
 }
 
-/// Native table/page exporters truncate to whole twips before the 600-DPI
+/// Native paragraph/table/page exporters truncate to whole twips before the 600-DPI
 /// grid. In particular, authored sz25 (3.125pt) has a 25-dot middle band.
 pub(super) fn device_band_widths(border: BorderStyle) -> Option<[i64; 3]> {
   Some(band_widths(border)?.map(|width| {
@@ -80,6 +80,69 @@ pub(super) fn band_colors(border: BorderStyle) -> [RgbColor; 3] {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn paragraph_edges_and_separators_keep_the_shared_three_d_extent() {
+    for (value, pattern) in [
+      (
+        w::BorderValues::ThreeDEmboss,
+        BorderCompoundPattern::ThreeDEmboss,
+      ),
+      (
+        w::BorderValues::ThreeDEngrave,
+        BorderCompoundPattern::ThreeDEngrave,
+      ),
+    ] {
+      let borders = w::ParagraphBorders {
+        top_border: Some(w::TopBorder {
+          val: value,
+          size: Some(24),
+          ..Default::default()
+        }),
+        right_border: Some(w::RightBorder {
+          val: value,
+          size: Some(24),
+          ..Default::default()
+        }),
+        bottom_border: Some(w::BottomBorder {
+          val: value,
+          size: Some(24),
+          ..Default::default()
+        }),
+        left_border: Some(w::LeftBorder {
+          val: value,
+          size: Some(24),
+          ..Default::default()
+        }),
+        between_border: Some(w::BetweenBorder {
+          val: value,
+          size: Some(24),
+          ..Default::default()
+        }),
+        bar_border: Some(w::BarBorder {
+          val: value,
+          size: Some(24),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      let actual = [
+        super::super::top_border_style(borders.top_border.as_ref().unwrap()),
+        super::super::right_border_style(borders.right_border.as_ref().unwrap()),
+        super::super::bottom_border_style(borders.bottom_border.as_ref().unwrap()),
+        super::super::left_border_style(borders.left_border.as_ref().unwrap()),
+        super::super::between_border_style(borders.between_border.as_ref().unwrap()),
+        super::super::bar_border_style(borders.bar_border.as_ref().unwrap()),
+      ];
+      for border in actual {
+        let border = border.expect("paragraph border");
+        assert!(border.compound);
+        assert_eq!(border.compound_pattern, pattern);
+        assert_eq!(border.width_pt, 6.0);
+        assert_eq!(device_band_widths(border), Some([12, 25, 12]));
+      }
+    }
+  }
 
   #[test]
   fn three_d_border_native_width_boundaries_keep_the_middle_and_both_faces() {

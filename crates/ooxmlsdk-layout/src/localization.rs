@@ -223,8 +223,11 @@ const OFFICE_UI_STRING_OVERRIDES: &[OfficeUiStringOverrides] = &[
     // Current Office legend_manual_layout.xlsx chart-sheet PDF.
     chart_title: Some("차트 제목"),
     word_chart_series_prefix: Some("계열"),
-    chart_axis_title: None,
-    waterfall_legend: None,
+    // Native independent ChartEx category/value-title controls, Korean UI.
+    chart_axis_title: Some("축 제목"),
+    // Word's automatic ChartEx roles use UI resources (Of16-01.docx),
+    // independently of its Chinese format and authoring locales.
+    waterfall_legend: Some(["증가", "감소", "합계"]),
     boolean_values: None,
     invalid_citation_source: None,
   },

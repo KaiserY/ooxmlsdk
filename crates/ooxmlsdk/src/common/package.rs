@@ -1483,8 +1483,15 @@ impl SdkPackageStorage {
     if let Some(entry) = &package_relationships {
       claimed_entry_indices[entry.entry_index] = true;
     }
+    let shadowed_entry_indices = shadowed_recovery_entries(&entry_names, &claimed_entry_indices);
     let archived_extra_entry_indices = (0..archive.len())
-      .filter(|entry_index| !claimed_entry_indices[*entry_index])
+      .filter(|entry_index| {
+        !claimed_entry_indices[*entry_index]
+          && !shadowed_entry_indices
+            .get(*entry_index)
+            .copied()
+            .unwrap_or(false)
+      })
       .collect::<Box<[_]>>();
     let mut by_path = HashMap::with_capacity(raw_parts.len());
 
@@ -3395,13 +3402,13 @@ fn media_data_part_content_type(content_type: &str) -> bool {
 
 fn read_archive_model<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
-  entry_names: &[Box<str>],
+  entry_names: &[ArchiveEntryName],
 ) -> Result<OpenedArchiveModel, SdkError> {
   let mut entry_indices = HashMap::with_capacity(entry_names.len());
-  for (entry_index, entry_name) in entry_names.iter().enumerate() {
+  for entry in entry_names {
     entry_indices
-      .entry(entry_name.as_ref())
-      .or_insert(entry_index);
+      .entry(entry.name.as_ref())
+      .or_insert(entry.entry_index);
   }
   let (content_types, content_types_archive_entry_index) =
     read_content_types(archive, &entry_indices)?;
@@ -3502,12 +3509,13 @@ fn read_content_types<R: Read + Seek>(
   ))
 }
 
-fn read_raw_parts(entry_names: &[Box<str>], content_types: &Types) -> Vec<RawPart> {
+fn read_raw_parts(entry_names: &[ArchiveEntryName], content_types: &Types) -> Vec<RawPart> {
   let mut parts = Vec::new();
   let mut seen_paths = HashSet::new();
   let content_type_resolver = ContentTypeResolver::new(content_types);
 
-  for (index, entry_name) in entry_names.iter().enumerate() {
+  for entry in entry_names {
+    let entry_name = &entry.name;
     if entry_name.ends_with('/') {
       continue;
     }
@@ -3526,7 +3534,7 @@ fn read_raw_parts(entry_names: &[Box<str>], content_types: &Types) -> Vec<RawPar
     parts.push(RawPart {
       path: path.into_boxed_str(),
       content_type: content_type.into(),
-      entry_index: index,
+      entry_index: entry.entry_index,
       #[cfg(feature = "flat-opc")]
       bytes: Vec::new(),
     });
@@ -3540,35 +3548,95 @@ fn read_raw_parts(entry_names: &[Box<str>], content_types: &Types) -> Vec<RawPar
 const ZIP_UNICODE_PATH_EXTRA_FIELD_ID: u16 = 0x7075;
 const ZIP_UTF8_FILE_NAME_FLAG: u16 = 1 << 11;
 const ZIP_CENTRAL_HEADER_LEN: usize = 46;
+const ZIP_LOCAL_HEADER_LEN: usize = 30;
+
+struct ArchiveEntryName {
+  name: Box<str>,
+  entry_index: usize,
+}
+
+fn shadowed_recovery_entries(names: &[ArchiveEntryName], claimed: &[bool]) -> Vec<bool> {
+  if names.len() == claimed.len() {
+    return Vec::new();
+  }
+  // Native repaired SaveAs discards the unselected duplicate payload. Raw
+  // copying it under its conflicting central name would collide with the
+  // selected part. Keep unrelated extras and the SDK's unknown-part policy;
+  // ordinary archives, with no recovered aliases, retain their exact path.
+  let mut shadowed = vec![false; claimed.len()];
+  let mut first_indices = HashMap::with_capacity(names.len());
+  let mut previous_index = None;
+  for entry in names {
+    // Each central name precedes its optional local alias. Only the central
+    // name is used by raw_copy_archived_extra, so an alias collision alone
+    // must not discard an otherwise distinct, unclaimed extra entry.
+    let is_central = previous_index != Some(entry.entry_index);
+    previous_index = Some(entry.entry_index);
+    let first = *first_indices
+      .entry(entry.name.as_ref())
+      .or_insert(entry.entry_index);
+    if is_central && first != entry.entry_index && claimed[first] {
+      shadowed[entry.entry_index] = true;
+    }
+  }
+  shadowed
+}
 
 fn read_archive_entry_names<R: Read + Seek>(
   archive: &mut zip::ZipArchive<R>,
   raw_reader: &mut R,
-) -> Result<Box<[Box<str>]>, SdkError> {
+) -> Result<Box<[ArchiveEntryName]>, SdkError> {
   let mut names = Vec::with_capacity(archive.len());
+  let mut local_header = Vec::new();
   for entry_index in 0..archive.len() {
     let entry = archive.by_index_raw(entry_index)?;
     let mut name = entry.name()?.into_owned();
     let has_unicode_path = entry
       .extra_data_fields()
       .any(|field| matches!(field, zip::extra_fields::ExtraField::UnicodePath(_)));
-    let central_header_start = entry.central_header_start();
-    drop(entry);
-
-    if has_unicode_path
-      && let Some(raw_name) = read_utf8_central_directory_name(raw_reader, central_header_start)?
+    let central_name = if has_unicode_path {
+      read_central_directory_name(raw_reader, entry.central_header_start())?
+    } else {
+      None
+    };
+    if let Some((flags, raw_name)) = &central_name
+      && flags & ZIP_UTF8_FILE_NAME_FLAG != 0
+      && let Ok(raw_name) = std::str::from_utf8(raw_name)
     {
-      name = raw_name;
+      name = raw_name.to_owned();
     }
-    names.push(name.into_boxed_str());
+    let raw_name = central_name
+      .as_ref()
+      .map_or_else(|| entry.name_raw(), |(_, name)| name.as_slice());
+    let local_name = read_conflicting_local_name(
+      raw_reader,
+      entry.header_start(),
+      raw_name,
+      &mut local_header,
+    )?
+    .filter(|local_name| *local_name != name);
+    names.push(ArchiveEntryName {
+      name: name.into_boxed_str(),
+      entry_index,
+    });
+    // Native OpenAndRepair controls retain both header names. The first
+    // matching central-directory record wins, including when that directory
+    // is reordered; unconditionally replacing its name with the local one
+    // selects the wrong document for the reverse-conflict control.
+    if let Some(local_name) = local_name {
+      names.push(ArchiveEntryName {
+        name: local_name.into_boxed_str(),
+        entry_index,
+      });
+    }
   }
   Ok(names.into_boxed_slice())
 }
 
-fn read_utf8_central_directory_name<R: Read + Seek>(
+fn read_central_directory_name<R: Read + Seek>(
   reader: &mut R,
   header_start: u64,
-) -> Result<Option<String>, SdkError> {
+) -> Result<Option<(u16, Vec<u8>)>, SdkError> {
   let mut header = [0; ZIP_CENTRAL_HEADER_LEN];
   reader.seek(SeekFrom::Start(header_start))?;
   reader.read_exact(&mut header)?;
@@ -3577,14 +3645,55 @@ fn read_utf8_central_directory_name<R: Read + Seek>(
   }
 
   let flags = u16::from_le_bytes([header[8], header[9]]);
-  if flags & ZIP_UTF8_FILE_NAME_FLAG == 0 {
-    return Ok(None);
-  }
-
   let name_len = usize::from(u16::from_le_bytes([header[28], header[29]]));
   let mut raw_name = vec![0; name_len];
   reader.read_exact(&mut raw_name)?;
-  Ok(String::from_utf8(raw_name).ok())
+  Ok(Some((flags, raw_name)))
+}
+
+fn read_conflicting_local_name<R: Read + Seek>(
+  reader: &mut R,
+  header_start: u64,
+  central_name: &[u8],
+  scratch: &mut Vec<u8>,
+) -> Result<Option<String>, SdkError> {
+  let mut header = [0; ZIP_LOCAL_HEADER_LEN];
+  reader.seek(SeekFrom::Start(header_start))?;
+  reader.read_exact(&mut header)?;
+  if header[..4] != *b"PK\x03\x04" {
+    return Ok(None);
+  }
+  let flags = u16::from_le_bytes([header[6], header[7]]);
+  let name_len = usize::from(u16::from_le_bytes([header[26], header[27]]));
+  let name_end = ZIP_LOCAL_HEADER_LEN + name_len;
+  scratch.clear();
+  scratch.extend_from_slice(&header);
+  scratch.resize(name_end, 0);
+  reader.read_exact(&mut scratch[ZIP_LOCAL_HEADER_LEN..])?;
+  if &scratch[ZIP_LOCAL_HEADER_LEN..] == central_name {
+    return Ok(None);
+  }
+  if flags & ZIP_UTF8_FILE_NAME_FLAG != 0
+    && let Ok(name) = std::str::from_utf8(&scratch[ZIP_LOCAL_HEADER_LEN..])
+  {
+    return Ok(Some(name.to_owned()));
+  }
+
+  // Reuse zip's CP437/UnicodePath and ZIP64/data-descriptor metadata parser
+  // only for a conflict. The cursor contains just this bounded header, so
+  // dropping the streaming entry cannot read or decompress any payload.
+  let extra_len = usize::from(u16::from_le_bytes([header[28], header[29]]));
+  scratch.resize(name_end + extra_len, 0);
+  reader.read_exact(&mut scratch[name_end..])?;
+  let mut header_reader = Cursor::new(scratch.as_slice());
+  let options = zip::ZipReadOptions::default()
+    .override_compressed_size(0)
+    .ignore_encryption_flag(true);
+  let Some(entry) = zip::read::read_zipfile_from_stream_with_options(&mut header_reader, options)?
+  else {
+    return Ok(None);
+  };
+  Ok(Some(entry.name()?.into_owned()))
 }
 
 fn read_archive_entry_by_index<R: Read + Seek>(
@@ -4070,6 +4179,107 @@ mod tests {
       "word/document.xml"
     );
     assert_eq!(storage.part_bytes(main_part_id).unwrap(), b"first document");
+  }
+
+  #[test]
+  fn storage_recovers_conflicting_header_aliases_in_central_directory_order() {
+    // Native normal/reverse/reordered-header controls distinguish retaining
+    // aliases from blindly choosing either the central or local filename.
+    for (swap_central, swap_local, reverse_directory, rename_relationships, expected) in [
+      (false, false, false, false, b"first document".as_slice()),
+      (true, false, false, false, b"first document".as_slice()),
+      (false, true, false, false, b"first document".as_slice()),
+      (true, true, false, false, b"second document".as_slice()),
+      (true, false, true, false, b"second document".as_slice()),
+      (true, false, false, true, b"first document".as_slice()),
+    ] {
+      let mut buffer = Cursor::new(Vec::new());
+      {
+        let mut writer = zip::ZipWriter::new(&mut buffer);
+        let options = zip::write::SimpleFileOptions::default();
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer.write_all(br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#).unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer.write_all(br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="main" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#).unwrap();
+        writer.start_file("word/document.xml", options).unwrap();
+        writer.write_all(b"first document").unwrap();
+        writer.start_file("aaaaaaaaaaaaaaaaa", options).unwrap();
+        writer.write_all(b"second document").unwrap();
+        writer
+          .start_file("spare/_rels/orphan.rels", options)
+          .unwrap();
+        writer.write_all(br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#).unwrap();
+        writer.finish().unwrap();
+      }
+      let mut bytes = buffer.into_inner();
+      let mut archive = zip::ZipArchive::new(Cursor::new(bytes.as_slice())).unwrap();
+      let positions = (0..archive.len())
+        .map(|index| {
+          let entry = archive.by_index_raw(index).unwrap();
+          (
+            entry.header_start() as usize,
+            entry.central_header_start() as usize,
+          )
+        })
+        .collect::<Vec<_>>();
+      drop(archive);
+      if swap_central {
+        bytes[positions[2].1 + 46..positions[2].1 + 63].copy_from_slice(b"aaaaaaaaaaaaaaaaa");
+        bytes[positions[3].1 + 46..positions[3].1 + 63].copy_from_slice(b"word/document.xml");
+      }
+      if swap_local {
+        bytes[positions[2].0 + 30..positions[2].0 + 47].copy_from_slice(b"aaaaaaaaaaaaaaaaa");
+        bytes[positions[3].0 + 30..positions[3].0 + 47].copy_from_slice(b"word/document.xml");
+      }
+      if rename_relationships {
+        bytes[positions[1].1 + 46..positions[1].1 + 57].copy_from_slice(b"rrrrrrrrrrr");
+      }
+      if reverse_directory {
+        let first = positions[2].1;
+        let second = positions[3].1;
+        let length = second - first;
+        assert_eq!(length, 63);
+        let record = bytes[first..second].to_vec();
+        bytes.copy_within(second..second + length, first);
+        bytes[second..second + length].copy_from_slice(&record);
+      }
+      let storage = SdkPackageStorage::open(Cursor::new(bytes)).unwrap();
+      assert!(storage.archived_extra_entry_indices.contains(&4));
+      if swap_central != swap_local {
+        assert!(!storage.archived_extra_entry_indices.contains(&3));
+      }
+      let main = storage
+        .package_relationships()
+        .get("main")
+        .unwrap()
+        .target_part_slot()
+        .unwrap();
+      assert_eq!(
+        storage.part_bytes(main).unwrap(),
+        expected,
+        "central={swap_central}/local={swap_local}/reversed={reverse_directory}/rels={rename_relationships}"
+      );
+    }
+  }
+
+  #[test]
+  fn local_header_alias_decoding_is_bounded_to_metadata() {
+    // CP437 and data-descriptor decoding reuse zip's implementation. There
+    // is deliberately no compressed data after this local header.
+    for flags in [0u16, 8] {
+      let mut header = vec![0; 30];
+      header[..4].copy_from_slice(b"PK\x03\x04");
+      header[4..6].copy_from_slice(&20u16.to_le_bytes());
+      header[6..8].copy_from_slice(&flags.to_le_bytes());
+      header[8..10].copy_from_slice(&8u16.to_le_bytes());
+      header[18..22].copy_from_slice(&4096u32.to_le_bytes());
+      header[26..28].copy_from_slice(&5u16.to_le_bytes());
+      header.extend_from_slice(b"\x82.xml");
+      let mut reader = Cursor::new(header);
+      let alias = read_conflicting_local_name(&mut reader, 0, b"x.xml", &mut Vec::new()).unwrap();
+      assert_eq!(alias.as_deref(), Some("é.xml"));
+      assert_eq!(reader.position(), 35);
+    }
   }
 
   #[test]

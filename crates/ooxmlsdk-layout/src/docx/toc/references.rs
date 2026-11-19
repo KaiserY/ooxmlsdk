@@ -64,7 +64,10 @@ fn supported_source_fields(paragraph: &w::Paragraph) -> bool {
       ParagraphFieldEvent::End if open => {
         if !matches!(
           dynamic_field_kind(&instruction),
-          Some(DynamicFieldKind::Sequence { .. })
+          Some(DynamicFieldKind::Sequence {
+            bookmark_name: None,
+            ..
+          })
         ) {
           return false;
         }
@@ -85,6 +88,7 @@ pub(super) fn inline_refreshes(
 ) -> Vec<ReferenceResultRefresh> {
   let mut sources = HashMap::new();
   let mut requested = HashSet::new();
+  let mut requested_numbers = HashSet::new();
   let mut has_references = false;
   for ordinal in 0..scan.paragraphs.len() {
     if let Some(paragraph) = paragraph(sections, scan, ordinal) {
@@ -96,11 +100,15 @@ pub(super) fn inline_refreshes(
           ParagraphFieldEvent::ReferenceResultSpan {
             bookmark_name,
             copy_text,
+            numbering_only,
             ..
           } => {
             has_references = true;
             if *copy_text {
               requested.insert(bookmark_name.to_ascii_lowercase());
+            }
+            if *numbering_only {
+              requested_numbers.insert(bookmark_name.to_ascii_lowercase());
             }
           }
           _ => {}
@@ -110,6 +118,37 @@ pub(super) fn inline_refreshes(
   }
   if !has_references {
     return Vec::new();
+  }
+  let mut unnumbered_targets = HashSet::new();
+  if !requested_numbers.is_empty() {
+    // Resolve requested starts once in source order, before replacing any
+    // field spans. A missing source, caret-only bookmark, unsupported list
+    // or separate story keeps its previous owner rather than becoming zero.
+    for (ordinal, entry) in scan.paragraphs.iter().enumerate() {
+      if entry.source_bookmarks.is_empty() {
+        continue;
+      }
+      let Some(source) = paragraph(sections, scan, ordinal) else {
+        continue;
+      };
+      if source.list_label.is_some()
+        || source.list_label_image.is_some()
+        || source.format.numbering_id.is_some_and(|id| id != 0)
+      {
+        continue;
+      }
+      for name in &entry.source_bookmarks {
+        if scan.caret_reference_bookmarks.contains(name) {
+          continue;
+        }
+        if let Some(requested) = requested_numbers
+          .iter()
+          .find(|key| key.eq_ignore_ascii_case(name))
+        {
+          unnumbered_targets.insert(requested.as_str());
+        }
+      }
+    }
   }
   sources.retain(|name, _| requested.contains(name));
   // Separate stories do not supply main-story TOC ranges or sequence state,
@@ -136,11 +175,20 @@ pub(super) fn inline_refreshes(
       };
       for inline in &paragraph.inlines {
         match inline {
+          InlineItem::SequenceCounter(identifier) => {
+            let value = sequence_numbers.entry(identifier.clone()).or_default();
+            *value = value.saturating_add(1);
+          }
           InlineItem::BookmarkStart(name) if sources.contains_key(&name.to_ascii_lowercase()) => {
             source_sequences.insert(name.to_ascii_lowercase(), sequence_numbers.clone());
           }
           InlineItem::Text(run) => {
-            if let Some(DynamicFieldKind::Sequence { identifier, .. }) = &run.dynamic_field {
+            if let Some(DynamicFieldKind::Sequence {
+              identifier,
+              bookmark_name: None,
+              ..
+            }) = &run.dynamic_field
+            {
               let value = sequence_numbers.entry(identifier.clone()).or_default();
               *value = value.saturating_add(1);
             }
@@ -160,10 +208,12 @@ pub(super) fn inline_refreshes(
       let ParagraphFieldEvent::ReferenceResultSpan {
         field_id,
         bookmark_name,
+        reference_kind,
         inline_start,
         inline_end,
         merge_format,
         copy_text,
+        numbering_only,
         separator_style,
       } = event
       else {
@@ -186,7 +236,19 @@ pub(super) fn inline_refreshes(
         .iter()
         .any(|name| name.eq_ignore_ascii_case(bookmark_name));
       let mut replacement = if missing {
-        if start == 0 && end == paragraph.inlines.len() {
+        if *reference_kind == field_reference::Kind::Implicit
+          && cached
+            .iter()
+            .any(|item| matches!(item, InlineItem::Text(run) if !run.text.is_empty()))
+        {
+          // Word keeps a missing implicit REF's nonempty cache, including
+          // spaces, even when the optional print-update pass is enabled.
+          continue;
+        }
+        if *reference_kind == field_reference::Kind::Explicit
+          && start == 0
+          && end == paragraph.inlines.len()
+        {
           // The existing whole-story owner also handles multi-paragraph REF
           // caches. Keep that structural replacement independent.
           continue;
@@ -197,8 +259,27 @@ pub(super) fn inline_refreshes(
         if let Some(style) = separator_style {
           run.style.clone_from(style);
         }
-        let message = FieldMessage::ReferenceSourceNotFound;
-        field_localization::apply_reference_separator_message_style(&mut run.style, ui_language);
+        let message = match reference_kind {
+          field_reference::Kind::Explicit => {
+            field_localization::apply_reference_separator_message_style(
+              &mut run.style,
+              ui_language,
+            );
+            FieldMessage::ReferenceSourceNotFound
+          }
+          field_reference::Kind::Implicit => {
+            let bold = !run.style.bold;
+            let complex_bold = !run.style.complex_bold.unwrap_or(run.style.bold);
+            apply_generated_field_message_style(
+              &mut run.style,
+              FieldMessage::UndefinedBookmark,
+              ui_language,
+            );
+            run.style.bold = bold;
+            run.style.complex_bold = Some(complex_bold);
+            FieldMessage::UndefinedBookmark
+          }
+        };
         run.text = run_display_text(
           localized_field_message(message, ui_language),
           run.style.clone(),
@@ -229,6 +310,27 @@ pub(super) fn inline_refreshes(
           continue;
         };
         result
+      } else if *numbering_only
+        && unnumbered_targets
+          .iter()
+          .any(|name| name.eq_ignore_ascii_case(bookmark_name))
+      {
+        // Word returns zero for an unnumbered REF target even with print
+        // updates disabled. The insertion/separator properties own this new
+        // result; explicit MERGEFORMAT instead retains cached formatting.
+        let mut run = template
+          .cloned()
+          .unwrap_or_else(|| empty_run(paragraph.base_style.clone()));
+        if !*merge_format && let Some(style) = separator_style {
+          run.style.clone_from(style);
+        }
+        run.text = "0".to_owned();
+        run.dynamic_field = None;
+        run.style_ref_keys.clear();
+        run.style_ref_text = None;
+        run.style_ref_numbering_text = None;
+        run.preserve_text_portion = false;
+        vec![InlineItem::Text(run)]
       } else {
         continue;
       };
@@ -246,7 +348,7 @@ pub(super) fn inline_refreshes(
   refreshes
 }
 
-fn collect_reference_bookmarks<'a>(blocks: &'a [Block], names: &mut HashSet<&'a str>) {
+pub(super) fn collect_reference_bookmarks<'a>(blocks: &'a [Block], names: &mut HashSet<&'a str>) {
   for block in blocks {
     match block {
       Block::Paragraph(paragraph) => {
@@ -301,12 +403,18 @@ fn source_result(
   );
   let mut sequence_numbers = sequence_numbers.clone();
   for item in &mut result {
+    if let InlineItem::SequenceCounter(identifier) = item {
+      let value = sequence_numbers.entry(identifier.clone()).or_default();
+      *value = value.saturating_add(1);
+      continue;
+    }
     let InlineItem::Text(run) = item else {
       return None;
     };
     if let Some(kind) = run.dynamic_field.take() {
       let DynamicFieldKind::Sequence {
         identifier,
+        bookmark_name: None,
         number_format,
       } = kind
       else {
@@ -321,6 +429,9 @@ fn source_result(
       run.hyperlink_url.clone_from(&template.hyperlink_url);
     }
   }
+  // The copied value reads the source state; it must not consume the same
+  // instruction's sequence a second time in the destination story.
+  result.retain(|item| !matches!(item, InlineItem::SequenceCounter(_)));
   Some(result)
 }
 

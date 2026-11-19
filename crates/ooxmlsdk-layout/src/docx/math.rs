@@ -530,13 +530,15 @@ fn inline_image_from_math_box(
   let padding = MATH_CANVAS_PADDING_PT;
   InlineImage {
     contour_owned_wrap: None,
-    source_run_font_size_pt: None,
+    source_run_character_indent_unit_pt: None,
     data: Bytes::from(svg.into_bytes()),
     content_type: Some(OFFICE_MATH_SVG_CONTENT_TYPE.to_string()),
     blip_compression_state: crate::common::BlipCompressionState::Unspecified,
     picture_frame: None,
     run_border: None,
+    vml_picture_borders: None,
     picture_frame_clips_image: false,
+    picture_scaled_height_pt: None,
     picture_paint_size_pt: None,
     effects: None,
     static3d: None,
@@ -562,12 +564,14 @@ fn inline_image_from_math_box(
     flip_horizontal: false,
     flip_vertical: false,
     metafile_background_color: None,
+    metafile_external_header: None,
     alt_text: (!semantic_text.is_empty()).then_some(semantic_text),
     hyperlink_url: None,
     semantic_metafile_text: false,
     metafile_semantic_text_includes_raster_backdrop: false,
     signature_line: None,
     semantic_metafile_font_family: None,
+    embedded_object: false,
     native_ole_equation: None,
     metafile_native_size: false,
     metafile_fixed_output_profile: crate::common::MetafileFixedOutputProfile::Default,
@@ -1229,20 +1233,16 @@ impl MathParser<'_> {
         }
       }
     }
-    // Materialize the active OfficeMath face after the ordinary run cascade.
-    // Other run properties still participate, while none of the four inherited
-    // Word font slots can redirect a covered math character to a text face.
-    apply_office_math_font_family(&mut style, self.styles, &self.math_font_family);
     let properties = run.math_run_properties.as_deref();
     let literal = properties
       .and_then(|properties| properties.literal.as_ref())
       .is_some_and(|literal| math_on(literal.val));
-    let normal = properties
-      .and_then(|properties| properties.run_properties_choice.as_ref())
-      .is_some_and(|choice| match choice {
-        m::RunPropertiesChoice::NormalText(normal) => math_on(normal.val),
-        m::RunPropertiesChoice::Sequence(_) => false,
-      });
+    let normal = shared_math::math_run_is_normal_text(run);
+    // m:nor retains the ordinary run's complete font binding. Literal math
+    // still uses the math font; it is not the ordinary-text font switch.
+    if !normal {
+      apply_office_math_font_family(&mut style, self.styles, &self.math_font_family);
+    }
     // OfficeMath's m:sty supplies mathematical alphabets; host b/i is only
     // ordinary text formatting inside m:nor. Native PowerPoint controls with
     // a:rPr i=0/1 and b=0/1 keep the same built math glyphs and matrices.
@@ -1396,7 +1396,20 @@ impl MathParser<'_> {
   }
 
   fn equation_array(&self, value: &m::EquationArray) -> MathNode {
-    MathNode::EquationArray(value.base.iter().map(|base| self.base(base)).collect())
+    let properties = value.equation_array_properties.as_deref();
+    MathNode::EquationArray {
+      rows: value.base.iter().map(|base| self.base(base)).collect(),
+      row_spacing: MathRowSpacing::from_omml(
+        properties.and_then(|value| value.row_spacing_rule.as_ref()),
+        properties.and_then(|value| value.row_spacing.as_ref()),
+      ),
+      control_style: if self.drawingml_properties.is_none() {
+        self
+          .explicit_control_style(properties.and_then(|value| value.control_properties.as_deref()))
+      } else {
+        None
+      },
+    }
   }
 
   fn fraction(&self, value: &m::Fraction) -> MathNode {
@@ -1463,13 +1476,24 @@ impl MathParser<'_> {
   }
 
   fn matrix(&self, value: &m::Matrix) -> MathNode {
-    MathNode::Matrix(
-      value
+    let properties = value.matrix_properties.as_deref();
+    MathNode::Matrix {
+      rows: value
         .matrix_row
         .iter()
         .map(|row| row.base.iter().map(|base| self.base(base)).collect())
         .collect(),
-    )
+      row_spacing: MathRowSpacing::from_omml(
+        properties.and_then(|value| value.row_spacing_rule.as_ref()),
+        properties.and_then(|value| value.row_spacing.as_ref()),
+      ),
+      control_style: if self.drawingml_properties.is_none() {
+        self
+          .explicit_control_style(properties.and_then(|value| value.control_properties.as_deref()))
+      } else {
+        None
+      },
+    }
   }
 
   fn nary(&self, value: &m::Nary) -> MathNode {
@@ -1773,6 +1797,42 @@ fn math_class_controls_spacing(class: MathClass) -> bool {
   )
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+enum MathRowSpacing {
+  #[default]
+  Single,
+  OneAndHalf,
+  Double,
+  Exactly(u16),
+  Multiple(u16),
+}
+
+impl MathRowSpacing {
+  fn from_omml(rule: Option<&m::RowSpacingRule>, spacing: Option<&m::RowSpacing>) -> Self {
+    let value = spacing.map_or(0, |spacing| spacing.val);
+    match rule.map_or(0, |rule| rule.val) {
+      1 => Self::OneAndHalf,
+      2 => Self::Double,
+      3 => Self::Exactly(value),
+      4 => Self::Multiple(value),
+      _ => Self::Single,
+    }
+  }
+
+  fn baseline_distance_pt(self, single_line_pt: f32) -> f32 {
+    // [MS-OI29500] §22.1.2.92–93: Word's Exact value is in twips,
+    // Multiple is in half-lines, and an omitted rule means Single even
+    // when an rSp value is present. The control font supplies one line.
+    match self {
+      Self::Single => single_line_pt,
+      Self::OneAndHalf => single_line_pt * 1.5,
+      Self::Double => single_line_pt * 2.0,
+      Self::Exactly(twips) => f32::from(twips) / 20.0,
+      Self::Multiple(half_lines) => single_line_pt * f32::from(half_lines) / 2.0,
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 enum MathNode {
   Empty,
@@ -1830,8 +1890,16 @@ enum MathNode {
     arguments: Vec<Self>,
     control_style: Option<TextStyle>,
   },
-  EquationArray(Vec<Self>),
-  Matrix(Vec<Vec<Self>>),
+  EquationArray {
+    rows: Vec<Self>,
+    row_spacing: MathRowSpacing,
+    control_style: Option<TextStyle>,
+  },
+  Matrix {
+    rows: Vec<Vec<Self>>,
+    row_spacing: MathRowSpacing,
+    control_style: Option<TextStyle>,
+  },
   Nary {
     operator: String,
     lower: Option<Box<Self>>,
@@ -1931,8 +1999,8 @@ impl MathNode {
       | Self::Scripts { .. }
       | Self::Limits { .. }
       | Self::Delimiter { .. }
-      | Self::EquationArray(_)
-      | Self::Matrix(_)
+      | Self::EquationArray { .. }
+      | Self::Matrix { .. }
       | Self::Nary { .. }
       | Self::Radical { .. }
       | Self::Accent { .. }
@@ -2031,7 +2099,7 @@ impl MathNode {
         }
         output.push_str(end);
       }
-      Self::EquationArray(rows) => {
+      Self::EquationArray { rows, .. } => {
         for (index, row) in rows.iter().enumerate() {
           if index > 0 {
             output.push('\n');
@@ -2039,7 +2107,7 @@ impl MathNode {
           row.append_semantic_text(output);
         }
       }
-      Self::Matrix(rows) => {
+      Self::Matrix { rows, .. } => {
         for (row_index, row) in rows.iter().enumerate() {
           if row_index > 0 {
             output.push('\n');
@@ -2148,8 +2216,10 @@ fn math_background_coverage(node: &MathNode) -> MathBackgroundCoverage {
     MathNode::Argument { base, .. } | MathNode::OperatorEmulator { base } => {
       math_background_coverage(base)
     }
-    MathNode::Row(nodes) | MathNode::EquationArray(nodes) => combine_node_backgrounds(nodes),
-    MathNode::Matrix(rows) => combine_node_backgrounds(rows.iter().flatten()),
+    MathNode::Row(nodes) | MathNode::EquationArray { rows: nodes, .. } => {
+      combine_node_backgrounds(nodes)
+    }
+    MathNode::Matrix { rows, .. } => combine_node_backgrounds(rows.iter().flatten()),
     MathNode::Fraction {
       numerator,
       denominator,
@@ -3442,8 +3512,16 @@ fn layout_node(node: &MathNode, context: MathLayoutContext, metrics: &mut TextMe
       context,
       metrics,
     ),
-    MathNode::EquationArray(rows) => layout_stack(rows, context, metrics, 0.25),
-    MathNode::Matrix(rows) => layout_matrix(rows, context, metrics),
+    MathNode::EquationArray {
+      rows,
+      row_spacing,
+      control_style,
+    } => layout_stack(rows, *row_spacing, control_style.as_ref(), context, metrics),
+    MathNode::Matrix {
+      rows,
+      row_spacing,
+      control_style,
+    } => layout_matrix(rows, *row_spacing, control_style.as_ref(), context, metrics),
     MathNode::Nary {
       operator,
       lower,
@@ -4130,8 +4208,8 @@ fn math_node_classes(node: &MathNode) -> Option<MathAtomClasses> {
       })
     }
     MathNode::Fraction { .. }
-    | MathNode::EquationArray(_)
-    | MathNode::Matrix(_)
+    | MathNode::EquationArray { .. }
+    | MathNode::Matrix { .. }
     | MathNode::Radical { .. } => Some(MathAtomClasses::single(MathClass::Normal)),
     MathNode::Scripts { base, .. } | MathNode::Limits { base, .. } => math_node_classes(base),
     MathNode::Delimiter {
@@ -4562,7 +4640,7 @@ fn office_math_object_surround_spacing(
 
 fn math_node_is_spaced_object(node: &MathNode) -> bool {
   match node {
-    MathNode::EquationArray(_) => true,
+    MathNode::EquationArray { .. } => true,
     MathNode::Fraction { kind, .. } => matches!(
       kind,
       m::FractionTypeValues::Bar | m::FractionTypeValues::NoBar
@@ -4593,10 +4671,21 @@ fn representative_style(node: &MathNode) -> Option<&TextStyle> {
       representative_style(base)
     }
     MathNode::RunBackground { base, style } => representative_style(base).or(Some(style)),
-    MathNode::Row(nodes) | MathNode::EquationArray(nodes) => {
-      nodes.iter().find_map(representative_style)
-    }
-    MathNode::Matrix(rows) => rows.iter().flatten().find_map(representative_style),
+    MathNode::Row(nodes) => nodes.iter().find_map(representative_style),
+    MathNode::EquationArray {
+      rows,
+      control_style,
+      ..
+    } => control_style
+      .as_ref()
+      .or_else(|| rows.iter().find_map(representative_style)),
+    MathNode::Matrix {
+      rows,
+      control_style,
+      ..
+    } => control_style
+      .as_ref()
+      .or_else(|| rows.iter().flatten().find_map(representative_style)),
     MathNode::Fraction {
       numerator,
       denominator,
@@ -6455,9 +6544,10 @@ impl OutlinePen for SvgGlyphOutline {
 
 fn layout_stack(
   rows: &[MathNode],
+  row_spacing: MathRowSpacing,
+  control_style: Option<&TextStyle>,
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
-  gap_em: f32,
 ) -> MathBox {
   let boxes = rows
     .iter()
@@ -6470,21 +6560,45 @@ fn layout_stack(
     .iter()
     .map(|value| value.width_pt)
     .fold(0.0_f32, f32::max);
-  let gap = style.font_size_pt * gap_em;
+  let effective_style = math_script_style(control_style.unwrap_or(style), context, metrics);
+  let math = metrics.math_font_metrics(&effective_style);
+  let requested_spacing =
+    row_spacing.baseline_distance_pt(metrics.vertical_metrics(&effective_style).line_height_pt());
+  let row_gaps = boxes
+    .windows(2)
+    .map(|rows| {
+      if context.drawingml_host {
+        // [MS-ODRAWXML] forbids rSp/rSpRule in a14 equation arrays. Keep
+        // this separately observed host's existing default layout.
+        style.font_size_pt * 0.25
+      } else {
+        math_inter_row_gap(
+          requested_spacing,
+          math.stack_display_style_gap_min_pt,
+          rows[0].descent_pt,
+          rows[1].ascent_pt,
+        )
+      }
+    })
+    .collect::<Vec<_>>();
   let total_height = boxes
     .iter()
     .map(|value| value.ascent_pt + value.descent_pt)
     .sum::<f32>()
-    + gap * boxes.len().saturating_sub(1) as f32;
-  let axis = metrics.math_font_metrics(style).axis_height_pt;
+    + row_gaps.iter().sum::<f32>();
+  let axis = if context.drawingml_host {
+    metrics.math_font_metrics(style).axis_height_pt
+  } else {
+    math.axis_height_pt
+  };
   let mut top = -axis - total_height / 2.0;
   let mut result = MathBox::empty();
-  for row in boxes {
+  for (index, row) in boxes.into_iter().enumerate() {
     let baseline = top + row.ascent_pt;
     let row_width = row.width_pt;
     let row_height = row.ascent_pt + row.descent_pt;
     result.append(row, (width - row_width) / 2.0, baseline);
-    top += row_height + gap;
+    top += row_height + row_gaps.get(index).copied().unwrap_or_default();
   }
   result.width_pt = width;
   result
@@ -6492,6 +6606,8 @@ fn layout_stack(
 
 fn layout_matrix(
   rows: &[Vec<MathNode>],
+  row_spacing: MathRowSpacing,
+  control_style: Option<&TextStyle>,
   context: MathLayoutContext,
   metrics: &mut TextMetrics,
 ) -> MathBox {
@@ -6518,7 +6634,16 @@ fn layout_matrix(
   // one-em column gap. Word likewise treats omitted rSp/rSpRule as single
   // line spacing, measured from one matrix-row baseline to the next.
   let column_gap = style.font_size_pt;
-  let single_line_spacing = metrics.vertical_metrics(style).line_height_pt();
+  let effective_style = math_script_style(control_style.unwrap_or(style), context, metrics);
+  let math = metrics.math_font_metrics(&effective_style);
+  let (requested_spacing, minimum_gap) = if context.drawingml_host {
+    (metrics.vertical_metrics(style).line_height_pt(), 0.0)
+  } else {
+    (
+      row_spacing.baseline_distance_pt(metrics.vertical_metrics(&effective_style).line_height_pt()),
+      math.stack_display_style_gap_min_pt,
+    )
+  };
   let row_metrics = boxes
     .iter()
     .map(|row| {
@@ -6538,14 +6663,18 @@ fn layout_matrix(
     column_widths.iter().sum::<f32>() + column_gap * column_count.saturating_sub(1) as f32;
   let row_gaps = row_metrics
     .windows(2)
-    .map(|rows| matrix_inter_row_gap(single_line_spacing, rows[0].1, rows[1].0))
+    .map(|rows| math_inter_row_gap(requested_spacing, minimum_gap, rows[0].1, rows[1].0))
     .collect::<Vec<_>>();
   let total_height = row_metrics
     .iter()
     .map(|(ascent, descent)| ascent + descent)
     .sum::<f32>()
     + row_gaps.iter().sum::<f32>();
-  let axis = metrics.math_font_metrics(style).axis_height_pt;
+  let axis = if context.drawingml_host {
+    metrics.math_font_metrics(style).axis_height_pt
+  } else {
+    math.axis_height_pt
+  };
   let mut top = -axis - total_height / 2.0;
   let mut result = MathBox::empty();
   for (row_index, row) in boxes.into_iter().enumerate() {
@@ -6567,12 +6696,16 @@ fn layout_matrix(
   result
 }
 
-fn matrix_inter_row_gap(
+fn math_inter_row_gap(
   baseline_spacing_pt: f32,
+  minimum_gap_pt: f32,
   upper_descent_pt: f32,
   lower_ascent_pt: f32,
 ) -> f32 {
-  (baseline_spacing_pt - upper_descent_pt - lower_ascent_pt).max(0.0)
+  // Office array/matrix, tall-row and independent control/row-size probes:
+  // even Exact/Multiple zero preserves the control font's display-stack
+  // ink gap. Word uses that same MATH value in inline arrays as well.
+  (baseline_spacing_pt - upper_descent_pt - lower_ascent_pt).max(minimum_gap_pt)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -7234,6 +7367,7 @@ fn xml_escape_attribute(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+  use std::fmt::Write as _;
   use std::sync::Arc;
 
   use ooxmlsdk::schemas::{m, schemas_openxmlformats_org_wordprocessingml_2006_main as w};
@@ -7254,12 +7388,13 @@ mod tests {
     automatic_math_spacing, function_application_spacing, group_character_aligns_character,
     layout_node, layout_user_space, limit_baseline_distance_pt, math_argument_size_delta,
     math_background_coverage, math_character_class, math_glyph_construction, math_glyph_kerns,
-    math_is_extended_shape, math_italics_correction, math_node_classes, math_node_is_spaced_object,
-    math_script_style, math_top_accent_attachment, matrix_inter_row_gap, nary_argument_spacing,
-    nary_layout_policy, normalize_automatic_math_text, office_math_object_surround_spacing,
-    open_type_math_line_extents, plan_math_glyph_assembly, prepared_math_variant_for_target,
-    representative_style, resolve_vary_math_classes, split_math_text, text_math_classes,
-    wordprocessing_math_script_size, wordprocessing_math_zone_image,
+    math_inter_row_gap, math_is_extended_shape, math_italics_correction, math_node_classes,
+    math_node_is_spaced_object, math_script_style, math_top_accent_attachment,
+    nary_argument_spacing, nary_layout_policy, normalize_automatic_math_text,
+    office_math_object_surround_spacing, open_type_math_line_extents, plan_math_glyph_assembly,
+    prepared_math_variant_for_target, representative_style, resolve_vary_math_classes,
+    split_math_text, text_math_classes, wordprocessing_math_script_size,
+    wordprocessing_math_zone_image,
   };
 
   #[test]
@@ -7400,6 +7535,45 @@ mod tests {
     let drawing = word.with_drawingml_host();
     assert!((super::math_script_size(36.0, 0.73, drawing) - 26.28).abs() < 0.0001);
     assert_eq!(super::math_script_size(36.0, 0.73, word), 26.0);
+  }
+
+  #[test]
+  fn normal_math_runs_keep_inherited_and_direct_text_fonts() {
+    for normal in [false, true] {
+      for literal in [false, true] {
+        for direct in [None, Some("Times New Roman")] {
+          let font = direct.map_or(String::new(), |font| {
+            format!(r#"<w:rPr><w:rFonts w:ascii="{font}" w:hAnsi="{font}"/></w:rPr>"#)
+          });
+          let xml = format!(
+            r#"<m:r xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><m:rPr><m:lit m:val="{}"/><m:nor m:val="{}"/></m:rPr>{font}<m:t>A+∞</m:t></m:r>"#,
+            u8::from(literal),
+            u8::from(normal)
+          );
+          let run = m::Run::from_bytes(xml.as_bytes()).unwrap();
+          let base = TextStyle {
+            font_family: Some("Arial".into()),
+            high_ansi_font_family: Some("Arial".into()),
+            ..TextStyle::default()
+          };
+          let parser = MathParser {
+            base_style: &base,
+            styles: &StylesCatalog::default(),
+            math_font_family: Arc::from("Cambria Math"),
+            drawingml_properties: None,
+          };
+          let node = parser.run(&run);
+          let style = representative_style(&node).unwrap();
+          let expected = if normal {
+            direct.unwrap_or("Arial")
+          } else {
+            "Cambria Math"
+          };
+          assert_eq!(style.font_family.as_deref(), Some(expected));
+          assert_eq!(style.high_ansi_font_family.as_deref(), Some(expected));
+        }
+      }
+    }
   }
 
   #[test]
@@ -8861,7 +9035,11 @@ mod tests {
         style: style.clone(),
         math_class_override: None,
       };
-      let array = MathNode::EquationArray(vec![text("Ω"), text("0")]);
+      let array = MathNode::EquationArray {
+        rows: vec![text("Ω"), text("0")],
+        row_spacing: super::MathRowSpacing::default(),
+        control_style: None,
+      };
       let array_width = layout_node(&array, context, &mut metrics).width_pt;
       for (prefix, expected_em) in [("𝑎", 1.0 / 6.0), ("=", 5.0 / 18.0)] {
         let prefix_width = layout_node(&text(prefix), context, &mut metrics).width_pt;
@@ -10098,13 +10276,181 @@ mod tests {
   }
 
   #[test]
+  fn word_math_arrays_import_exact_row_spacing_and_keep_row_fonts() {
+    let mut metrics = TextMetrics::new();
+    for matrix in [false, true] {
+      for (control, row) in [(11.0, 11.0), (11.0, 22.0), (22.0, 11.0)] {
+        let node = math_row_probe_node(matrix, Some(3), Some(1080), control, row);
+        let built = layout_node(
+          &node,
+          MathLayoutContext::root(true, false, true),
+          &mut metrics,
+        );
+        let text = built
+          .items
+          .iter()
+          .filter_map(|item| match item {
+            MathPaintItem::Text {
+              baseline_y_pt,
+              style,
+              ..
+            } => Some((*baseline_y_pt, style.font_size_pt)),
+            _ => None,
+          })
+          .collect::<Vec<_>>();
+        assert_eq!(text.len(), 3);
+        assert!(text.iter().all(|(_, size)| (*size - row).abs() < 0.001));
+        for pair in text.windows(2) {
+          assert!(
+            (pair[1].0 - pair[0].0 - 54.0).abs() < 0.001,
+            "{matrix}/{control}/{row}: {text:?}"
+          );
+        }
+        assert_eq!(
+          node
+            .semantic_text()
+            .chars()
+            .filter(|c| c.is_alphabetic())
+            .count(),
+          3
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn word_math_row_rules_use_control_lines_and_ignore_unused_values() {
+    let mut metrics = TextMetrics::new();
+    for matrix in [false, true] {
+      for control in [11.0, 22.0] {
+        let baselines = |node: &MathNode, metrics: &mut TextMetrics| {
+          layout_node(node, MathLayoutContext::root(true, false, true), metrics)
+            .items
+            .into_iter()
+            .filter_map(|item| match item {
+              MathPaintItem::Text { baseline_y_pt, .. } => Some(baseline_y_pt),
+              _ => None,
+            })
+            .collect::<Vec<_>>()
+        };
+        let single = math_row_probe_node(matrix, None, None, control, 11.0);
+        let base = baselines(&single, &mut metrics);
+        let single_distance = base[1] - base[0];
+        // Native 11/22pt control-font opposites give approximately12.9/25.8pt;
+        // changing row glyph size does not redefine this requested line unit.
+        assert!((single_distance / control - 2401.0 / 2048.0).abs() < 0.001);
+        for (rule, value, multiple) in [
+          (None, Some(1080), 1.0),
+          (Some(0), Some(1080), 1.0),
+          (Some(1), None, 1.5),
+          (Some(2), None, 2.0),
+          (Some(4), Some(3), 1.5),
+          (Some(4), Some(4), 2.0),
+        ] {
+          let node = math_row_probe_node(matrix, rule, value, control, 11.0);
+          let actual = baselines(&node, &mut metrics);
+          for pair in actual.windows(2) {
+            assert!(
+              (pair[1] - pair[0] - single_distance * multiple).abs() < 0.001,
+              "{matrix}/{control}/{rule:?}/{value:?}: {actual:?}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_math_row_minimum_uses_control_stack_metrics_in_both_layout_modes() {
+    let mut metrics = TextMetrics::new();
+    // Actual Office control/row-font opposites, in points. Residual allowance
+    // is two600-DPI cells for unhinted ideal glyph boxes versus fixed output.
+    for (control, row, expected) in [
+      (11.0, 11.0, [11.16, 8.88]),
+      (11.0, 22.0, [19.08, 14.16]),
+      (22.0, 11.0, [14.76, 12.36]),
+    ] {
+      for matrix in [false, true] {
+        for display in [false, true] {
+          let node = math_row_probe_node(matrix, Some(3), Some(0), control, row);
+          let built = layout_node(
+            &node,
+            MathLayoutContext::root(display, false, display),
+            &mut metrics,
+          );
+          let baselines = built
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              MathPaintItem::Text { baseline_y_pt, .. } => Some(*baseline_y_pt),
+              _ => None,
+            })
+            .collect::<Vec<_>>();
+          assert_eq!(baselines.len(), 3);
+          for (pair, expected) in baselines.windows(2).zip(expected) {
+            assert!(
+              (pair[1] - pair[0] - expected).abs() < 0.24,
+              "{matrix}/{display}/{control}/{row}: {baselines:?}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  fn math_row_probe_node(
+    matrix: bool,
+    rule: Option<i64>,
+    spacing: Option<u16>,
+    control_size: f32,
+    row_size: f32,
+  ) -> MathNode {
+    let mut properties = String::new();
+    if let Some(rule) = rule {
+      write!(properties, r#"<m:rSpRule m:val="{rule}"/>"#).unwrap();
+    }
+    if let Some(spacing) = spacing {
+      write!(properties, r#"<m:rSp m:val="{spacing}"/>"#).unwrap();
+    }
+    write!(properties, r#"<m:ctrlPr><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math"/><w:sz w:val="{}"/></w:rPr></m:ctrlPr>"#, control_size * 2.0).unwrap();
+    let rows = "abc".chars().map(|letter| {
+      let argument = format!(r#"<m:e><m:r><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math"/><w:sz w:val="{}"/></w:rPr><m:t>{letter}</m:t></m:r></m:e>"#, row_size * 2.0);
+      if matrix { format!("<m:mr>{argument}</m:mr>") } else { argument }
+    }).collect::<String>();
+    let base = TextStyle {
+      font_size_pt: 11.0,
+      ..Default::default()
+    };
+    let styles = StylesCatalog::default();
+    let parser = MathParser {
+      base_style: &base,
+      styles: &styles,
+      math_font_family: Arc::from("Cambria Math"),
+      drawingml_properties: None,
+    };
+    let (tag, property_tag) = if matrix {
+      ("m", "mPr")
+    } else {
+      ("eqArr", "eqArrPr")
+    };
+    let xml = format!(
+      r#"<m:{tag} xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><m:{property_tag}>{properties}</m:{property_tag}>{rows}</m:{tag}>"#
+    );
+    if matrix {
+      parser.matrix(&m::Matrix::from_bytes(xml.as_bytes()).unwrap())
+    } else {
+      parser.equation_array(&m::EquationArray::from_bytes(xml.as_bytes()).unwrap())
+    }
+  }
+
+  #[test]
   fn matrix_single_line_spacing_is_a_baseline_distance() {
     let upper_descent = 3.594_726_6_f32;
     let lower_ascent = 5.601_562_5_f32;
     let line_spacing = 14.068_359_f32;
-    let gap = matrix_inter_row_gap(line_spacing, upper_descent, lower_ascent);
+    let gap = math_inter_row_gap(line_spacing, 0.0, upper_descent, lower_ascent);
 
     assert!((upper_descent + gap + lower_ascent - line_spacing).abs() < 0.000_1);
-    assert_eq!(matrix_inter_row_gap(12.0, 7.0, 6.0), 0.0);
+    assert_eq!(math_inter_row_gap(12.0, 0.0, 7.0, 6.0), 0.0);
   }
 }

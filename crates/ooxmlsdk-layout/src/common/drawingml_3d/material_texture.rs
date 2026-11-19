@@ -78,8 +78,60 @@ impl TextSurfaceRealizationPlan {
     )
   }
 
+  pub(crate) fn for_picture(
+    geometry: &Static3dTextGeometry,
+    paint_bounds: Rect,
+    projection: Static3dProjection,
+    shape: &a::Shape3DType,
+    options: Static3dRenderOptions,
+    target_pixels_per_point: f32,
+  ) -> Option<Self> {
+    // A picture's outward-painted outline can enclose more than its physical
+    // mesh. Native material matrices normalize that complete paint rectangle;
+    // the mesh, camera window and shadow must retain their independent bounds.
+    let left =
+      paint_bounds.origin.x.0 * geometry.page_plane_scale_x + geometry.page_plane_translate_x;
+    let top =
+      paint_bounds.origin.y.0 * geometry.page_plane_scale_y + geometry.page_plane_translate_y;
+    let width = paint_bounds.size.width.0 * geometry.page_plane_scale_x;
+    let height = paint_bounds.size.height.0 * geometry.page_plane_scale_y;
+    Self::for_bounds(
+      kurbo::Rect::new(
+        f64::from(left),
+        f64::from(top),
+        f64::from(left + width),
+        f64::from(top + height),
+      ),
+      projection
+        .with_viewport_scale(1.0, 1.0)
+        .with_viewport_translation_px(0.0, 0.0),
+      shape,
+      options,
+      target_pixels_per_point,
+      true,
+    )
+  }
+
   fn for_geometry(
     geometry: &Static3dTextGeometry,
+    projection: Static3dProjection,
+    shape: &a::Shape3DType,
+    options: Static3dRenderOptions,
+    target_pixels_per_point: f32,
+    word_shape: bool,
+  ) -> Option<Self> {
+    Self::for_bounds(
+      geometry.source_coverage_path.bounding_box(),
+      projection,
+      shape,
+      options,
+      target_pixels_per_point,
+      word_shape,
+    )
+  }
+
+  fn for_bounds(
+    bounds: kurbo::Rect,
     projection: Static3dProjection,
     shape: &a::Shape3DType,
     options: Static3dRenderOptions,
@@ -98,7 +150,6 @@ impl TextSurfaceRealizationPlan {
     if !scale.is_finite() || scale <= 0.0 {
       return None;
     }
-    let bounds = geometry.source_coverage_path.bounding_box();
     if bounds.width() <= 0.0 || bounds.height() <= 0.0 {
       return None;
     }

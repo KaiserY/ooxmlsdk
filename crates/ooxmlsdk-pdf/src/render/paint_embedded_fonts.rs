@@ -1,9 +1,9 @@
-//! Word's bitmap realization for private CFF and variable font faces.
+//! Word's bitmap realization for CFF and variable font faces.
 //!
 //! The private CFF versus TrueType and bitmap-option controls distinguish this
 //! branch from ordinary font substitution. Font rasters are glyph surfaces,
 //! not source pictures: Screen/Print use 300/600 DPI independently of picture
-//! optimization, with a Win-metric cell and twenty percent horizontal padding.
+//! optimization, with a Win-metric cell and one average glyph of horizontal padding.
 use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 
@@ -26,7 +26,20 @@ const MAX_BITMAP_PIXELS: u64 = 16_777_216;
 
 #[derive(Default)]
 pub(super) struct FontBitmaps {
+  bitmap_missing_fonts: bool,
+  variable_fonts: bool,
+  kinds: HashMap<FontFaceCacheKey, BitmapFontKind>,
   instances: HashMap<(FontFaceCacheKey, u32), RasterInstance>,
+}
+
+#[derive(Clone, Copy)]
+enum BitmapFontKind {
+  Ordinary,
+  Variable,
+  Cff {
+    cid: bool,
+    carrier_family: &'static str,
+  },
 }
 
 struct RasterInstance {
@@ -68,6 +81,67 @@ impl RasterGlyph {
 }
 
 impl FontBitmaps {
+  pub(super) fn new(bitmap_missing_fonts: bool, archival: bool) -> Self {
+    Self {
+      bitmap_missing_fonts,
+      variable_fonts: bitmap_missing_fonts || archival,
+      ..Self::default()
+    }
+  }
+
+  fn kind(&mut self, face: &FontFaceData) -> BitmapFontKind {
+    *self.kinds.entry(face.cache_key()).or_insert_with(|| {
+      let Ok(font) = FontRef::from_index(face.data.as_slice(), face.index) else {
+        return BitmapFontKind::Ordinary;
+      };
+      if !font.axes().is_empty() {
+        return BitmapFontKind::Variable;
+      }
+      if let Ok(cff) = font.cff() {
+        return BitmapFontKind::Cff {
+          cid: skrifa::raw::ps::cff::CffFontRef::new_cff(cff.offset_data().as_bytes(), 0, None)
+            .is_ok_and(|font| font.is_cid()),
+          // The native PDF bitmap path preserves the realized face's
+          // charset and PANOSE family in its replacement LOGFONT. Office
+          // CreateFontIndirectW/GetFontData observations and independent GDI
+          // controls establish these GB2312 mappings for serif/sans faces.
+          // The PDF resource retains the requested Calibri name separately.
+          carrier_family: font.os2().ok().map_or("Calibri", |os2| {
+            if os2.ul_code_page_range_1().unwrap_or_default() & (1 << 18) == 0 {
+              "Calibri"
+            } else if os2.panose_10()[0] == 2 && (2..=10).contains(&os2.panose_10()[1]) {
+              "MingLiU-ExtB"
+            } else {
+              "SimSun"
+            }
+          }),
+        };
+      }
+      BitmapFontKind::Ordinary
+    })
+  }
+
+  fn needs_bitmap(&mut self, text: &PaintText<'_>, run: &super::PaintGlyphFontRun) -> bool {
+    match self.kind(&run.font_face) {
+      BitmapFontKind::Ordinary => false,
+      BitmapFontKind::Variable => self.variable_fonts,
+      BitmapFontKind::Cff { cid, .. } => {
+        // Native CID-CFF controls retain ASCII as Type1 with the bitmap
+        // option off, but force non-ASCII portions through GGO_BITMAP.
+        // Name-keyed CFF is separate: e.g. Libertine's Latin-1 é remains text.
+        self.bitmap_missing_fonts
+          || (cid
+            && run.glyphs.iter().any(|glyph| {
+              text
+                .item
+                .text
+                .get(glyph.text_range.clone())
+                .is_some_and(|text| !text.is_ascii())
+            }))
+      }
+    }
+  }
+
   pub(super) fn realize<'doc>(
     &mut self,
     items: &mut [PaintItem<'doc>],
@@ -75,58 +149,26 @@ impl FontBitmaps {
     page_width_pt: f32,
     page_height_pt: f32,
     metrics: &mut TextMetrics,
-    bitmap_missing_fonts: bool,
   ) {
     for item in items {
       match item {
         PaintItem::Text(text) => {
-          if let Some((images, baseline, semantic_x)) = self.images(
-            text,
-            quality,
-            page_width_pt,
-            page_height_pt,
-            bitmap_missing_fonts,
-          ) {
-            let mut semantic = text.item.clone();
-            semantic.x_pt = semantic_x;
-            if semantic.text.starts_with(' ') {
-              semantic.text = Cow::Owned(semantic.text.trim_start_matches(' ').to_owned());
-            }
-            semantic.y_pt = baseline;
-            semantic.origin_is_baseline = true;
-            semantic.style.baseline_shift_pt = 0.0;
-            semantic.style.embedded_fonts = None;
-            semantic.style.font_family = Some(Cow::Borrowed("Calibri"));
-            semantic.style.high_ansi_font_family = None;
-            semantic.style.east_asia_font_family = None;
-            semantic.style.complex_font_family = None;
-            semantic.style.fallback_font_family = None;
-            semantic.style.high_ansi_fallback_font_family = None;
-            semantic.style.east_asia_fallback_font_family = None;
-            semantic.style.complex_fallback_font_family = None;
-            semantic.style.font_charset = None;
-            semantic.style.high_ansi_font_charset = None;
-            semantic.style.wordprocessingml_east_asia_font_charset = None;
-            semantic.style.complex_font_charset = None;
-            semantic.style.opacity = 0.0;
-            semantic.style.bitmap_semantic_text = true;
-            semantic.style.semantic_character_advances_pt = None;
-            // Native bitmap carriers use nominal fallback-font widths, not
-            // the original face's positioning features or kerned advances.
-            semantic.style.kerning_minimum_size_pt = Some(f32::MAX);
-            let mut semantic =
-              PaintText::from_layout_text(semantic, None, None, page_width_pt, metrics);
-            semantic.source_frame_index = text.source_frame_index;
-            semantic.source_line_index = text.source_line_index;
-            let mut children = images.into_iter().map(PaintItem::Image).collect::<Vec<_>>();
-            children.push(PaintItem::Text(Box::new(semantic)));
+          if let Some(realized) =
+            self.realize_text(text, quality, page_width_pt, page_height_pt, metrics)
+          {
+            *item = realized;
+          } else if let Some(fragments) = self.bitmap_font_fragments(text) {
+            let children = fragments
+              .into_iter()
+              .map(|fragment| {
+                self
+                  .realize_text(&fragment, quality, page_width_pt, page_height_pt, metrics)
+                  .unwrap_or_else(|| PaintItem::Text(Box::new(fragment)))
+              })
+              .collect();
             *item = PaintItem::Group {
               mask: None,
-              clip: text
-                .portions
-                .first()
-                .and_then(|portion| portion.clip)
-                .or(text.item.paint_clip),
+              clip: None,
               transform: None,
               blend_mode: common::BlendMode::Normal,
               opacity: 1.0,
@@ -135,17 +177,135 @@ impl FontBitmaps {
             };
           }
         }
-        PaintItem::Group { items, .. } => self.realize(
-          items,
-          quality,
-          page_width_pt,
-          page_height_pt,
-          metrics,
-          bitmap_missing_fonts,
-        ),
+        PaintItem::Group { items, .. } => {
+          self.realize(items, quality, page_width_pt, page_height_pt, metrics)
+        }
         _ => {}
       }
     }
+  }
+
+  fn realize_text<'doc>(
+    &mut self,
+    text: &PaintText<'doc>,
+    quality: PdfOptimizeFor,
+    page_width_pt: f32,
+    page_height_pt: f32,
+    metrics: &mut TextMetrics,
+  ) -> Option<PaintItem<'doc>> {
+    let (images, baseline, semantic_x) =
+      self.images(text, quality, page_width_pt, page_height_pt)?;
+    let carrier_family = text
+      .portions
+      .iter()
+      .flat_map(|portion| portion.glyphs.iter().flatten())
+      .find_map(|run| match self.kind(&run.font_face) {
+        BitmapFontKind::Cff { carrier_family, .. } => Some(carrier_family),
+        _ => None,
+      })
+      .unwrap_or("Calibri");
+    let mut semantic = text.item.clone();
+    semantic.x_pt = semantic_x;
+    if semantic.text.starts_with(' ') {
+      semantic.text = Cow::Owned(semantic.text.trim_start_matches(' ').to_owned());
+    }
+    semantic.y_pt = baseline;
+    semantic.origin_is_baseline = true;
+    semantic.style.baseline_shift_pt = 0.0;
+    semantic.style.embedded_fonts = None;
+    semantic.style.font_family = Some(Cow::Borrowed(carrier_family));
+    semantic.style.high_ansi_font_family = None;
+    semantic.style.east_asia_font_family = None;
+    semantic.style.complex_font_family = None;
+    semantic.style.fallback_font_family = None;
+    semantic.style.high_ansi_fallback_font_family = None;
+    semantic.style.east_asia_fallback_font_family = None;
+    semantic.style.complex_fallback_font_family = None;
+    semantic.style.font_charset = None;
+    semantic.style.high_ansi_font_charset = None;
+    semantic.style.wordprocessingml_east_asia_font_charset = None;
+    semantic.style.complex_font_charset = None;
+    semantic.style.opacity = 0.0;
+    semantic.style.bitmap_semantic_text = true;
+    semantic.style.semantic_character_advances_pt = None;
+    // Resolve the physical replacement independently of the source's font
+    // slots. Its requested PDF name remains Calibri, even where the GDI
+    // charset/family mapper selected another physical face.
+    semantic.style.wordprocessingml_font_slots = false;
+    semantic.style.wordprocessingml_font_hint = None;
+    semantic.style.wordprocessingml_resolved_font_slot = None;
+    semantic.style.complex_script = None;
+    semantic.style.right_to_left = None;
+    // Native bitmap carriers use nominal fallback-font widths, not
+    // the original face's positioning features or kerned advances.
+    semantic.style.kerning_minimum_size_pt = Some(f32::MAX);
+    let mut semantic = PaintText::from_layout_text(semantic, None, None, page_width_pt, metrics);
+    semantic.source_frame_index = text.source_frame_index;
+    semantic.source_line_index = text.source_line_index;
+    let mut children = images.into_iter().map(PaintItem::Image).collect::<Vec<_>>();
+    children.push(PaintItem::Text(Box::new(semantic)));
+    Some(PaintItem::Group {
+      mask: None,
+      clip: text
+        .portions
+        .first()
+        .and_then(|portion| portion.clip)
+        .or(text.item.paint_clip),
+      transform: None,
+      blend_mode: common::BlendMode::Normal,
+      opacity: 1.0,
+      flatten_identity: true,
+      items: children,
+    })
+  }
+
+  fn bitmap_font_fragments<'doc>(
+    &mut self,
+    text: &PaintText<'doc>,
+  ) -> Option<Vec<PaintText<'doc>>> {
+    if !supported_style(text)
+      || !text.portions.iter().any(|portion| {
+        portion
+          .glyphs
+          .as_ref()
+          .is_some_and(|runs| runs.iter().any(|run| self.needs_bitmap(text, run)))
+      })
+    {
+      return None;
+    }
+    let mut fragments = Vec::new();
+    for portion in &text.portions {
+      for run in super::merge_word_font_runs(portion.glyphs.as_ref()?).iter() {
+        let start = run
+          .glyphs
+          .iter()
+          .map(|glyph| glyph.text_range.start)
+          .min()?;
+        let end = run.glyphs.iter().map(|glyph| glyph.text_range.end).max()?;
+        let mut fragment = text.clone();
+        fragment.item.text = Cow::Owned(text.item.text.get(start..end)?.to_owned());
+        fragment.item.x_pt = portion.x_pt + run.x_offset_pt;
+        let width = run
+          .glyphs
+          .iter()
+          .map(|glyph| glyph.x_advance * run.font_size_pt)
+          .sum();
+        fragment.width_pt = width;
+        let mut single = portion.clone();
+        single.x_pt = fragment.item.x_pt;
+        single.text_range = 0..end - start;
+        single.width_pt = width;
+        let mut run = run.clone();
+        run.x_offset_pt = 0.0;
+        for glyph in &mut run.glyphs {
+          glyph.text_range = glyph.text_range.start - start..glyph.text_range.end - start;
+        }
+        single.glyphs = Some(std::iter::once(run).collect());
+        fragment.portions = vec![single];
+        fragments.push(fragment);
+      }
+    }
+    (fragments.len() > 1).then_some(fragments)
   }
 
   fn images<'doc>(
@@ -154,27 +314,16 @@ impl FontBitmaps {
     quality: PdfOptimizeFor,
     page_width_pt: f32,
     page_height_pt: f32,
-    bitmap_missing_fonts: bool,
   ) -> Option<(Vec<ImageItem<'doc>>, f32, f32)> {
     let style = &text.item.style;
-    // Decorated/warped text needs its own composition contract. Leave those
-    // runs on the vector path until their independent effects can be retained.
-    if style.semantic_only
-      || style.opacity != 1.0
-      || style.rotation_deg != 0.0
-      || style.pdf_glyph_outlines
-      || style.pdf_glyph_outline_options.is_some()
-      || style.outline_color.is_some()
-      || style.highlight.is_some()
-      || style.underline
-      || style.strikethrough
-      || style.bold
-      || style.italic
-      || style.horizontal_scale.unwrap_or(1.0) != 1.0
-      || style.character_spacing_pt != 0.0
-      || text.item.word_spacing_pt != 0.0
-      || text.item.paragraph_bidi
-      || text.item.hyperlink_url.is_some()
+    if !supported_style(text)
+      || text.portions.iter().any(|portion| {
+        portion.glyphs.as_ref().is_none_or(|runs| {
+          super::merge_word_font_runs(runs)
+            .iter()
+            .any(|run| !self.needs_bitmap(text, run))
+        })
+      })
     {
       return None;
     }
@@ -188,15 +337,10 @@ impl FontBitmaps {
     let mut semantic_x = None;
     for portion in &text.portions {
       let runs = portion.glyphs.as_ref()?;
-      for run in runs {
+      for run in super::merge_word_font_runs(runs).iter() {
         let font = FontRef::from_index(run.font_face.data.as_slice(), run.font_face.index).ok()?;
         let variable = !font.axes().is_empty();
-        let private_cff =
-          bitmap_missing_fonts && run.font_face.document_embedded && font.cff().is_ok();
-        if !(variable || private_cff)
-          || run.font_face.synthetic_bold
-          || run.font_face.synthetic_italic
-        {
+        if run.font_face.synthetic_bold || run.font_face.synthetic_italic {
           return None;
         }
         // Word drops a leading blank into its own unpainted portion before
@@ -241,9 +385,17 @@ impl FontBitmaps {
         };
         let ascent_px = (ascent * printer_em).round() as i64;
         let height_px = (cell_height * printer_em).round() as i64;
-        let source_y = common::wordprocessing_device::source_coordinate(text.item.y_pt);
+        // Installed CFF portions share the completed line baseline with
+        // neighbouring vector text. The private/variable route retains its
+        // separately established source-cell metric contract.
+        let installed_cff = !variable && !run.font_face.document_embedded;
+        let source_y = common::wordprocessing_device::source_coordinate(if installed_cff {
+          text.baseline_y
+        } else {
+          text.item.y_pt
+        });
         let baseline_px = source_y
-          + if text.item.origin_is_baseline {
+          + if installed_cff || text.item.origin_is_baseline {
             0
           } else {
             ascent_px
@@ -399,6 +551,27 @@ impl FontBitmaps {
     };
     Some(bitmap.as_ref())
   }
+}
+
+// Decorations and transformed text retain their separate composition owners.
+fn supported_style(text: &PaintText<'_>) -> bool {
+  let style = &text.item.style;
+  !(style.semantic_only
+    || style.opacity != 1.0
+    || style.rotation_deg != 0.0
+    || style.pdf_glyph_outlines
+    || style.pdf_glyph_outline_options.is_some()
+    || style.outline_color.is_some()
+    || style.highlight.is_some()
+    || style.underline
+    || style.strikethrough
+    || style.bold
+    || style.italic
+    || style.horizontal_scale.unwrap_or(1.0) != 1.0
+    || style.character_spacing_pt != 0.0
+    || text.item.word_spacing_pt != 0.0
+    || text.item.paragraph_bidi
+    || text.item.hyperlink_url.is_some())
 }
 
 // Word serializes image matrices with five significant digits. Quantize the

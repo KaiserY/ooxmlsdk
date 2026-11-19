@@ -904,8 +904,10 @@ mod tests {
         super::super::ParagraphAlignmentLineKey::Coordinate(line.y_pt),
         &mut metrics,
         super::super::ParagraphAlignmentLineCoordinates::Top,
-        true,
-        false,
+        super::super::ParagraphLineAlignmentPolicy {
+          block_justification: true,
+          ..Default::default()
+        },
       )
       .unwrap();
       assert!((left - line.left_pt).abs() < 0.0001, "split={split}");
@@ -974,8 +976,10 @@ mod tests {
         super::super::ParagraphAlignmentLineKey::Coordinate(line.y_pt),
         &mut metrics,
         super::super::ParagraphAlignmentLineCoordinates::Top,
-        true,
-        false,
+        super::super::ParagraphLineAlignmentPolicy {
+          block_justification: true,
+          ..Default::default()
+        },
       )
       .unwrap();
       assert!((left - line.left_pt).abs() < 0.0001);

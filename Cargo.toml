@@ -62,6 +62,7 @@ encoding_rs = "0.8.35"
 flate2 = "1.1.0"
 pdf-writer = "0.15.0"
 subsetter = { version = "0.2.6", features = ["variable-fonts"] }
+write-fonts = { version = "0.48.1", features = ["read"] }
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 png = "0.18.1"
 toml = "1.1.8"

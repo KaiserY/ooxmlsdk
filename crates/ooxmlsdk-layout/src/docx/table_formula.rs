@@ -1,7 +1,10 @@
-//! Word's positional table formula fields (ECMA-376 §17.16.3.4–5).
+//! Word table calculation fields (ECMA-376 §17.16.3–4).
 //!
 //! Resolve the complete table in Word's print-update order. A single formula
 //! reads current cell values; batch field scheduling owns dependency updates.
+mod number_picture;
+mod scalar;
+
 use smallvec::SmallVec;
 
 use super::model::{Block, InlineItem, ParagraphFieldEvent, Table, TableCell, TextStyle};
@@ -27,13 +30,40 @@ enum Direction {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Formula {
-  function: Aggregate,
+  function: Option<Aggregate>,
   directions: SmallVec<[Direction; 2]>,
+  scalar: Option<Number>,
+  picture: Option<number_picture::Picture>,
 }
 
 impl Formula {
-  pub(super) fn parse(instruction: &str) -> Option<Self> {
+  pub(super) fn parse(instruction: &str, symbols: OfficeNumberSeparators) -> Option<Self> {
     let expression = instruction.trim().strip_prefix('=')?.trim();
+    let (expression, switches) = expression.split_once('\\').unwrap_or((expression, ""));
+    let mut switches = switches.trim();
+    let picture = if let Some(rest) = switches.strip_prefix('#') {
+      let rest = rest.trim_start();
+      let (picture, tail) = if let Some(rest) = rest.strip_prefix('"') {
+        rest.split_once('"')?
+      } else {
+        rest.split_once(char::is_whitespace).unwrap_or((rest, ""))
+      };
+      switches = tail.trim().strip_prefix('\\').unwrap_or(tail.trim());
+      Some(number_picture::Picture::parse(picture, symbols)?)
+    } else {
+      None
+    };
+    if !switches.is_empty() && !switches.eq_ignore_ascii_case("* MERGEFORMAT") {
+      return None;
+    }
+    if let Some(number) = scalar::evaluate(expression.trim(), symbols) {
+      return Some(Self {
+        function: None,
+        directions: SmallVec::new(),
+        scalar: Some(number),
+        picture,
+      });
+    }
     let (name, arguments) = expression.split_once('(')?;
     let function = match name.trim().to_ascii_uppercase().as_str() {
       "SUM" => Aggregate::Sum,
@@ -45,7 +75,7 @@ impl Formula {
       _ => return None,
     };
     let (arguments, suffix) = arguments.split_once(')')?;
-    if !suffix.trim().is_empty() && !suffix.trim().eq_ignore_ascii_case(r"\* MERGEFORMAT") {
+    if !suffix.trim().is_empty() {
       return None;
     }
     let directions = arguments
@@ -61,13 +91,15 @@ impl Formula {
       )
       .collect::<Option<SmallVec<_>>>()?;
     Some(Self {
-      function,
+      function: Some(function),
       directions,
+      scalar: None,
+      picture,
     })
   }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct Number {
   value: f64,
   decimals: usize,
@@ -357,6 +389,22 @@ impl Evaluation<'_> {
   }
 
   fn formula(&self, owner: usize, formula: &Formula) -> Result<String, ()> {
+    if let Some(number) = formula.scalar {
+      return Ok(if let Some(picture) = &formula.picture {
+        picture.format(number.value, self.symbols)
+      } else {
+        let value = ooxmlsdk_formula::calc::numeric::round_to_decimal_places(
+          number.value,
+          number.decimals as i32,
+        );
+        if value == 0.0 && number.value != 0.0 {
+          format!("0{}0", self.symbols.decimal)
+        } else {
+          format_number(Number { value, ..number }, self.symbols)
+        }
+      });
+    }
+    let function = formula.function.ok_or(())?;
     let mut values = SmallVec::<[Number; 8]>::new();
     let mut numeric = false;
     for direction in &formula.directions {
@@ -365,7 +413,7 @@ impl Evaluation<'_> {
         values.push(self.values[index].unwrap_or_default());
       }
     }
-    if matches!(formula.function, Aggregate::Average) && !numeric {
+    if matches!(function, Aggregate::Average) && !numeric {
       return Ok(if values.is_empty() {
         String::new()
       } else {
@@ -374,7 +422,7 @@ impl Evaluation<'_> {
     }
     let decimals = values.iter().map(|n| n.decimals).max().unwrap_or(0);
     let mut number = Number {
-      decimals: if matches!(formula.function, Aggregate::Average) {
+      decimals: if matches!(function, Aggregate::Average) {
         decimals.max(2)
       } else {
         decimals
@@ -382,7 +430,7 @@ impl Evaluation<'_> {
       grouped: values.iter().any(|n| n.grouped),
       ..Number::default()
     };
-    number.value = match formula.function {
+    number.value = match function {
       Aggregate::Sum => values.iter().map(|n| n.value).sum(),
       Aggregate::Average => values.iter().map(|n| n.value).sum::<f64>() / values.len() as f64,
       Aggregate::Count => values.len() as f64,
@@ -402,7 +450,12 @@ impl Evaluation<'_> {
     number
       .value
       .is_finite()
-      .then(|| format_number(number, self.symbols))
+      .then(|| {
+        formula.picture.as_ref().map_or_else(
+          || format_number(number, self.symbols),
+          |picture| picture.format(number.value, self.symbols),
+        )
+      })
       .ok_or(())
   }
 }
@@ -591,6 +644,169 @@ mod tests {
         )
       })
       .collect()
+  }
+
+  #[test]
+  fn calculation_diagnostics_respect_print_locks_and_use_code_formatting() {
+    // Native complex/simple, print OFF, locked and MERGEFORMAT opposites:
+    // diagnostics use code/inherited size and own bold; cache formatting is
+    // retained only when refresh is disabled or the field is locked.
+    for simple in [false, true] {
+      for locked in [false, true] {
+        for enabled in [false, true] {
+          for merge in [false, true] {
+            let code = if merge {
+              r"=ROUND(2,345;1) \* MERGEFORMAT"
+            } else {
+              "=ROUND(2,345;1)"
+            };
+            let table = imported_with_print_update(
+              &[vec![field(code, "CACHED", simple, locked)]],
+              Some(enabled),
+            );
+            let refreshed = enabled && !locked;
+            assert_eq!(
+              cell_text(&table, 0, 0),
+              if refreshed {
+                "!Syntax Error, ;"
+              } else {
+                "CACHED"
+              }
+            );
+            let Block::Paragraph(paragraph) = &table.rows[0].cells[0].blocks[0] else {
+              panic!("paragraph");
+            };
+            let run = paragraph
+              .inlines
+              .iter()
+              .find_map(|inline| match inline {
+                InlineItem::Text(run) if !run.text.is_empty() => Some(run),
+                _ => None,
+              })
+              .expect("result run");
+            assert_eq!(
+              run.style.font_size_pt,
+              if !refreshed {
+                20.0
+              } else if simple {
+                11.0
+              } else {
+                8.0
+              }
+            );
+            if refreshed {
+              assert!(run.style.bold);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn scalar_calculations_use_word_operand_precision_and_precedence() {
+    let symbols = OfficeNumberSeparators::default();
+    for (expression, expected) in [
+      ("50*40", "2000"),
+      ("-50*40", "-2000"),
+      ("0", "0"),
+      ("1/8", "0.13"),
+      ("3/4", "0.75"),
+      ("1234567/100", "12345.67"),
+      ("2+3*4", "14"),
+      ("(2+3)*4", "20"),
+      ("2^3^2", "512"),
+      ("-2^2", "4"),
+      ("(-2)^2", "4"),
+      ("2^-2", "0.25"),
+      ("1.25+2.5", "3.75"),
+      ("50%*40", "20"),
+      ("1/3", "0.33"),
+      ("10/6", "1.67"),
+      ("2^3%", "1.02"),
+      ("-0.125", "-0.125"),
+      ("1.005", "1.005"),
+      ("2.675", "2.675"),
+      ("(50*40)", "2000"),
+      ("2000", "2000"),
+      ("1.25*1.25", "1.56"),
+      ("1.234*1.234", "1.523"),
+      ("0.001*0.001", "0.0"),
+      ("1.000/3", "0.333"),
+      ("10/3", "3.33"),
+      ("1.234+2.001", "3.235"),
+      ("1.234-1.233", "0.001"),
+      ("2^0.5", "1.4"),
+      ("9^0.5", "3"),
+      ("1.5^2", "2.3"),
+      ("12345^3", "1881365963625"),
+      ("50%", "0.5"),
+      ("0.125%", "0.00125"),
+      ("2*-3", "-6"),
+      ("2% ^ 2", "0.0"),
+      ("1.2300", "1.23"),
+      ("1.2300+0", "1.23"),
+      ("0.000001", "0.000001"),
+      ("1.005+0", "1.005"),
+      ("0.1+0.2", "0.3"),
+    ] {
+      let number = scalar::evaluate(expression, symbols).unwrap();
+      let rounded = ooxmlsdk_formula::calc::numeric::round_to_decimal_places(
+        number.value,
+        number.decimals as i32,
+      );
+      let actual = if rounded == 0.0 && number.value != 0.0 {
+        "0.0".into()
+      } else {
+        format_number(
+          Number {
+            value: rounded,
+            ..number
+          },
+          symbols,
+        )
+      };
+      assert_eq!(actual, expected, "{expression}");
+    }
+    for expression in ["+2", "1e3", "1/0", "1,25+2,5", "A1+B1", "(1.2300)"] {
+      assert!(
+        scalar::evaluate(expression, symbols).is_none(),
+        "{expression}"
+      );
+    }
+  }
+
+  #[test]
+  fn scalar_and_directional_pictures_follow_print_locks_and_field_styles() {
+    for enabled in [false, true] {
+      for locked in [false, true] {
+        for simple in [false, true] {
+          for (code, expected) in [
+            (
+              r#"=50*40 \# &quot;# ##0,00 Ft;(# ##0,00 Ft)&quot;"#,
+              "   2,000 Ft",
+            ),
+            (r#"=50*40 \# &quot;0%&quot;"#, "2000%"),
+            (r#"=50*40 \# &quot;0.00&quot;"#, "2000.00"),
+            (r#"=SUM(LEFT) \# &quot;0.00&quot;"#, "5.00"),
+          ] {
+            let table = imported_with_print_update(
+              &[vec![
+                text("2"),
+                text("3"),
+                field(code, "99", simple, locked),
+              ]],
+              Some(enabled),
+            );
+            assert_eq!(
+              cell_text(&table, 0, 2),
+              if enabled && !locked { expected } else { "99" },
+              "{code}"
+            );
+          }
+        }
+      }
+    }
   }
 
   #[test]
@@ -844,13 +1060,11 @@ mod tests {
     ]]);
     assert_eq!(cell_text(&table, 0, 0), "222");
     assert_eq!(cell_text(&table, 0, 1), "222");
-    for code in [
-      "=A1+B1",
-      "=SUM(LEFT;RIGHT)",
-      r#"=SUM(LEFT) \# "0.00""#,
-      "=NOTSUPPORTED(LEFT)",
-    ] {
-      assert!(Formula::parse(code).is_none(), "{code}");
+    for code in ["=A1+B1", "=SUM(LEFT;RIGHT)", "=NOTSUPPORTED(LEFT)"] {
+      assert!(
+        Formula::parse(code, OfficeNumberSeparators::default()).is_none(),
+        "{code}"
+      );
     }
   }
 

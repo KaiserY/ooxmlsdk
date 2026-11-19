@@ -74,18 +74,28 @@ pub(super) fn linear_gradient(background: &super::w::DocumentBackground) -> Opti
     }
     gradient.stops = stops;
   }
-  // Word's horizontal preset uses the small brush; custom angled/axial
-  // fills use the general 123x92.28pt period. Target-screen is a UI hint.
-  let (width, height) =
-    if authored_angle.rem_euclid(180.0) == 0.0 && (focus == 0.0 || focus.abs() == 1.0) {
-      (61.44, 46.08)
-    } else {
-      (123.0, 92.28)
-    };
+  // Word recognizes signed VML angles as UI gradient styles before normalizing
+  // their color-field direction: -45 is DiagonalDown, while the equivalent
+  // +315 is a custom angle. Native GradientStyle and PDF shading periods agree
+  // across signed turns, palettes, methods and target-screen hints. Diagonal
+  // presets keep the small brush even at center focus; axial center profiles
+  // retain the general brush. DrawingML and ordinary shape fills are separate.
+  let preset_angle = authored_angle % 180.0;
+  let diagonal_preset = matches!(preset_angle, -45.0 | -135.0);
+  let axial_end_preset =
+    matches!(preset_angle, 0.0 | -90.0) && (focus == 0.0 || focus.abs() == 1.0);
+  let (width, height) = if diagonal_preset || axial_end_preset {
+    (61.44, 46.08)
+  } else {
+    (123.0, 92.28)
+  };
   gradient.line = super::vml_gradient::transformed_line(
     Some(direction),
     kurbo::Affine::scale_non_uniform(width, height),
   );
+  // The page owns the physical period. Its final clipping rectangle does
+  // not redefine the color field as it does for a VML shape.
+  gradient.rotate_with_shape = None;
   gradient.angle_degrees = Some(direction);
   for stop in &mut gradient.stops {
     stop.color.a = 255;
@@ -457,6 +467,60 @@ mod tests {
     let mut absent = background;
     absent.color = None;
     assert!(linear_gradient(&absent).is_none());
+  }
+
+  #[test]
+  fn linear_page_brush_native_presets_preserve_signed_angle_ownership() {
+    // Actual Word PDF coordinates converted from bottom-left to layout axes.
+    // These compare the complete repeated gradient, not just the size selector.
+    for (angle, focus, samples, start, end) in [
+      (-45.0, 0.0, 3840, (-389.53, 583.37), (274.02, -301.36)),
+      (-225.0, 0.0, 3840, (-389.53, 583.37), (274.02, -301.36)),
+      (-405.0, 0.0, 3840, (-389.53, 583.37), (274.02, -301.36)),
+      (-585.0, 0.0, 3840, (-389.53, 583.37), (274.02, -301.36)),
+      (-45.0, 0.5, 7665, (-389.53, 583.37), (274.02, -301.36)),
+      (-45.0, 1.0, 3840, (-389.53, 583.37), (274.02, -301.36)),
+      (-135.0, 0.0, 3584, (8.6016, -6.45), (627.92, 819.302)),
+      (-315.0, 0.0, 3584, (8.6016, -6.45), (627.92, 819.302)),
+      (-495.0, 0.0, 3584, (8.6016, -6.45), (627.92, 819.302)),
+      (315.0, 0.0, 1792, (-337.19, 577.55), (282.99, -249.09)),
+      (135.0, 0.0, 1792, (-337.19, 577.55), (282.99, -249.09)),
+      (-45.01, 0.0, 1792, (-337.29, 577.51), (283.05, -249.06)),
+      (45.0, 0.0, 1792, (17.202, -12.91), (637.38, 813.73)),
+      (405.0, 0.0, 1792, (17.202, -12.91), (637.38, 813.73)),
+    ] {
+      for color2 in ["fill darken(118)", "#54666B"] {
+        let source = super::super::w::DocumentBackground::from_bytes(
+          format!(
+            r##"<w:background xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:v="urn:schemas-microsoft-com:vml" w:color="B6DDE8">
+            <v:background fillcolor="#B6DDE8"><v:fill type="gradient" method="linear sigma"
+            angle="{angle}" focus="{}%" color2="{color2}"/></v:background></w:background>"##,
+            focus * 100.0
+          )
+          .as_bytes(),
+        )
+        .unwrap();
+        let gradient = linear_gradient(&source).unwrap().for_page(612.0, 792.0);
+        assert_eq!(
+          gradient.stops.len(),
+          samples,
+          "angle={angle}, focus={focus}"
+        );
+        let (actual_start, actual_end) = gradient.line.unwrap();
+        for (actual, native) in [
+          (actual_start.x.0, start.0),
+          (actual_start.y.0, start.1),
+          (actual_end.x.0, end.0),
+          (actual_end.y.0, end.1),
+        ] {
+          assert!(
+            (actual - native).abs() < 0.01,
+            "angle={angle}, focus={focus}: {actual}/{native}"
+          );
+        }
+      }
+    }
   }
 
   #[test]

@@ -1,13 +1,13 @@
 use super::{
   LO_SUBSCRIPT_BASELINE_SHIFT_SCALE, LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, LegacyTextRelief,
-  MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides,
-  StylesCatalog, TextStyle, ThemeColors, ThemeFonts, WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT,
-  apply_w14_rgb_effect_transforms, apply_w14_scheme_effect_transforms,
-  automatic_text_color_for_background, drawingml_text_effect_common_fill,
-  drawingml_text_outline_effect_common_fill, merge_paragraph_format_with_theme,
-  opacity_from_w14_rgb_transforms, opacity_from_w14_scheme_transforms, parse_hex_color,
-  resolve_run_color, resolve_text_fill, resolve_text_outline, text_background_shading_fill,
-  wordprocessing_text_outline_common_stroke,
+  MIN_ESCAPEMENT_FONT_SIZE_PT, MIN_WORD_FONT_SIZE_PT, ParagraphFormat, ParagraphProps, RunProps,
+  RunStyleOverrides, StylesCatalog, TextStyle, ThemeColors, ThemeFonts,
+  WORD_DEFAULT_ESCAPEMENT_HEIGHT_PERCENT, apply_w14_rgb_effect_transforms,
+  apply_w14_scheme_effect_transforms, automatic_text_color_for_background,
+  drawingml_text_effect_common_fill, drawingml_text_outline_effect_common_fill,
+  merge_paragraph_format_with_theme, opacity_from_w14_rgb_transforms,
+  opacity_from_w14_scheme_transforms, parse_hex_color, resolve_run_color, resolve_text_fill,
+  resolve_text_outline, text_background_shading_fill, wordprocessing_text_outline_common_stroke,
 };
 use crate::common;
 use crate::units;
@@ -161,7 +161,7 @@ pub(super) fn run_style(
   run_style_with_character_style_policy(properties, base_style, styles, true)
 }
 
-pub(super) fn run_style_without_hyperlink_character_style(
+pub(super) fn cached_toc_run_style(
   properties: Option<&w::RunProperties>,
   base_style: TextStyle,
   styles: &StylesCatalog,
@@ -183,9 +183,19 @@ fn run_style_with_character_style_policy(
 
   let character_style_id =
     super::run_properties_run_style(properties).map(|run_style| run_style.val.as_str());
-  if apply_hyperlink_character_style
-    || !character_style_id.is_some_and(|style_id| styles.is_hyperlink_character_style(style_id))
+  if !apply_hyperlink_character_style
+    && let Some(id) = character_style_id.filter(|id| styles.is_hyperlink_character_style(id))
   {
+    // Word prints cached TOC link text with the character style's rFonts.
+    // The TOC paragraph supplies size, emphasis and decoration. Direct run
+    // properties still take precedence, including an explicit font override.
+    for entry in styles.style_chain(Some(id)) {
+      if matches!(entry.style_type, Some(w::StyleValues::Character)) {
+        super::merge_style_font_faces(&mut style, &entry.run_style);
+      }
+    }
+    styles.apply_font_substitution(&mut style);
+  } else {
     style = styles.character_run_style(character_style_id, style);
   }
   merge_run_style(
@@ -451,6 +461,7 @@ fn merge_run_style_with_policy(
   // style chain (for example cached field-result runs).
   style.wordprocessingml_font_slots = true;
   style.wordprocessingml_han_fallback = true;
+  style.wordprocessingml_symbol_fallback = true;
   let Some(properties) = properties else {
     return;
   };
@@ -543,13 +554,33 @@ fn merge_run_style_with_policy(
       style.bidi_language = Some(Arc::<str>::from(language));
     }
   }
+  if let Some(layout) = properties.east_asian_layout()
+    && !matches!(properties, RunProps::Numbering(_))
+  {
+    // An authored complex property replaces its inherited value. A vert-only
+    // or id-only element does not retain the style's combine setting.
+    style.wordprocessingml_two_lines =
+      layout.combine.filter(|combine| combine.as_bool()).map(|_| {
+        crate::model::WordprocessingTwoLines {
+          id: layout.id,
+          brackets: layout.combine_brackets.unwrap_or_default(),
+        }
+      });
+  }
   if let Some(vertical) = properties
     .east_asian_layout()
     .and_then(|layout| layout.vertical)
   {
-    // LibreOffice's WordprocessingML mapper imports w:eastAsianLayout/@w:vert
-    // as CharRotation: true is 900 tenths of a degree and false is 0.
-    style.rotation_deg = if vertical.as_bool() { 90.0 } else { 0.0 };
+    // Word and Writer import this as GDI/CharRotation 900. Our page coordinates
+    // point downward, so the same counterclockwise glyph matrix is -90 degrees.
+    style.wordprocessingml_vertical_run = vertical.as_bool();
+    style.rotation_deg = if vertical.as_bool() { -90.0 } else { 0.0 };
+  }
+  if style.wordprocessingml_two_lines.is_some() {
+    // MS-OI29500 §2.1.75: combine takes precedence over vert. Numbering
+    // definitions do not participate in these East Asian layout settings.
+    style.wordprocessingml_vertical_run = false;
+    style.rotation_deg = 0.0;
   }
   if let Some(bold) = properties.bold() {
     let bold = bold.val.is_none_or(|value| value.as_bool());
@@ -599,7 +630,7 @@ fn merge_run_style_with_policy(
     let size = font_size.val;
     set_font_size_preserving_automatic_escapement(
       style,
-      (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT),
+      (size.to_points() as f32).max(MIN_WORD_FONT_SIZE_PT),
     );
   }
   if let Some(font_size) = properties.complex_script_font_size() {
@@ -609,7 +640,7 @@ fn merge_run_style_with_policy(
     // line height can still see the complex-script font height.
     set_complex_font_size_preserving_automatic_escapement(
       style,
-      (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT),
+      (size.to_points() as f32).max(MIN_WORD_FONT_SIZE_PT),
     );
   }
   if let Some(color) = properties.color() {
@@ -632,12 +663,12 @@ fn merge_run_style_with_policy(
   }
   if policy.shading
     && let Some(shading) = properties.shading()
-    && let Some(background) = text_background_shading_fill(shading, theme_colors).solid_color()
   {
-    // ECMA-376 Part 1 §17.3.2.32 makes run shading a background behind
-    // the run contents. Automatic text remains context-sensitive, and Word
-    // selects the higher-contrast neutral for a dark run background.
-    style.highlight = Some(background);
+    style.wordprocessing_run_shading =
+      text_background_shading_fill(shading, theme_colors).solid_color();
+    if let Some(background) = style.wordprocessing_run_shading {
+      style.highlight = Some(background);
+    }
   }
   if let Some(border) = properties.border() {
     style.word_run_border = Some(super::run_border_style(border, theme_colors));
@@ -1393,7 +1424,7 @@ fn resolve_word_run_font(
 ) -> Option<Arc<str>> {
   if theme.is_some() {
     return theme_fonts
-      .resolve(theme)
+      .resolve_wordprocessingml(theme)
       // [MS-OI29500] section 2.1.88(c) applies Times New Roman only after an
       // actual Theme part or the recovered Office application theme cannot
       // resolve the authored token. It must not replace that missing-package-
@@ -1490,6 +1521,50 @@ pub(super) fn highlight_color(
 mod tests {
   use super::*;
   use ooxmlsdk::sdk::SdkType;
+
+  #[test]
+  fn east_asian_vertical_run_keeps_source_ownership_and_explicit_false() {
+    let styles = StylesCatalog::default();
+    let vertical = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:eastAsianLayout w:vert="1"/></w:rPr>"#,
+    )
+    .unwrap();
+    let horizontal = w::RunProperties::from_bytes(
+      br#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:eastAsianLayout w:vert="0"/></w:rPr>"#,
+    )
+    .unwrap();
+    let inherited = run_style(Some(&vertical), TextStyle::default(), &styles);
+    assert!(inherited.wordprocessingml_vertical_run);
+    assert_eq!(inherited.rotation_deg, -90.0);
+    let unchanged = run_style(None, inherited.clone(), &styles);
+    assert!(unchanged.wordprocessingml_vertical_run);
+    let cleared = run_style(Some(&horizontal), inherited, &styles);
+    assert!(!cleared.wordprocessingml_vertical_run);
+    assert_eq!(cleared.rotation_deg, 0.0);
+  }
+
+  #[test]
+  fn authored_half_point_run_and_paragraph_mark_keep_independent_script_sizes() {
+    let styles = StylesCatalog::default();
+    for complex_half_points in [1, 24] {
+      let xml = format!(
+        r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sz w:val="1"/><w:szCs w:val="{complex_half_points}"/></w:rPr>"#
+      );
+      let run = w::RunProperties::from_bytes(xml.as_bytes()).unwrap();
+      let mark = w::ParagraphMarkRunProperties::from_bytes(xml.as_bytes()).unwrap();
+      let overrides = super::super::run_style_overrides(Some(RunProps::Direct(&run)));
+      let expected_complex_size = complex_half_points as f32 / 2.0;
+      assert_eq!(overrides.font_size_pt, Some(0.5));
+      assert_eq!(overrides.complex_font_size_pt, Some(expected_complex_size));
+      for actual in [
+        run_style(Some(&run), TextStyle::default(), &styles),
+        paragraph_mark_run_style(Some(&mark), TextStyle::default(), &styles),
+      ] {
+        assert_eq!(actual.font_size_pt, 0.5);
+        assert_eq!(actual.complex_font_size_pt, Some(expected_complex_size));
+      }
+    }
+  }
 
   #[test]
   fn toc_numbering_keeps_style_size_and_paint_while_copying_direct_font_and_effects() {

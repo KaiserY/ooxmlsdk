@@ -6,6 +6,12 @@ use crate::docx::CellBordersModel;
 use crate::model::{common_point, common_rect};
 use crate::units;
 
+mod cake_slice;
+mod gems;
+mod holly;
+mod people_hats;
+mod weaving_angles;
+
 const DOT: f64 = units::POINTS_PER_INCH as f64 / WORD_FIXED_OUTPUT_DPI as f64;
 
 /// Distribute complete art cells along an edge. Word reserves the two corner
@@ -22,6 +28,11 @@ fn edge_cells(start: i32, end: i32, corner: i32) -> Vec<(i32, i32)> {
   // EMF viewport extents store the coordinate difference. Six-point art is
   // a useful counterexample to simply dividing by the viewport extent.
   let count = (span / (corner + 1)).max(2);
+  distribute_edge_cells(start, end, corner, count)
+}
+
+fn distribute_edge_cells(start: i32, end: i32, corner: i32, count: i32) -> Vec<(i32, i32)> {
+  let span = end - start;
   let mut cells = Vec::with_capacity(count as usize);
   cells.push((start, corner));
   if count > 2 {
@@ -42,39 +53,186 @@ fn edge_cells(start: i32, end: i32, corner: i32) -> Vec<(i32, i32)> {
 
 pub(super) fn paint_maple_muffins(
   page: &mut Page,
-  (left, top, right, bottom): (f32, f32, f32, f32),
+  reference: (f32, f32, f32, f32),
   borders: CellBordersModel,
 ) {
-  let (Some(t), Some(r), Some(b), Some(l)) =
-    (borders.top, borders.right, borders.bottom, borders.left)
+  paint_motif(
+    page,
+    reference,
+    borders,
+    edge_cells,
+    |page, coordinates, tile| {
+      paint_muffin(page, coordinates, tile.x, tile.y, tile.width, tile.height);
+    },
+  );
+}
+
+pub(super) fn paint_holly(
+  page: &mut Page,
+  reference: (f32, f32, f32, f32),
+  borders: CellBordersModel,
+) {
+  paint_motif(
+    page,
+    reference,
+    borders,
+    edge_cells,
+    |page, coordinates, tile| {
+      holly::paint(page, coordinates, tile.x, tile.y, tile.width, tile.height);
+    },
+  );
+}
+
+pub(super) fn paint_cake_slice(
+  page: &mut Page,
+  reference: (f32, f32, f32, f32),
+  borders: CellBordersModel,
+) {
+  // ECMA-376 ST_Border gives one all-sides image. Native frames retain its
+  // intrinsic palette and orientation, including explicitly colored slots.
+  paint_motif(page, reference, borders, edge_cells, cake_slice::paint);
+}
+
+pub(super) fn paint_people_hats(
+  page: &mut Page,
+  reference: (f32, f32, f32, f32),
+  borders: CellBordersModel,
+) {
+  paint_motif(page, reference, borders, edge_cells, people_hats::paint);
+}
+
+pub(super) fn paint_gems(
+  page: &mut Page,
+  reference: (f32, f32, f32, f32),
+  borders: CellBordersModel,
+) {
+  // Like the resource identity, the foreground color comes from the final
+  // authored slot. Native red/blue and Maple/nil opposites retain the gray
+  // facets while replacing only the resource's black foreground.
+  let Some(color) = foreground_color(borders) else {
+    return;
+  };
+  paint_motif(
+    page,
+    reference,
+    borders,
+    edge_cells,
+    |page, coordinates, tile| {
+      gems::paint(page, coordinates, tile, color);
+    },
+  );
+}
+
+pub(super) fn paint_weaving_angles(
+  page: &mut Page,
+  reference: (f32, f32, f32, f32),
+  borders: CellBordersModel,
+) {
+  let Some(color) = foreground_color(borders) else {
+    return;
+  };
+  paint_motif(
+    page,
+    reference,
+    borders,
+    weaving_angles::edge_cells,
+    |page, coordinates, tile| weaving_angles::paint(page, coordinates, tile, color),
+  );
+}
+
+fn foreground_color(borders: CellBordersModel) -> Option<Color> {
+  let border = [borders.right, borders.bottom, borders.left, borders.top]
+    .into_iter()
+    .flatten()
+    .next()?;
+  Some(Color {
+    r: border.color.r,
+    g: border.color.g,
+    b: border.color.b,
+    a: 255,
+  })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ArtCell {
+  TopLeft,
+  Top,
+  TopRight,
+  Right,
+  BottomLeft,
+  Bottom,
+  BottomRight,
+  Left,
+}
+
+#[derive(Clone, Copy)]
+struct ArtTile {
+  x: i32,
+  y: i32,
+  width: i32,
+  height: i32,
+  cell: ArtCell,
+}
+
+fn square_printer_box(rect: [i16; 4], tile: ArtTile, window: f64) -> [f64; 4] {
+  let [left, top, right, bottom] = rect;
+  let axis = |value: i16, origin: i32, extent: i32| {
+    let device = f64::from(origin) + f64::from(value) * f64::from(extent) / window;
+    // Classic GDI retains POINTFIX's four fractional bits. Rectangle and
+    // Ellipse exclude the last device column/row in compatible graphics mode.
+    (device * 16.0).round() / 16.0
+  };
+  [
+    axis(left, tile.x, tile.width),
+    axis(top, tile.y, tile.height),
+    axis(right, tile.x, tile.width) - 1.0,
+    axis(bottom, tile.y, tile.height) - 1.0,
+  ]
+}
+
+fn paint_motif(
+  page: &mut Page,
+  (left, top, right, bottom): (f32, f32, f32, f32),
+  borders: CellBordersModel,
+  partition: fn(i32, i32, i32) -> Vec<(i32, i32)>,
+  mut paint: impl FnMut(&mut Page, ArtPageCoordinates, ArtTile),
+) {
+  let Some(width_pt) = [borders.top, borders.left, borders.bottom, borders.right]
+    .into_iter()
+    .flatten()
+    .map(|border| border.width_pt)
+    .find(|width| *width > 0.0)
   else {
     return;
   };
+  let spacing = |border: Option<crate::docx::BorderStyle>| border.map_or(0.0, |b| b.spacing_pt);
+  let outset =
+    |border: Option<crate::docx::BorderStyle>| border.map_or(0.0, |b| b.spacing_pt + b.width_pt);
   let (left, top, right, bottom) = if page.setup.borders_offset_from_text {
     (
-      left - l.spacing_pt - l.width_pt,
-      top - t.spacing_pt - t.width_pt,
-      right + r.spacing_pt + r.width_pt,
-      bottom + b.spacing_pt + b.width_pt,
+      left - outset(borders.left),
+      top - outset(borders.top),
+      right + outset(borders.right),
+      bottom + outset(borders.bottom),
     )
   } else {
     (
-      left + l.spacing_pt,
-      top + t.spacing_pt,
-      right - r.spacing_pt,
-      bottom - b.spacing_pt,
+      left + spacing(borders.left),
+      top + spacing(borders.top),
+      right - spacing(borders.right),
+      bottom - spacing(borders.bottom),
     )
   };
-  if ![left, top, right, bottom, t.width_pt]
+  if ![left, top, right, bottom, width_pt]
     .iter()
     .all(|v| v.is_finite())
   {
     return;
   }
   let dot = |value: f32| (f64::from(value) / DOT).round() as i32;
-  let size = dot(t.width_pt);
-  let columns = edge_cells(dot(left), dot(right), size);
-  let rows = edge_cells(dot(top), dot(bottom), size);
+  let size = dot(width_pt);
+  let columns = partition(dot(left), dot(right), size);
+  let rows = partition(dot(top), dot(bottom), size);
   if columns.is_empty() || rows.is_empty() {
     return;
   }
@@ -83,15 +241,59 @@ pub(super) fn paint_maple_muffins(
   let (y_first, _) = rows[0];
   let (y_last, _) = rows[rows.len() - 1];
   let coordinates = ArtPageCoordinates::new(page.setup.width_pt, page.setup.height_pt);
-  // The art remains upright on all four edges, including corners. There is
-  // one corner image, shared by the two adjoining edges.
+  let mut paint_tile = |page: &mut Page, x, y, width, height| {
+    let cell = if y == y_first {
+      if x == x_first {
+        ArtCell::TopLeft
+      } else if x == x_last {
+        ArtCell::TopRight
+      } else {
+        ArtCell::Top
+      }
+    } else if y == y_last {
+      if x == x_first {
+        ArtCell::BottomLeft
+      } else if x == x_last {
+        ArtCell::BottomRight
+      } else {
+        ArtCell::Bottom
+      }
+    } else if x == x_first {
+      ArtCell::Left
+    } else {
+      ArtCell::Right
+    };
+    paint(
+      page,
+      coordinates,
+      ArtTile {
+        x,
+        y,
+        width,
+        height,
+        cell,
+      },
+    );
+  };
+  // ST_Border defines eight directional images. A corner is shared by the
+  // two adjoining edges; individual motifs can reuse the same resource.
   for (x, width) in columns {
-    paint_muffin(page, coordinates, x, y_first, width, size);
-    paint_muffin(page, coordinates, x, y_last, width, size);
+    if borders.top.is_some() {
+      paint_tile(page, x, y_first, width, size);
+    }
+    if borders.bottom.is_some() {
+      paint_tile(page, x, y_last, width, size);
+    }
   }
-  for &(y, height) in &rows[1..rows.len() - 1] {
-    paint_muffin(page, coordinates, x_first, y, size, height);
-    paint_muffin(page, coordinates, x_last, y, size, height);
+  let start = usize::from(borders.top.is_some());
+  let end = rows.len() - usize::from(borders.bottom.is_some());
+  for &(y, height) in &rows[start..end] {
+    if borders.left.is_some() {
+      paint_tile(page, x_first, y, size, height);
+    }
+    if borders.right.is_some() {
+      paint_tile(page, x_last, y, size, height);
+    }
   }
 }
 
@@ -270,6 +472,384 @@ fn paint_muffin(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn weaving_angles_native_bottom_corners_face_the_adjoining_edge() {
+    // Actual single-left/single-right EMFs select different bottom corner
+    // resources. The two vertical contours must turn into the adjoining
+    // bottom edge, including when that bottom border itself is absent.
+    for left in [true, false] {
+      let border = crate::docx::BorderStyle {
+        width_pt: 16.0,
+        spacing_pt: 24.0,
+        ..Default::default()
+      };
+      let setup = super::super::PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        borders_offset_from_text: false,
+        ..Default::default()
+      };
+      let mut page = super::super::empty_section_page(setup, 0, 0);
+      paint_weaving_angles(
+        &mut page,
+        (0.0, 0.0, 612.0, 792.0),
+        CellBordersModel {
+          left: left.then_some(border),
+          right: (!left).then_some(border),
+          ..Default::default()
+        },
+      );
+      let Some(PageItem::CompositingGroup { items, .. }) = page.items.last() else {
+        panic!("bottom corner artwork")
+      };
+      let contours: Vec<_> = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Path(path) if matches!(path.fill, Fill::None) && path.points.len() == 3 => {
+            Some(path)
+          }
+          _ => None,
+        })
+        .collect();
+      assert_eq!(contours.len(), 2);
+      for path in contours {
+        let p = &path.points;
+        assert_eq!(p[0].x, p[1].x);
+        assert!(p[1].y.0 > p[0].y.0);
+        assert_eq!(p[1].y, p[2].y);
+        assert_eq!(p[2].x.0 > p[1].x.0, left);
+      }
+    }
+  }
+
+  #[test]
+  fn weaving_angles_native_frames_keep_eight_directions_and_last_slot_ink() {
+    for (width, cells, primitives) in [(8.0, 116, 822), (16.0, 60, 430), (24.0, 38, 276)] {
+      let red = crate::docx::BorderStyle {
+        width_pt: width,
+        spacing_pt: 24.0,
+        color: crate::docx::RgbColor { r: 255, g: 0, b: 0 },
+        ..Default::default()
+      };
+      let blue = crate::docx::BorderStyle {
+        color: crate::docx::RgbColor { r: 0, g: 0, b: 255 },
+        ..red
+      };
+      let setup = super::super::PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        borders_offset_from_text: false,
+        ..Default::default()
+      };
+      let mut page = super::super::empty_section_page(setup, 0, 0);
+      paint_weaving_angles(
+        &mut page,
+        (0.0, 0.0, 612.0, 792.0),
+        CellBordersModel {
+          top: Some(red),
+          left: Some(red),
+          bottom: Some(red),
+          right: Some(blue),
+        },
+      );
+      assert_eq!(page.items.len(), cells);
+      let mut paths = 0;
+      let mut square_caps = 0;
+      let mut white_fills = 0;
+      for group in &page.items {
+        let PageItem::CompositingGroup { items, clip, .. } = group else {
+          panic!("native art cell")
+        };
+        assert!(clip.is_some());
+        paths += items.len();
+        for item in items {
+          let PageItem::Path(path) = item else {
+            panic!("native vector artwork")
+          };
+          let stroke = path.stroke.as_ref().unwrap();
+          assert_eq!(stroke.width.0, 0.14);
+          square_caps += usize::from(stroke.cap == Some(StrokeCap::Square));
+          for color in [
+            Some(stroke.color),
+            if let Fill::Solid(c) = path.fill {
+              Some(c)
+            } else {
+              None
+            },
+          ]
+          .into_iter()
+          .flatten()
+          {
+            assert!(
+              color
+                == Color {
+                  r: 0,
+                  g: 0,
+                  b: 255,
+                  a: 255
+                }
+                || color
+                  == Color {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                    a: 255
+                  }
+            );
+          }
+          white_fills += usize::from(matches!(
+            path.fill,
+            Fill::Solid(Color {
+              r: 255,
+              g: 255,
+              b: 255,
+              ..
+            })
+          ));
+        }
+      }
+      assert_eq!(paths, primitives);
+      assert_eq!(square_caps, 4);
+      assert_eq!(white_fills, 2 * cells);
+    }
+  }
+
+  #[test]
+  fn gems_native_frame_keeps_distinct_corners_and_last_slot_ink() {
+    let red = crate::docx::BorderStyle {
+      width_pt: 16.0,
+      spacing_pt: 24.0,
+      color: crate::docx::RgbColor { r: 255, g: 0, b: 0 },
+      ..Default::default()
+    };
+    let blue = crate::docx::BorderStyle {
+      color: crate::docx::RgbColor { r: 0, g: 0, b: 255 },
+      ..red
+    };
+    let setup = super::super::PageSetup {
+      width_pt: 612.0,
+      height_pt: 792.0,
+      borders_offset_from_text: false,
+      ..Default::default()
+    };
+    let mut page = super::super::empty_section_page(setup, 0, 0);
+    paint_gems(
+      &mut page,
+      (0.0, 0.0, 612.0, 792.0),
+      CellBordersModel {
+        top: Some(red),
+        left: Some(red),
+        bottom: Some(red),
+        right: Some(blue),
+      },
+    );
+    // Actual16pt complete-frame EMF and PDF counts. The other28controls
+    // separately pin corner positions, palette and independent dimensions.
+    assert_eq!(page.items.len(), 158);
+    let mut primitives = 0;
+    let mut strokes = 0;
+    let mut corners = 0;
+    for tile in &page.items {
+      let PageItem::CompositingGroup { items, clip, .. } = tile else {
+        panic!("native cell clip")
+      };
+      assert!(clip.is_some());
+      corners += usize::from(items.len() == 19);
+      primitives += items.len();
+      for item in items {
+        let PageItem::Path(path) = item else {
+          panic!("native vector resource")
+        };
+        strokes += usize::from(path.stroke.is_some());
+        if let Fill::Solid(color) = path.fill {
+          assert!(
+            color
+              == Color {
+                r: 0,
+                g: 0,
+                b: 255,
+                a: 255
+              }
+              || (color.r == color.g && color.g == color.b && [128, 192, 255].contains(&color.r))
+          );
+        }
+      }
+    }
+    assert_eq!(corners, 4);
+    assert_eq!(primitives, 3618);
+    assert_eq!(strokes, 628);
+  }
+
+  #[test]
+  fn people_hats_art_keeps_native_boxes_limbs_palette_and_inside_hat_pens() {
+    for (width, edges, count) in [
+      (8.0, [true, false, false, false], 75),
+      (8.0, [false, true, false, false], 97),
+      (16.0, [true, true, true, true], 158),
+    ] {
+      let border = crate::docx::BorderStyle {
+        width_pt: width,
+        spacing_pt: 24.0,
+        color: crate::docx::RgbColor { r: 255, g: 0, b: 0 },
+        ..Default::default()
+      };
+      let borders = CellBordersModel {
+        top: edges[0].then_some(border),
+        right: edges[1].then_some(border),
+        bottom: edges[2].then_some(border),
+        left: edges[3].then_some(border),
+      };
+      let setup = super::super::PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        borders_offset_from_text: false,
+        ..Default::default()
+      };
+      let mut page = super::super::empty_section_page(setup, 0, 0);
+      paint_people_hats(&mut page, (0.0, 0.0, 612.0, 792.0), borders);
+      assert_eq!(page.items.len(), count);
+      for tile in &page.items {
+        let PageItem::CompositingGroup { items, .. } = tile else {
+          panic!("native PeopleHats cell")
+        };
+        assert_eq!(items.len(), 14);
+        let mut inside = 0;
+        let mut limbs = 0;
+        let mut ellipses = 0;
+        let mut fills = Vec::new();
+        for item in items {
+          let PageItem::Path(path) = item else {
+            panic!("native PeopleHats primitive")
+          };
+          let stroke = path.stroke.as_ref().expect("all14native strokes");
+          inside += usize::from(stroke.alignment == Some(crate::common::StrokeAlignment::Inside));
+          if !path.closed {
+            limbs += 1;
+            assert_eq!(path.points.len(), 2);
+            assert_eq!(stroke.cap, Some(StrokeCap::Square));
+          }
+          ellipses += usize::from(
+            path
+              .commands
+              .iter()
+              .any(|c| matches!(c, PathCommand::CubicTo { .. })),
+          );
+          if let Fill::Solid(color) = path.fill {
+            fills.push([color.r, color.g, color.b]);
+          }
+        }
+        assert_eq!((inside, limbs, ellipses), (2, 2, 5));
+        assert_eq!(fills.iter().filter(|c| **c == [255, 255, 255]).count(), 1);
+        assert_eq!(fills.iter().filter(|c| **c == [192, 192, 192]).count(), 7);
+        assert_eq!(fills.iter().filter(|c| **c == [255, 255, 128]).count(), 1);
+        assert_eq!(fills.iter().filter(|c| **c == [0, 0, 128]).count(), 3);
+      }
+    }
+  }
+
+  #[test]
+  fn cake_slice_art_retains_native_five_layers_palette_and_shared_cells() {
+    for (width, edges, count) in [
+      (8.0, [true, false, false, false], 75),
+      (8.0, [false, true, false, false], 97),
+      (16.0, [false, false, true, false], 38),
+      (16.0, [true, true, true, true], 158),
+    ] {
+      let border = crate::docx::BorderStyle {
+        width_pt: width,
+        spacing_pt: 24.0,
+        color: crate::docx::RgbColor { r: 0, g: 0, b: 255 },
+        ..Default::default()
+      };
+      let borders = CellBordersModel {
+        top: edges[0].then_some(border),
+        right: edges[1].then_some(border),
+        bottom: edges[2].then_some(border),
+        left: edges[3].then_some(border),
+      };
+      let setup = super::super::PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        borders_offset_from_text: false,
+        ..Default::default()
+      };
+      let mut page = super::super::empty_section_page(setup, 0, 0);
+      paint_cake_slice(&mut page, (0.0, 0.0, 612.0, 792.0), borders);
+      assert_eq!(page.items.len(), count);
+      for tile in &page.items {
+        let PageItem::CompositingGroup { items, clip, .. } = tile else {
+          panic!("native CakeSlice cell")
+        };
+        assert!(clip.is_some());
+        assert_eq!(items.len(), 5);
+        let expected = [
+          (153, [0, 0, 0]),
+          (151, [255, 238, 202]),
+          (113, [255, 238, 202]),
+          (113, [255, 153, 194]),
+          (49, [255, 153, 194]),
+        ];
+        for (item, (point_count, rgb)) in items.iter().zip(expected) {
+          let PageItem::Path(path) = item else {
+            panic!("native CakeSlice polygon")
+          };
+          assert!(path.closed && path.stroke.is_none());
+          assert_eq!(path.points.len(), point_count);
+          let Fill::Solid(color) = path.fill else {
+            panic!("native intrinsic fill")
+          };
+          assert_eq!([color.r, color.g, color.b], rgb);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn holly_art_repeats_native_cells_on_single_sides_and_shared_corners() {
+    for (width, edges, count) in [
+      (8.0, [true, false, false, false], 75),
+      (8.0, [false, true, false, false], 97),
+      (16.0, [false, false, true, false], 38),
+      (16.0, [true, false, false, true], 82),
+      (16.0, [true, true, true, true], 158),
+    ] {
+      let border = crate::docx::BorderStyle {
+        width_pt: width,
+        spacing_pt: 24.0,
+        ..Default::default()
+      };
+      let borders = CellBordersModel {
+        top: edges[0].then_some(border),
+        right: edges[1].then_some(border),
+        bottom: edges[2].then_some(border),
+        left: edges[3].then_some(border),
+      };
+      let setup = super::super::PageSetup {
+        width_pt: 612.0,
+        height_pt: 792.0,
+        borders_offset_from_text: false,
+        ..Default::default()
+      };
+      let mut page = super::super::empty_section_page(setup, 0, 0);
+      paint_holly(&mut page, (0.0, 0.0, 612.0, 792.0), borders);
+      assert_eq!(page.items.len(), count);
+      for tile in &page.items {
+        let PageItem::CompositingGroup { items, clip, .. } = tile else {
+          panic!("native tile clip")
+        };
+        assert!(clip.is_some());
+        assert_eq!(items.len(), 12);
+        assert_eq!(
+          items
+            .iter()
+            .filter(|p| matches!(p,PageItem::Path(p) if p.stroke.is_some()))
+            .count(),
+          3
+        );
+      }
+    }
+  }
 
   #[test]
   fn native_fixed_format_art_coordinates_include_the_canvas_endpoint() {

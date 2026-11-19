@@ -1553,6 +1553,9 @@ fn lower_chart(
         point_colors,
         point_styles,
         point_image_effects,
+        word_point_3d_styles: Vec::new(),
+        word_legend_key_strokes: Vec::new(),
+        word_pie_3d_shadow_support: false,
         data_label_fill_colors: chart
           .data_labels
           .iter()
@@ -11518,6 +11521,7 @@ fn text_base_style(
         vml_fitted_text: false,
         semantic_text_overlay: !vectorize_without_semantic_overlay,
         wordprocessing_outline: false,
+        gdi_synthetic_bold: false,
         wordprocessing_unscaled_linear_fill: false,
         definition_width_basis: common::PdfGlyphDefinitionWidthBasis::AtLeastFontSize,
         definition_trailing_advance: common::Pt(0.0),
@@ -11530,6 +11534,7 @@ fn text_base_style(
         transform: None,
         text_warp: None,
         vml_text_shadow: None,
+        vml_text_shadow_secondary: None,
       })
     }),
     ..TextStyle::default()

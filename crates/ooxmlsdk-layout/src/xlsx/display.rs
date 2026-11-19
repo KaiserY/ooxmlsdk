@@ -2103,14 +2103,22 @@ pub(crate) fn vml_shape_common_fill(
   ) {
     return common::Fill::Solid(primary);
   }
-  let secondary = vml_common_color(
-    shape.fill_color2.as_deref(),
-    shape.fill_opacity2.as_deref(),
-    RgbColor {
-      r: primary.r,
-      g: primary.g,
-      b: primary.b,
-    },
+  let primary_rgb = RgbColor {
+    r: primary.r,
+    g: primary.g,
+    b: primary.b,
+  };
+  let secondary = common_rgb(
+    shape
+      .fill_color2
+      .as_deref()
+      .and_then(|value| crate::docx::parse_vml_color_with_fill(value, primary_rgb))
+      .unwrap_or(primary_rgb),
+    shape
+      .fill_opacity2
+      .as_deref()
+      .and_then(parse_vml_opacity)
+      .unwrap_or(1.0),
   );
   let focus = shape
     .fill_focus
@@ -2384,7 +2392,7 @@ pub(crate) fn recolor_typed_vml_pattern_image(fill: &vml::Fill, data: &[u8]) -> 
   )
 }
 
-fn parse_vml_opacity(value: &str) -> Option<f32> {
+pub(crate) fn parse_vml_opacity(value: &str) -> Option<f32> {
   let value = value.trim();
   let opacity = if let Some(value) = value.strip_suffix('f') {
     value.trim().parse::<f32>().ok()? / 65_536.0
@@ -11089,7 +11097,7 @@ fn transform_group_text_items(items: &mut [PageItem], transform: Affine, rect: C
           common::drawingml_geometry::transform_commands(commands.iter().copied(), transform)
         })
         .collect(),
-      vml_fit_path: warp.vml_fit_path,
+      vml_fit_path: warp.vml_fit_path.clone(),
       word_envelope: warp.word_envelope,
       follow_path: warp.follow_path.clone(),
       vml_trim_band: warp.vml_trim_band,
@@ -11388,6 +11396,9 @@ fn lower_drawing_chart(
         point_colors,
         point_styles,
         point_image_effects,
+        word_point_3d_styles: Vec::new(),
+        word_legend_key_strokes: Vec::new(),
+        word_pie_3d_shadow_support: false,
         data_label_fill_colors,
         data_label_shape_styles: Vec::new(),
         data_label_image_effects: Vec::new(),
@@ -19859,6 +19870,39 @@ mod drawing_page_tests {
       ..Default::default()
     };
     assert!(vml_shape_drawing_paths(&shape, 10.0, 10.0).is_none());
+  }
+
+  #[test]
+  fn vml_gradient_resolves_fill_derived_endpoints_and_secondary_opacity() {
+    for kind in [
+      vml::FillTypeValues::Gradient,
+      vml::FillTypeValues::GradientRadial,
+    ] {
+      let shape = super::super::object_resources::VmlShapeModel {
+        fill_color: Some("#66CC33".into()),
+        fill_color2: Some("fill lighten(0)".into()),
+        fill_opacity2: Some("32768f".into()),
+        fill_type: Some(kind),
+        ..Default::default()
+      };
+      let common::Fill::Gradient(gradient) = vml_shape_common_fill(&shape, Affine::IDENTITY) else {
+        panic!("derived colour retains its gradient owner");
+      };
+      assert!(gradient.stops.iter().any(|stop| stop.color
+        == common::Color {
+          r: 102,
+          g: 204,
+          b: 51,
+          a: 255
+        }));
+      assert!(gradient.stops.iter().any(|stop| stop.color
+        == common::Color {
+          r: 255,
+          g: 255,
+          b: 255,
+          a: 128
+        }));
+    }
   }
 
   #[test]

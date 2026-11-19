@@ -5,6 +5,15 @@ use quick_xml::{NsReader, Reader};
 use std::cell::RefCell;
 
 const CORE_PROPERTIES_STORE_ITEM_ID: &str = "{6C3C8BC8-F283-45AE-878A-BAB7291924A1}";
+const CORE_PROPERTIES_NAMESPACE: &[u8] =
+  b"http://schemas.openxmlformats.org/package/2006/metadata/core-properties";
+const DUBLIN_CORE_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
+const DEFAULT_CORE_PROPERTIES: &str = concat!(
+  "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" ",
+  "xmlns:dc=\"http://purl.org/dc/elements/1.1/\">",
+  "<dc:creator/><dc:description/><dc:subject/><dc:title/>",
+  "<cp:keywords/><cp:category/><cp:contentStatus/></cp:coreProperties>",
+);
 const EXTENDED_PROPERTIES_STORE_ITEM_ID: &str = "{6668398D-A668-4E3E-A5EB-62B293D839F1}";
 const COVER_PAGE_PROPERTIES_STORE_ITEM_ID: &str = "{55AF091B-3C7A-41E3-B477-F2FDAA23CFDA}";
 const COVER_PAGE_PROPERTIES_NAMESPACE: &[u8] =
@@ -198,13 +207,8 @@ impl CustomXmlBindings {
     xpath: &str,
     prefix_mappings: Option<&str>,
   ) -> Option<String> {
-    let value_for_entry = |entry: &CustomXmlBindingEntry| {
-      if is_cover_page_properties_entry(entry) {
-        cover_page_property_value(&entry.xml, xpath, prefix_mappings)
-      } else {
-        custom_xml_xpath_value(&entry.xml, xpath)
-      }
-    };
+    let value_for_entry =
+      |entry: &CustomXmlBindingEntry| binding_entry_value(entry, xpath, prefix_mappings);
     if let Some(value) = self
       .entries
       .iter()
@@ -229,6 +233,13 @@ impl CustomXmlBindings {
       .split("name()='")
       .nth(1)
       .and_then(|value| value.split(':').next())
+      .or_else(|| {
+        binding
+          .x_path
+          .strip_prefix('/')?
+          .split_once(':')
+          .map(|(prefix, _)| prefix)
+      })
       .filter(|prefix| !prefix.is_empty())?;
     let mappings = binding.prefix_mappings.as_deref()?;
     let namespace = mappings.split_whitespace().find_map(|mapping| {
@@ -240,8 +251,87 @@ impl CustomXmlBindings {
       .entries
       .iter()
       .filter(|entry| entry.xml.contains(&namespace))
-      .find_map(|entry| custom_xml_xpath_value(&entry.xml, &binding.x_path))
+      .find_map(|entry| {
+        binding_entry_value(entry, &binding.x_path, binding.prefix_mappings.as_deref())
+      })
   }
+}
+
+fn binding_entry_value(
+  entry: &CustomXmlBindingEntry,
+  xpath: &str,
+  prefix_mappings: Option<&str>,
+) -> Option<String> {
+  if is_cover_page_properties_entry(entry) {
+    cover_page_property_value(&entry.xml, xpath, prefix_mappings)
+  } else if entry
+    .store_item_id
+    .as_deref()
+    .is_some_and(|id| id.eq_ignore_ascii_case(CORE_PROPERTIES_STORE_ITEM_ID))
+  {
+    core_property_value(&entry.xml, xpath, prefix_mappings)
+  } else {
+    custom_xml_xpath_value(&entry.xml, xpath)
+  }
+}
+
+fn core_property_value(xml: &str, xpath: &str, prefix_mappings: Option<&str>) -> Option<String> {
+  if !xpath.contains("coreProperties") {
+    return None;
+  }
+  let mut reader = NsReader::from_str(xml);
+  loop {
+    match reader.read_resolved_event().ok()? {
+      (namespace, Event::Start(element) | Event::Empty(element)) => {
+        if element.local_name().as_ref() != b"coreProperties"
+          || !matches!(namespace, ResolveResult::Bound(uri) if uri.as_ref() == CORE_PROPERTIES_NAMESPACE)
+        {
+          return None;
+        }
+        break;
+      }
+      (_, Event::Decl(_) | Event::Comment(_) | Event::PI(_)) => {}
+      (_, Event::Text(text)) if text.iter().all(u8::is_ascii_whitespace) => {}
+      _ => return None,
+    }
+  }
+  let steps = xpath.strip_prefix('/')?.split('/').collect::<Vec<_>>();
+  let [root, field] = steps.as_slice() else {
+    return None;
+  };
+  let root_step = xpath_local_name(root)?;
+  let field_step = xpath_local_name(field)?;
+  if root_step.name != "coreProperties"
+    || root_step.position.is_some_and(|position| position != 1)
+    || field_step.position.is_some_and(|position| position != 1)
+  {
+    return None;
+  }
+  let field_namespace = match field_step.name.as_str() {
+    "creator" | "description" | "subject" | "title" => DUBLIN_CORE_NAMESPACE,
+    "keywords" | "category" | "contentStatus" => CORE_PROPERTIES_NAMESPACE,
+    _ => return None,
+  };
+  let mappings = prefix_mappings.filter(|mappings| !mappings.trim().is_empty())?;
+  let scope = format!("<mapping {mappings}>");
+  let mut reader = NsReader::from_str(&scope);
+  if !matches!(reader.read_event().ok()?, Event::Start(_)) {
+    return None;
+  }
+  for (step, expected_namespace) in [(root, CORE_PROPERTIES_NAMESPACE), (field, field_namespace)] {
+    let name = step.split('[').next()?;
+    if !matches!(reader.resolver().resolve_element(QName(name.as_bytes())).0,
+        ResolveResult::Bound(uri) if uri.as_ref() == expected_namespace)
+    {
+      return None;
+    }
+  }
+  // Word's built-in CustomXMLPart is a projection of document properties,
+  // rather than the raw OPC part. Its seven editable string fields exist as
+  // empty elements even when docProps/core.xml omits them. An empty mapping
+  // restores the glossary placeholder; an unknown XPath remains unresolved.
+  custom_xml_xpath_value(xml, xpath)
+    .or_else(|| custom_xml_xpath_value(DEFAULT_CORE_PROPERTIES, xpath))
 }
 
 fn cover_page_property_value(
@@ -538,6 +628,87 @@ mod tests {
     w::SdtProperties::from_bytes(format!(
       r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:dataBinding w:storeItemID="{id}" w:xpath="{path}"{mappings}/><w:text/></w:sdtPr>"#,
     ).as_bytes()).expect("cover-page XML mapping")
+  }
+
+  #[test]
+  fn core_property_bindings_use_builtin_empty_string_fields_and_reserved_namespace() {
+    let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:subject> </dc:subject><dc:title>Title</dc:title></cp:coreProperties>"#;
+    let bindings = CustomXmlBindings::from_test_xml(Some(CORE_PROPERTIES_STORE_ITEM_ID), xml);
+    let mappings = "xmlns:cp='http://schemas.openxmlformats.org/package/2006/metadata/core-properties' xmlns:dc='http://purl.org/dc/elements/1.1/'";
+    for id in [CORE_PROPERTIES_STORE_ITEM_ID, "unknown-store", ""] {
+      for (field, expected) in [
+        ("dc:creator", ""),
+        ("dc:description", ""),
+        ("dc:subject", " "),
+        ("dc:title", "Title"),
+        ("cp:keywords", ""),
+        ("cp:category", ""),
+        ("cp:contentStatus", ""),
+      ] {
+        let properties = cover_page_mapping(
+          id,
+          &format!("/cp:coreProperties[1]/{field}[1]"),
+          Some(mappings),
+        );
+        assert_eq!(
+          bindings.value_for_sdt(&properties).as_deref(),
+          Some(expected),
+          "{id}/{field}"
+        );
+      }
+    }
+    for path in [
+      "/cp:coreProperties[1]/dc:UnknownField[1]",
+      "/cp:coreProperties[2]/dc:title[1]",
+      "/cp:coreProperties[1]/dc:title[2]",
+    ] {
+      assert!(
+        bindings
+          .value_for_sdt(&cover_page_mapping(
+            CORE_PROPERTIES_STORE_ITEM_ID,
+            path,
+            Some(mappings)
+          ))
+          .is_none(),
+        "{path}"
+      );
+    }
+    for wrong_namespace in [
+      mappings.replace("http://purl.org/dc/elements/1.1/", "urn:wrong"),
+      mappings.replace(
+        "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+        "urn:wrong",
+      ),
+    ] {
+      assert!(
+        bindings
+          .value_for_sdt(&cover_page_mapping(
+            CORE_PROPERTIES_STORE_ITEM_ID,
+            "/cp:coreProperties[1]/dc:title[1]",
+            Some(&wrong_namespace)
+          ))
+          .is_none()
+      );
+    }
+    let unrelated = CustomXmlBindings::from_test_xml(Some("custom-store"), "<coreProperties/>");
+    assert!(
+      unrelated
+        .value_for_sdt(&cover_page_mapping(
+          "custom-store",
+          "/cp:coreProperties[1]/dc:title[1]",
+          Some(mappings)
+        ))
+        .is_none()
+    );
+    assert!(
+      bindings
+        .value_for_sdt(&cover_page_mapping(
+          CORE_PROPERTIES_STORE_ITEM_ID,
+          "/cp:coreProperties[1]/dc:title[1]",
+          None
+        ))
+        .is_none()
+    );
   }
 
   #[test]

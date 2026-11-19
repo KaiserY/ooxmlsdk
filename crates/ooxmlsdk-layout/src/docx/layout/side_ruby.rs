@@ -43,7 +43,7 @@ pub(super) fn metrics(
   CompoundTextMetrics {
     width_pt: base_width + (column.height - ruby.container_font_size_pt / 5.0).max(0.0),
     height_pt: base_height.max(text_runs_width(&ruby.guide, text_metrics)),
-    overstrike_extents: None,
+    line_extents: None,
   }
 }
 

@@ -11,6 +11,8 @@ pub(super) struct Entry {
   tag: String,
   authors: Authors,
   book_authors: Authors,
+  interviewees: Option<Authors>,
+  interviewers: Option<Authors>,
   title: String,
   book_title: String,
   year: String,
@@ -25,6 +27,7 @@ pub(super) struct Entry {
   issue: String,
   doi: String,
   url: String,
+  accessed: WebsiteDate,
   locale: Option<Locale>,
 }
 
@@ -109,6 +112,9 @@ pub(super) fn parse(sources: &b::Sources, xml: &str) -> Option<Vec<Entry>> {
           b::SourceChoice::Year(v) => entry.year = v.to_string(),
           b::SourceChoice::Month(v) => entry.month = v.to_string(),
           b::SourceChoice::Day(v) => entry.day = v.to_string(),
+          b::SourceChoice::YearAccessed(v) => entry.accessed.year = Some(v.to_string()),
+          b::SourceChoice::MonthAccessed(v) => entry.accessed.month = Some(v.to_string()),
+          b::SourceChoice::DayAccessed(v) => entry.accessed.day = Some(v.to_string()),
           b::SourceChoice::City(v) => entry.city = v.to_string(),
           b::SourceChoice::Publisher(v) => entry.publisher = v.to_string(),
           b::SourceChoice::Edition(v) => entry.edition = v.to_string(),
@@ -134,12 +140,47 @@ pub(super) fn parse(sources: &b::Sources, xml: &str) -> Option<Vec<Entry>> {
                 b::AuthorListChoice::BookAuthor(author) => {
                   entry.book_authors = Authors::parse(&author.name_list)?
                 }
+                b::AuthorListChoice::Interviewee(author) => {
+                  entry.interviewees = Some(Authors::parse(&author.name_list)?)
+                }
+                b::AuthorListChoice::Interviewer(author) => {
+                  entry.interviewers = Some(Authors::parse(&author.name_list)?)
+                }
                 _ => return None,
               }
             }
           }
           _ => return None,
         }
+      }
+      // These roles belong to Interview's APA template. Keep the whole cache
+      // for other source/metadata combinations whose templates are not covered.
+      if entry.kind != b::DataSourceValues::Interview
+        && (entry.interviewees.is_some() || entry.interviewers.is_some())
+      {
+        return None;
+      }
+      if !matches!(
+        entry.kind,
+        b::DataSourceValues::InternetSite | b::DataSourceValues::ElectronicSource
+      ) && (entry.accessed.year.is_some()
+        || entry.accessed.month.is_some()
+        || entry.accessed.day.is_some())
+      {
+        return None;
+      }
+      if entry.kind == b::DataSourceValues::Interview
+        && (!entry.book_authors.people.is_empty()
+          || !entry.book_title.is_empty()
+          || !entry.edition.is_empty()
+          || !entry.pages.is_empty()
+          || !entry.journal.is_empty()
+          || !entry.volume.is_empty()
+          || !entry.issue.is_empty()
+          || !entry.doi.is_empty()
+          || !entry.url.is_empty())
+      {
+        return None;
       }
       (matches!(
         entry.kind,
@@ -149,6 +190,7 @@ pub(super) fn parse(sources: &b::Sources, xml: &str) -> Option<Vec<Entry>> {
           | b::DataSourceValues::Report
           | b::DataSourceValues::ElectronicSource
           | b::DataSourceValues::InternetSite
+          | b::DataSourceValues::Interview
       ) && !entry.tag.is_empty())
       .then_some(entry)
     })
@@ -263,8 +305,21 @@ impl Text {
 }
 
 impl Entry {
+  fn primary_author(&self, locale: Locale) -> String {
+    // APASixthEditionOfficeOnline's Interview branch and sort key both select
+    // Interviewee. A generic Author is not its fallback (native role matrix).
+    if self.kind == b::DataSourceValues::Interview {
+      self
+        .interviewees
+        .as_ref()
+        .map_or_else(String::new, |authors| authors.text(locale, false))
+    } else {
+      self.authors.text(locale, false)
+    }
+  }
+
   fn sort_key(&self, locale: Locale) -> String {
-    let author = self.authors.text(self.locale.unwrap_or(locale), false);
+    let author = self.primary_author(self.locale.unwrap_or(locale));
     let parts = if author.is_empty() {
       [&self.title, &self.year, &author]
     } else {
@@ -303,6 +358,24 @@ impl Entry {
       }
     }
     date
+  }
+
+  fn accessed_date(&self, locale: Locale) -> String {
+    // formatDateAccessed: year is required; day requires month. Unlike the
+    // publication date, English retrieval dates put the year last.
+    let Some(year) = self.accessed.year.as_deref().filter(|v| !v.is_empty()) else {
+      return String::new();
+    };
+    let Some(month) = self.accessed.month.as_deref().filter(|v| !v.is_empty()) else {
+      return year.to_owned();
+    };
+    let day = self.accessed.day.as_deref().filter(|v| !v.is_empty());
+    match (locale, day) {
+      (Locale::English, Some(day)) => format!("{month} {day}, {year}"),
+      (Locale::English, None) => format!("{month} {year}"),
+      (Locale::Chinese, Some(day)) => format!("{year}年{month}月{day}日"),
+      (Locale::Chinese, None) => format!("{year}年{month}月"),
+    }
   }
 
   fn title(&self, locale: Locale, book: bool) -> Text {
@@ -345,12 +418,13 @@ impl Entry {
   }
 
   fn formatted(&self, locale: Locale) -> Text {
-    let author = self.authors.text(locale, false);
+    let author = self.primary_author(locale);
     let date = format!("({})", self.date(locale));
     let mut out = Text::default();
     let is_book = self.kind == b::DataSourceValues::Book;
     let is_report = self.kind == b::DataSourceValues::Report;
-    let titled_first = author.is_empty() && !is_report;
+    let is_interview = self.kind == b::DataSourceValues::Interview;
+    let titled_first = author.is_empty() && !is_report && !is_interview;
     let push_title = |out: &mut Text| {
       if is_book {
         let title = self.title(locale, false);
@@ -359,6 +433,14 @@ impl Entry {
         }
         for (text, italic) in title.runs {
           out.push(text, italic);
+        }
+      } else if self.kind == b::DataSourceValues::InternetSite && !self.title.is_empty() {
+        // templateTV/templateCItalic wrap the title, then append an unstyled
+        // sentence terminator. ElectronicSource uses plain titleDot instead.
+        out.space();
+        out.push(&self.title, locale == Locale::English);
+        if !self.title.ends_with(['.', '?', '!']) {
+          out.push(".", false);
         }
       } else {
         out.sentence(&self.title, is_report && locale == Locale::English);
@@ -374,6 +456,20 @@ impl Entry {
       push_title(&mut out);
     }
     match self.kind {
+      b::DataSourceValues::Interview => {
+        if let Some(interviewers) = &self.interviewers {
+          let people = interviewers.text(locale, true);
+          if !people.is_empty() {
+            let role = match (locale, interviewers.people.len()) {
+              (Locale::Chinese, _) => "采访人",
+              (Locale::English, 1) => "Interviewer",
+              (Locale::English, _) => "Interviewers",
+            };
+            out.space();
+            out.push(format!("({people}, {role})"), false);
+          }
+        }
+      }
       b::DataSourceValues::BookSection => {
         let authors = self.book_authors.text(locale, true);
         if !authors.is_empty() || !self.book_title.is_empty() {
@@ -444,17 +540,42 @@ impl Entry {
     if !self.doi.is_empty() {
       out.space();
       out.push(format!("doi:{}", self.doi), false);
-    } else if !self.url.is_empty() {
-      out.space();
-      out.push(
-        if locale == Locale::Chinese {
-          "检索来源: "
-        } else {
-          "Retrieved from "
-        },
-        false,
-      );
-      out.push(&self.url, false);
+    } else {
+      let accessed = self.accessed_date(locale);
+      if !accessed.is_empty() {
+        out.space();
+        out.push(
+          if locale == Locale::Chinese {
+            "检索日期: "
+          } else {
+            "Retrieved "
+          },
+          false,
+        );
+        out.push(accessed, false);
+        if !self.url.is_empty() {
+          out.push(
+            if locale == Locale::Chinese {
+              "，来源: "
+            } else {
+              ", from "
+            },
+            false,
+          );
+          out.push(&self.url, false);
+        }
+      } else if !self.url.is_empty() {
+        out.space();
+        out.push(
+          if locale == Locale::Chinese {
+            "检索来源: "
+          } else {
+            "Retrieved from "
+          },
+          false,
+        );
+        out.push(&self.url, false);
+      }
     }
     out
   }
@@ -697,6 +818,170 @@ mod tests {
     entry.kind = b::DataSourceValues::Report;
     entry.url.clear();
     assert_eq!(plain(entry.formatted(Locale::English)), "(n.d.). Resource.");
+  }
+
+  #[test]
+  fn native_interview_roles_override_generic_author_and_title_fallback() {
+    let mut entry = Entry {
+      kind: b::DataSourceValues::Interview,
+      authors: authors(2),
+      title: "Interview".into(),
+      year: "2021".into(),
+      month: "October".into(),
+      day: "3".into(),
+      ..Default::default()
+    };
+    assert_eq!(
+      plain(entry.formatted(Locale::English)),
+      "(2021, October 3). Interview."
+    );
+    assert_eq!(entry.sort_key(Locale::English), "interview 2021");
+    entry.interviewees = Some(authors(1));
+    entry.interviewers = Some(authors(1));
+    let formatted = entry.formatted(Locale::English);
+    assert!(formatted.runs.iter().all(|(_, italic)| !italic));
+    assert_eq!(
+      plain(formatted),
+      "Adams, A. B. (2021, October 3). Interview. (A. B. Adams, Interviewer)"
+    );
+    assert_eq!(
+      entry.sort_key(Locale::English),
+      "adams, a. b. 2021 interview"
+    );
+    entry.interviewers = Some(authors(2));
+    assert_eq!(
+      plain(entry.formatted(Locale::Chinese)),
+      "AdamsBethAnne. (2021年October月3日). Interview. (AdamsBethAnne, & BakerBethAnne, 采访人)"
+    );
+    assert!(
+      plain(entry.formatted(Locale::English))
+        .ends_with("(A. B. Adams, & A. B. Baker, Interviewers)")
+    );
+    entry.title.clear();
+    entry.interviewers = None;
+    assert_eq!(
+      plain(entry.formatted(Locale::English)),
+      "Adams, A. B. (2021, October 3)."
+    );
+  }
+
+  #[test]
+  fn native_accessed_date_requires_year_and_month_before_day() {
+    for (locale, expected) in [
+      (
+        Locale::English,
+        [
+          "",
+          "2022",
+          "",
+          "November 2022",
+          "",
+          "2022",
+          "",
+          "November 17, 2022",
+        ],
+      ),
+      (
+        Locale::Chinese,
+        [
+          "",
+          "2022",
+          "",
+          "2022年November月",
+          "",
+          "2022",
+          "",
+          "2022年November月17日",
+        ],
+      ),
+    ] {
+      for (mask, date) in expected.into_iter().enumerate() {
+        let mut entry = Entry {
+          kind: b::DataSourceValues::InternetSite,
+          accessed: WebsiteDate {
+            year: (mask & 1 != 0).then(|| "2022".into()),
+            month: (mask & 2 != 0).then(|| "November".into()),
+            day: (mask & 4 != 0).then(|| "17".into()),
+          },
+          ..Default::default()
+        };
+        assert_eq!(entry.accessed_date(locale), date);
+        for url in ["", "https://example.org"] {
+          entry.url = url.into();
+          let suffix = match (locale, date.is_empty(), url.is_empty()) {
+            (_, true, true) => String::new(),
+            (Locale::English, true, false) => format!(" Retrieved from {url}"),
+            (Locale::Chinese, true, false) => format!(" 检索来源: {url}"),
+            (Locale::English, false, true) => format!(" Retrieved {date}"),
+            (Locale::Chinese, false, true) => format!(" 检索日期: {date}"),
+            (Locale::English, false, false) => format!(" Retrieved {date}, from {url}"),
+            (Locale::Chinese, false, false) => format!(" 检索日期: {date}，来源: {url}"),
+          };
+          let prefix = if locale == Locale::English {
+            "(n.d.)."
+          } else {
+            "(无日期)."
+          };
+          assert_eq!(plain(entry.formatted(locale)), format!("{prefix}{suffix}"));
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn native_internet_title_has_distinct_rich_boundary() {
+    let mut entry = Entry {
+      kind: b::DataSourceValues::InternetSite,
+      title: "Website".into(),
+      ..Default::default()
+    };
+    assert_eq!(
+      entry.formatted(Locale::English).runs,
+      [("Website".into(), true), (". (n.d.).".into(), false)]
+    );
+    assert_eq!(
+      entry.formatted(Locale::Chinese).runs,
+      [("Website. (无日期).".into(), false)]
+    );
+    entry.kind = b::DataSourceValues::ElectronicSource;
+    assert_eq!(
+      entry.formatted(Locale::English).runs,
+      [("Website. (n.d.).".into(), false)]
+    );
+  }
+
+  #[test]
+  fn interview_roles_parse_without_accepting_unsupported_source_profiles() {
+    let xml = r#"<b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography" SelectedStyle="\APASixthEditionOfficeOnline.xsl"><b:Source><b:Tag>I</b:Tag><b:SourceType>Interview</b:SourceType><b:Author><b:Author><b:Corporate>Ignored</b:Corporate></b:Author><b:Interviewee><b:NameList><b:Person><b:Last>Smith</b:Last></b:Person></b:NameList></b:Interviewee><b:Interviewer><b:NameList><b:Person><b:Last>Jones</b:Last></b:Person></b:NameList></b:Interviewer></b:Author><b:Title>Interview</b:Title></b:Source></b:Sources>"#;
+    let catalog = Catalog::parse(xml).unwrap();
+    assert_eq!(
+      plain(catalog.apa[0].formatted(Locale::English)),
+      "Smith. (n.d.). Interview. (Jones, Interviewer)"
+    );
+    for other in [
+      xml.replace(">Interview<", ">Book<"),
+      xml.replace("Interviewer", "Editor"),
+      xml.replace("APASixthEditionOfficeOnline", "IEEE2006OfficeOnline"),
+      xml.replace("</b:Source>", "<b:Pages>4-7</b:Pages></b:Source>"),
+      xml.replace(
+        "</b:Source>",
+        "<b:YearAccessed>2022</b:YearAccessed></b:Source>",
+      ),
+      xml.replace("</b:Interviewer>", "text</b:Interviewer>"),
+    ] {
+      assert!(Catalog::parse(&other).is_none(), "{other}");
+    }
+    let start = xml.find("<b:Author>").unwrap();
+    let end = xml.find("<b:Title>").unwrap();
+    let website = format!("{}{}", &xml[..start], &xml[end..])
+      .replace(">Interview<", ">InternetSite<")
+      .replace("</b:Source>", "<b:YearAccessed>2022</b:YearAccessed><b:MonthAccessed>November</b:MonthAccessed><b:DayAccessed>17</b:DayAccessed></b:Source>");
+    let catalog = Catalog::parse(&website).unwrap();
+    assert_eq!(
+      catalog.apa[0].accessed_date(Locale::English),
+      "November 17, 2022"
+    );
+    assert!(Catalog::parse(&website.replace(">InternetSite<", ">Book<")).is_none());
   }
 
   #[test]

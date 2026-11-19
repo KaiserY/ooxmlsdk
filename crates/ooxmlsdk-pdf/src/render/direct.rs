@@ -425,6 +425,14 @@ fn ensure_stroke_supported(stroke: &common::Stroke<'static>, usage: StrokeUse) -
 
 fn ensure_path_stroke_supported(stroke: &common::Stroke<'static>, closed: bool) -> Result<()> {
   if !stroke_is_compound(stroke) {
+    if stroke.alignment == Some(common::StrokeAlignment::Inside) {
+      if !closed || stroke_has_visible_endpoint_markers(stroke) || stroke.gradient.is_some() {
+        return unsupported("open, gradient or marked inside-aligned strokes");
+      }
+      let mut centered = stroke.clone();
+      centered.alignment = None;
+      return ensure_stroke_supported(&centered, StrokeUse::Path);
+    }
     return ensure_stroke_supported(stroke, StrokeUse::Path);
   }
   if !stroke.width.0.is_finite() || stroke.width.0 < 0.0 {
@@ -854,6 +862,13 @@ fn observe_raster_display_item(
         options,
         display_size_pt,
         image.blip_compression_state,
+      );
+      image_policy.observe_word_png_display(
+        &image.data,
+        image.content_type.as_deref(),
+        options,
+        display_size_pt,
+        image.crop != super::paint::ImageCrop::default(),
       );
     }
     super::paint::PaintItem::Group { items, .. } => {
@@ -1724,6 +1739,89 @@ fn write_prepared_office_math_svg(
   )
 }
 
+fn write_metafile_bitmap_picture(
+  content: &mut Content,
+  image: &super::paint::ImageItem<'_>,
+  picture: &emfsdk::render::MetafileBitmapPicture,
+  writer: &mut PreparedPageWriter<'_>,
+) -> Result<()> {
+  let bitmap = &picture.bitmap;
+  let Some((display_width, display_height)) =
+    expanded_image_display_size(image.width_pt, image.height_pt, image.crop)
+  else {
+    return Ok(());
+  };
+  // Keep the EMF+ source image, then apply the ordinary Word picture codec
+  // and resolution policy once. The metafile canvas is not a source bitmap.
+  let prepared = writer.image_policy.raster_direct(
+    &bitmap.data,
+    Some(bitmap.content_type),
+    writer.options,
+    None,
+    (display_width * bitmap.width, display_height * bitmap.height),
+    image.blip_compression_state,
+  )?;
+  let registered = writer.images.register(prepared, || writer.refs.alloc())?;
+  writer
+    .resources
+    .register_image(&registered.name, registered.id);
+  // Native Word's EMF+ Half sampling shifts the source window by half a
+  // pixel. For an unmodified full-source picture its far edge is clipped
+  // to the source bounds. None/HighSpeed retain the full extent. Preserve
+  // the destination origin; this sampling state does not move the host.
+  let sample_fraction = |pixels: u32| {
+    if picture.half_pixel_offset {
+      (pixels as f32 - 0.5) / pixels as f32
+    } else {
+      1.0
+    }
+  };
+  write_transformed_image_content(
+    content,
+    image,
+    image.width_pt,
+    image.height_pt,
+    image.crop,
+    |content, width, height, local_transform| {
+      let draw_width = width * bitmap.width * sample_fraction(picture.source_size[0]);
+      let draw_height = height * bitmap.height * sample_fraction(picture.source_size[1]);
+      content
+        .transform(local_transform)
+        .rect(0.0, 0.0, width, height)
+        .clip_nonzero()
+        .end_path()
+        .transform([
+          if bitmap.flip_horizontal {
+            -draw_width
+          } else {
+            draw_width
+          },
+          0.0,
+          0.0,
+          if bitmap.flip_vertical {
+            draw_height
+          } else {
+            -draw_height
+          },
+          width * bitmap.x
+            + if bitmap.flip_horizontal {
+              draw_width
+            } else {
+              0.0
+            },
+          height * bitmap.y
+            + if bitmap.flip_vertical {
+              0.0
+            } else {
+              draw_height
+            },
+        ])
+        .x_object(Name(&registered.name));
+      Ok(())
+    },
+  )
+}
+
 fn write_prepared_metafile(
   content: &mut Content,
   image: &super::paint::ImageItem<'_>,
@@ -1745,85 +1843,88 @@ fn write_prepared_metafile(
   }
 
   let render_options = super::metafile::render_options_for_image(image, writer.options);
-  if matches!(
+  let word_fixed_output = matches!(
     writer.options.images.optimization_policy,
     crate::PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
-  ) && let Some(picture) =
-    ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_picture_with_options(
+  );
+  let word_wmf =
+    word_fixed_output && emfsdk::detect_format(&image.data) == Some(emfsdk::Format::Wmf);
+  // All WMF layers share the VML printer rectangle, including partial DIBs.
+  let vector_image = word_wmf
+    .then(|| super::metafile::fixed_output_paint_image(image, writer.options))
+    .flatten();
+  let vector_image = vector_image.as_ref().unwrap_or(image);
+  if word_fixed_output
+    && let Some(picture) =
+      ooxmlsdk_layout::render::emf_wmf::extract_metafile_bitmap_picture_with_options(
+        &image.data,
+        render_options,
+      )
+  {
+    return write_metafile_bitmap_picture(content, vector_image, &picture, writer);
+  }
+  if word_wmf
+    && let Ok(Some(layers)) = emfsdk::render::extract_word_wmf_picture_layers(
       &image.data,
-      render_options,
+      emfsdk::render::RenderOptions {
+        word_emf_vector_pens: true,
+        ..render_options
+      },
     )
   {
-    let bitmap = &picture.bitmap;
-    let mut source = image.clone();
-    source.data = Cow::Borrowed(&bitmap.data);
-    source.content_type = Some(Cow::Borrowed(bitmap.content_type));
-    let Some((display_width, display_height)) =
-      expanded_image_display_size(image.width_pt, image.height_pt, image.crop)
-    else {
-      return Ok(());
-    };
-    // Keep the EMF+ source image, then apply the ordinary Word picture codec
-    // and resolution policy once. The metafile canvas is not a source bitmap.
-    let prepared = writer.image_policy.raster_direct(
-      &source.data,
-      source.content_type.as_deref(),
-      writer.options,
-      None,
-      (display_width * bitmap.width, display_height * bitmap.height),
-      image.blip_compression_state,
-    )?;
-    let registered = writer.images.register(prepared, || writer.refs.alloc())?;
-    writer
-      .resources
-      .register_image(&registered.name, registered.id);
-    // Native Word's EMF+ Half sampling shifts the source window by half a
-    // pixel. For an unmodified full-source picture its far edge is clipped
-    // to the source bounds. None/HighSpeed retain the full extent. Preserve
-    // the destination origin; this sampling state does not move the host.
-    let sample_fraction = |pixels: u32| {
-      if picture.half_pixel_offset {
-        (pixels as f32 - 0.5) / pixels as f32
-      } else {
-        1.0
+    for layer in layers {
+      match layer {
+        emfsdk::render::MetafilePictureLayer::Drawing(drawing) => {
+          write_metafile_vector_drawing(content, vector_image, &drawing)?
+        }
+        emfsdk::render::MetafilePictureLayer::Bitmap(picture) => {
+          write_metafile_bitmap_picture(content, vector_image, &picture, writer)?
+        }
       }
-    };
-    return write_transformed_image_content(
-      content,
-      image,
-      image.width_pt,
-      image.height_pt,
-      image.crop,
-      |content, width, height, local_transform| {
-        let draw_width = width * bitmap.width * sample_fraction(picture.source_size[0]);
-        let draw_height = height * bitmap.height * sample_fraction(picture.source_size[1]);
-        content
-          .transform(local_transform)
-          .rect(0.0, 0.0, width, height)
-          .clip_nonzero()
-          .end_path()
-          .transform([
-            draw_width,
-            0.0,
-            0.0,
-            -draw_height,
-            width * bitmap.x,
-            height * bitmap.y + draw_height,
-          ])
-          .x_object(Name(&registered.name));
-        Ok(())
-      },
-    );
+    }
+    return Ok(());
   }
-  if image.metafile_fixed_output_profile == common::MetafileFixedOutputProfile::WordVmlEmfPicture
+  if (image.metafile_fixed_output_profile.is_word_emf_picture() || word_wmf)
     && let Ok(Some(drawing)) =
       ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_drawing_with_options(
         &image.data,
         image.content_type.as_deref(),
-        render_options,
+        ooxmlsdk_layout::render::emf_wmf::RenderOptions {
+          word_emf_vector_pens: true,
+          ..render_options
+        },
       )
   {
-    return write_metafile_vector_drawing(content, image, &drawing);
+    return write_metafile_vector_drawing(content, vector_image, &drawing);
+  }
+  if word_wmf
+    && !image.metafile_semantic_text_includes_raster_backdrop
+    && let Ok(Some(prefix)) =
+      ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_prefix_with_options(
+        &image.data,
+        image.content_type.as_deref(),
+        ooxmlsdk_layout::render::emf_wmf::RenderOptions {
+          word_emf_vector_pens: true,
+          ..render_options
+        },
+      )
+  {
+    write_metafile_vector_drawing(content, vector_image, &prefix.drawing)?;
+    let mut tail = vector_image.clone();
+    tail.data = Cow::Borrowed(&prefix.residual_metafile);
+    let (paint_width, paint_height) =
+      super::metafile::native_paint_size(&tail).unwrap_or((tail.width_pt, tail.height_pt));
+    return write_prepared_raster_image(
+      content,
+      &tail,
+      writer,
+      Some(ooxmlsdk_layout::render::emf_wmf::RenderOptions {
+        transparent_background: true,
+        ..render_options
+      }),
+      paint_width,
+      paint_height,
+    );
   }
   if let Ok(Some(scene)) =
     ooxmlsdk_layout::render::emf_wmf::extract_metafile_vector_scene_with_options(
@@ -1832,7 +1933,7 @@ fn write_prepared_metafile(
       render_options,
     )
   {
-    return write_metafile_vector_scene(content, image, &scene);
+    return write_metafile_vector_scene(content, vector_image, &scene);
   }
 
   let painted_image = floating_frame
@@ -1845,7 +1946,7 @@ fn write_prepared_metafile(
       painted.metafile_native_size = false;
       painted
     })
-    .or_else(|| super::metafile::fixed_output_paint_image(image, writer.options));
+    .or_else(|| super::metafile::inline_raster_paint_image(image, writer.options));
   let image = painted_image.as_ref().unwrap_or(image);
   let (paint_width_pt, paint_height_pt) =
     super::metafile::native_paint_size(image).unwrap_or((image.width_pt, image.height_pt));
@@ -2146,6 +2247,7 @@ fn write_metafile_vector_drawing(
             subpaths,
             color,
             width,
+            line_cap,
             closed,
             ..
           } => {
@@ -2155,10 +2257,16 @@ fn write_metafile_vector_drawing(
             content
               .transform(scale(draw_width * width[0], draw_height * width[1]))
               .set_line_width(1.0)
-              .set_line_cap(if *closed {
-                LineCapStyle::ButtCap
-              } else {
-                LineCapStyle::ProjectingSquareCap
+              .set_line_cap(match line_cap {
+                ooxmlsdk_layout::render::emf_wmf::MetafileVectorLineCap::Flat => {
+                  LineCapStyle::ButtCap
+                }
+                ooxmlsdk_layout::render::emf_wmf::MetafileVectorLineCap::Round => {
+                  LineCapStyle::RoundCap
+                }
+                ooxmlsdk_layout::render::emf_wmf::MetafileVectorLineCap::Square => {
+                  LineCapStyle::ProjectingSquareCap
+                }
               })
               .set_line_join(LineJoinStyle::RoundJoin)
               .set_stroke_rgb(
@@ -2468,11 +2576,7 @@ fn write_prepared_text(
     return Ok(());
   }
 
-  let glyph_semantic_text = super::paint::pdf_semantic_text(
-    &text.item.text,
-    text.item.style.small_caps,
-    text.item.style.pdf_font_family(),
-  );
+  let glyph_semantic_text = super::paint::prepared_pdf_semantic_text(text);
 
   let color = text.item.style.color;
   if paints_glyphs {
@@ -2571,6 +2675,7 @@ fn write_prepared_text(
             let semantic_run = PreparedTextRun {
               word_font_family: None,
               word_font_names: false,
+              metafile_system_font: text.item.style.metafile_system_font,
               portion,
               run,
               semantic_text: run_semantic_text,
@@ -2583,6 +2688,7 @@ fn write_prepared_text(
               word_text_spacing: false,
               office_text_spacing: false,
               word_leader_spacing_scale: None,
+              word_winansi_control: None,
             };
             if let Some(warp) = text
               .item
@@ -2606,6 +2712,7 @@ fn write_prepared_text(
           write_run(
             content,
             PreparedTextRun {
+              metafile_system_font: text.item.style.metafile_system_font,
               word_font_family: word_text_uses_fixed_output(text, writer)
                 .then(|| text.item.style.pdf_font_family())
                 .flatten(),
@@ -2633,7 +2740,11 @@ fn write_prepared_text(
                 // Word's linked-shape descriptions are searchable alpha-zero
                 // text. Keep that state rather than making the semantic
                 // carrier opaque under its independent nonpainting clip.
-                PreparedTextRunKind::TransparentSemanticOverlay
+                if text.item.style.bitmap_semantic_text {
+                  PreparedTextRunKind::TransparentBitmapSemanticOverlay
+                } else {
+                  PreparedTextRunKind::TransparentSemanticOverlay
+                }
               } else {
                 PreparedTextRunKind::Ordinary
               },
@@ -2663,6 +2774,7 @@ fn write_prepared_text(
                   )
                 })
                 .map(|ratio| ratio as f32),
+              word_winansi_control: None,
             },
             writer,
           )?;
@@ -2674,7 +2786,9 @@ fn write_prepared_text(
         write_prepared_text_decoration(
           content,
           underline,
-          text.item.decoration_span_start_x_pt.is_some() || text.item.style.office_text_array,
+          text.item.decoration_span_start_x_pt.is_some()
+            || text.item.style.office_text_array
+            || text.item.wordprocessing_line_metrics.is_some(),
         )?;
       }
       if let Some(strikethrough) = portion.strikethrough.as_ref() {
@@ -2719,11 +2833,13 @@ fn write_prepared_text(
 enum PreparedTextRunKind {
   Ordinary,
   TransparentSemanticOverlay,
+  TransparentBitmapSemanticOverlay,
 }
 
 struct PreparedTextRun<'a> {
   word_font_family: Option<&'a str>,
   word_font_names: bool,
+  metafile_system_font: bool,
   portion: &'a super::paint::PaintTextPortion,
   run: &'a super::paint::PaintGlyphFontRun,
   semantic_text: &'a str,
@@ -2736,6 +2852,7 @@ struct PreparedTextRun<'a> {
   word_text_spacing: bool,
   office_text_spacing: bool,
   word_leader_spacing_scale: Option<f32>,
+  word_winansi_control: Option<u8>,
 }
 
 fn write_prepared_follow_path_font_run_as_text(
@@ -2822,18 +2939,38 @@ fn word_missing_private_use_glyph(glyph: &super::paint::PaintGlyph, source: &str
     })
 }
 
+fn word_missing_winansi_control(glyph: &super::paint::PaintGlyph, source: &str) -> Option<u8> {
+  if glyph.glyph_id != 0 {
+    return None;
+  }
+  let mut characters = source.get(glyph.text_range.clone())?.chars();
+  let character = characters.next()?;
+  (characters.next().is_none() && ('\u{7f}'..='\u{9f}').contains(&character))
+    .then_some(character as u8)
+}
+
 fn write_prepared_word_font_run_as_text(
   content: &mut Content,
   text_run: PreparedTextRun<'_>,
   writer: &mut PreparedPageWriter<'_>,
 ) -> Result<()> {
-  if !text_run.word_text_spacing
-    || text_run.glyphs.iter().any(|glyph| glyph.y_advance != 0.0)
-    || !text_run
-      .glyphs
-      .iter()
-      .any(|glyph| word_missing_private_use_glyph(glyph, text_run.semantic_text))
-  {
+  if !text_run.word_text_spacing || text_run.glyphs.iter().any(|glyph| glyph.y_advance != 0.0) {
+    return write_prepared_font_run_as_text(content, text_run, writer);
+  }
+  let winansi_controls = text_run.kind == PreparedTextRunKind::Ordinary
+    && !writer.requires_codepoint_mappings
+    && !writer.options.standards.iter().any(|s| s.is_archival());
+  let mut has_missing_private_use = false;
+  let mut has_missing_control = false;
+  for glyph in text_run.glyphs {
+    if glyph.glyph_id != 0 {
+      continue;
+    }
+    has_missing_private_use |= word_missing_private_use_glyph(glyph, text_run.semantic_text);
+    has_missing_control |=
+      winansi_controls && word_missing_winansi_control(glyph, text_run.semantic_text).is_some();
+  }
+  if !has_missing_private_use && !has_missing_control {
     return write_prepared_font_run_as_text(content, text_run, writer);
   }
   if skrifa::FontRef::from_index(
@@ -2854,27 +2991,33 @@ fn write_prepared_word_font_run_as_text(
   // owns its advance. Do not paint that face's .notdef box or substitute Calibri
   // widths. XPS preserves each source scalar; PDF's reused CID 0 mapping does
   // not, so retain our existing ActualText handling for semantic conflicts.
-  let carrier_face = writer
-    .fonts
-    .word_missing_glyph_face()
-    .unwrap_or_else(|| text_run.run.font_face.clone());
+  let carrier_face = has_missing_private_use
+    .then(|| writer.fonts.word_missing_glyph_face())
+    .flatten();
   let mut start = 0;
   let mut advance_em = 0.0;
   while start < text_run.glyphs.len() {
     let missing = word_missing_private_use_glyph(&text_run.glyphs[start], text_run.semantic_text);
+    let control = winansi_controls
+      .then(|| word_missing_winansi_control(&text_run.glyphs[start], text_run.semantic_text))
+      .flatten();
     let mut end = start + 1;
     // Each missing glyph is a separate native text object; preserve ordinary
     // contiguous text so its Word PDF width accumulator is not reset per glyph.
-    if !missing {
+    if !missing && control.is_none() {
       while end < text_run.glyphs.len()
         && !word_missing_private_use_glyph(&text_run.glyphs[end], text_run.semantic_text)
+        && (!winansi_controls
+          || word_missing_winansi_control(&text_run.glyphs[end], text_run.semantic_text).is_none())
       {
         end += 1;
       }
     }
     let run = super::paint::PaintGlyphFontRun {
       font_face: if missing {
-        carrier_face.clone()
+        carrier_face
+          .clone()
+          .unwrap_or_else(|| text_run.run.font_face.clone())
       } else {
         text_run.run.font_face.clone()
       },
@@ -2897,6 +3040,7 @@ fn write_prepared_word_font_run_as_text(
         } else {
           text_run.color
         },
+        word_winansi_control: control,
         ..text_run
       },
       writer,
@@ -2918,7 +3062,7 @@ fn word_text_uses_fixed_output(
   matches!(
     writer.options.images.optimization_policy,
     PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx)
-  ) && text.item.pdf_text_segmentation == common::PdfTextSegmentation::WordLine
+  ) && text.item.pdf_text_segmentation.is_word_line()
     && text.item.style.rotation_deg.abs() <= f32::EPSILON
 }
 
@@ -2976,6 +3120,7 @@ fn write_prepared_font_run_as_text(
   let PreparedTextRun {
     word_font_family,
     word_font_names,
+    metafile_system_font,
     portion,
     run,
     semantic_text,
@@ -2988,6 +3133,7 @@ fn write_prepared_font_run_as_text(
     word_text_spacing: _,
     office_text_spacing,
     word_leader_spacing_scale,
+    word_winansi_control,
   } = text_run;
   let visible_glyphs = without_nonprinting_control_glyphs(glyphs, semantic_text);
   let glyphs = visible_glyphs.as_ref();
@@ -3007,14 +3153,37 @@ fn write_prepared_font_run_as_text(
     && glyphs
       .windows(2)
       .all(|pair| pair[0].text_range != pair[1].text_range);
-  let handle = writer.fonts.register_text_face(
-    &run.font_face,
-    office_text_spacing,
-    word_font_family,
-    word_font_names,
-    || writer.refs.alloc(),
-  )?;
-  let (resource_name, font_id) = writer.fonts.resource(handle)?;
+  let handle = if kind == PreparedTextRunKind::TransparentBitmapSemanticOverlay {
+    writer
+      .fonts
+      .register_bitmap_semantic_face(&run.font_face, office_text_spacing, || writer.refs.alloc())?
+  } else if metafile_system_font {
+    writer
+      .fonts
+      .register_metafile_system_face(&run.font_face, office_text_spacing, || writer.refs.alloc())?
+  } else {
+    writer.fonts.register_text_face(
+      &run.font_face,
+      office_text_spacing,
+      word_font_family,
+      word_font_names,
+      || writer.refs.alloc(),
+    )?
+  };
+  let word_winansi_control = if word_winansi_control.is_some()
+    && writer
+      .fonts
+      .enable_word_winansi(handle, || writer.refs.alloc())?
+  {
+    word_winansi_control
+  } else {
+    None
+  };
+  let (resource_name, font_id) = if word_winansi_control.is_some() {
+    writer.fonts.word_winansi_resource(handle)?
+  } else {
+    writer.fonts.resource(handle)?
+  };
   let resource_name = resource_name.to_vec();
   writer.resources.register_font(&resource_name, font_id);
   let baseline_y = device_coordinates
@@ -3038,7 +3207,7 @@ fn write_prepared_font_run_as_text(
     word_fixed_output,
     baseline_y,
   };
-  if kind == PreparedTextRunKind::TransparentSemanticOverlay {
+  if kind != PreparedTextRunKind::Ordinary {
     content.save_state();
     set_alpha(content, writer.resources, writer.refs, None, Some(0))?;
     // Word fixed output carries outlined DrawingML text in a separate,
@@ -3059,12 +3228,18 @@ fn write_prepared_font_run_as_text(
     resource_name: &resource_name,
     handle,
     rendering_mode: synthesis.rendering_mode(),
+    word_winansi_control,
   };
   let mut segment_start = 0usize;
   let mut consumed_advance_em = 0.0f32;
   let mut consumed_y_advance_em = 0.0f32;
   while segment_start < glyphs.len() {
-    let segment = next_glyph_segment(semantic_text, glyphs, segment_start);
+    let segment = next_glyph_segment(
+      semantic_text,
+      glyphs,
+      segment_start,
+      kind == PreparedTextRunKind::Ordinary,
+    );
     let actual_text = segment
       .actual_text_range
       .as_ref()
@@ -3098,7 +3273,7 @@ fn write_prepared_font_run_as_text(
     segment_start = segment.end;
   }
   synthesis.end(content);
-  if kind == PreparedTextRunKind::TransparentSemanticOverlay {
+  if kind != PreparedTextRunKind::Ordinary {
     content.restore_state();
   }
   Ok(())
@@ -3227,9 +3402,13 @@ fn write_prepared_glyph_outline_run(
     return Ok(());
   }
 
-  if let Some(shadow) = options.and_then(|options| options.vml_text_shadow)
-    && let Some(shadow_path) = path.vml_shadowed(shadow)
+  for shadow in options
+    .into_iter()
+    .flat_map(|options| options.vml_text_shadows())
   {
+    let Some(shadow_path) = path.vml_shadowed(shadow) else {
+      continue;
+    };
     write_glyph_outline_fill(
       content,
       GlyphOutlinePaintContext {
@@ -3791,9 +3970,9 @@ fn write_prepared_text_decoration(
     ));
   }
   if filled_underline {
-    // Word's preserved tabs and Excel's GDI cell strings export filled printer-
-    // grid underline bands beginning at the decoration coordinate. A centered
-    // PDF stroke covers a different device row with the same nominal width.
+    // Word lines (including preserved tabs) and Excel GDI cell strings export
+    // filled printer-grid bands beginning at the OpenType underline top. A
+    // centered PDF stroke covers a different row with the same nominal width.
     let width_pt = ooxmlsdk_layout::units::quantize_points_to_office_print_grid(line.width_pt).max(
       ooxmlsdk_layout::units::POINTS_PER_INCH / ooxmlsdk_layout::units::OFFICE_FIXED_OUTPUT_DPI,
     );
@@ -3891,53 +4070,110 @@ fn next_glyph_segment(
   source: &str,
   glyphs: &[super::paint::PaintGlyph],
   start: usize,
+  preserve_cluster_neighbors: bool,
 ) -> GlyphSegment {
   debug_assert!(start < glyphs.len());
-  if start + 1 < glyphs.len() && glyphs[start].text_range == glyphs[start + 1].text_range {
-    let mut end = start + 2;
-    while end < glyphs.len() && glyphs[end].text_range == glyphs[start].text_range {
-      end += 1;
-    }
-    return GlyphSegment {
-      end,
-      actual_text_range: Some(glyphs[start].text_range.clone()),
-    };
-  }
-
-  let mut end = start + 1;
+  let mut end = glyph_cluster_end(glyphs, start);
+  let mut has_multi_glyph_cluster = end > start + 1;
+  let mut replacement = has_multi_glyph_cluster;
+  let mut previous = start;
   let mut source_range = glyphs[start].text_range.clone();
   while end < glyphs.len() {
-    if end + 1 < glyphs.len() && glyphs[end].text_range == glyphs[end + 1].text_range {
+    let next_end = glyph_cluster_end(glyphs, end);
+    // Each multi-glyph cluster already has its own replacement owner. Extend
+    // that owner over an unprotected neighbor, but keep other replacement
+    // owners separate (including consecutive justified extender clusters).
+    if has_multi_glyph_cluster && next_end > end + 1 {
       break;
     }
-    if !adjacent_text_clusters_overlap(source, &glyphs[end - 1], &glyphs[end]) {
+    if !neighboring_glyph_clusters_need_replacement(
+      source,
+      glyphs,
+      previous..end,
+      end..next_end,
+      preserve_cluster_neighbors,
+    ) {
       break;
     }
     source_range.start = source_range.start.min(glyphs[end].text_range.start);
     source_range.end = source_range.end.max(glyphs[end].text_range.end);
-    end += 1;
+    has_multi_glyph_cluster |= next_end > end + 1;
+    previous = end;
+    end = next_end;
+    replacement = true;
   }
-  if end > start + 1 {
+  if replacement {
     return GlyphSegment {
       end,
       actual_text_range: Some(source_range),
     };
   }
 
-  let mut end = start + 1;
   while end < glyphs.len() {
-    if end + 1 < glyphs.len()
-      && (glyphs[end].text_range == glyphs[end + 1].text_range
-        || adjacent_text_clusters_overlap(source, &glyphs[end], &glyphs[end + 1]))
+    let next_end = glyph_cluster_end(glyphs, end);
+    if next_end > end + 1
+      || (next_end < glyphs.len()
+        && neighboring_glyph_clusters_need_replacement(
+          source,
+          glyphs,
+          end..next_end,
+          next_end..glyph_cluster_end(glyphs, next_end),
+          preserve_cluster_neighbors,
+        ))
     {
       break;
     }
-    end += 1;
+    end = next_end;
   }
   GlyphSegment {
     end,
     actual_text_range: None,
   }
+}
+
+fn glyph_cluster_end(glyphs: &[super::paint::PaintGlyph], start: usize) -> usize {
+  let mut end = start + 1;
+  while end < glyphs.len() && glyphs[end].text_range == glyphs[start].text_range {
+    end += 1;
+  }
+  end
+}
+
+fn neighboring_glyph_clusters_need_replacement(
+  source: &str,
+  glyphs: &[super::paint::PaintGlyph],
+  previous: std::ops::Range<usize>,
+  next: std::ops::Range<usize>,
+  preserve_cluster_neighbors: bool,
+) -> bool {
+  if adjacent_text_clusters_overlap(source, &glyphs[previous.end - 1], &glyphs[next.start]) {
+    return true;
+  }
+  if preserve_cluster_neighbors
+    && adjacent_narrow_repeated_glyphs(source, &glyphs[previous.end - 1], &glyphs[next.start])
+  {
+    return true;
+  }
+  if !preserve_cluster_neighbors || (previous.len() == 1 && next.len() == 1) {
+    return false;
+  }
+  let previous = &glyphs[previous.start].text_range;
+  let next = &glyphs[next.start].text_range;
+  if previous.end != next.start && next.end != previous.start {
+    return false;
+  }
+  let (Some(previous), Some(next)) = (source.get(previous.clone()), source.get(next.clone()))
+  else {
+    return false;
+  };
+  // The replacement bounds of a marked/decomposed cluster cover all of its
+  // glyphs. A reader can suppress a neighboring equal scalar against those
+  // bounds even when the cluster's base advance does not overlap it. Keep
+  // both contiguous source owners in one replacement span. Invisible search
+  // layers retain their separate, already established segmentation policy.
+  previous
+    .chars()
+    .any(|ch| !ch.is_whitespace() && !ch.is_control() && next.contains(ch))
 }
 
 fn adjacent_text_clusters_overlap(
@@ -3983,6 +4219,43 @@ fn adjacent_text_clusters_overlap(
     && (previous_chars.next().is_some() || next_chars.next().is_some())
 }
 
+fn adjacent_narrow_repeated_glyphs(
+  source: &str,
+  previous: &super::paint::PaintGlyph,
+  next: &super::paint::PaintGlyph,
+) -> bool {
+  if (previous.text_range.end != next.text_range.start
+    && next.text_range.end != previous.text_range.start)
+    || previous.glyph_id != next.glyph_id
+    || previous.x_advance <= 0.0
+    || next.x_advance <= 0.0
+    || previous.y_advance != 0.0
+    || next.y_advance != 0.0
+    || previous.y_offset != next.y_offset
+  {
+    return false;
+  }
+  let distance = previous.x_advance + next.x_offset - previous.x_offset;
+  // Poppler TextOutputDev's dupMaxPriDelta is 0.1 em: distinct authored
+  // narrow characters can otherwise be discarded as fake bold/overprint.
+  // PDF 1.7 §10.8.3 ActualText preserves their contiguous source owner while
+  // retaining every original glyph, mapping and paint coordinate.
+  if !(0.0..0.1).contains(&distance) {
+    return false;
+  }
+  let (Some(previous), Some(next)) = (
+    source.get(previous.text_range.clone()),
+    source.get(next.text_range.clone()),
+  ) else {
+    return false;
+  };
+  let mut chars = previous.chars();
+  let Some(ch) = chars.next() else {
+    return false;
+  };
+  chars.next().is_none() && !ch.is_whitespace() && !ch.is_control() && previous == next
+}
+
 fn begin_actual_text(content: &mut Content, text: &str) {
   let mut marked = content.begin_marked_content_with_properties(Name(b"Span"));
   let mut properties = marked.properties();
@@ -4003,6 +4276,7 @@ struct GlyphWriteContext<'a> {
   resource_name: &'a [u8],
   handle: super::direct_font::FontHandle,
   rendering_mode: TextRenderingMode,
+  word_winansi_control: Option<u8>,
 }
 
 struct PositionedGlyphSegment<'glyphs, 'text> {
@@ -4038,14 +4312,18 @@ fn write_positioned_glyph_segment(
         requires_actual_text_for_private_use,
         true,
       )?;
-      let registered = fonts.register_glyph(
-        context.handle,
-        glyph.glyph_id,
-        (index == 0
-          || glyph.text_range != glyphs[index - 1].text_range
-          || requires_codepoint_mappings)
-          .then_some(semantic.as_ref()),
-      )?;
+      let registered = if let Some(code) = context.word_winansi_control {
+        fonts.register_word_winansi_control(context.handle, code)?
+      } else {
+        fonts.register_glyph(
+          context.handle,
+          glyph.glyph_id,
+          (index == 0
+            || glyph.text_range != glyphs[index - 1].text_range
+            || requires_codepoint_mappings)
+            .then_some(semantic.as_ref()),
+        )?
+      };
       prepared.push(PreparedGlyph { glyph, registered });
     }
     begin_actual_text(content, &actual_text);
@@ -4068,7 +4346,11 @@ fn write_positioned_glyph_segment(
       requires_actual_text_for_private_use,
       private_use_actual_text,
     )?;
-    let registered = fonts.register_glyph(context.handle, glyph.glyph_id, Some(&semantic))?;
+    let registered = if let Some(code) = context.word_winansi_control {
+      fonts.register_word_winansi_control(context.handle, code)?
+    } else {
+      fonts.register_glyph(context.handle, glyph.glyph_id, Some(&semantic))?
+    };
     let prepared = PreparedGlyph { glyph, registered };
     if registered.semantic_conflict || private_use_actual_text {
       let advance = write_registered_glyph_segment(
@@ -4288,7 +4570,9 @@ fn write_horizontal_glyph_segment(
       ));
       adjustment_em = 0.0;
     }
-    encoded.push((registered.cid >> 8) as u8);
+    if context.word_winansi_control.is_none() {
+      encoded.push((registered.cid >> 8) as u8);
+    }
     encoded.push(registered.cid as u8);
     adjustment_em += glyph.x_advance * advance_scale
       - registered.natural_advance_pdf_units / PDF_TEXT_UNITS_PER_EM;
@@ -4377,7 +4661,10 @@ fn write_office_horizontal_glyph_segment(
   let mut adjustments = positioning.adjustments.into_iter().peekable();
   let mut total_advance = 0.0;
   for (index, glyph) in glyphs.iter().enumerate() {
-    encoded.extend_from_slice(&glyph.registered.cid.to_be_bytes());
+    if context.word_winansi_control.is_none() {
+      encoded.push((glyph.registered.cid >> 8) as u8);
+    }
+    encoded.push(glyph.registered.cid as u8);
     total_advance += glyph.glyph.x_advance;
     if let Some(&(boundary, amount)) = adjustments.peek()
       && boundary == index
@@ -5007,6 +5294,31 @@ fn write_prepared_polyline(
     return Ok(());
   }
   if let Some(stroke) = path.stroke
+    && stroke.alignment == Some(common::StrokeAlignment::Inside)
+  {
+    // PDF centers S on its path. A doubled pen clipped to the closed caster
+    // paints the authored inside width, including GDI PS_INSIDEFRAME art.
+    // Keep fill and stroke separate so translucent outlines composite once.
+    write_prepared_polyline_fill_only(content, path, writer)?;
+    content.save_state();
+    append_prepared_polyline(content, path);
+    content.clip_even_odd().end_path();
+    let mut centered = stroke.clone();
+    centered.alignment = None;
+    centered.width.0 *= 2.0;
+    set_alpha(
+      content,
+      writer.resources,
+      writer.refs,
+      Some(stroke.color.a),
+      None,
+    )?;
+    set_stroke(content, &centered);
+    append_prepared_polyline(content, path);
+    content.stroke().restore_state();
+    return Ok(());
+  }
+  if let Some(stroke) = path.stroke
     && let Some(outline) =
       common::drawingml_triangle_stroke_outline(path.commands, path.points, path.closed, stroke)
   {
@@ -5129,8 +5441,11 @@ fn write_prepared_polyline(
     _ => return unsupported("non-solid path fills"),
   };
   let stroke = path.stroke;
+  // Keep the rasterizer's fill-then-stroke order for translucent strokes.
+  // The combined PDF operator knocks out the underlying fill in the stroke
+  // region (ISO 32000-1, 11.7.4.4).
   match (fill, stroke) {
-    (Some(fill), Some(stroke)) if path.separate_fill_and_stroke => {
+    (Some(fill), Some(stroke)) if path.separate_fill_and_stroke || stroke.color.a < u8::MAX => {
       content.save_state();
       set_alpha(content, writer.resources, writer.refs, None, Some(fill.a))?;
       set_fill_color(content, fill);
@@ -5591,6 +5906,28 @@ fn write_path_item(
     return Ok(());
   }
   if let Some(stroke) = &path.stroke
+    && stroke.alignment == Some(common::StrokeAlignment::Inside)
+  {
+    write_path_fill_only(content, path, writer)?;
+    content.save_state();
+    append_path(content, path);
+    content.clip_even_odd().end_path();
+    let mut centered = stroke.clone();
+    centered.alignment = None;
+    centered.width.0 *= 2.0;
+    set_alpha(
+      content,
+      writer.resources,
+      writer.refs,
+      Some(stroke.color.a),
+      None,
+    )?;
+    set_stroke(content, &centered);
+    append_path(content, path);
+    content.stroke().restore_state();
+    return Ok(());
+  }
+  if let Some(stroke) = &path.stroke
     && stroke_is_compound(stroke)
   {
     write_path_fill_only(content, path, writer)?;
@@ -5694,10 +6031,10 @@ fn write_path_item(
   let stroke = path.stroke.as_ref();
 
   match (fill, stroke) {
-    (Some(fill), Some(stroke)) if writer.engine_kind == common::LayoutEngineKind::Pptx => {
-      // The PowerPoint reference path submits fill and outline independently;
-      // a PDF paint operator consumes its current path, so construct it once
-      // for `f*` and once for `S`.
+    (Some(fill), Some(stroke))
+      if writer.engine_kind == common::LayoutEngineKind::Pptx || stroke.color.a < u8::MAX =>
+    {
+      // Rebuild the path for S after f* so the stroke composites over the fill.
       content.save_state();
       set_alpha(content, writer.resources, writer.refs, None, Some(fill.a))?;
       set_fill_color(content, fill);
@@ -6110,11 +6447,7 @@ fn paint_items_require_actual_text(
 ) -> bool {
   items.iter().any(|item| match item {
     super::paint::PaintItem::Text(text) => {
-      let glyph_semantic_text = super::paint::pdf_semantic_text(
-        &text.item.text,
-        text.item.style.small_caps,
-        text.item.style.pdf_font_family(),
-      );
+      let glyph_semantic_text = super::paint::prepared_pdf_semantic_text(text);
       for portion in &text.portions {
         if matches!(portion.kind, super::paint::PaintTextPortionKind::Tab) {
           continue;
@@ -6137,6 +6470,7 @@ fn paint_items_require_actual_text(
           if run_glyphs.windows(2).any(|pair| {
             pair[0].text_range == pair[1].text_range
               || adjacent_text_clusters_overlap(run_semantic_text, &pair[0], &pair[1])
+              || adjacent_narrow_repeated_glyphs(run_semantic_text, &pair[0], &pair[1])
           }) {
             return true;
           }
@@ -7183,6 +7517,66 @@ mod tests {
         }
       }
     }
+  }
+
+  #[test]
+  fn direct_writer_clips_inside_path_outline_and_restores_following_paint() {
+    let mut document = blank_document(&[(100.0, 100.0)]);
+    let point = |x, y| common::Point { x: Pt(x), y: Pt(y) };
+    let path = common::PathItem {
+      bounds: common::Rect {
+        origin: point(10.0, 10.0),
+        size: Size {
+          width: Pt(20.0),
+          height: Pt(20.0),
+        },
+      },
+      commands: vec![
+        common::PathCommand::MoveTo(point(10.0, 10.0)),
+        common::PathCommand::LineTo(point(30.0, 10.0)),
+        common::PathCommand::LineTo(point(10.0, 30.0)),
+        common::PathCommand::Close,
+      ],
+      closed: true,
+      fill: common::Fill::Solid(color(255, 0, 0, 255)),
+      stroke: Some(common::Stroke {
+        width: Pt(2.0),
+        color: color(0, 0, 255, 128),
+        alignment: Some(common::StrokeAlignment::Inside),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    document.pages[0]
+      .items
+      .push(common::DisplayItem::Path(path.clone()));
+    document.pages[0]
+      .items
+      .push(common::DisplayItem::Rect(common::RectItem {
+        bounds: common::Rect {
+          origin: point(50.0, 50.0),
+          size: Size {
+            width: Pt(10.0),
+            height: Pt(10.0),
+          },
+        },
+        fill: common::Fill::Solid(color(0, 255, 0, 255)),
+        stroke: None,
+      }));
+    let options = uncompressed_options();
+    let bytes = render(&document, &options).unwrap();
+    assert_eq!(
+      render_with_diagnostics(&document, &options).unwrap().pdf,
+      bytes
+    );
+    let pdf = String::from_utf8_lossy(&bytes);
+    let fill = pdf.find("1 0 0 rg").unwrap();
+    let clip = pdf.find("W*").unwrap();
+    let pen = pdf[clip..].find("4 w").unwrap() + clip;
+    let following = pdf.find("50 50 10 10 re").unwrap();
+    assert!(fill < clip && clip < pen && pen < following);
+    assert!(pdf[pen..following].contains("Q"));
+    assert!(ensure_path_stroke_supported(path.stroke.as_ref().unwrap(), false).is_err());
   }
 
   #[test]
@@ -8254,6 +8648,7 @@ mod tests {
           subpaths,
           color: [0, 0, 255],
           width: [0.1, 0.05],
+          line_cap: ooxmlsdk_layout::render::emf_wmf::MetafileVectorLineCap::Square,
           closed: false,
           clip: Some([0.25, 0.0, 0.75, 1.0]),
         },
@@ -10038,16 +10433,16 @@ mod tests {
       glyph(5..6),
     ];
 
-    let first = next_glyph_segment("abcdef", &glyphs, 0);
+    let first = next_glyph_segment("abcdef", &glyphs, 0, true);
     assert_eq!(first.end, 1);
     assert_eq!(first.actual_text_range, None);
-    let second = next_glyph_segment("abcdef", &glyphs, first.end);
+    let second = next_glyph_segment("abcdef", &glyphs, first.end, true);
     assert_eq!(second.end, 3);
     assert_eq!(second.actual_text_range, Some(1..4));
-    let third = next_glyph_segment("abcdef", &glyphs, second.end);
+    let third = next_glyph_segment("abcdef", &glyphs, second.end, true);
     assert_eq!(third.end, 4);
     assert_eq!(third.actual_text_range, None);
-    let fourth = next_glyph_segment("abcdef", &glyphs, third.end);
+    let fourth = next_glyph_segment("abcdef", &glyphs, third.end, true);
     assert_eq!(fourth.end, glyphs.len());
     assert_eq!(fourth.actual_text_range, Some(5..6));
 
@@ -10058,6 +10453,124 @@ mod tests {
     assert_eq!(content.matches("/ActualText").count(), 1);
     assert!(content.starts_with("/Span<</ActualText(ffi)>>BDC"));
     assert!(content.ends_with("EMC"));
+  }
+
+  #[test]
+  fn direct_writer_preserves_a_marked_cluster_and_its_equal_scalar_neighbor() {
+    let glyph = |text_range, x_advance, x_offset, y_offset| super::super::paint::PaintGlyph {
+      glyph_id: 1,
+      text_range,
+      x_advance,
+      x_offset,
+      y_offset,
+      y_advance: 0.0,
+      bounds_em: None,
+    };
+    // A marked lam-alef owns two glyphs; its neighbor's alef is a distinct
+    // source scalar. Replacement bounds must not make readers deduplicate it.
+    let marked = [glyph(2..8, 0.0, 0.265, 0.145), glyph(2..8, 0.542, 0.0, 0.0)];
+    let alef = glyph(0..2, 0.206, 0.0, 0.0);
+    for glyphs in [
+      vec![marked[0].clone(), marked[1].clone(), alef.clone()],
+      vec![alef, marked[0].clone(), marked[1].clone()],
+    ] {
+      let segment = next_glyph_segment("الّا", &glyphs, 0, true);
+      assert_eq!(segment.end, 3);
+      assert_eq!(segment.actual_text_range, Some(0..8));
+    }
+    let glyphs = [
+      marked[0].clone(),
+      marked[1].clone(),
+      glyph(0..2, 0.206, 0.0, 0.0),
+    ];
+    let invisible = next_glyph_segment("الّا", &glyphs, 0, false);
+    assert_eq!(invisible.end, 2);
+    assert_eq!(invisible.actual_text_range, Some(2..8));
+    let unrelated = next_glyph_segment("بلّا", &glyphs, 0, true);
+    assert_eq!(unrelated.end, 2);
+    assert_eq!(unrelated.actual_text_range, Some(2..8));
+  }
+
+  #[test]
+  fn direct_writer_keeps_each_multi_glyph_replacement_owner_separate() {
+    let glyph = |text_range| super::super::paint::PaintGlyph {
+      glyph_id: 1,
+      text_range,
+      x_advance: 1.0,
+      x_offset: 0.0,
+      y_offset: 0.0,
+      y_advance: 0.0,
+      bounds_em: None,
+    };
+    // Equal source scalars can each own a base plus inserted extenders. Both
+    // clusters already have ActualText; neither is an unprotected neighbor.
+    for ranges in [[0..2, 2..4], [2..4, 0..2]] {
+      let glyphs = [
+        glyph(ranges[0].clone()),
+        glyph(ranges[0].clone()),
+        glyph(ranges[1].clone()),
+        glyph(ranges[1].clone()),
+      ];
+      let first = next_glyph_segment("یی", &glyphs, 0, true);
+      assert_eq!(first.end, 2);
+      assert_eq!(first.actual_text_range, Some(ranges[0].clone()));
+      let second = next_glyph_segment("یی", &glyphs, first.end, true);
+      assert_eq!(second.end, 4);
+      assert_eq!(second.actual_text_range, Some(ranges[1].clone()));
+    }
+
+    // A singleton between two replacement clusters may join one owner, but
+    // must not bridge both owners into one span.
+    let glyphs = [
+      glyph(0..2),
+      glyph(0..2),
+      glyph(2..4),
+      glyph(4..6),
+      glyph(4..6),
+    ];
+    let first = next_glyph_segment("ییی", &glyphs, 0, true);
+    assert_eq!(first.end, 3);
+    assert_eq!(first.actual_text_range, Some(0..4));
+    let second = next_glyph_segment("ییی", &glyphs, first.end, true);
+    assert_eq!(second.end, glyphs.len());
+    assert_eq!(second.actual_text_range, Some(4..6));
+  }
+
+  #[test]
+  fn direct_writer_preserves_narrow_repeated_source_clusters() {
+    let source = "ـ".repeat(16);
+    for advance in [0.046, 0.099, 0.1, 0.2] {
+      for reversed in [false, true] {
+        let mut glyphs = (0..16)
+          .map(|i| super::super::paint::PaintGlyph {
+            glyph_id: 1,
+            text_range: i * 2..(i + 1) * 2,
+            x_advance: advance,
+            x_offset: 0.0,
+            y_offset: 0.0,
+            y_advance: 0.0,
+            bounds_em: None,
+          })
+          .collect::<Vec<_>>();
+        if reversed {
+          glyphs.reverse();
+        }
+        let segment = next_glyph_segment(&source, &glyphs, 0, true);
+        assert_eq!(segment.end, 16);
+        assert_eq!(
+          segment.actual_text_range,
+          (advance < 0.1).then_some(0..source.len())
+        );
+        assert_eq!(
+          next_glyph_segment(&source, &glyphs, 0, false).actual_text_range,
+          None
+        );
+        glyphs[1].glyph_id = 2;
+        assert!(!super::adjacent_narrow_repeated_glyphs(
+          &source, &glyphs[0], &glyphs[1]
+        ));
+      }
+    }
   }
 
   #[test]
@@ -10077,29 +10590,29 @@ mod tests {
       glyph(2..4, -0.25),
       glyph(4..5, 0.0),
     ];
-    let first = next_glyph_segment("-ffix", &latin, 0);
+    let first = next_glyph_segment("-ffix", &latin, 0, true);
     assert_eq!(first.end, 1);
     assert_eq!(first.actual_text_range, None);
-    let overlap = next_glyph_segment("-ffix", &latin, first.end);
+    let overlap = next_glyph_segment("-ffix", &latin, first.end, true);
     assert_eq!(overlap.end, 3);
     assert_eq!(overlap.actual_text_range, Some(1..4));
-    let last = next_glyph_segment("-ffix", &latin, overlap.end);
+    let last = next_glyph_segment("-ffix", &latin, overlap.end, true);
     assert_eq!(last.end, 4);
     assert_eq!(last.actual_text_range, None);
 
     let arabic = [glyph(4..6, 0.0), glyph(0..4, -0.25)];
-    let overlap = next_glyph_segment("يري", &arabic, 0);
+    let overlap = next_glyph_segment("يري", &arabic, 0, true);
     assert_eq!(overlap.end, 2);
     assert_eq!(overlap.actual_text_range, Some(0..6));
 
     let chain = [glyph(0..1, 0.0), glyph(1..3, -0.25), glyph(3..6, -0.5)];
-    let overlap = next_glyph_segment("ffiffi", &chain, 0);
+    let overlap = next_glyph_segment("ffiffi", &chain, 0, true);
     assert_eq!(overlap.end, 3);
     assert_eq!(overlap.actual_text_range, Some(0..6));
 
     let separate = |source: &str, glyphs: &[super::super::paint::PaintGlyph]| {
       assert_eq!(
-        next_glyph_segment(source, glyphs, 0).actual_text_range,
+        next_glyph_segment(source, glyphs, 0, true).actual_text_range,
         None
       );
     };
@@ -10118,6 +10631,48 @@ mod tests {
     let mut vertical = arabic.clone();
     vertical[1].y_advance = 1.0;
     separate("يري", &vertical);
+  }
+
+  #[test]
+  fn literal_soft_hyphen_pdf_semantics_require_the_realized_minus_glyph_alias() {
+    for (family, source, expected) in [
+      ("Times New Roman", "\u{00ad}", "-"),
+      ("Arial", "\u{00ad}", "-"),
+      ("Symbol", "\u{f0ad}", "\u{f0ad}"),
+      ("Wingdings", "\u{f0ad}", "\u{f0ad}"),
+    ] {
+      let document = text_document(
+        source,
+        common::TextStyle {
+          font_family: Some(family.into()),
+          font_size: Pt(12.0),
+          wordprocessingml_font_slots: true,
+          wordprocessingml_literal_soft_hyphen: true,
+          color: color(0, 0, 0, u8::MAX),
+          ..Default::default()
+        },
+      );
+      let mut paint = super::super::paint::prepare_for_direct(&document, &uncompressed_options());
+      let super::super::paint::PaintItem::Text(text) = &mut paint.pages[0].items[0] else {
+        panic!("painted text")
+      };
+      assert_eq!(text.item.text, source);
+      assert_eq!(
+        super::super::paint::prepared_pdf_semantic_text(text),
+        expected
+      );
+      if source == "\u{00ad}" {
+        // A missing or changed glyph must not acquire hyphen semantics just
+        // because the source scalar and family happen to be familiar.
+        let glyph = &mut text.portions[0].glyphs.as_mut().unwrap()[0].glyphs[0];
+        assert_ne!(glyph.glyph_id, 0);
+        glyph.glyph_id = 0;
+        assert_eq!(
+          super::super::paint::prepared_pdf_semantic_text(text),
+          source
+        );
+      }
+    }
   }
 
   #[test]
@@ -10277,6 +10832,55 @@ mod tests {
     assert!(serialized.contains("MT-Extra"));
     assert!(!serialized.contains("/ca 0"));
     assert!(serialized.contains("/ActualText<FEFFF035>"));
+  }
+
+  #[test]
+  fn direct_writer_word_winansi_controls_keep_source_missing_glyph_advances() {
+    let mut document = text_document(
+      "A\u{81}B\u{8d}C",
+      common::TextStyle {
+        font_family: Some("Arial".into()),
+        font_size: Pt(12.0),
+        color: color(0, 0, 0, u8::MAX),
+        ..Default::default()
+      },
+    );
+    let common::DisplayItem::Text(text) = &mut document.pages[0].items[0] else {
+      unreachable!();
+    };
+    text.pdf_text_segmentation = common::PdfTextSegmentation::WordLine;
+    let mut options = uncompressed_options();
+    options.images.optimization_policy =
+      PdfImageOptimizationPolicy::MicrosoftOfficeFixedOutput(crate::PdfDocumentKind::Docx);
+    let paint = super::super::paint::prepare_for_direct(&document, &options);
+    let super::super::paint::PaintItem::Text(text) = &paint.pages[0].items[0] else {
+      unreachable!();
+    };
+    let missing = text
+      .portions
+      .iter()
+      .flat_map(|portion| portion.glyphs.as_ref().unwrap())
+      .flat_map(|run| &run.glyphs)
+      .filter(|glyph| glyph.glyph_id == 0)
+      .collect::<Vec<_>>();
+    assert_eq!(missing.len(), 2);
+    assert!(missing.iter().all(|g| (g.x_advance - 0.75).abs() < 0.001));
+    let selection = PageSelection::from_range(document.pages.len(), None).unwrap();
+    let conformance = DirectConformance::from_options(&options).unwrap();
+    let pdf =
+      write_page_document(&document, &options, &selection, Some(&paint), conformance).unwrap();
+    let serialized = String::from_utf8_lossy(&pdf);
+    assert!(serialized.contains("/Subtype/TrueType"));
+    assert!(serialized.contains("/Encoding/WinAnsiEncoding"));
+    assert!(serialized.contains("/Subtype/CIDFontType2"));
+    assert!(serialized.contains("/Widths[750 0 0 0 0 0 0 0 0 0 0 0 750]"));
+    assert!(!serialized.contains("/ActualText"));
+
+    let options = uncompressed_options();
+    let conformance = DirectConformance::from_options(&options).unwrap();
+    let pdf =
+      write_page_document(&document, &options, &selection, Some(&paint), conformance).unwrap();
+    assert!(!String::from_utf8_lossy(&pdf).contains("/WinAnsiEncoding"));
   }
 
   #[test]
@@ -10489,7 +11093,7 @@ mod tests {
 
   #[test]
   fn direct_writer_legacy_symbol_selectors_keep_unknown_private_use_rejected() {
-    for (family, source) in [("Wingdings", "\u{f0e8}"), ("Symbol", "\u{f0de}")] {
+    for (family, source) in [("Wingdings", "\u{f0e8}"), ("Symbol", "\u{f0ae}")] {
       let semantic = super::super::paint::symbol_font_semantic_text(source, Some(family));
       assert!(ensure_glyph_semantic_mapping_supported(&semantic, true, true, false).is_ok());
       for (family, source) in [("Calibri", source), (family, "\u{e225}")] {
@@ -10502,9 +11106,15 @@ mod tests {
         ));
       }
     }
+    // Office keeps Symbol DE private; level A still requires covering
+    // ActualText for that mapping, independently of its known glyph.
+    let private = super::super::paint::symbol_font_semantic_text("\u{f0de}", Some("Symbol"));
+    assert_eq!(private, "\u{f0de}");
+    assert!(ensure_glyph_semantic_mapping_supported(&private, true, true, false).is_err());
+    assert!(ensure_glyph_semantic_mapping_supported(&private, true, true, true).is_ok());
     let mixed =
       super::super::paint::symbol_font_semantic_text("\u{f0e8}\u{e225}", Some("Wingdings"));
-    assert_eq!(mixed, "\u{1f87a}\u{e225}");
+    assert_eq!(mixed, "\u{2794}\u{e225}");
     assert!(matches!(
       ensure_glyph_semantic_mapping_supported(&mixed, true, true, false),
       Err(PdfError::DirectWriterUnsupported {

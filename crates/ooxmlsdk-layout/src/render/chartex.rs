@@ -6,6 +6,7 @@
 //! semantic role.  [MS-ODRAWXML] 2.6.3.5 and 2.6.3.6 make all three
 //! distinctions observable.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::{PI, TAU};
 use std::io::Cursor;
@@ -29,7 +30,7 @@ use crate::pptx::drawingml::color::{
   system_color,
 };
 use crate::render::chart::{automatic_chart_title, automatic_series_title, format_chart_number};
-use crate::text_metrics::TextMetrics;
+use crate::text_metrics::{TextMetrics, TextVerticalMetrics};
 
 const DRAWINGML_PERCENT_MAX: i32 = 100_000;
 // Office's fixed-format output spaces linear ChartEx colors over a 42%
@@ -268,6 +269,23 @@ struct PlotRect {
   height: f32,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct ChartLabelVerticalInsets {
+  top_pt: f32,
+  bottom_pt: f32,
+}
+
+impl ChartLabelVerticalInsets {
+  fn override_with(&mut self, top: Option<i64>, bottom: Option<i64>) {
+    if let Some(top) = top {
+      self.top_pt = crate::units::emu_to_points(top);
+    }
+    if let Some(bottom) = bottom {
+      self.bottom_pt = crate::units::emu_to_points(bottom);
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 struct Appearance {
   host: ChartExHost,
@@ -284,14 +302,13 @@ struct Appearance {
   data_point_line_outline: Option<a::Outline>,
   series_line_color: RgbColor,
   series_line_width: f32,
-  axis_color: RgbColor,
-  axis_width: f32,
-  grid_color: RgbColor,
-  grid_width: f32,
+  axis_stroke: crate::common::Stroke<'static>,
+  grid_stroke: crate::common::Stroke<'static>,
   title_style: TextStyle,
   axis_title_style: TextStyle,
   label_style: TextStyle,
   data_label_style: TextStyle,
+  data_label_insets: ChartLabelVerticalInsets,
   palette: Vec<RgbColor>,
   color_method: Option<cs::ColorStyleMethodEnum>,
 }
@@ -464,6 +481,45 @@ pub(crate) fn lower_extended_chart(
     }
   });
   let legend = chart_space.chart.legend.as_deref();
+  let word_chart_text = (options.host == ChartExHost::Word
+    && series.first().is_some_and(|series| {
+      matches!(
+        series.layout,
+        cx::SeriesLayout::Waterfall | cx::SeriesLayout::BoxWhisker | cx::SeriesLayout::Sunburst
+      )
+    })
+    && chart_space
+      .chart
+      .chart_title
+      .as_deref()
+      .is_none_or(|title| {
+        title.pos.unwrap_or(cx::SidePos::T) == cx::SidePos::T
+          && !title.overlay.is_some_and(|overlay| overlay.as_bool())
+      })
+    && legend.is_none_or(|legend| {
+      legend.pos.unwrap_or(cx::SidePos::R) == cx::SidePos::T
+        && !legend.overlay.is_some_and(|overlay| overlay.as_bool())
+    }))
+  .then(|| {
+    let legend_name: Option<Cow<'_, str>> = legend.and_then(|_| series.first()).map(|first| {
+      if first.layout == cx::SeriesLayout::Waterfall {
+        Cow::Borrowed(crate::localization::office_waterfall_legend(options.ui_language)[0])
+      } else if first.automatic_name {
+        Cow::Owned(automatic_series_title(
+          options.ui_language,
+          first.source_index + 1,
+        ))
+      } else {
+        Cow::Borrowed(first.name.as_str())
+      }
+    });
+    word_chart_text_layout(
+      title.as_deref(),
+      legend_name.as_deref(),
+      &appearance.title_style,
+      &appearance.label_style,
+    )
+  });
   let has_category_axis_title =
     category_axis(chart_space).is_some_and(|axis| axis.axis_title.is_some());
   let (plot, title_slot, legend_slot) = chart_bands(
@@ -473,6 +529,7 @@ pub(crate) fn lower_extended_chart(
     options.host,
     appearance.label_style.font_size_pt,
     has_category_axis_title,
+    word_chart_text,
   );
   let has_funnel = series
     .iter()
@@ -513,6 +570,17 @@ pub(crate) fn lower_extended_chart(
         &mut items,
         frame.x_pt + (frame.width_pt - width) * 0.5,
         frame.y_pt + appearance.title_style.font_size_pt * title_top_em,
+        title_text.to_string(),
+        appearance.title_style.clone(),
+      );
+    } else if let Some(word) = word_chart_text {
+      let width = TextMetrics::new().measure_text(title_text, &appearance.title_style);
+      // The Word title is top-aligned in a font-owned physical line. Its
+      // Windows baseline is independent of the generic text item's origin.
+      push_text(
+        &mut items,
+        slot.x + (slot.width - width) * 0.5,
+        slot.y + 0.5 + word.title_origin_delta_pt,
         title_text.to_string(),
         appearance.title_style.clone(),
       );
@@ -650,8 +718,11 @@ pub(crate) fn lower_extended_chart(
         &legend_entries,
         &appearance,
         &legend_style,
-        has_funnel,
-        has_category_axis_title,
+        LegendPaintOptions {
+          compact_funnel: has_funnel,
+          has_category_axis_title,
+          word_chart_text,
+        },
       );
     }
   }
@@ -937,6 +1008,7 @@ fn chart_appearance(
   let mut axis_title_style = options.label_style.clone();
   let mut label_style = options.label_style.clone();
   let mut data_label_style = options.label_style.clone();
+  let mut data_label_insets = ChartLabelVerticalInsets::default();
   // Office's ChartEx fixed-format path emits ordinary Latin characters as
   // independent glyphs. In particular, Calibri `ti` in "Cumulative" is not
   // replaced by the font's optional ligature. HarfRust enables `liga`/`clig`
@@ -961,10 +1033,8 @@ fn chart_appearance(
   let mut data_point_line_outline = None;
   let mut series_line_color = rgb(217, 217, 217);
   let mut series_line_width = 0.75;
-  let mut axis_color = rgb(127, 127, 127);
-  let mut axis_width = 0.75;
-  let mut grid_color = rgb(217, 217, 217);
-  let mut grid_width = 0.75;
+  let mut axis_stroke = chart_path_stroke(rgb(127, 127, 127), 0.75, None);
+  let mut grid_stroke = chart_path_stroke(rgb(217, 217, 217), 0.75, None);
 
   if let Some(style) = chart_style {
     chart_gradient = style
@@ -1024,16 +1094,14 @@ fn chart_appearance(
       series_line_width = drawingml_outline_width(shape.outline.as_deref());
     }
     if let Some(shape) = style.category_axis.shape_properties.as_deref()
-      && let Some(color) = resolve_cs_outline_over(shape, options.theme, None, chart_fill)
+      && let Some(stroke) = resolve_cs_axis_stroke(shape, options.theme, None)
     {
-      axis_color = color;
-      axis_width = drawingml_outline_width(shape.outline.as_deref());
+      axis_stroke = stroke;
     }
     if let Some(shape) = style.gridline_major.shape_properties.as_deref()
-      && let Some(color) = resolve_cs_outline_over(shape, options.theme, None, chart_fill)
+      && let Some(stroke) = resolve_cs_axis_stroke(shape, options.theme, None)
     {
-      grid_color = color;
-      grid_width = drawingml_outline_width(shape.outline.as_deref());
+      grid_stroke = stroke;
     }
     apply_style_text(
       &mut title_style,
@@ -1059,6 +1127,12 @@ fn chart_appearance(
       &style.data_label.font_reference,
       options.theme,
     );
+    if let Some(body) = style.data_label.text_body_properties.as_deref() {
+      data_label_insets.override_with(
+        body.top_inset.map(i64::from),
+        body.bottom_inset.map(i64::from),
+      );
+    }
   }
 
   chart_fill = chart_space
@@ -1130,14 +1204,13 @@ fn chart_appearance(
     data_point_line_outline,
     series_line_color,
     series_line_width,
-    axis_color,
-    axis_width,
-    grid_color,
-    grid_width,
+    axis_stroke,
+    grid_stroke,
     title_style,
     axis_title_style,
     label_style,
     data_label_style,
+    data_label_insets,
     palette,
     color_method,
   }
@@ -1205,6 +1278,38 @@ fn apply_style_text(
   }
   if let Some(italic) = properties.italic {
     style.italic = italic.as_bool();
+  }
+  if let Some(spacing) = properties.spacing {
+    style.character_spacing_pt = spacing as f32 / 100.0;
+  }
+  if let Some(minimum) = crate::model::drawingml_kerning_minimum_size_pt(properties.kerning) {
+    style.kerning_minimum_size_pt = Some(minimum);
+  }
+  if let Some(typeface) = properties
+    .latin_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.is_empty() && !typeface.starts_with('+'))
+  {
+    let family: Arc<str> = Arc::from(typeface);
+    style.font_family = Some(Arc::clone(&family));
+    style.high_ansi_font_family = Some(family);
+  }
+  if let Some(typeface) = properties
+    .east_asian_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.is_empty() && !typeface.starts_with('+'))
+  {
+    style.east_asia_font_family = Some(Arc::from(typeface));
+  }
+  if let Some(typeface) = properties
+    .complex_script_font
+    .as_ref()
+    .and_then(|font| font.typeface.as_deref())
+    .filter(|typeface| !typeface.is_empty() && !typeface.starts_with('+'))
+  {
+    style.complex_font_family = Some(Arc::from(typeface));
   }
   let effects = match properties.text_character_properties_type_choice2.as_ref() {
     Some(cs::TextCharacterPropertiesTypeChoice2::EffectList(effects)) => {
@@ -1544,13 +1649,13 @@ fn drawingml_outline_width(outline: Option<&a::Outline>) -> f32 {
     .unwrap_or(0.75)
 }
 
-fn resolve_cs_outline_over(
+fn resolve_cs_axis_stroke(
   shape: &cs::ShapeProperties,
   theme: ChartExTheme,
   placeholder: Option<RgbColor>,
-  background: RgbColor,
-) -> Option<RgbColor> {
-  let fill = shape.outline.as_deref()?.outline_choice1.as_ref()?;
+) -> Option<crate::common::Stroke<'static>> {
+  let outline = shape.outline.as_deref()?;
+  let fill = outline.outline_choice1.as_ref()?;
   let a::OutlineChoice::SolidFill(fill) = fill else {
     return None;
   };
@@ -1565,11 +1670,13 @@ fn resolve_cs_outline_over(
   let mut resolver = |value| theme.drawing_color(value);
   let resolved = color.resolve_rgb(&mut resolver, placeholder.as_ref())?;
   let opacity = resolved.alpha.clamp(0, 100_000) as f32 / 100_000.0;
-  Some(rgb(
-    (f32::from(background.r) * (1.0 - opacity) + f32::from(resolved.r) * opacity).round() as u8,
-    (f32::from(background.g) * (1.0 - opacity) + f32::from(resolved.g) * opacity).round() as u8,
-    (f32::from(background.b) * (1.0 - opacity) + f32::from(resolved.b) * opacity).round() as u8,
-  ))
+  let color = rgb(resolved.r, resolved.g, resolved.b);
+  let mut stroke = chart_path_stroke(color, drawingml_outline_width(Some(outline)), Some(outline));
+  // Axes/gridlines can cross a gradient or painted points. Preserve the
+  // source alpha for PDF compositing rather than baking one background color
+  // into an opaque pen. Native Office quantizes this alpha to the same8bits.
+  stroke.color = common_rgb(color, opacity);
+  Some(stroke)
 }
 
 fn resolve_cx_outline(
@@ -1701,6 +1808,90 @@ fn shade(color: RgbColor, amount: f32) -> RgbColor {
   )
 }
 
+const WORD_CHART_EDGE_INSET_PT: f32 = 5.04;
+
+#[derive(Clone, Copy, Debug, Default)]
+struct WordChartTextLayout {
+  title_band_pt: f32,
+  title_origin_delta_pt: f32,
+  legend_band_pt: f32,
+  legend_cell_height_pt: f32,
+  legend_cell_baseline_pt: f32,
+  legend_text_baseline_pt: f32,
+}
+
+fn word_chart_font_cell_height(
+  metrics: TextVerticalMetrics,
+  font_size_pt: f32,
+  height_pt: f32,
+) -> f32 {
+  if !font_size_pt.is_finite() || font_size_pt <= 0.0 {
+    return height_pt;
+  }
+  // The legend's row cell contains the font ink and the nominal text line.
+  // Keep its outward font bounds separate from the physical glyph baseline
+  // and from the title's measured-text extent.
+  let percent = |value: f32| {
+    let (value, em) = if metrics.font_design_unit_pt > 0.0 {
+      // Recover integral design metrics before division: an exact percent
+      // must not round up again because its cached point value was f32.
+      (
+        f64::from((value / metrics.font_design_unit_pt).round()),
+        f64::from((font_size_pt / metrics.font_design_unit_pt).round()),
+      )
+    } else {
+      (f64::from(value), f64::from(font_size_pt))
+    };
+    (value * 100.0 / em).ceil() as f32
+  };
+  let ascent = metrics.ascent_pt.clamp(0.0, height_pt);
+  let descent = height_pt - ascent;
+  ((percent(ascent) + percent(descent)) * font_size_pt / 100.0).max(height_pt)
+}
+
+fn word_chart_text_layout(
+  title: Option<&str>,
+  legend: Option<&str>,
+  title_style: &TextStyle,
+  legend_style: &TextStyle,
+) -> WordChartTextLayout {
+  let mut metrics = TextMetrics::new();
+  let mut layout = WordChartTextLayout::default();
+  if let Some(title) = title {
+    let line = metrics.line_vertical_metrics_for_text(title, title_style);
+    // Native Word 216/252/288pt controls keep the title line fixed. The
+    // independent Malgun/Batang/Calibri8/14/20pt controls reserve the font's
+    // line cell plus3.6pt, including Word's existing CJK side leading.
+    // CHART's text-extent path expands both measured dimensions by1%.
+    // Native before/after observations and independent8..24pt title
+    // advances retain this height owner separately from legend font cells.
+    layout.title_band_pt = line.line_height_pt() * 1.01 + 3.6;
+    layout.title_origin_delta_pt = line.baseline_offset_pt
+      - metrics.baseline_offset_in_line_for_text(
+        title,
+        title_style,
+        title_style.font_size_pt * 1.2,
+      );
+  }
+  if let Some(legend) = legend {
+    let cell = metrics.vertical_metrics_for_text(legend, legend_style);
+    // The legend centers a nominal text row large enough for the font ink,
+    // independently of the Word paragraph line used by its text item.
+    // Native Korean/English opposites distinguish it from CJK title leading.
+    layout.legend_cell_height_pt =
+      word_chart_font_cell_height(cell, legend_style.font_size_pt, cell.ink_height_pt())
+        .max(legend_style.font_size_pt * 1.2);
+    layout.legend_cell_baseline_pt = cell.baseline_offset_pt;
+    layout.legend_band_pt = layout.legend_cell_height_pt + legend_style.font_size_pt * 2.0;
+    layout.legend_text_baseline_pt = metrics.baseline_offset_in_line_for_text(
+      legend,
+      legend_style,
+      legend_style.font_size_pt * 1.2,
+    );
+  }
+  layout
+}
+
 fn chart_bands(
   frame: ChartFrame,
   title: Option<&cx::ChartTitle>,
@@ -1708,12 +1899,13 @@ fn chart_bands(
   host: ChartExHost,
   label_font_size_pt: f32,
   has_category_axis_title: bool,
+  word_chart_text: Option<WordChartTextLayout>,
 ) -> (PlotRect, Option<PlotRect>, Option<PlotRect>) {
   // Word's ChartEx frame keeps a physical 5.04pt edge inset as chart height
   // changes. Native 216/252/288pt box-whisker controls keep the title and
   // top grid at the same page position while the bottom grid follows height.
   let edge_inset = if host == ChartExHost::Word {
-    5.04
+    WORD_CHART_EDGE_INSET_PT
   } else {
     frame.height_pt * 0.02
   };
@@ -1740,32 +1932,35 @@ fn chart_bands(
   if let Some(title) = title {
     let overlay = title.overlay.is_some_and(|value| value.as_bool());
     let side = title.pos.unwrap_or(cx::SidePos::T);
-    let mut thickness =
-      if host == ChartExHost::Word && side == cx::SidePos::T && !chart_title_text(title).is_empty()
-      {
-        // The authored Word ChartEx title owns a 19.2pt band independent of
-        // chart height; its text baseline is fixed in the same three controls.
-        19.2
-      } else if matches!(side, cx::SidePos::T | cx::SidePos::B) {
-        frame.height_pt
-          * if automatic_title_with_top_legend && side == cx::SidePos::T {
-            0.125
-          } else if excel_top_title_with_top_legend && side == cx::SidePos::T {
-            0.112
-          } else if host == ChartExHost::PowerPoint
-            && side == cx::SidePos::T
-            && chart_title_text(title).is_empty()
-          {
-            // PowerPoint's empty ChartEx title reserves a compact one-line UI
-            // resource band. The Office 2016 waterfall, box-whisker, and
-            // sunburst decks all retain 95% of the inset plot height below it.
-            0.05
-          } else {
-            0.09
-          }
-      } else {
-        frame.width_pt * 0.14
-      };
+    let mut thickness = if let Some(word) = word_chart_text {
+      word.title_band_pt
+    } else if host == ChartExHost::Word
+      && side == cx::SidePos::T
+      && !chart_title_text(title).is_empty()
+    {
+      // The authored Word ChartEx title owns a 19.2pt band independent of
+      // chart height; its text baseline is fixed in the same three controls.
+      19.2
+    } else if matches!(side, cx::SidePos::T | cx::SidePos::B) {
+      frame.height_pt
+        * if automatic_title_with_top_legend && side == cx::SidePos::T {
+          0.125
+        } else if excel_top_title_with_top_legend && side == cx::SidePos::T {
+          0.112
+        } else if host == ChartExHost::PowerPoint
+          && side == cx::SidePos::T
+          && chart_title_text(title).is_empty()
+        {
+          // PowerPoint's empty ChartEx title reserves a compact one-line UI
+          // resource band. The Office 2016 waterfall, box-whisker, and
+          // sunburst decks all retain 95% of the inset plot height below it.
+          0.05
+        } else {
+          0.09
+        }
+    } else {
+      frame.width_pt * 0.14
+    };
     if matches!(side, cx::SidePos::T | cx::SidePos::B) {
       // An authored title outline participates in Office's automatic title
       // box.  The stroke is centered on the shape boundary, so half of its
@@ -1785,7 +1980,9 @@ fn chart_bands(
   if let Some(legend) = legend {
     let overlay = legend.overlay.is_some_and(|value| value.as_bool());
     let side = legend.pos.unwrap_or(cx::SidePos::R);
-    let thickness = if matches!(side, cx::SidePos::T | cx::SidePos::B) {
+    let thickness = if let Some(word) = word_chart_text {
+      word.legend_band_pt
+    } else if matches!(side, cx::SidePos::T | cx::SidePos::B) {
       frame.height_pt
         * if automatic_title_with_top_legend && side == cx::SidePos::T {
           0.14
@@ -1931,15 +2128,26 @@ fn reserve_side(plot: &mut PlotRect, side: cx::SidePos, thickness: f32, overlay:
   }
 }
 
+#[derive(Clone, Copy)]
+struct LegendPaintOptions {
+  compact_funnel: bool,
+  has_category_axis_title: bool,
+  word_chart_text: Option<WordChartTextLayout>,
+}
+
 fn lower_legend(
   items: &mut Vec<PageItem>,
   slot: PlotRect,
   entries: &[(String, RgbColor)],
   appearance: &Appearance,
   style: &TextStyle,
-  compact_funnel: bool,
-  has_category_axis_title: bool,
+  options: LegendPaintOptions,
 ) {
+  let LegendPaintOptions {
+    compact_funnel,
+    has_category_axis_title,
+    word_chart_text,
+  } = options;
   if entries.is_empty() {
     return;
   }
@@ -1968,9 +2176,13 @@ fn lower_legend(
     } else {
       0.8
     };
+  // The shaped captions own entry advances. Character-category estimates
+  // lose both proportional Latin widths and accented/CJK font selection.
+  // Reuse one measurement owner for the complete legend row.
+  let mut metrics = TextMetrics::new();
   let content_widths = entries
     .iter()
-    .map(|(name, _)| marker_width + marker_to_text + text_width(name, style))
+    .map(|(name, _)| marker_width + marker_to_text + metrics.measure_text(name, style))
     .collect::<Vec<_>>();
   let total_horizontal_width =
     content_widths.iter().sum::<f32>() + entry_spacing * entries.len().saturating_sub(1) as f32;
@@ -2013,28 +2225,41 @@ fn lower_legend(
     } else {
       (slot.x, slot.y + step * index as f32)
     };
-    push_data_point_rect(
-      items,
-      PlotRect {
-        x,
-        y: y
-          + style.font_size_pt
-            * if compact_funnel || powerpoint_compact {
-              0.235
-            } else {
-              0.18
-            },
-        width: marker_width,
-        height: marker_width,
-      },
-      *color,
-      appearance,
-      None,
-      None,
-    );
+    let marker_y = y
+      + style.font_size_pt
+        * if compact_funnel || powerpoint_compact {
+          0.235
+        } else {
+          0.18
+        };
+    let (y, marker_y) = if horizontal && let Some(word) = word_chart_text {
+      // Word's legend row starts at the preceding title band, outside the
+      // plot's edge inset. Center its marker and font cell together; convert
+      // the resulting Windows baseline to the existing text-item origin.
+      let marker_y = slot.y - WORD_CHART_EDGE_INSET_PT + slot.height * 0.5;
+      let baseline =
+        marker_y + (marker_width - word.legend_cell_height_pt) * 0.5 + word.legend_cell_baseline_pt;
+      (baseline - word.legend_text_baseline_pt, marker_y)
+    } else {
+      (y, marker_y)
+    };
+    let marker_bounds = PlotRect {
+      x,
+      y: marker_y,
+      width: marker_width,
+      height: marker_width,
+    };
+    let marker_bounds = if horizontal && word_chart_text.is_some() {
+      // Native Word uses the same fixed-output point rectangle for the
+      // legend clip, gradient and effect source as for its chart points.
+      snap_office_chart_rect(marker_bounds)
+    } else {
+      marker_bounds
+    };
+    push_data_point_rect(items, marker_bounds, *color, appearance, None, None);
     let text_x = x + marker_width + marker_to_text;
     if let Some((prefix, ordinal)) = split_automatic_legend_name(name) {
-      let prefix_width = TextMetrics::new().measure_text(prefix, style);
+      let prefix_width = metrics.measure_text(prefix, style);
       push_text(items, text_x, y, prefix.to_string(), style.clone());
       push_text(
         items,
@@ -2211,6 +2436,7 @@ fn cartesian_plot(
       appearance,
       top_inset: None,
       use_excel_minimum_gutter: true,
+      word_waterfall_axis_title_bands: None,
     },
   )
 }
@@ -2235,8 +2461,33 @@ fn cartesian_plot_without_excel_label_floor(
       appearance,
       top_inset: None,
       use_excel_minimum_gutter: false,
+      word_waterfall_axis_title_bands: None,
     },
   )
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct WordWaterfallAxisTitleBands {
+  value_pt: f32,
+  category_pt: f32,
+}
+
+fn word_waterfall_axis_title_band(
+  metrics: &mut TextMetrics,
+  title: Option<&str>,
+  style: &TextStyle,
+) -> f32 {
+  let Some(title) = title.filter(|title| !title.is_empty()) else {
+    return 0.0;
+  };
+  // Independent Word title-presence, size and face controls reserve the
+  // measured line extent plus the fixed axis-text separation. The chart's
+  // height and width do not scale either reservation.
+  metrics
+    .line_vertical_metrics_for_text(title, style)
+    .line_height_pt()
+    * 1.01
+    + 6.5
 }
 
 struct CartesianPlotOptions<'a> {
@@ -2248,6 +2499,7 @@ struct CartesianPlotOptions<'a> {
   appearance: &'a Appearance,
   top_inset: Option<f32>,
   use_excel_minimum_gutter: bool,
+  word_waterfall_axis_title_bands: Option<WordWaterfallAxisTitleBands>,
 }
 
 fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'_>) -> PlotRect {
@@ -2260,6 +2512,7 @@ fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'
     appearance,
     top_inset,
     use_excel_minimum_gutter,
+    word_waterfall_axis_title_bands,
   } = options;
   let style = &appearance.label_style;
   let mut widest_label = widest_value_axis_label(scale, axis, style);
@@ -2272,7 +2525,9 @@ fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'
   // Office's automatic ChartEx plot frame is expressed on its 0.05pt
   // fixed-layout grid. Keeping these insets on the same grid avoids moving
   // otherwise identical bar and gridline edges to the adjacent PDF pixel.
-  let bottom = if has_category_title {
+  let bottom = if let Some(word) = word_waterfall_axis_title_bands {
+    17.95 + word.category_pt
+  } else if has_category_title {
     38.05
   } else if appearance.host == ChartExHost::Excel {
     19.5
@@ -2309,8 +2564,11 @@ fn cartesian_plot_with_top_inset(plot: PlotRect, options: CartesianPlotOptions<'
   } else {
     0.0
   };
-  let left =
-    12.05 + widest_label + if has_value_title { 20.15 } else { 0.0 } + wrapped_value_title_gutter;
+  let title_gutter = word_waterfall_axis_title_bands.map_or_else(
+    || if has_value_title { 20.15 } else { 0.0 },
+    |word| word.value_pt,
+  );
+  let left = 12.05 + widest_label + title_gutter + wrapped_value_title_gutter;
   PlotRect {
     x: plot.x + left,
     y: plot.y + top,
@@ -2681,14 +2939,11 @@ fn lower_axes(
       let mut guard = 0;
       while value <= scale.maximum + scale.major * 0.001 && guard < 100 {
         let y = scale.y(data_plot, value);
-        push_line(
+        push_chart_axis_line(
           items,
-          data_plot.x,
-          y,
-          data_plot.x + data_plot.width,
-          y,
-          appearance.grid_color,
-          appearance.grid_width,
+          (data_plot.x, y),
+          (data_plot.x + data_plot.width, y),
+          &appearance.grid_stroke,
         );
         value += scale.major;
         guard += 1;
@@ -2703,14 +2958,11 @@ fn lower_axes(
   };
 
   if !value_hidden {
-    push_line(
+    push_chart_axis_line(
       items,
-      data_plot.x,
-      data_plot.y,
-      data_plot.x,
-      data_plot.y + data_plot.height,
-      appearance.axis_color,
-      appearance.axis_width,
+      (data_plot.x, data_plot.y),
+      (data_plot.x, data_plot.y + data_plot.height),
+      &appearance.axis_stroke,
     );
     let show_ticks = value_axis.is_none_or(|axis| axis.tick_labels.is_some());
     let format = value_axis
@@ -2781,6 +3033,7 @@ fn lower_axes(
             width,
             line,
             style.clone(),
+            0.0,
           );
         }
       } else {
@@ -2794,20 +3047,18 @@ fn lower_axes(
           width,
           title,
           style,
+          0.0,
         );
       }
     }
   }
 
   if !category_hidden {
-    push_line(
+    push_chart_axis_line(
       items,
-      data_plot.x,
-      category_y,
-      data_plot.x + data_plot.width,
-      category_y,
-      appearance.axis_color,
-      appearance.axis_width,
+      (data_plot.x, category_y),
+      (data_plot.x + data_plot.width, category_y),
+      &appearance.axis_stroke,
     );
     if category_axis.is_none_or(|axis| axis.tick_labels.is_some()) && !categories.is_empty() {
       let slot = data_plot.width / categories.len() as f32;
@@ -2827,7 +3078,7 @@ fn lower_axes(
     }
     if let Some(title) = axis_title(category_axis_title, ui_language) {
       let (offset_x, offset_y) = axis_title_offset_points(category_axis_title);
-      push_centered_text(
+      push_centered_measured_text(
         items,
         PlotRect {
           x: data_plot.x + offset_x,
@@ -2856,6 +3107,26 @@ struct WaterfallBar {
   end: f64,
   value: f64,
   subtotal: bool,
+}
+
+#[derive(Clone, Copy)]
+struct WaterfallPointPaint {
+  bounds: PlotRect,
+  color: RgbColor,
+  role: WaterfallColorRole,
+}
+
+fn waterfall_paint_run_end(points: &[Option<WaterfallPointPaint>], start: usize) -> usize {
+  let Some(first) = points[start] else {
+    return start + 1;
+  };
+  let mut end = start + 1;
+  while points.get(end).is_some_and(|point| {
+    point.is_some_and(|point| point.role == first.role && point.color == first.color)
+  }) {
+    end += 1;
+  }
+  end
 }
 
 fn waterfall_bars(series: &SeriesModel<'_>) -> Vec<Option<WaterfallBar>> {
@@ -2948,15 +3219,56 @@ fn lower_waterfall_chart(
       scale.maximum += major;
     }
   }
-  let data_plot = cartesian_plot_without_excel_label_floor(
-    plot,
-    value_title,
-    category_title,
-    has_out_end_labels(series),
-    scale,
-    value_axis(chart_space),
-    appearance,
-  );
+  let data_plot = if appearance.host == ChartExHost::Word {
+    // Native presence/face/size opposites separate the two title bands from
+    // the physical6pt upper clearance. Resolve each title's actual text so
+    // its Latin and East Asian font cells follow the same styles as paint.
+    let mut metrics = TextMetrics::new();
+    let value_text = axis_title(
+      value_axis(chart_space).and_then(|axis| axis.axis_title.as_deref()),
+      ui_language,
+    );
+    let category_text = axis_title(
+      category_axis(chart_space).and_then(|axis| axis.axis_title.as_deref()),
+      ui_language,
+    );
+    let bands = WordWaterfallAxisTitleBands {
+      value_pt: word_waterfall_axis_title_band(
+        &mut metrics,
+        value_text.as_deref(),
+        &appearance.axis_title_style,
+      ),
+      category_pt: word_waterfall_axis_title_band(
+        &mut metrics,
+        category_text.as_deref(),
+        &appearance.axis_title_style,
+      ),
+    };
+    cartesian_plot_with_top_inset(
+      plot,
+      CartesianPlotOptions {
+        has_value_title: value_title,
+        has_category_title: category_title,
+        has_out_end_labels: has_out_end_labels(series),
+        scale,
+        axis: value_axis(chart_space),
+        appearance,
+        top_inset: Some(6.0),
+        use_excel_minimum_gutter: false,
+        word_waterfall_axis_title_bands: Some(bands),
+      },
+    )
+  } else {
+    cartesian_plot_without_excel_label_floor(
+      plot,
+      value_title,
+      category_title,
+      has_out_end_labels(series),
+      scale,
+      value_axis(chart_space),
+      appearance,
+    )
+  };
   lower_axes(
     items,
     data_plot,
@@ -3021,6 +3333,47 @@ fn lower_waterfall_chart(
     .and_then(|properties| properties.series_element_visibilities.as_ref())
     .and_then(|visibility| visibility.connector_lines)
     .is_none_or(|value| value.as_bool());
+  let grouped_paint =
+    appearance.data_point_gradient.is_some() || appearance.data_point_effects.is_some();
+  let point_paints = grouped_paint.then(|| {
+    bars
+      .iter()
+      .enumerate()
+      .map(|(index, bar)| {
+        let bar = bar.as_ref()?;
+        let (x, width) = point_bounds(index);
+        let start = scale.y(data_plot, bar.start);
+        let end = scale.y(data_plot, bar.end);
+        let role = if bar.subtotal {
+          WaterfallColorRole::Total
+        } else if bar.value < 0.0 {
+          WaterfallColorRole::Decrease
+        } else {
+          WaterfallColorRole::Increase
+        };
+        let color = series_color_override(
+          series,
+          index,
+          appearance,
+          waterfall_role_color(appearance, role),
+        );
+        Some(WaterfallPointPaint {
+          bounds: PlotRect {
+            x,
+            y: start.min(end),
+            width,
+            height: (end - start).abs().max(0.75),
+          },
+          color,
+          role,
+        })
+      })
+      .collect::<Vec<_>>()
+  });
+  let mut painted_until = 0;
+  let mut word_label_metrics = (appearance.host == ChartExHost::Word
+    && series.source.data_labels.is_some())
+  .then(TextMetrics::new);
   for (index, bar) in bars.iter().enumerate() {
     let Some(bar) = bar else {
       continue;
@@ -3028,31 +3381,50 @@ fn lower_waterfall_chart(
     let (x, point_width) = point_bounds(index);
     let y1 = scale.y(data_plot, bar.start);
     let y2 = scale.y(data_plot, bar.end);
-    let role = if bar.subtotal {
-      WaterfallColorRole::Total
-    } else if bar.value < 0.0 {
-      WaterfallColorRole::Decrease
+    let color = point_paints
+      .as_ref()
+      .and_then(|points| points[index].map(|point| point.color))
+      .unwrap_or_else(|| {
+        let role = if bar.subtotal {
+          WaterfallColorRole::Total
+        } else if bar.value < 0.0 {
+          WaterfallColorRole::Decrease
+        } else {
+          WaterfallColorRole::Increase
+        };
+        series_color_override(
+          series,
+          index,
+          appearance,
+          waterfall_role_color(appearance, role),
+        )
+      });
+    if let Some(points) = point_paints.as_deref() {
+      if index >= painted_until {
+        let end = waterfall_paint_run_end(points, index);
+        let bounds = points[index..end]
+          .iter()
+          .flatten()
+          .map(|point| point.bounds)
+          .collect::<Vec<_>>();
+        push_data_point_group(items, &bounds, color, appearance, Some(effect_clip));
+        painted_until = end;
+      }
     } else {
-      WaterfallColorRole::Increase
-    };
-    let color = waterfall_role_color(appearance, role);
-    let color = series_color_override(series, index, appearance, color);
-    push_data_point_rect(
-      items,
-      PlotRect {
-        x,
-        y: y1.min(y2),
-        width: point_width,
-        height: (y2 - y1).abs().max(0.75),
-      },
-      color,
-      appearance,
-      Some(effect_clip),
-      // The shared point helper resolves an authored ChartStyle `dataPoint`
-      // outline. Of16-05 carries only `gradFill`/`effectLst` and remains
-      // fill-only, while style 395 uses a same-color 0.75pt outline.
-      None,
-    );
+      push_data_point_rect(
+        items,
+        PlotRect {
+          x,
+          y: y1.min(y2),
+          width: point_width,
+          height: (y2 - y1).abs().max(0.75),
+        },
+        color,
+        appearance,
+        Some(effect_clip),
+        None,
+      );
+    }
     if connectors && index + 1 < bars.len() && bars[index + 1].is_some() {
       let y = scale.y(data_plot, bar.end);
       let (next_x, _) = point_bounds(index + 1);
@@ -3108,6 +3480,24 @@ fn lower_waterfall_chart(
           // Office leaves a 0.35pt optical overshoot below the axis edge.
           label_y = label_y
             .min(data_plot.y + data_plot.height - appearance.data_label_style.font_size_pt - 0.35);
+        }
+      }
+      if let Some(metrics) = word_label_metrics.as_mut() {
+        let placement = WaterfallLabelPlacement {
+          bounds: PlotRect {
+            x,
+            y: y1.min(y2),
+            width: point_width,
+            height: (y2 - y1).abs(),
+          },
+          increasing: bar.end >= bar.start,
+          position,
+          insets: data_label_vertical_insets(series, index, appearance.data_label_insets),
+        };
+        if let Some(origin) =
+          word_waterfall_label_origin(metrics, &label, &appearance.data_label_style, placement)
+        {
+          label_y = origin;
         }
       }
       push_centered_text(
@@ -3168,7 +3558,7 @@ fn wrap_chart_axis_title(text: &str, maximum_width: f32, style: &TextStyle) -> V
   }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WaterfallColorRole {
   Increase,
   Decrease,
@@ -3349,6 +3739,80 @@ fn data_label_text(series: &SeriesModel<'_>, index: usize, value: f64) -> Option
   (!parts.is_empty()).then(|| parts.join(separator))
 }
 
+fn data_label_vertical_insets(
+  series: &SeriesModel<'_>,
+  index: usize,
+  style_insets: ChartLabelVerticalInsets,
+) -> ChartLabelVerticalInsets {
+  let body = series.source.data_labels.as_deref().and_then(|labels| {
+    labels
+      .data_label
+      .iter()
+      .find(|label| label.idx as usize == index)
+      .and_then(|label| label.tx_pr_text_body.as_deref())
+      .or(labels.tx_pr_text_body.as_deref())
+  });
+  let Some(body) = body else {
+    return style_insets;
+  };
+  // An explicit txPr supplies a complete bodyPr. Native series/point
+  // opposites reset omitted insets to zero rather than merging each field
+  // with the ChartStyle or the series text body.
+  let mut insets = ChartLabelVerticalInsets::default();
+  insets.override_with(
+    body.body_properties.top_inset.map(|value| value.to_emu()),
+    body
+      .body_properties
+      .bottom_inset
+      .map(|value| value.to_emu()),
+  );
+  insets
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WaterfallLabelPlacement {
+  bounds: PlotRect,
+  increasing: bool,
+  position: cx::DataLabelPos,
+  insets: ChartLabelVerticalInsets,
+}
+
+fn word_waterfall_label_origin(
+  metrics: &mut TextMetrics,
+  text: &str,
+  style: &TextStyle,
+  placement: WaterfallLabelPlacement,
+) -> Option<f32> {
+  let WaterfallLabelPlacement {
+    bounds,
+    increasing,
+    position,
+    insets,
+  } = placement;
+  let cell = metrics.vertical_metrics_for_text(text, style);
+  let height = cell.windows_line_height_pt();
+  // Word's ChartEx labels anchor the full Windows font cell to the point,
+  // then apply cs:bodyPr/cx:txPr insets. The font size is not that cell's
+  // height. Native6/9/12pt controls and independent top/bottom inset changes
+  // distinguish both owners; missing ChartStyle insets contribute zero.
+  let top = match position {
+    cx::DataLabelPos::InEnd if increasing => bounds.y + insets.top_pt,
+    cx::DataLabelPos::InEnd => bounds.y + bounds.height - insets.bottom_pt - height,
+    cx::DataLabelPos::InBase if increasing => bounds.y + bounds.height - insets.bottom_pt - height,
+    cx::DataLabelPos::InBase => bounds.y + insets.top_pt,
+    cx::DataLabelPos::OutEnd if increasing => bounds.y - insets.bottom_pt - height,
+    cx::DataLabelPos::OutEnd => bounds.y + bounds.height + insets.top_pt,
+    cx::DataLabelPos::Ctr => {
+      bounds.y + (bounds.height - height + insets.top_pt - insets.bottom_pt) * 0.5
+    }
+    _ => return None,
+  };
+  Some(
+    top + cell.baseline_offset_pt
+      - metrics.baseline_offset_in_line_for_text(text, style, style.font_size_pt * 1.2),
+  )
+}
+
 fn data_label_position(series: &SeriesModel<'_>, index: usize) -> cx::DataLabelPos {
   let Some(labels) = series.source.data_labels.as_deref() else {
     return cx::DataLabelPos::BestFit;
@@ -3503,14 +3967,11 @@ fn lower_funnel(
   }
 
   if !axis_hidden && axis.is_some() {
-    push_line(
+    push_chart_axis_line(
       items,
-      data_plot.x,
-      data_plot.y,
-      data_plot.x,
-      data_plot.y + data_plot.height,
-      appearance.axis_color,
-      appearance.axis_width,
+      (data_plot.x, data_plot.y),
+      (data_plot.x, data_plot.y + data_plot.height),
+      &appearance.axis_stroke,
     );
     if let Some(tick_marks) = axis.and_then(|axis| axis.major_tick_marks_tick_marks.as_deref()) {
       let tick_type = tick_marks.r#type.unwrap_or_default();
@@ -3523,14 +3984,11 @@ fn lower_funnel(
         };
         for boundary in 0..=count {
           let y = data_plot.y + category_slot * boundary as f32;
-          push_line(
+          push_chart_axis_line(
             items,
-            data_plot.x - outside,
-            y,
-            data_plot.x + inside,
-            y,
-            appearance.axis_color,
-            appearance.axis_width,
+            (data_plot.x - outside, y),
+            (data_plot.x + inside, y),
+            &appearance.axis_stroke,
           );
         }
       }
@@ -3796,9 +4254,11 @@ fn lower_box_whisker_chart(
     // Excel keeps the lower category edge fixed but reserves one additional
     // half-line above the ten-increment box-whisker scale. boxWhisker.xlsx
     // exposes this as a 124.3pt 0..10 grid instead of the generic 129.6pt
-    // Cartesian grid. Word remains the counterexample and keeps the generic
-    // statistical inset.
+    // Cartesian grid.
     ChartExHost::Excel => 11.40,
+    // Word title/legend-free and216/252/288pt controls isolate the same
+    // physical6pt top clearance as waterfall, independently of the fonts.
+    ChartExHost::Word if !value_title && !category_title => 6.0,
     ChartExHost::Word => 7.5,
   };
   let data_plot = cartesian_plot_with_top_inset(
@@ -3812,6 +4272,7 @@ fn lower_box_whisker_chart(
       appearance,
       top_inset: Some(top_inset),
       use_excel_minimum_gutter: false,
+      word_waterfall_axis_title_bands: None,
     },
   );
   lower_axes(
@@ -3974,14 +4435,24 @@ fn lower_box_whisker_chart(
           .collect::<Vec<_>>();
         inner.dedup_by(|left, right| *left == *right);
         for value in inner {
-          push_marker(items, x, scale.y(data_plot, value), 1.5, color);
+          push_box_whisker_marker(
+            items,
+            (x, scale.y(data_plot, value)),
+            color,
+            chart_path_stroke(outline, outline_width, outline_source),
+          );
         }
       }
       if show_outliers {
         let mut outliers = summary.outliers.clone();
         outliers.dedup_by(|left, right| *left == *right);
         for value in outliers {
-          push_marker(items, x, scale.y(data_plot, value), 1.5, color);
+          push_box_whisker_marker(
+            items,
+            (x, scale.y(data_plot, value)),
+            color,
+            chart_path_stroke(outline, outline_width, outline_source),
+          );
         }
       }
       lower_box_whisker_data_labels(
@@ -4036,14 +4507,7 @@ fn push_box_whisker_line(
 ) {
   let (x1, y1) = start;
   let (x2, y2) = end;
-  let mut stroke = crate::common::Stroke {
-    width: crate::common::Pt(width),
-    color: common_rgb(color, 1.0),
-    ..Default::default()
-  };
-  if let Some(outline) = outline {
-    crate::common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
-  }
+  let stroke = chart_path_stroke(color, width, outline);
   items.push(PageItem::Path(crate::common::PathItem {
     bounds: common_rect(x1.min(x2), y1.min(y2), (x2 - x1).abs(), (y2 - y1).abs()),
     points: Vec::new(),
@@ -4053,6 +4517,89 @@ fn push_box_whisker_line(
     ],
     closed: false,
     fill: crate::common::Fill::None,
+    stroke: Some(stroke),
+  }));
+}
+
+fn chart_path_stroke(
+  color: RgbColor,
+  width: f32,
+  outline: Option<&a::Outline>,
+) -> crate::common::Stroke<'static> {
+  let mut stroke = crate::common::Stroke {
+    width: crate::common::Pt(width),
+    color: common_rgb(color, 1.0),
+    ..Default::default()
+  };
+  if let Some(outline) = outline {
+    crate::common::drawingml_stroke::apply_outline_style(&mut stroke, outline);
+  }
+  stroke
+}
+
+fn push_chart_axis_line(
+  items: &mut Vec<PageItem>,
+  start: (f32, f32),
+  end: (f32, f32),
+  stroke: &crate::common::Stroke<'static>,
+) {
+  if stroke.color.a == 0 {
+    return;
+  }
+  if stroke.color.a == 255 {
+    // Keep the ordinary opaque-axis path allocation-free.
+    push_line(
+      items,
+      start.0,
+      start.1,
+      end.0,
+      end.1,
+      rgb(stroke.color.r, stroke.color.g, stroke.color.b),
+      stroke.width.0,
+    );
+    return;
+  }
+  items.push(PageItem::Path(crate::common::PathItem {
+    bounds: common_rect(
+      start.0.min(end.0),
+      start.1.min(end.1),
+      (end.0 - start.0).abs(),
+      (end.1 - start.1).abs(),
+    ),
+    points: Vec::new(),
+    commands: vec![
+      crate::common::PathCommand::MoveTo(common_point(start.0, start.1)),
+      crate::common::PathCommand::LineTo(common_point(end.0, end.1)),
+    ],
+    closed: false,
+    fill: crate::common::Fill::None,
+    stroke: Some(stroke.clone()),
+  }));
+}
+
+fn push_box_whisker_marker(
+  items: &mut Vec<PageItem>,
+  center: (f32, f32),
+  fill: RgbColor,
+  stroke: crate::common::Stroke<'static>,
+) {
+  // Native inner/outlier points share a 3pt circular path and the resolved
+  // statistical outline. A filled polygon loses both the curved edge and
+  // its darker stroke, even though the series outline was already parsed.
+  let radius = 1.5;
+  let mut commands = Vec::with_capacity(6);
+  commands.push(crate::common::PathCommand::MoveTo(common_point(
+    center.0 + radius,
+    center.1,
+  )));
+  push_circular_arc_commands(&mut commands, center, radius, 0.0, TAU);
+  commands.push(crate::common::PathCommand::Close);
+  items.push(PageItem::Path(crate::common::PathItem {
+    bounds: common_rect(center.0 - radius, center.1 - radius, 3.0, 3.0),
+    points: Vec::new(),
+    commands,
+    closed: true,
+    fill: crate::common::Fill::Solid(common_rgb(fill, 1.0)),
     stroke: Some(stroke),
   }));
 }
@@ -4814,6 +5361,13 @@ fn lower_sunburst(
   // hierarchy level an equal-width ring.
   let ring_width = radius / (rings + 1) as f32;
   let show_labels = hierarchy_category_labels(series);
+  let mut context = SunburstRenderContext {
+    center,
+    ring_width,
+    show_labels,
+    appearance,
+    metrics: TextMetrics::new(),
+  };
   let total = root.value.max(f64::EPSILON);
   let mut angle = -PI * 0.5;
   let mut top_nodes = root.children.iter().enumerate().collect::<Vec<_>>();
@@ -4827,35 +5381,36 @@ fn lower_sunburst(
   for (palette_index, node) in top_nodes {
     let sweep = TAU * (node.value / total) as f32;
     let color = appearance.point_color(palette_index, root.children.len());
-    lower_sunburst_node(
-      items,
-      node,
-      center,
-      0,
-      ring_width,
-      angle,
-      angle + sweep,
-      color,
-      show_labels,
-      appearance,
-    );
+    lower_sunburst_node(items, node, 0, angle, angle + sweep, color, &mut context);
     angle += sweep;
   }
 }
 
-#[allow(clippy::too_many_arguments)]
+struct SunburstRenderContext<'a> {
+  center: (f32, f32),
+  ring_width: f32,
+  show_labels: bool,
+  appearance: &'a Appearance,
+  metrics: TextMetrics,
+}
+
 fn lower_sunburst_node(
   items: &mut Vec<PageItem>,
   node: &HierarchyNode,
-  center: (f32, f32),
   depth: usize,
-  ring_width: f32,
   start: f32,
   end: f32,
   base: RgbColor,
-  show_labels: bool,
-  appearance: &Appearance,
+  context: &mut SunburstRenderContext<'_>,
 ) {
+  let SunburstRenderContext {
+    center,
+    ring_width,
+    show_labels,
+    appearance,
+    metrics,
+  } = context;
+  let (center, ring_width) = (*center, *ring_width);
   let inner = ring_width * (depth + 1) as f32;
   // A point with a blank lower category remains in its own ring. Office
   // leaves the deeper rings empty rather than stretching that point outward.
@@ -4872,7 +5427,7 @@ fn lower_sunburst_node(
       .data_point_stroke(base)
       .unwrap_or((appearance.chart_fill, 0.75)),
   );
-  if show_labels {
+  if *show_labels {
     let middle = (start + end) * 0.5;
     let label_radius = (inner + outer) * 0.5;
     let arc = (end - start).abs() * label_radius;
@@ -4880,9 +5435,46 @@ fn lower_sunburst_node(
     // while the arc owns only the glyph height. Testing those dimensions in
     // the opposite order drops Office's narrow Leaf 2/6/12/13/16 sectors.
     let mut style = appearance.data_label_style.clone();
-    let width = TextMetrics::new().measure_text(&node.name, &style);
+    let width = metrics.measure_text(&node.name, &style);
     let line_height = style.font_size_pt * 1.2;
-    if arc >= line_height + 3.0 && width <= (ring_width - 6.0).max(0.0) {
+    let radial_width = (ring_width - 6.0).max(0.0);
+    let lines = if appearance.host == ChartExHost::Word && radial_width > 0.0 {
+      let spans = [crate::text_layout::StyledTextSpan {
+        range: 0..node.name.len(),
+        style: &style,
+      }];
+      crate::text_layout::break_text_lines_with_overflow(
+        &node.name,
+        &spans,
+        Some(radial_width),
+        parley::OverflowWrap::BreakWord,
+        metrics,
+      )
+      .map(|ranges| {
+        ranges
+          .into_iter()
+          .map(|range| node.name[range].trim())
+          .collect::<Vec<_>>()
+      })
+      .unwrap_or_else(|| vec![node.name.as_str()])
+    } else {
+      vec![node.name.as_str()]
+    };
+    let word_cell = (appearance.host == ChartExHost::Word)
+      .then(|| metrics.vertical_metrics_for_text(&node.name, &style));
+    let physical_line_height = word_cell.map_or(line_height, |cell| cell.windows_line_height_pt());
+    // The narrow side of a radial text frame is the sector's inner edge.
+    // Using only its middle arc admits wrapped labels across adjacent wedges.
+    let available_height = if word_cell.is_some() {
+      (end - start).abs() * inner
+    } else {
+      arc
+    };
+    if available_height >= physical_line_height * lines.len() as f32 + 3.0
+      && lines
+        .iter()
+        .all(|line| metrics.measure_text(line, &style) <= radial_width)
+    {
       let x = center.0 + middle.cos() * label_radius;
       let y = center.1 + middle.sin() * label_radius;
       // Office's fixed-format writer emits rotated sunburst labels as glyph
@@ -4895,7 +5487,29 @@ fn lower_sunburst_node(
       } else {
         degrees
       };
-      push_centered_rotated_text(items, (x, y), width, node.name.clone(), style);
+      let rotation = style.rotation_deg.to_radians();
+      let count = lines.len() as f32;
+      for (index, line) in lines.into_iter().enumerate() {
+        let offset = (index as f32 - (count - 1.0) * 0.5) * physical_line_height;
+        let center = (x - rotation.sin() * offset, y + rotation.cos() * offset);
+        let origin_delta = word_cell.map_or(0.0, |cell| {
+          (line_height - physical_line_height) * 0.5 + cell.baseline_offset_pt
+            - metrics.baseline_offset_in_line_for_text(line, &style, line_height)
+        });
+        let width = if count == 1.0 {
+          width
+        } else {
+          metrics.measure_text(line, &style)
+        };
+        push_centered_rotated_text(
+          items,
+          center,
+          width,
+          line.to_string(),
+          style.clone(),
+          origin_delta,
+        );
+      }
     }
   }
   if node.children.is_empty() {
@@ -4919,14 +5533,11 @@ fn lower_sunburst_node(
     lower_sunburst_node(
       items,
       child,
-      center,
       depth + 1,
-      ring_width,
       child_start,
       child_start + sweep,
       base,
-      show_labels,
-      appearance,
+      context,
     );
     child_start += sweep;
   }
@@ -5153,14 +5764,14 @@ fn lower_pareto_percentage_axis(
   if axis.hidden.is_some_and(|hidden| hidden.as_bool()) {
     return;
   }
-  push_line(
+  push_chart_axis_line(
     items,
-    data_plot.x + data_plot.width,
-    data_plot.y,
-    data_plot.x + data_plot.width,
-    data_plot.y + data_plot.height,
-    appearance.axis_color,
-    appearance.axis_width,
+    (data_plot.x + data_plot.width, data_plot.y),
+    (
+      data_plot.x + data_plot.width,
+      data_plot.y + data_plot.height,
+    ),
+    &appearance.axis_stroke,
   );
   if axis.tick_labels.is_none() {
     return;
@@ -5268,11 +5879,21 @@ fn lower_region_map(
     })
     .unwrap_or_default();
 
-  items.push(rect_item(
-    plot,
-    Some(tint(appearance.theme.light2, 0.45)),
-    Some((appearance.axis_color, 0.55)),
-  ));
+  let mut border = appearance.axis_stroke.clone();
+  border.width = crate::common::Pt(0.55);
+  items.push(PageItem::Path(crate::common::PathItem {
+    bounds: common_rect(plot.x, plot.y, plot.width, plot.height),
+    points: vec![
+      common_point(plot.x, plot.y),
+      common_point(plot.x + plot.width, plot.y),
+      common_point(plot.x + plot.width, plot.y + plot.height),
+      common_point(plot.x, plot.y + plot.height),
+    ],
+    commands: Vec::new(),
+    closed: true,
+    fill: crate::common::Fill::Solid(common_rgb(tint(appearance.theme.light2, 0.45), 1.0)),
+    stroke: Some(border),
+  }));
   let values = series.values.iter().copied().flatten().collect::<Vec<_>>();
   let minimum = values.iter().copied().fold(f64::INFINITY, f64::min);
   let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
@@ -5913,11 +6534,108 @@ fn push_data_point_rect(
   );
 }
 
+fn data_point_group_bounds(points: &[PlotRect]) -> Option<PlotRect> {
+  let first = *points.first()?;
+  if points.len() == 1 {
+    return Some(first);
+  }
+  let (mut left, mut top, mut right, mut bottom) = (
+    first.x,
+    first.y,
+    first.x + first.width,
+    first.y + first.height,
+  );
+  for point in &points[1..] {
+    left = left.min(point.x);
+    top = top.min(point.y);
+    right = right.max(point.x + point.width);
+    bottom = bottom.max(point.y + point.height);
+  }
+  Some(PlotRect {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  })
+}
+
+fn push_data_point_group(
+  items: &mut Vec<PageItem>,
+  points: &[PlotRect],
+  color: RgbColor,
+  appearance: &Appearance,
+  effect_clip: Option<PlotRect>,
+) {
+  if let [point] = points {
+    push_data_point_rect(items, *point, color, appearance, effect_clip, None);
+    return;
+  }
+  let Some(bounds) = data_point_group_bounds(points) else {
+    return;
+  };
+  // Native consecutive same-role points form one compound path: its union
+  // owns both the gradient definition and the shadow's raster coordinate grid.
+  if let Some(source) = appearance.data_point_effects.as_ref()
+    && let Some(effects) = resolve_chart_effects(source, appearance.theme, Some(color))
+    && let Some(backdrop) =
+      crate::common::drawingml_image_effects::unchanged_foreground_backdrop(&effects)
+    && let Some(image) = data_point_effect_backdrop_group(points, backdrop, effect_clip)
+  {
+    items.push(PageItem::Image(image));
+  }
+  let fill = appearance
+    .data_point_gradient
+    .as_ref()
+    .and_then(|gradient| {
+      resolved_common_gradient(
+        gradient,
+        appearance.theme,
+        Some(color),
+        bounds,
+        crate::common::GradientInterpolation::LinearSrgb,
+      )
+    })
+    .map(crate::common::Fill::Gradient)
+    .unwrap_or_else(|| crate::common::Fill::Solid(common_rgb(color, 1.0)));
+  let mut commands = Vec::with_capacity(points.len() * 5);
+  for point in points {
+    commands.extend([
+      crate::common::PathCommand::MoveTo(common_point(point.x, point.y)),
+      crate::common::PathCommand::LineTo(common_point(point.x + point.width, point.y)),
+      crate::common::PathCommand::LineTo(common_point(
+        point.x + point.width,
+        point.y + point.height,
+      )),
+      crate::common::PathCommand::LineTo(common_point(point.x, point.y + point.height)),
+      crate::common::PathCommand::Close,
+    ]);
+  }
+  items.push(PageItem::Path(crate::common::PathItem {
+    bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
+    points: Vec::new(),
+    commands,
+    closed: true,
+    fill,
+    stroke: appearance
+      .data_point_stroke(color)
+      .map(|(color, width)| chart_path_stroke(color, width, None)),
+  }));
+}
+
 fn data_point_effect_backdrop(
   bounds: PlotRect,
+  effects: crate::common::drawingml_image_effects::ImageEffectContainer,
+  clip: Option<PlotRect>,
+) -> Option<ImageItem> {
+  data_point_effect_backdrop_group(std::slice::from_ref(&bounds), effects, clip)
+}
+
+fn data_point_effect_backdrop_group(
+  points: &[PlotRect],
   mut effects: crate::common::drawingml_image_effects::ImageEffectContainer,
   clip: Option<PlotRect>,
 ) -> Option<ImageItem> {
+  let bounds = data_point_group_bounds(points)?;
   let output = crate::common::drawingml_image_effects::container_output_bounds(
     &effects,
     bounds.width,
@@ -5949,23 +6667,28 @@ fn data_point_effect_backdrop(
   if raster_bounds.size.width.0 <= f32::EPSILON || raster_bounds.size.height.0 <= f32::EPSILON {
     return None;
   }
-  let source = crate::common::DisplayItem::Rect(crate::common::RectItem {
-    bounds: common_rect(bounds.x, bounds.y, bounds.width, bounds.height),
-    fill: crate::common::Fill::Solid(crate::common::Color {
-      r: 255,
-      g: 255,
-      b: 255,
-      a: 255,
-    }),
-    stroke: None,
-  });
+  let sources = points
+    .iter()
+    .map(|point| {
+      crate::common::DisplayItem::Rect(crate::common::RectItem {
+        bounds: common_rect(point.x, point.y, point.width, point.height),
+        fill: crate::common::Fill::Solid(crate::common::Color {
+          r: 255,
+          g: 255,
+          b: 255,
+          a: 255,
+        }),
+        stroke: None,
+      })
+    })
+    .collect::<Vec<_>>();
   crate::common::drawingml_image_effects::scale_outer_shadow_filter_radius(
     &mut effects,
     OFFICE_CHART_OUTER_SHADOW_FILTER_SCALE,
   );
   let mut raster =
     crate::common::drawingml_shape_raster::rasterize_vector_items_for_effects_at_pixels_per_point(
-      std::slice::from_ref(&source),
+      &sources,
       raster_bounds,
       &effects,
       OFFICE_CHART_EFFECT_PIXELS_PER_POINT,
@@ -6216,6 +6939,7 @@ fn push_centered_rotated_text(
   width: f32,
   text: String,
   style: TextStyle,
+  origin_delta_pt: f32,
 ) {
   if text.is_empty() {
     return;
@@ -6223,7 +6947,7 @@ fn push_centered_rotated_text(
   let line_height = style.font_size_pt * 1.2;
   items.push(PageItem::Text(TextItem {
     x_pt: center.0 - width * 0.5,
-    y_pt: center.1 - line_height * 0.5,
+    y_pt: center.1 - line_height * 0.5 + origin_delta_pt,
     line_height_pt: line_height,
     drawingml_text_effect_anchor: None,
     paint_clip: None,
@@ -6352,7 +7076,1110 @@ fn push_text_if_fits(
 
 #[cfg(test)]
 mod tests {
+  use ooxmlsdk::sdk::SdkType;
+
   use super::*;
+
+  fn word_chart_style(family: &str, size: f32) -> TextStyle {
+    TextStyle {
+      font_family: Some(Arc::from(family)),
+      east_asia_font_family: Some(Arc::from(family)),
+      font_size_pt: size,
+      wordprocessingml_font_slots: true,
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn word_waterfall_labels_anchor_native_font_cells_and_authored_insets() {
+    use cx::DataLabelPos::{Ctr, InBase, InEnd, OutEnd};
+    let mut metrics = TextMetrics::new();
+    // Independent native top/bottom inset and6/9/12pt controls. Each pair
+    // gives the printed baseline of the positive100 and negative40 point.
+    for (size, top, bottom, position, native) in [
+      (9.0, 1.5, 1.5, InEnd, [224.26, 184.03]),
+      (9.0, 0.0, 1.5, InEnd, [222.74, 184.06]),
+      (9.0, 4.5, 1.5, InEnd, [227.26, 184.03]),
+      (9.0, 1.5, 0.0, InEnd, [224.23, 185.54]),
+      (9.0, 1.5, 4.5, InEnd, [224.26, 181.03]),
+      (9.0, 3.0, 3.0, InEnd, [225.77, 182.52]),
+      (12.0, 1.5, 1.5, InEnd, [227.14, 183.24]),
+      (6.0, 1.5, 1.5, InEnd, [221.47, 184.97]),
+      (12.0, 0.0, 0.0, InEnd, [225.62, 184.75]),
+      (6.0, 0.0, 0.0, InEnd, [219.96, 186.48]),
+      (9.0, 0.0, 0.0, InBase, [298.56, 161.88]),
+      (9.0, 3.0, 3.0, InBase, [295.51, 164.93]),
+      (9.0, 0.0, 0.0, OutEnd, [211.63, 196.66]),
+      (9.0, 3.0, 3.0, OutEnd, [208.61, 199.68]),
+      (9.0, 0.0, 0.0, Ctr, [260.64, 173.71]),
+      (9.0, 3.0, 3.0, Ctr, [260.64, 173.71]),
+    ] {
+      let style = word_chart_style("Calibri", size);
+      for (increasing, y, height, text, expected) in [
+        (true, 214.14, 86.88, "100", native[0]),
+        (false, 153.30, 34.80, "-40", native[1]),
+      ] {
+        let origin = word_waterfall_label_origin(
+          &mut metrics,
+          text,
+          &style,
+          WaterfallLabelPlacement {
+            bounds: PlotRect {
+              x: 100.0,
+              y,
+              width: 40.0,
+              height,
+            },
+            increasing,
+            position,
+            insets: ChartLabelVerticalInsets {
+              top_pt: top,
+              bottom_pt: bottom,
+            },
+          },
+        )
+        .unwrap();
+        let baseline = origin + metrics.baseline_offset_in_line_for_text(text, &style, size * 1.2);
+        assert!(
+          (baseline - expected).abs() < 0.18,
+          "{size}/{top}/{bottom}/{position:?}/{increasing}: {baseline} vs {expected}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn chart_label_vertical_insets_select_the_nearest_complete_text_body() {
+    use ooxmlsdk::simple_type::Coordinate32Value::Emu;
+    let body = |top_inset, bottom_inset| {
+      Box::new(cx::TxPrTextBody {
+        body_properties: Box::new(a::BodyProperties {
+          top_inset,
+          bottom_inset,
+          ..Default::default()
+        }),
+        ..Default::default()
+      })
+    };
+    let source = cx::Series {
+      data_labels: Some(Box::new(cx::DataLabels {
+        tx_pr_text_body: Some(body(Some(Emu(38_100)), None)),
+        data_label: vec![cx::DataLabel {
+          idx: 2,
+          tx_pr_text_body: Some(body(None, Some(Emu(57_150)))),
+          ..Default::default()
+        }],
+        ..Default::default()
+      })),
+      ..Default::default()
+    };
+    let series = series_model(&source, 0, None, None);
+    let mut insets = ChartLabelVerticalInsets::default();
+    assert_eq!(insets.top_pt, 0.0);
+    assert_eq!(insets.bottom_pt, 0.0);
+    insets.override_with(Some(19_050), Some(19_050));
+    assert_eq!(
+      data_label_vertical_insets(&series, 0, insets),
+      ChartLabelVerticalInsets {
+        top_pt: 3.0,
+        bottom_pt: 0.0,
+      },
+    );
+    assert_eq!(
+      data_label_vertical_insets(&series, 2, insets),
+      ChartLabelVerticalInsets {
+        top_pt: 0.0,
+        bottom_pt: 4.5,
+      },
+    );
+  }
+
+  #[test]
+  fn word_waterfall_title_band_follows_native_font_cells_at_each_chart_height() {
+    let title = cx::ChartTitle::default();
+    let label_style = word_chart_style("Calibri", 9.0);
+    // Native Word font/size opposites isolate the title from legend and
+    // axes. These are measured band advances, not fractions of the frame.
+    for (family, native_bands) in [
+      ("Calibri", [13.44, 20.88, 28.20]),
+      ("Malgun Gothic", [17.52, 27.96, 38.52]),
+      ("Batang", [14.04, 21.96, 29.88]),
+    ] {
+      for (size, native_band) in [8.0, 14.0, 20.0].into_iter().zip(native_bands) {
+        let style = word_chart_style(family, size);
+        let profile = word_chart_text_layout(Some("Authored Title"), None, &style, &label_style);
+        for height in [216.0, 252.0, 288.0] {
+          let (plot, title_slot, legend_slot) = chart_bands(
+            ChartFrame {
+              x_pt: 72.0,
+              y_pt: 72.0,
+              width_pt: 432.0,
+              height_pt: height,
+            },
+            Some(&title),
+            None,
+            ChartExHost::Word,
+            9.0,
+            false,
+            Some(profile),
+          );
+          assert!(legend_slot.is_none());
+          let title_slot = title_slot.unwrap();
+          assert!(
+            (title_slot.height - native_band).abs() < 0.15,
+            "{family}/{size}/{height}: {} versus {native_band}",
+            title_slot.height,
+          );
+          assert!((plot.y - (77.04 + native_band)).abs() < 0.15);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn word_chart_title_extents_follow_the_native_measurement_across_font_sizes() {
+    let mut metrics = TextMetrics::new();
+    for (family, text, native_bands) in [
+      (
+        "Calibri",
+        "Chart Title",
+        [
+          13.44, 18.36, 20.88, 22.08, 23.28, 24.48, 25.80, 28.20, 33.12,
+        ],
+      ),
+      (
+        "Malgun Gothic",
+        "차트 제목",
+        [
+          17.52, 24.48, 27.96, 29.76, 31.56, 33.24, 35.04, 38.52, 45.48,
+        ],
+      ),
+    ] {
+      for (size, native_band) in [8.0, 12.0, 14.0, 15.0, 16.0, 17.0, 18.0, 20.0, 24.0]
+        .into_iter()
+        .zip(native_bands)
+      {
+        let mut style = word_chart_style(family, size);
+        style.bold = true;
+        let line = metrics.line_vertical_metrics_for_text(text, &style);
+        let profile = word_chart_text_layout(Some(text), None, &style, &style);
+        let height = profile.title_band_pt - 3.6;
+        assert!(height >= line.line_height_pt());
+        assert!(
+          (height + 3.6 - native_band).abs() < 0.15,
+          "{family}/{size}: {} vs {native_band}",
+          height + 3.6,
+        );
+      }
+    }
+    // An integral percentage stays exact at a size whose point metrics do
+    // not themselves have an exact binary representation.
+    let mut cell = metrics.vertical_metrics_for_text("A", &word_chart_style("Calibri", 16.0));
+    cell.font_design_unit_pt = 16.0 / 1000.0;
+    cell.ascent_pt = 19.2;
+    cell.baseline_offset_pt = 19.2;
+    assert_eq!(word_chart_font_cell_height(cell, 16.0, 24.0), 24.0);
+  }
+
+  #[test]
+  fn word_legend_markers_follow_native_title_sizes_and_ui_font_cells() {
+    let frame = ChartFrame {
+      x_pt: 72.0,
+      y_pt: 72.0,
+      width_pt: 432.0,
+      height_pt: 252.0,
+    };
+    let mut label_style = word_chart_style("Calibri", 9.0);
+    label_style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+    let title = cx::ChartTitle::default();
+    let legend = cx::Legend {
+      pos: Some(cx::SidePos::T),
+      ..Default::default()
+    };
+    // Actual Word rectangles, with both languages retaining their source
+    // theme slots. The no-title control isolates the row from title advance.
+    for (ui, native_tops) in [
+      ("ko-KR", [87.06, 104.58, 115.14, 118.62, 125.58, 132.54]),
+      ("en-US", [86.46, 99.90, 107.22, 109.74, 114.66, 119.58]),
+    ] {
+      for (size, native_top) in [
+        None,
+        Some(8.0),
+        Some(14.0),
+        Some(16.0),
+        Some(20.0),
+        Some(24.0),
+      ]
+      .into_iter()
+      .zip(native_tops)
+      {
+        let mut title_style = word_chart_style("Calibri", size.unwrap_or(16.0));
+        title_style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+        title_style.bold = true;
+        let appearance = chart_appearance(
+          &cx::ChartSpace::default(),
+          &ChartExRenderOptions {
+            host: ChartExHost::Word,
+            frame,
+            title_style: title_style.clone(),
+            label_style: label_style.clone(),
+            ui_language: Some(ui),
+            theme: ChartExTheme::default(),
+            resources: ChartExStyleResources::default(),
+          },
+        );
+        let word = word_chart_text_layout(
+          size.map(|_| automatic_chart_title(Some(ui))),
+          Some(crate::localization::office_waterfall_legend(Some(ui))[0]),
+          &title_style,
+          &label_style,
+        );
+        let (_, _, slot) = chart_bands(
+          frame,
+          size.map(|_| &title),
+          Some(&legend),
+          ChartExHost::Word,
+          9.0,
+          false,
+          Some(word),
+        );
+        let mut items = Vec::new();
+        lower_legend(
+          &mut items,
+          slot.unwrap(),
+          &waterfall_legend(Some(ui), &appearance),
+          &appearance,
+          &label_style,
+          LegendPaintOptions {
+            compact_funnel: false,
+            has_category_axis_title: false,
+            word_chart_text: Some(word),
+          },
+        );
+        let mut markers = 0;
+        for item in items {
+          if let PageItem::Rect(rect) = item {
+            markers += 1;
+            assert!(
+              (rect.y_pt - native_top).abs() < 0.001,
+              "{ui}/{size:?}: {} vs {native_top}",
+              rect.y_pt,
+            );
+          }
+        }
+        assert_eq!(markers, 3);
+      }
+    }
+  }
+
+  #[test]
+  fn automatic_legend_entries_follow_native_shaped_caption_advances() {
+    let frame = ChartFrame {
+      x_pt: 72.0,
+      y_pt: 72.0,
+      width_pt: 432.0,
+      height_pt: 252.0,
+    };
+    let mut label_style = word_chart_style("Calibri", 9.0);
+    label_style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+    label_style.kerning_minimum_size_pt = Some(12.0);
+    let mut title_style = label_style.clone();
+    title_style.font_size_pt = 14.0;
+    let title = cx::ChartTitle::default();
+    let legend = cx::Legend {
+      pos: Some(cx::SidePos::T),
+      ..Default::default()
+    };
+    // Actual native marker starts. In particular, the Spanish acute vowel
+    // does not occupy a full em, and the first caption is proportional.
+    for (ui, native_starts) in [
+      ("es-MX", [217.02, 269.46, 333.06]),
+      ("en-US", [224.46, 273.54, 325.62]),
+      ("ko-KR", [239.10, 275.34, 311.46]),
+    ] {
+      let appearance = chart_appearance(
+        &cx::ChartSpace::default(),
+        &ChartExRenderOptions {
+          host: ChartExHost::Word,
+          frame,
+          title_style: title_style.clone(),
+          label_style: label_style.clone(),
+          ui_language: Some(ui),
+          theme: ChartExTheme::default(),
+          resources: ChartExStyleResources::default(),
+        },
+      );
+      let word = word_chart_text_layout(
+        Some(automatic_chart_title(Some(ui))),
+        Some(crate::localization::office_waterfall_legend(Some(ui))[0]),
+        &title_style,
+        &label_style,
+      );
+      let (_, _, slot) = chart_bands(
+        frame,
+        Some(&title),
+        Some(&legend),
+        ChartExHost::Word,
+        9.0,
+        false,
+        Some(word),
+      );
+      let mut items = Vec::new();
+      lower_legend(
+        &mut items,
+        slot.unwrap(),
+        &waterfall_legend(Some(ui), &appearance),
+        &appearance,
+        &label_style,
+        LegendPaintOptions {
+          compact_funnel: false,
+          has_category_axis_title: false,
+          word_chart_text: Some(word),
+        },
+      );
+      let starts = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Rect(rect) => Some(rect.x_pt),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(starts.len(), native_starts.len());
+      for (actual, native) in starts.into_iter().zip(native_starts) {
+        assert!((actual - native).abs() < 0.6, "{ui}: {actual} vs {native}");
+      }
+    }
+  }
+
+  #[test]
+  fn centered_axis_titles_follow_native_faces_sizes_and_plot_widths() {
+    // Native plot frames and text origins are independent observations;
+    // this checks actual title placement rather than a width-helper formula.
+    for (ui, family, size, left, right, native_x) in [
+      ("es-MX", "Calibri", 10.0, 116.46, 497.46, 280.66),
+      ("es-MX", "Calibri", 8.0, 114.06, 497.46, 284.74),
+      ("es-MX", "Calibri", 12.0, 118.98, 497.46, 276.55),
+      ("es-MX", "Calibri", 16.0, 123.90, 497.46, 268.63),
+      ("es-MX", "Arial", 10.0, 115.74, 497.46, 278.02),
+      ("es-MX", "Times New Roman", 10.0, 115.74, 497.46, 280.01),
+      ("en-US", "Calibri", 10.0, 116.46, 497.46, 288.91),
+      ("ko-KR", "Calibri", 10.0, 121.62, 497.46, 293.57),
+      ("es-MX", "Calibri", 10.0, 97.74, 497.46, 271.25),
+      ("es-MX", "Calibri", 10.0, 116.46, 281.46, 172.63),
+      ("es-MX", "Calibri", 10.0, 116.46, 389.46, 226.66),
+      ("es-MX", "Calibri", 10.0, 116.46, 545.46, 304.66),
+    ] {
+      let mut items = Vec::new();
+      let mut style = word_chart_style("Calibri", size);
+      style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+      let properties = cs::TextCharacterPropertiesType {
+        kerning: Some(1200),
+        latin_font: Some(a::LatinFont {
+          typeface: Some(family.into()),
+          ..Default::default()
+        }),
+        ..Default::default()
+      };
+      apply_style_text(
+        &mut style,
+        Some(&properties),
+        &cs::FontReference::default(),
+        ChartExTheme::default(),
+      );
+      push_centered_measured_text(
+        &mut items,
+        PlotRect {
+          x: left,
+          y: 0.0,
+          width: right - left,
+          height: 20.0,
+        },
+        automatic_axis_title(Some(ui)).to_string(),
+        style,
+      );
+      let [PageItem::Text(title)] = items.as_slice() else {
+        panic!("one painted axis title");
+      };
+      assert!(
+        (title.x_pt - native_x).abs() < 0.6,
+        "{ui}/{family}/{size}: {} vs {native_x}",
+        title.x_pt,
+      );
+    }
+  }
+
+  #[test]
+  fn word_waterfall_axis_title_bands_follow_native_face_and_size_opposites() {
+    let mut metrics = TextMetrics::new();
+    // Independent native plot-edge changes with only one title enabled.
+    // The two output axes may round the same measured cell one grid apart.
+    for (ui, family, size, value_band, category_band) in [
+      ("es-MX", "Calibri", 8.0, 16.32, 16.32),
+      ("es-MX", "Calibri", 10.0, 18.72, 18.84),
+      ("es-MX", "Calibri", 12.0, 21.24, 21.24),
+      ("es-MX", "Calibri", 16.0, 26.16, 26.16),
+      ("es-MX", "Arial", 10.0, 18.00, 18.12),
+      ("es-MX", "Times New Roman", 10.0, 18.00, 18.12),
+      ("en-US", "Calibri", 10.0, 18.72, 18.84),
+      ("ko-KR", "Calibri", 10.0, 23.88, 23.88),
+    ] {
+      let mut style = word_chart_style(family, size);
+      style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+      let actual =
+        word_waterfall_axis_title_band(&mut metrics, Some(automatic_axis_title(Some(ui))), &style);
+      assert!(
+        (actual - value_band).abs() < 0.15 && (actual - category_band).abs() < 0.15,
+        "{ui}/{family}/{size}: {actual} vs {value_band}/{category_band}",
+      );
+      assert_eq!(
+        word_waterfall_axis_title_band(&mut metrics, None, &style),
+        0.0
+      );
+    }
+  }
+
+  #[test]
+  fn chart_style_explicit_font_slots_and_kerning_override_inherited_text() {
+    let mut style = word_chart_style("Calibri", 10.0);
+    style.high_ansi_font_family = Some(Arc::from("Cambria"));
+    let properties = cs::TextCharacterPropertiesType {
+      latin_font: Some(a::LatinFont {
+        typeface: Some("Arial".into()),
+        ..Default::default()
+      }),
+      east_asian_font: Some(a::EastAsianFont {
+        typeface: Some("Malgun Gothic".into()),
+        ..Default::default()
+      }),
+      complex_script_font: Some(a::ComplexScriptFont {
+        typeface: Some("Arial".into()),
+        ..Default::default()
+      }),
+      kerning: Some(1200),
+      ..Default::default()
+    };
+    apply_style_text(
+      &mut style,
+      Some(&properties),
+      &cs::FontReference::default(),
+      ChartExTheme::default(),
+    );
+    assert_eq!(style.font_family.as_deref(), Some("Arial"));
+    assert_eq!(style.high_ansi_font_family.as_deref(), Some("Arial"));
+    assert_eq!(
+      style.east_asia_font_family.as_deref(),
+      Some("Malgun Gothic")
+    );
+    assert_eq!(style.complex_font_family.as_deref(), Some("Arial"));
+    assert_eq!(style.kerning_minimum_size_pt, Some(12.0));
+    // An absent role attribute inherits; an explicit zero uses the shared
+    // Office DrawingML disable rule instead of enabling kerning at all sizes.
+    apply_style_text(
+      &mut style,
+      Some(&cs::TextCharacterPropertiesType::default()),
+      &cs::FontReference::default(),
+      ChartExTheme::default(),
+    );
+    assert_eq!(style.font_family.as_deref(), Some("Arial"));
+    assert_eq!(style.kerning_minimum_size_pt, Some(12.0));
+    apply_style_text(
+      &mut style,
+      Some(&cs::TextCharacterPropertiesType {
+        kerning: Some(0),
+        ..Default::default()
+      }),
+      &cs::FontReference::default(),
+      ChartExTheme::default(),
+    );
+    assert_eq!(style.kerning_minimum_size_pt, Some(f32::INFINITY));
+  }
+
+  #[test]
+  fn word_waterfall_legend_centers_the_physical_cell_before_text_origin_conversion() {
+    let mut style = word_chart_style("Calibri", 9.0);
+    style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+    let title_style = word_chart_style("Calibri", 14.0);
+    let legend = cx::Legend {
+      pos: Some(cx::SidePos::T),
+      ..Default::default()
+    };
+    for (ui, native_band, native_baseline) in [("ko-KR", 30.12, 94.54), ("en-US", 28.80, 93.14)] {
+      let frame = ChartFrame {
+        x_pt: 72.0,
+        y_pt: 72.0,
+        width_pt: 432.0,
+        height_pt: 252.0,
+      };
+      let appearance = chart_appearance(
+        &cx::ChartSpace::default(),
+        &ChartExRenderOptions {
+          host: ChartExHost::Word,
+          frame,
+          title_style: title_style.clone(),
+          label_style: style.clone(),
+          ui_language: Some(ui),
+          theme: ChartExTheme::default(),
+          resources: ChartExStyleResources::default(),
+        },
+      );
+      let word = word_chart_text_layout(
+        None,
+        Some(crate::localization::office_waterfall_legend(Some(ui))[0]),
+        &title_style,
+        &style,
+      );
+      assert!((word.legend_band_pt - native_band).abs() < 0.3);
+      let (_, _, slot) = chart_bands(
+        frame,
+        None,
+        Some(&legend),
+        ChartExHost::Word,
+        9.0,
+        false,
+        Some(word),
+      );
+      let entries = waterfall_legend(Some(ui), &appearance);
+      let mut items = Vec::new();
+      lower_legend(
+        &mut items,
+        slot.unwrap(),
+        &entries,
+        &appearance,
+        &style,
+        LegendPaintOptions {
+          compact_funnel: false,
+          has_category_axis_title: false,
+          word_chart_text: Some(word),
+        },
+      );
+      let mut metrics = TextMetrics::new();
+      let mut labels = 0;
+      for item in items {
+        if let PageItem::Text(text) = item {
+          labels += 1;
+          let baseline = text.y_pt
+            + metrics.baseline_offset_in_line_for_text(
+              &text.text,
+              text.style.as_ref(),
+              text.line_height_pt,
+            );
+          assert!((baseline - native_baseline).abs() < 0.3, "{ui}: {baseline}");
+        }
+      }
+      assert_eq!(labels, 3);
+    }
+  }
+
+  #[test]
+  fn word_box_whisker_title_and_cached_legend_follow_native_physical_bands() {
+    // These top-grid and baseline positions come from independent Word
+    // controls. The cached Latin series name keeps a Calibri legend even
+    // when the automatic Korean title uses Malgun Gothic.
+    for (ui, height, title, legend, native_top, title_baseline, legend_baseline) in [
+      ("es-MX", 252.0, true, false, 103.86, Some(90.82), None),
+      ("en-US", 252.0, true, false, 103.86, Some(90.82), None),
+      ("es-MX", 216.0, true, false, 103.86, Some(90.82), None),
+      ("es-MX", 288.0, true, false, 103.86, Some(90.82), None),
+      ("es-MX", 252.0, false, false, 82.98, None, None),
+      ("es-MX", 252.0, false, true, 111.78, None, Some(93.05)),
+      (
+        "es-MX",
+        252.0,
+        true,
+        true,
+        132.66,
+        Some(90.82),
+        Some(113.90),
+      ),
+      ("ko-KR", 252.0, true, false, 110.94, Some(95.54), None),
+      (
+        "ko-KR",
+        252.0,
+        true,
+        true,
+        139.74,
+        Some(95.54),
+        Some(121.10),
+      ),
+    ] {
+      let title_xml = if title { "<cx:title/>" } else { "" };
+      let legend_xml = if legend { "<cx:legend pos=\"t\"/>" } else { "" };
+      let xml = format!(
+        r#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+          <cx:chartData><cx:data id="0"><cx:numDim type="val"><cx:lvl ptCount="5">
+            <cx:pt idx="0">-20</cx:pt><cx:pt idx="1">0</cx:pt><cx:pt idx="2">10</cx:pt>
+            <cx:pt idx="3">20</cx:pt><cx:pt idx="4">40</cx:pt>
+          </cx:lvl></cx:numDim></cx:data></cx:chartData>
+          <cx:chart>{title_xml}<cx:plotArea><cx:plotAreaRegion>
+            <cx:series layoutId="boxWhisker"><cx:tx><cx:txData><cx:v>Series1</cx:v></cx:txData></cx:tx>
+              <cx:dataId val="0"/><cx:layoutPr>
+                <cx:visibility meanMarker="0" nonoutliers="0" outliers="0"/>
+              </cx:layoutPr>
+            </cx:series>
+          </cx:plotAreaRegion>
+            <cx:axis id="0"><cx:catScaling gapWidth="1"/><cx:tickLabels/></cx:axis>
+            <cx:axis id="1"><cx:valScaling/><cx:majorGridlines/><cx:tickLabels/></cx:axis>
+          </cx:plotArea>{legend_xml}</cx:chart>
+        </cx:chartSpace>"#,
+      );
+      let space = cx::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let mut title_style = word_chart_style("Calibri", 14.0);
+      title_style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+      let mut label_style = word_chart_style("Calibri", 9.0);
+      label_style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+      let items = lower_extended_chart(
+        &space,
+        ChartExRenderOptions {
+          host: ChartExHost::Word,
+          frame: ChartFrame {
+            x_pt: 72.0,
+            y_pt: 72.0,
+            width_pt: 432.0,
+            height_pt: height,
+          },
+          title_style,
+          label_style,
+          ui_language: Some(ui),
+          theme: ChartExTheme::default(),
+          resources: ChartExStyleResources::default(),
+        },
+        None,
+      );
+      let top_grid = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Line(line)
+            if line.color == rgb(217, 217, 217)
+              && (line.y1_pt - line.y2_pt).abs() < 0.01
+              && (line.x1_pt - line.x2_pt).abs() > 300.0 =>
+          {
+            Some(line.y1_pt)
+          }
+          _ => None,
+        })
+        .min_by(f32::total_cmp)
+        .expect("statistical grid");
+      assert!(
+        (top_grid - native_top).abs() < 0.5,
+        "{ui}/{height}: {top_grid}"
+      );
+      let mut metrics = TextMetrics::new();
+      for (caption, native_baseline) in [
+        (automatic_chart_title(Some(ui)), title_baseline),
+        ("Series1", legend_baseline),
+      ] {
+        let Some(native_baseline) = native_baseline else {
+          continue;
+        };
+        let text = items
+          .iter()
+          .find_map(|item| match item {
+            PageItem::Text(text) if text.text == caption => Some(text),
+            _ => None,
+          })
+          .expect("native caption");
+        let baseline = text.y_pt
+          + metrics.baseline_offset_in_line_for_text(
+            &text.text,
+            text.style.as_ref(),
+            text.line_height_pt,
+          );
+        assert!(
+          (baseline - native_baseline).abs() < 0.5,
+          "{ui}/{caption}: {baseline}"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn box_whisker_statistical_points_retain_the_native_circle_and_resolved_pen() {
+    let fill = rgb(237, 125, 49);
+    let outline = rgb(190, 100, 39);
+    let mut items = Vec::new();
+    push_box_whisker_marker(
+      &mut items,
+      (20.0, 40.0),
+      fill,
+      chart_path_stroke(outline, 0.75, None),
+    );
+    let [PageItem::Path(marker)] = items.as_slice() else {
+      panic!("statistical marker path");
+    };
+    assert!(marker.closed);
+    assert_eq!(marker.bounds, common_rect(18.5, 38.5, 3.0, 3.0));
+    assert_eq!(
+      marker.fill,
+      crate::common::Fill::Solid(common_rgb(fill, 1.0))
+    );
+    assert_eq!(
+      marker
+        .commands
+        .iter()
+        .filter(|command| matches!(command, crate::common::PathCommand::CubicTo { .. }))
+        .count(),
+      4,
+    );
+    assert!(matches!(
+      marker.commands.last(),
+      Some(crate::common::PathCommand::Close)
+    ));
+    let stroke = marker.stroke.as_ref().expect("native statistical pen");
+    assert_eq!(stroke.width, crate::common::Pt(0.75));
+    assert_eq!(stroke.color, common_rgb(outline, 1.0));
+  }
+
+  #[test]
+  fn chart_axis_alpha_reaches_the_pen_without_a_background_color() {
+    // Native dark-gradient axes/gridlines retain RGB242 and alpha138/26.
+    // Premixing against one gradient stop instead produces opaque171/104.
+    for (alpha, native_byte) in [(10_000, 26), (54_000, 138), (100_000, 255), (0, 0)] {
+      let xml = format!(
+        r#"<cs:spPr xmlns:cs="http://schemas.microsoft.com/office/drawing/2012/chartStyle"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:ln w="9525" cap="flat"><a:solidFill><a:schemeClr val="lt1">
+          <a:lumMod val="95000"/><a:alpha val="{alpha}"/>
+        </a:schemeClr></a:solidFill><a:round/></a:ln>
+      </cs:spPr>"#
+      );
+      let shape = cs::ShapeProperties::from_bytes(xml.as_bytes()).unwrap();
+      let stroke = resolve_cs_axis_stroke(&shape, ChartExTheme::default(), None).unwrap();
+      assert_eq!(
+        stroke.color,
+        crate::common::Color {
+          r: 242,
+          g: 242,
+          b: 242,
+          a: native_byte
+        }
+      );
+      assert_eq!(stroke.width, crate::common::Pt(0.75));
+      let mut items = Vec::new();
+      push_chart_axis_line(&mut items, (10.0, 20.0), (100.0, 20.0), &stroke);
+      match items.as_slice() {
+        [] => assert_eq!(native_byte, 0),
+        [PageItem::Line(line)] => {
+          assert_eq!(native_byte, 255);
+          assert_eq!(line.color, rgb(242, 242, 242));
+        }
+        [PageItem::Path(path)] => {
+          assert_eq!(path.stroke.as_ref().unwrap().color, stroke.color);
+          assert_eq!(path.fill, crate::common::Fill::None);
+        }
+        _ => panic!("one native axis paint owner"),
+      }
+    }
+  }
+
+  #[test]
+  fn chart_style_character_spacing_uses_hundredths_of_a_point_and_the_shaped_cache() {
+    let base = word_chart_style("Calibri", 16.0);
+    let mut metrics = TextMetrics::new();
+    let width = metrics.measure_text("ABCDE", &base);
+    for spacing in [100, -75, 0] {
+      let mut style = base.clone();
+      let properties = cs::TextCharacterPropertiesType {
+        spacing: Some(spacing),
+        ..Default::default()
+      };
+      apply_style_text(
+        &mut style,
+        Some(&properties),
+        &cs::FontReference::default(),
+        ChartExTheme::default(),
+      );
+      let actual = metrics.measure_text("ABCDE", &style) - width;
+      let native_advance = spacing as f32 * 0.01 * 5.0;
+      assert!(
+        (actual - native_advance).abs() < 0.01,
+        "{spacing}: {actual}"
+      );
+    }
+  }
+
+  #[test]
+  fn waterfall_paint_groups_follow_adjacent_roles_and_material_colors() {
+    use WaterfallColorRole::{Decrease, Increase, Total};
+    for (third, native_runs) in [
+      (
+        Increase,
+        vec![(0, 1), (1, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8)],
+      ),
+      (
+        Decrease,
+        vec![(0, 1), (1, 2), (2, 4), (4, 5), (5, 6), (6, 7), (7, 8)],
+      ),
+    ] {
+      let points = [
+        Total, Increase, third, Decrease, Total, Decrease, Increase, Total,
+      ]
+      .into_iter()
+      .map(|role| {
+        Some(WaterfallPointPaint {
+          bounds: PlotRect {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+          },
+          color: role.fallback(),
+          role,
+        })
+      })
+      .collect::<Vec<_>>();
+      let mut runs = Vec::new();
+      let mut start = 0;
+      while start < points.len() {
+        let end = waterfall_paint_run_end(&points, start);
+        runs.push((start, end));
+        start = end;
+      }
+      assert_eq!(runs, native_runs);
+      let mut changed = points;
+      changed[2].as_mut().unwrap().color = rgb(1, 2, 3);
+      assert_eq!(waterfall_paint_run_end(&changed, 1), 2);
+    }
+  }
+
+  #[test]
+  fn waterfall_compound_points_share_one_gradient_definition_and_shadow_canvas() {
+    let mut appearance = chart_appearance(
+      &cx::ChartSpace::default(),
+      &ChartExRenderOptions {
+        host: ChartExHost::Word,
+        frame: ChartFrame {
+          x_pt: 72.0,
+          y_pt: 72.0,
+          width_pt: 432.0,
+          height_pt: 252.0,
+        },
+        title_style: word_chart_style("Calibri", 16.0),
+        label_style: word_chart_style("Calibri", 9.0),
+        ui_language: Some("ko-KR"),
+        theme: ChartExTheme::default(),
+        resources: ChartExStyleResources::default(),
+      },
+    );
+    appearance.data_point_gradient = Some(a::GradientFill::from_bytes(br#"<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:gsLst><a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs><a:gs pos="100000"><a:srgbClr val="000000"/></a:gs></a:gsLst>
+      <a:lin ang="5400000" scaled="0"/>
+    </a:gradFill>"#).unwrap());
+    appearance.data_point_effects = Some(ChartExEffectSource::List(
+      a::EffectList::from_bytes(
+        br#"<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0">
+        <a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr>
+      </a:outerShdw>
+    </a:effectLst>"#,
+      )
+      .unwrap(),
+    ));
+    let points = [
+      PlotRect {
+        x: 155.94,
+        y: 196.74,
+        width: 33.36,
+        height: 17.40,
+      },
+      PlotRect {
+        x: 205.98,
+        y: 153.30,
+        width: 33.24,
+        height: 43.44,
+      },
+    ];
+    let mut items = Vec::new();
+    push_data_point_group(&mut items, &points, WATERFALL_INCREASE, &appearance, None);
+    let [PageItem::Image(shadow), PageItem::Path(path)] = items.as_slice() else {
+      panic!("one compound backdrop and foreground");
+    };
+    assert!(shadow.width_pt > 83.28 && shadow.height_pt > 60.84);
+    assert_eq!(
+      path
+        .commands
+        .iter()
+        .filter(|command| matches!(command, crate::common::PathCommand::Close))
+        .count(),
+      2
+    );
+    let crate::common::Fill::Gradient(gradient) = &path.fill else {
+      panic!("shared gradient")
+    };
+    let bounds = gradient.definition_bounds.unwrap();
+    assert!((bounds.origin.x.0 - 155.94).abs() < 0.01);
+    assert!((bounds.origin.y.0 - 153.30).abs() < 0.01);
+    assert!((bounds.size.width.0 - 83.28).abs() < 0.01);
+    assert!((bounds.size.height.0 - 60.84).abs() < 0.01);
+  }
+
+  #[test]
+  fn word_sunburst_uses_the_native_title_cell_before_inscribing_the_radial_scene() {
+    let xml =
+      br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+      <cx:chartData><cx:data id="0"><cx:numDim type="size"><cx:lvl ptCount="1">
+        <cx:pt idx="0">1</cx:pt>
+      </cx:lvl></cx:numDim></cx:data></cx:chartData>
+      <cx:chart><cx:title/><cx:plotArea><cx:plotAreaRegion>
+        <cx:series layoutId="sunburst"><cx:dataId val="0"/></cx:series>
+      </cx:plotAreaRegion></cx:plotArea></cx:chart>
+    </cx:chartSpace>"#;
+    let space = cx::ChartSpace::from_bytes(xml).unwrap();
+    for (ui, height, native_center_y, native_radius, native_baseline) in [
+      ("ko-KR", 216.0, 194.03, 88.20, 95.54),
+      ("ko-KR", 252.0, 212.03, 106.20, 95.54),
+      ("ko-KR", 288.0, 230.03, 124.20, 95.54),
+      ("en-US", 252.0, 208.43, 109.80, 90.82),
+      ("es-MX", 252.0, 208.43, 109.80, 90.82),
+    ] {
+      let mut title_style = word_chart_style("Calibri", 14.0);
+      title_style.east_asia_font_family = Some(Arc::from("Malgun Gothic"));
+      let items = lower_extended_chart(
+        &space,
+        ChartExRenderOptions {
+          host: ChartExHost::Word,
+          frame: ChartFrame {
+            x_pt: 72.0,
+            y_pt: 72.0,
+            width_pt: 432.0,
+            height_pt: height,
+          },
+          title_style,
+          label_style: word_chart_style("Calibri", 8.5),
+          ui_language: Some(ui),
+          theme: ChartExTheme::default(),
+          resources: ChartExStyleResources::default(),
+        },
+        None,
+      );
+      let bounds = items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Path(path) => Some(path.bounds),
+          _ => None,
+        })
+        .expect("radial scene");
+      let radius = bounds.size.height.0 * 0.5;
+      let center_y = bounds.origin.y.0 + radius;
+      assert!(
+        (radius - native_radius).abs() < 0.5,
+        "{ui}/{height}: radius {radius}"
+      );
+      assert!(
+        (center_y - native_center_y).abs() < 0.5,
+        "{ui}/{height}: center {center_y}"
+      );
+      let title = items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text == automatic_chart_title(Some(ui)) => Some(text),
+          _ => None,
+        })
+        .expect("automatic title");
+      let baseline = title.y_pt
+        + TextMetrics::new().baseline_offset_in_line_for_text(
+          &title.text,
+          title.style.as_ref(),
+          title.line_height_pt,
+        );
+      assert!(
+        (baseline - native_baseline).abs() < 0.5,
+        "{ui}: baseline {baseline}"
+      );
+    }
+  }
+
+  #[test]
+  fn word_sunburst_wraps_radial_labels_before_testing_the_narrow_sector_edge() {
+    let style = word_chart_style("Calibri", 8.5);
+    let appearance = chart_appearance(
+      &cx::ChartSpace::default(),
+      &ChartExRenderOptions {
+        host: ChartExHost::Word,
+        frame: ChartFrame {
+          x_pt: 72.0,
+          y_pt: 72.0,
+          width_pt: 432.0,
+          height_pt: 252.0,
+        },
+        title_style: word_chart_style("Calibri", 14.0),
+        label_style: style,
+        ui_language: Some("ko-KR"),
+        theme: ChartExTheme::default(),
+        resources: ChartExStyleResources::default(),
+      },
+    );
+    let mut context = SunburstRenderContext {
+      center: (0.0, 0.0),
+      ring_width: 26.55,
+      show_labels: true,
+      appearance: &appearance,
+      metrics: TextMetrics::new(),
+    };
+    let text = "Branch 1";
+    let spans = [crate::text_layout::StyledTextSpan {
+      range: 0..text.len(),
+      style: &appearance.data_label_style,
+    }];
+    let ordinary_lines =
+      crate::text_layout::break_text_lines(text, &spans, Some(20.55), &mut context.metrics)
+        .expect("ordinary line breaking");
+    assert_eq!(text[ordinary_lines[0].clone()].trim(), "Branch");
+    for (name, depth, sweep, expected) in [
+      ("Branch 1", 0, 2.809466, vec!["Branc", "h 1"]),
+      ("Stem 2", 1, 1.905646, vec!["Stem", "2"]),
+      ("Leaf 5", 2, 0.958268, vec!["Leaf", "5"]),
+      ("Leaf 8", 2, 0.272235, vec![]),
+    ] {
+      let node = HierarchyNode {
+        name: name.to_string(),
+        value: 1.0,
+        ..Default::default()
+      };
+      let mut items = Vec::new();
+      lower_sunburst_node(
+        &mut items,
+        &node,
+        depth,
+        -sweep * 0.5,
+        sweep * 0.5,
+        rgb(91, 155, 213),
+        &mut context,
+      );
+      let labels = items
+        .iter()
+        .filter_map(|item| match item {
+          PageItem::Text(text) => Some(text),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      assert_eq!(
+        labels
+          .iter()
+          .map(|text| text.text.as_str())
+          .collect::<Vec<_>>(),
+        expected,
+        "{name}"
+      );
+      assert!(labels.iter().all(|text| text.style.pdf_glyph_outlines));
+      if name == "Branch 1" {
+        // Native glyph paths projected into the radial frame put the two
+        // Calibri baselines at -2.26/8.12pt. They advance by the raw physical
+        // font cell, independently of the generic text item's line height.
+        for (text, native_baseline) in labels.iter().zip([-2.26, 8.12]) {
+          let baseline = text.y_pt
+            + context.metrics.baseline_offset_in_line_for_text(
+              &text.text,
+              text.style.as_ref(),
+              text.line_height_pt,
+            );
+          assert!(
+            (baseline - native_baseline).abs() < 0.15,
+            "{name}: {baseline}"
+          );
+        }
+      }
+    }
+  }
 
   fn test_series<'a>(
     source: &'a cx::Series,
@@ -6572,6 +8399,10 @@ mod tests {
       Some("Axis Title")
     );
     assert_eq!(axis_title(None, Some("es-MX")), None);
+    assert_eq!(
+      axis_title(Some(&title), Some("ko-KR")).as_deref(),
+      Some("축 제목")
+    );
     let authored = cx::AxisTitle {
       text: Some(Box::new(cx::Text {
         text_choice: Some(cx::TextChoice::TextData(Box::new(cx::TextData {

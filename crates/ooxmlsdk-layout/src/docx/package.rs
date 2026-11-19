@@ -3,7 +3,7 @@ use bytes::Bytes;
 use olecfsdk::{
   cfb::CompoundFile,
   forms::{CommandButtonControl, LabelControl, MorphDataControl, TextProps},
-  ograph::{OgraphChart, OgraphFile},
+  ograph::OgraphFile,
 };
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
@@ -43,7 +43,10 @@ pub(super) struct ImageCatalog {
   pub(super) active_x_text_style_by_relationship_id: HashMap<String, ActiveXTextStyle>,
   pub(super) math_type_by_relationship_id: HashMap<String, super::math_type::MathTypeEquation>,
   pub(super) legacy_excel_font_size_twips_by_relationship_id: HashMap<String, u16>,
-  pub(super) ograph_charts_by_relationship_id: HashMap<String, OgraphChartResource>,
+  pub(super) legacy_excel_print_presentations_by_relationship_id:
+    HashMap<String, LegacyExcelPrintPresentation>,
+  pub(super) enhanced_print_presentations_by_relationship_id: HashMap<String, Bytes>,
+  pub(super) ograph_charts_by_relationship_id: HashMap<String, c::ChartSpace>,
   pub(super) charts_by_relationship_id: HashMap<String, ClassicChartResource>,
   pub(super) extended_charts_by_relationship_id: HashMap<String, ExtendedChartResource>,
   pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
@@ -60,12 +63,6 @@ pub(super) struct DiagramDrawingResource {
   // story. Keep the existing image resolver borrowed from that exact owner;
   // equal IDs in another drawing or the main document must not alias.
   pub(super) images: ImageCatalog,
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct OgraphChartResource {
-  pub(super) chart: OgraphChart,
-  pub(super) chart_space: c::ChartSpace,
 }
 
 #[derive(Clone, Debug)]
@@ -100,12 +97,62 @@ pub(super) struct AltChunkCatalog {
   pub(super) by_relationship_id: HashMap<String, AltChunkResource>,
 }
 
-fn legacy_excel_default_font_size_twips(data: &[u8]) -> Option<u16> {
-  let compound = CompoundFile::from_bytes(data).ok()?;
+#[derive(Clone, Debug)]
+pub(super) struct LegacyExcelPrintPresentation {
+  pub(super) data: Bytes,
+  pub(super) header: crate::render::emf_wmf::WmfExternalHeader,
+}
+
+struct LegacyExcelResources {
+  font_size_twips: Option<u16>,
+  print_presentation: Option<LegacyExcelPrintPresentation>,
+}
+
+fn legacy_excel_resources(compound: &CompoundFile) -> Option<LegacyExcelResources> {
   let workbook = compound
     .stream("Workbook")
     .or_else(|| compound.stream("Book"))?;
-  biff_default_font_size_twips(workbook)
+  Some(LegacyExcelResources {
+    font_size_twips: biff_default_font_size_twips(workbook),
+    print_presentation: compound
+      .stream("\u{3}PRINT")
+      .and_then(legacy_excel_print_presentation),
+  })
+}
+
+fn legacy_excel_print_presentation(data: &[u8]) -> Option<LegacyExcelPrintPresentation> {
+  // Excel's PRINT stream stores a Win16 METAFILEPICT followed by its WMF.
+  // Native independent substitutions distinguish this print presentation
+  // from both screen caches and the workbook's editable/cached cell values.
+  let word = |offset| {
+    Some(i16::from_le_bytes(
+      data.get(offset..offset + 2)?.try_into().ok()?,
+    ))
+  };
+  let (mode, width, height) = (word(0)?, word(2)?, word(4)?);
+  if mode != 8 || width <= 0 || height <= 0 {
+    return None;
+  }
+  let metafile = data.get(8..)?;
+  let parsed = emfsdk::wmf::WmfMetafileRef::from_bytes(metafile).ok()?;
+  if parsed.placeable_header.is_some() {
+    return None;
+  }
+  let size = usize::try_from(parsed.header.file_size_words)
+    .ok()?
+    .checked_mul(2)?;
+  if size < 24 {
+    return None;
+  }
+  Some(LegacyExcelPrintPresentation {
+    data: Bytes::copy_from_slice(metafile.get(..size)?),
+    header: crate::render::emf_wmf::WmfExternalHeader {
+      width_hundredths_mm: width as u32,
+      height_hundredths_mm: height as u32,
+      reference_device_dpi_x: crate::units::OFFICE_FIXED_OUTPUT_DPI as u32,
+      reference_device_dpi_y: crate::units::OFFICE_FIXED_OUTPUT_DPI as u32,
+    },
+  })
 }
 
 fn biff_default_font_size_twips(workbook: &[u8]) -> Option<u16> {
@@ -534,14 +581,39 @@ impl ImageCatalog {
         Some((related.relationship_id().to_string(), equation))
       })
       .collect();
-    catalog.legacy_excel_font_size_twips_by_relationship_id = part
-      .related_parts_of_type::<_, EmbeddedObjectPart>(package)
-      .filter_map(|related| {
-        let data = related.part().try_data_bytes(package).ok()?;
-        let size = legacy_excel_default_font_size_twips(&data)?;
-        Some((related.relationship_id().to_string(), size))
-      })
-      .collect();
+    for related in part.related_parts_of_type::<_, EmbeddedObjectPart>(package) {
+      let Ok(data) = related.part().try_data_bytes(package) else {
+        continue;
+      };
+      let Ok(compound) = CompoundFile::from_bytes(&data) else {
+        continue;
+      };
+      let id = related.relationship_id().to_string();
+      // MS-DOC §2.1.4.3 defines EPRINT as the object's enhanced print metafile. Word uses it
+      // ahead of the VML replacement during fixed-format export, including
+      // when the object's ProgID changes. Both shapes keep the host extent.
+      if let Some(emf) = compound.stream("\u{3}EPRINT")
+        && emfsdk::detect_format(emf) == Some(emfsdk::Format::Emf)
+        && emfsdk::emf::EmfMetafileRef::from_bytes(emf).is_ok()
+      {
+        catalog
+          .enhanced_print_presentations_by_relationship_id
+          .insert(id.clone(), Bytes::copy_from_slice(emf));
+      }
+      let Some(resources) = legacy_excel_resources(&compound) else {
+        continue;
+      };
+      if let Some(size) = resources.font_size_twips {
+        catalog
+          .legacy_excel_font_size_twips_by_relationship_id
+          .insert(id.clone(), size);
+      }
+      if let Some(presentation) = resources.print_presentation {
+        catalog
+          .legacy_excel_print_presentations_by_relationship_id
+          .insert(id, presentation);
+      }
+    }
     catalog.ograph_charts_by_relationship_id = part
       .related_parts_of_type::<_, EmbeddedObjectPart>(package)
       .filter_map(|related| {
@@ -550,10 +622,7 @@ impl ImageCatalog {
         let chart = file.workbook.chart().ok()?;
         Some((
           related.relationship_id().to_string(),
-          OgraphChartResource {
-            chart_space: super::ograph::chart_space(&chart),
-            chart,
-          },
+          super::ograph::chart_space(&chart),
         ))
       })
       .collect();
@@ -643,6 +712,8 @@ impl ImageCatalog {
       active_x_text_style_by_relationship_id: HashMap::new(),
       math_type_by_relationship_id: HashMap::new(),
       legacy_excel_font_size_twips_by_relationship_id: HashMap::new(),
+      legacy_excel_print_presentations_by_relationship_id: HashMap::new(),
+      enhanced_print_presentations_by_relationship_id: HashMap::new(),
       ograph_charts_by_relationship_id: HashMap::new(),
       charts_by_relationship_id: HashMap::new(),
       extended_charts_by_relationship_id: HashMap::new(),
@@ -924,6 +995,44 @@ mod tests {
     ];
     assert_eq!(biff_default_font_size_twips(&records), Some(200));
     assert_eq!(biff_default_font_size_twips(&records[..9]), None);
+  }
+
+  #[test]
+  fn legacy_excel_print_cache_preserves_the_metafilepict_and_owned_stream() {
+    let metafile = [
+      1u8, 0, 9, 0, 0, 3, 12, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
+    ];
+    let mut stream = vec![8, 0, 0xec, 0x09, 0xf6, 0x04, 0, 0]; // MM_ANISOTROPIC,2540x1270mm100
+    stream.extend_from_slice(&metafile);
+    let presentation = super::legacy_excel_print_presentation(&stream).unwrap();
+    assert_eq!(presentation.data.as_ref(), metafile);
+    assert_eq!(presentation.header.width_hundredths_mm, 2540);
+    assert_eq!(presentation.header.height_hundredths_mm, 1270);
+    assert_eq!(presentation.header.reference_device_dpi_x, 600);
+    assert_eq!(presentation.header.reference_device_dpi_y, 600);
+    for prefix in 0..stream.len() {
+      assert!(super::legacy_excel_print_presentation(&stream[..prefix]).is_none());
+    }
+    for (offset, value) in [(0, 7i16), (2, 0), (4, -1)] {
+      let mut invalid = stream.clone();
+      invalid[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+      assert!(super::legacy_excel_print_presentation(&invalid).is_none());
+    }
+    let mut compound = olecfsdk::cfb::CompoundFile::new(olecfsdk::cfb::Version::V3).unwrap();
+    compound
+      .create_stream("Workbook", vec![0x31, 0, 2, 0, 0xc8, 0])
+      .unwrap();
+    compound.create_stream("\u{3}PRINT", stream).unwrap();
+    let resources = super::legacy_excel_resources(&compound).unwrap();
+    assert_eq!(resources.font_size_twips, Some(200));
+    assert_eq!(
+      resources.print_presentation.unwrap().data.as_ref(),
+      metafile
+    );
+    compound.replace_stream("\u{3}PRINT", vec![0; 8]).unwrap();
+    let resources = super::legacy_excel_resources(&compound).unwrap();
+    assert_eq!(resources.font_size_twips, Some(200));
+    assert!(resources.print_presentation.is_none());
   }
 
   #[test]

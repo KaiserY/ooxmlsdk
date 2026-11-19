@@ -218,7 +218,7 @@ fn build(
   columns: SectionColumns,
   flow: FlowContext,
   metrics: &mut TextMetrics,
-) -> Option<Arc<Plan>> {
+) -> Option<Rc<Plan>> {
   let measured = trial(
     document,
     &ids,
@@ -318,7 +318,7 @@ fn build(
         .map(|bounds| translate_frame_bounds(bounds, 0.0, separator_height));
       influence
     }));
-  Some(Arc::new(Plan {
+  Some(Rc::new(Plan {
     ids,
     height_pt: height,
     items: separator.items,
@@ -542,7 +542,7 @@ mod tests {
     assert!(commit(&[3, 4, 5], &document, &mut page, flow, &mut metrics));
     assert!(page.footnote_reserved_height_pt > checkpoint.footnote_reserved_height_pt);
     restore_page_checkpoint(&mut page, checkpoint);
-    assert!(Arc::ptr_eq(
+    assert!(Rc::ptr_eq(
       page.footnote_column_plans.last().unwrap(),
       &prefix
     ));

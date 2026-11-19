@@ -21,14 +21,17 @@ use tiny_skia::{
 
 use super::{
   Color, DisplayItem, Fill, GradientFill, ImageItem, LineItem, PathCommand, PathItem, PatternFill,
-  Pt, Rect, RectItem, Stroke, StrokeAlignment, TextRun,
+  Point, Pt, Rect, RectItem, Stroke, StrokeAlignment, TextRun,
 };
 use crate::text_metrics::TextMetrics;
+
+mod fant;
 
 const MAX_EFFECT_RASTER_PIXELS: f32 = 250_000.0;
 // Fixed-format effects are output surfaces, not low-cost previews. Keep their
 // resource guard separate from the optional supersampling/preview budget.
 const MAX_FIXED_OUTPUT_EFFECT_RASTER_PIXELS: f32 = 16_000_000.0;
+const MAX_NATIVE_SOURCE_PIXELS: u64 = 16_000_000;
 const MAX_EFFECT_PIXELS_PER_POINT: f32 = 2.0;
 const OFFICE_SHAPE_GLOW_MAX_REFERENCE_RADIUS_PX: f32 = 16.0;
 const OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES: u32 = 8;
@@ -446,6 +449,7 @@ pub(crate) enum RasterTextHinting {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RasterResolveFilter {
   Native,
+  Area,
   Nearest,
   Triangle,
   CatmullRom,
@@ -479,6 +483,10 @@ pub(crate) enum RasterPrimitiveAntialiasing {
   /// GDI+ `SmoothingModeAntiAlias8x4`: sample an aliased 8x4 source grid and
   /// average its 32 samples with a premultiplied box resolve.
   OfficeAntiAlias8x4,
+  /// The same 8x4 filter with GDI+ `PixelOffsetModeHalf`: device pixels
+  /// cover [0,1] instead of [-0.5,0.5]. This changes the source sampling
+  /// coordinates, never the page-space geometry or output rectangle.
+  OfficeAntiAlias8x4PixelOffsetHalf,
 }
 
 /// Host policy for realizing a standalone WordprocessingShape before a
@@ -499,6 +507,9 @@ pub(crate) struct RasterSourceSurface {
   pub(crate) bounds: Rect,
   pub(crate) dpi: f64,
   pub(crate) extent: RasterSourceExtent,
+  /// When present, enclose both edges on this host's device grid instead of
+  /// rounding the extent independently of its fractional source origin.
+  pub(crate) device_grid_origin: Option<Point>,
   pub(crate) text_hinting: Option<RasterTextHinting>,
   pub(crate) primitive_antialiasing: RasterPrimitiveAntialiasing,
 }
@@ -522,13 +533,27 @@ pub(crate) struct WordShapeEffectSurface {
 }
 
 impl RasterPrimitiveAntialiasing {
+  fn realize_pixel_offset(self, mut mapping: PageToRasterMapping) -> (Self, PageToRasterMapping) {
+    if self == Self::OfficeAntiAlias8x4PixelOffsetHalf {
+      // The shared 8x4 scanner stores integer-centered GDI+ samples. A
+      // Half-mode source uses half-integer centers (gdiplusenums.h), so
+      // cancel that storage offset before supersampling. Word's observed
+      // FillPath calls set Half and AntiAlias8x4 independently.
+      mapping.translate_x -= 0.5;
+      mapping.translate_y -= 0.5;
+      (Self::OfficeAntiAlias8x4, mapping)
+    } else {
+      (self, mapping)
+    }
+  }
+
   fn enabled(self) -> bool {
     matches!(self, Self::PerPrimitive | Self::Direct2dStandard4)
   }
 
   fn sample_factors(self) -> (u32, u32) {
     match self {
-      Self::OfficeAntiAlias8x4 => (
+      Self::OfficeAntiAlias8x4 | Self::OfficeAntiAlias8x4PixelOffsetHalf => (
         OFFICE_ANTIALIAS_8X4_HORIZONTAL_SAMPLES,
         OFFICE_ANTIALIAS_8X4_VERTICAL_SAMPLES,
       ),
@@ -542,7 +567,7 @@ impl RasterPrimitiveAntialiasing {
 impl RasterResolveFilter {
   fn image_filter(self) -> Option<FilterType> {
     Some(match self {
-      Self::Native => return None,
+      Self::Native | Self::Area => return None,
       Self::Nearest => FilterType::Nearest,
       Self::Triangle => FilterType::Triangle,
       Self::CatmullRom => FilterType::CatmullRom,
@@ -1062,6 +1087,41 @@ pub(crate) fn rasterize_vector_items_for_effects_with_mapping(
   })
 }
 
+fn enclosing_source_grid_mapping(
+  bounds: Rect,
+  origin: Point,
+  dpi: f64,
+  text_hinting: Option<RasterTextHinting>,
+) -> Option<PageToRasterMapping> {
+  let scale = dpi / 72.0;
+  let axis = |near: f32, length: f32, anchor: f32| {
+    let local = (f64::from(near) - f64::from(anchor)) * scale;
+    let first = local.floor();
+    let last = (local + f64::from(length) * scale).ceil();
+    let size = last - first;
+    let translation = -f64::from(anchor) * scale - first;
+    (size.is_finite()
+      && size >= 1.0
+      && size <= f64::from(u32::MAX)
+      && (translation as f32).is_finite())
+    .then_some((size as u32, translation as f32))
+  };
+  if !scale.is_finite() || scale <= 0.0 {
+    return None;
+  }
+  let (width_px, translate_x) = axis(bounds.origin.x.0, bounds.size.width.0, origin.x.0)?;
+  let (height_px, translate_y) = axis(bounds.origin.y.0, bounds.size.height.0, origin.y.0)?;
+  Some(PageToRasterMapping {
+    width_px,
+    height_px,
+    scale_x: scale as f32,
+    scale_y: scale as f32,
+    translate_x,
+    translate_y,
+    text_hinting: text_hinting.map(|mode| (mode, scale as f32)),
+  })
+}
+
 pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
   items: &[DisplayItem<'static>],
   effects: &super::drawingml_image_effects::ImageEffectContainer,
@@ -1072,6 +1132,7 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
     bounds: source_bounds,
     dpi: source_dpi,
     extent,
+    device_grid_origin,
     text_hinting,
     primitive_antialiasing,
   } = source_surface;
@@ -1107,15 +1168,50 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
       RasterSourceExtent::Round => length_px.round().max(1.0) as u32,
     }
   };
-  let source_width_px = source_extent(source_bounds.size.width.0);
-  let source_height_px = source_extent(source_bounds.size.height.0);
   // Reject an unbounded source before allocating. Malformed/zero group extents
   // can leave an unfitted coordinate range here; the fixed-output owner can
   // still render it with its bounded viewport mapping. Never silently lower
   // the requested source density or label an upscaled image as native output.
-  const MAX_NATIVE_SOURCE_PIXELS: u64 = 16_000_000;
+  let source_mapping = if let Some(origin) = device_grid_origin {
+    enclosing_source_grid_mapping(source_bounds, origin, source_dpi, text_hinting)?
+  } else {
+    PageToRasterMapping {
+      width_px: source_extent(source_bounds.size.width.0),
+      height_px: source_extent(source_bounds.size.height.0),
+      scale_x: source_pixels_per_point,
+      scale_y: source_pixels_per_point,
+      translate_x: -source_bounds.origin.x.0 * source_pixels_per_point,
+      translate_y: -source_bounds.origin.y.0 * source_pixels_per_point,
+      text_hinting: text_hinting.map(|mode| (mode, source_pixels_per_point)),
+    }
+  };
+  let source_width_px = source_mapping.width_px;
+  let source_height_px = source_mapping.height_px;
   if u64::from(source_width_px) * u64::from(source_height_px) > MAX_NATIVE_SOURCE_PIXELS {
-    return None;
+    // An opaque black rectangle surface needs coverage only. Keep the same
+    // working-byte ceiling with an A8 mask instead of allocating RGBA plus
+    // another full-size associated-color plane. This preserves source density
+    // for large table grids without expanding other effect allocations.
+    if primitive_antialiasing != RasterPrimitiveAntialiasing::Aliased {
+      return None;
+    }
+    let image = rasterize_black_rectangles_via_mask(
+      items,
+      source_mapping,
+      RasterTargetSurface {
+        width_px: target_width_px,
+        height_px: target_height_px,
+        filter,
+      },
+    )?;
+    return Some(DrawingRaster {
+      image,
+      fill_image: None,
+      line_image: None,
+      fill_line_image: None,
+      children_image: None,
+      pixels_per_point: source_pixels_per_point,
+    });
   }
   let mut realized_items;
   let items = if primitive_antialiasing == RasterPrimitiveAntialiasing::Direct2dStandard4 {
@@ -1125,19 +1221,8 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
   } else {
     items
   };
-  let mut source = rasterize_vector_items_at_mapping(
-    items,
-    PageToRasterMapping {
-      width_px: source_width_px,
-      height_px: source_height_px,
-      scale_x: source_pixels_per_point,
-      scale_y: source_pixels_per_point,
-      translate_x: -source_bounds.origin.x.0 * source_pixels_per_point,
-      translate_y: -source_bounds.origin.y.0 * source_pixels_per_point,
-      text_hinting: text_hinting.map(|mode| (mode, source_pixels_per_point)),
-    },
-    primitive_antialiasing,
-  )?;
+  let mut source =
+    rasterize_vector_items_at_mapping(items, source_mapping, primitive_antialiasing)?;
   if std::env::var("OOXMLSDK_LOCKED_CANVAS_SOURCE_ALPHA_PROBE").as_deref() == Ok("wpf-gamma") {
     apply_wpf_grayscale_alpha_correction(&mut source);
   }
@@ -1145,7 +1230,9 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
     let _ = source.save(path);
   }
   Some(DrawingRaster {
-    image: if let Some(filter) = filter.image_filter() {
+    image: if filter == RasterResolveFilter::Area {
+      resize_premultiplied_rgba_area(&source, target_width_px, target_height_px)
+    } else if let Some(filter) = filter.image_filter() {
       resize_premultiplied_rgba(&source, target_width_px, target_height_px, filter)
     } else {
       source
@@ -1156,6 +1243,75 @@ pub(crate) fn rasterize_vector_items_for_effects_via_source_surface(
     children_image: None,
     pixels_per_point: source_pixels_per_point,
   })
+}
+
+fn rasterize_black_rectangles_via_mask(
+  items: &[DisplayItem<'static>],
+  mapping: PageToRasterMapping,
+  target: RasterTargetSurface,
+) -> Option<RgbaImage> {
+  if items.is_empty()
+    || u64::from(mapping.width_px) * u64::from(mapping.height_px) > MAX_NATIVE_SOURCE_PIXELS * 4
+    || !fixed_output_effect_raster_size_fits(target.width_px, target.height_px)
+    || target.filter == RasterResolveFilter::Native
+    || !items.iter().all(|item| {
+      matches!(
+        item,
+        DisplayItem::Rect(RectItem {
+          fill: Fill::Solid(Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255
+          }),
+          stroke: None,
+          ..
+        })
+      )
+    })
+  {
+    return None;
+  }
+  let mut mask = Mask::new(mapping.width_px, mapping.height_px)?;
+  let transform = SkTransform::from_row(
+    mapping.scale_x,
+    0.0,
+    0.0,
+    mapping.scale_y,
+    mapping.translate_x,
+    mapping.translate_y,
+  );
+  for item in items {
+    let DisplayItem::Rect(item) = item else {
+      return None;
+    };
+    let bounds = item.bounds;
+    let path = PathBuilder::from_rect(SkRect::from_xywh(
+      bounds.origin.x.0,
+      bounds.origin.y.0,
+      bounds.size.width.0,
+      bounds.size.height.0,
+    )?);
+    // tiny-skia Mask::fill_path uses the same path coverage implementation as
+    // Pixmap::fill_path. Opaque aliased black fills differ only in storage.
+    mask.fill_path(&path, FillRule::EvenOdd, false, transform);
+  }
+  let coverage = image::GrayImage::from_raw(mapping.width_px, mapping.height_px, mask.take())?;
+  let resolved = if target.filter == RasterResolveFilter::Area {
+    resize_coverage_area(&coverage, target.width_px, target.height_px)
+  } else {
+    image::imageops::resize(
+      &coverage,
+      target.width_px,
+      target.height_px,
+      target.filter.image_filter()?,
+    )
+  };
+  Some(RgbaImage::from_fn(
+    target.width_px,
+    target.height_px,
+    |x, y| image::Rgba([0, 0, 0, resolved.get_pixel(x, y)[0]]),
+  ))
 }
 
 fn realize_source_device_strokes(items: &mut [DisplayItem<'static>], dpi: f64) -> Option<()> {
@@ -1479,6 +1635,33 @@ pub(crate) fn resize_premultiplied_rgba_area(
   })
 }
 
+/// The same integer area integral for a coverage-only working surface.
+fn resize_coverage_area(source: &image::GrayImage, width: u32, height: u32) -> image::GrayImage {
+  if source.width() == 0 || source.height() == 0 || width == 0 || height == 0 {
+    return image::GrayImage::new(width, height);
+  }
+  let sw = u64::from(source.width());
+  let sh = u64::from(source.height());
+  let dw = u64::from(width);
+  let dh = u64::from(height);
+  let area = sw * sh;
+  image::GrayImage::from_fn(width, height, |x, y| {
+    let left = u64::from(x) * sw;
+    let right = left + sw;
+    let top = u64::from(y) * sh;
+    let bottom = top + sh;
+    let mut sum = 0_u64;
+    for sy in top / dh..bottom.div_ceil(dh) {
+      let wy = bottom.min((sy + 1) * dh) - top.max(sy * dh);
+      for sx in left / dw..right.div_ceil(dw) {
+        let wx = right.min((sx + 1) * dw) - left.max(sx * dw);
+        sum += wx * wy * u64::from(source.get_pixel(sx as u32, sy as u32)[0]);
+      }
+    }
+    image::Luma([((sum + area / 2) / area) as u8])
+  })
+}
+
 pub(crate) fn resize_premultiplied_rgba(
   source: &RgbaImage,
   width: u32,
@@ -1787,6 +1970,139 @@ pub(crate) fn rasterize_shape_surface_material_texture(
       )?;
       composite_material_sample_band(&mut pixmap, &samples, top);
     }
+  }
+  plan.finish(pixmap)
+}
+
+/// GDI+ draws a closed solid pen as a one-device-pixel stroke when both
+/// transformed pen axes are at most 1.5 pixels. Public DrawPath controls
+/// reproduce the same surface down to zero width at nine anisotropic scales.
+/// The material outline fits its own painted bounds, independently of the
+/// wider flat quad used to place the picture brush.
+fn picture_material_hairline(
+  outline: &PathItem<'static>,
+  width: u32,
+  height: u32,
+) -> Option<(Path, Color)> {
+  let stroke = outline.stroke.as_ref()?;
+  if stroke.resolved_dash().is_some()
+    || stroke.pattern.is_some()
+    || stroke.gradient.is_some()
+    || stroke.alignment == Some(super::StrokeAlignment::Inside)
+    || stroke
+      .compound
+      .is_some_and(|value| value != super::StrokeCompound::Single)
+  {
+    return None;
+  }
+  let bounds = super::drawingml_stroke::path_stroke_bounds(outline, stroke)?;
+  let sx = width as f32 / bounds.size.width.0;
+  let sy = height as f32 / bounds.size.height.0;
+  if stroke.width.0 * sx.max(sy) > 1.5 {
+    return None;
+  }
+  let centerline = path_from_commands(&outline.commands, &outline.points, true)?.transform(
+    SkTransform::from_row(
+      sx,
+      0.0,
+      0.0,
+      sy,
+      -bounds.origin.x.0 * sx,
+      -bounds.origin.y.0 * sy,
+    ),
+  )?;
+  let pen = SkStroke {
+    width: 1.0,
+    ..resolved_sk_stroke(stroke)
+  };
+  let path = expanded_stroke_path(&centerline, &pen, SkTransform::from_scale(8.0, 4.0))?;
+  Some((path, stroke.color))
+}
+
+/// A framed picture has an independent material texture, just like a solid
+/// shape. Word filters the image to the texture's realized image rectangle
+/// with WIC Fant, then paints its outline. The mesh and shadow keep their own
+/// device surfaces; resizing their completed bitmap cannot recover this paint.
+pub(crate) fn rasterize_picture_surface_material_texture(
+  items: &[DisplayItem<'static>],
+  plan: super::drawingml_3d::TextMaterialTexturePlan,
+) -> Option<super::drawingml_3d::TextMaterialTexture> {
+  let [DisplayItem::Image(image), DisplayItem::Path(outline)] = items else {
+    return None;
+  };
+  if image
+    .crop
+    .is_some_and(|crop| crop != super::ImageCrop::default())
+    || image.rotation_degrees.abs() > f32::EPSILON
+    || !matches!(outline.fill, Fill::None)
+    || !outline.closed
+  {
+    return None;
+  }
+  let t = plan.page_to_texture;
+  let source = decode_effect_source_image(&image.bytes, Some(image.content_type.as_ref()))?;
+  let frame_width = image.bounds.size.width.0 * t.sx;
+  let frame_height = image.bounds.size.height.0 * t.sy;
+  let width = frame_width.round().clamp(1.0, source.width() as f32) as u32;
+  let height = frame_height.round().clamp(1.0, source.height() as f32) as u32;
+  // WIC resolves a minified axis to whole texels. The texture brush places
+  // those texels at unit pitch from the fractional start of the image frame.
+  // Scaling them back to its fractional width would resample a second time.
+  let sample_span = (
+    if width < source.width() {
+      frame_width
+    } else {
+      source.width() as f32
+    },
+    if height < source.height() {
+      frame_height
+    } else {
+      source.height() as f32
+    },
+  );
+  let source = if (width, height) == source.dimensions() {
+    source
+  } else {
+    fant::resize_premultiplied_rgba_fant(&source, width, height)?
+  };
+  let mut pixmap = Pixmap::new(plan.width, plan.height)?;
+  let transform = SkTransform::from_row(t.sx, t.ky, t.kx, t.sy, t.tx, t.ty);
+  let region = image_raster_sample_region(image, transform, plan.width, plan.height);
+  draw_decoded_image_on_sample_region(
+    &mut pixmap,
+    image,
+    transform,
+    RasterPrimitiveAntialiasing::PerPrimitive,
+    region,
+    &source,
+    sample_span,
+  )?;
+  let hairline = picture_material_hairline(outline, plan.width, plan.height);
+  let sample_width = plan.width.checked_mul(8)?;
+  for top in (0..plan.height).step_by(64) {
+    let rows = (plan.height - top).min(64);
+    let mut samples = Pixmap::new(sample_width, rows * 4)?;
+    let band_y = (top * 4) as f32 + 2.0;
+    if let Some((path, color)) = &hairline {
+      let band = SkTransform::from_row(8.0, 0.0, 0.0, 4.0, -4.0, -band_y);
+      let mask = office_8x4_sample_mask(&samples, path, FillRule::Winding, band)?;
+      paint_sample_mask(&mut samples, &mask, solid_paint(*color), band)?;
+    } else {
+      draw_path(
+        &mut samples,
+        outline,
+        SkTransform::from_row(
+          t.sx * 8.0,
+          t.ky * 4.0,
+          t.kx * 8.0,
+          t.sy * 4.0,
+          t.tx * 8.0 - 4.0,
+          t.ty * 4.0 - band_y,
+        ),
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+      )?;
+    }
+    composite_material_sample_band(&mut pixmap, &samples, top);
   }
   plan.finish(pixmap)
 }
@@ -2119,6 +2435,7 @@ pub(crate) fn rasterize_static_3d_text_reflection_source_with_mapping(
   contour_color: Color,
   antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<RgbaImage> {
+  let (antialiasing, mapping) = antialiasing.realize_pixel_offset(mapping);
   if !valid_raster_mapping(mapping) || mapping.text_hinting.is_some() {
     // This source partitions continuous, unhinted raw-glyph geometry.
     // A hinted font bitmap cannot substitute for that geometry contract.
@@ -2141,7 +2458,8 @@ pub(crate) fn rasterize_static_3d_text_reflection_source_with_mapping(
     RasterPrimitiveAntialiasing::Aliased | RasterPrimitiveAntialiasing::ExactAliasedFill => {
       (1, 1, antialiasing)
     }
-    RasterPrimitiveAntialiasing::OfficeAntiAlias8x4 => (8, 4, antialiasing),
+    RasterPrimitiveAntialiasing::OfficeAntiAlias8x4
+    | RasterPrimitiveAntialiasing::OfficeAntiAlias8x4PixelOffsetHalf => (8, 4, antialiasing),
   };
   for top in (0..height).step_by(64) {
     let rows = (height - top).min(64);
@@ -3363,6 +3681,7 @@ pub(crate) fn rasterize_vector_items_at_mapping(
   mapping: PageToRasterMapping,
   primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<RgbaImage> {
+  let (primitive_antialiasing, mapping) = primitive_antialiasing.realize_pixel_offset(mapping);
   if !valid_raster_mapping(mapping) || items.iter().any(|item| !supported_raster_item(item)) {
     return None;
   }
@@ -3614,6 +3933,25 @@ fn draw_text(
     RasterPrimitiveAntialiasing::Direct2dStandard4 => RasterPrimitiveAntialiasing::PerPrimitive,
     other => other,
   };
+  if item.style.semantic_only || item.style.hidden || item.text.is_empty() {
+    return Some(());
+  }
+  if item
+    .style
+    .pdf_glyph_outline_options
+    .as_deref()
+    .is_some_and(|options| options.text_warp.is_some())
+    && let Some(path) = warped_text_effect_source(item, text_metrics)
+  {
+    // The foreground and its effect mask share the same completed WordArt
+    // envelope. Painting the ordinary glyph outline here loses prstTxWarp
+    // when the drawing is flattened into a canvas bitmap.
+    let page_to_raster = text_rotation_transform(item, text_metrics)
+      .map_or(page_to_raster, |rotation| {
+        page_to_raster.pre_concat(rotation)
+      });
+    return draw_path(pixmap, &path, page_to_raster, primitive_antialiasing);
+  }
   let outline = text_outline(item, text_hinting, text_metrics)?;
   let commands = outline.commands;
   if commands.is_empty() {
@@ -3775,9 +4113,78 @@ pub(crate) fn warped_text_effect_source(
   })
 }
 
+fn text_rotation_transform(
+  item: &TextRun<'static>,
+  text_metrics: &mut TextMetrics,
+) -> Option<SkTransform> {
+  if item.style.rotation_degrees.abs() <= f32::EPSILON {
+    return None;
+  }
+  let center = item.rotation_center.unwrap_or_else(|| super::Point {
+    x: item.origin.x,
+    y: super::Pt(text_baseline_y(item, text_metrics)),
+  });
+  Some(SkTransform::from_rotate_at(
+    item.style.rotation_degrees,
+    center.x.0,
+    center.y.0,
+  ))
+}
+
+/// Page-space geometry for effect allocation, including the glyph rotation.
+/// Paint rotated sources through `draw_text`, which transforms their brushes
+/// together with their contours. This path is only the allocation/stroke owner.
+pub(crate) fn warped_text_effect_geometry(
+  item: &TextRun<'static>,
+  text_metrics: &mut TextMetrics,
+) -> Option<PathItem<'static>> {
+  let mut source = warped_text_effect_source(item, text_metrics)?;
+  if let Some(rotation) = text_rotation_transform(item, text_metrics) {
+    let transform = Affine::new([
+      f64::from(rotation.sx),
+      f64::from(rotation.ky),
+      f64::from(rotation.kx),
+      f64::from(rotation.sy),
+      f64::from(rotation.tx),
+      f64::from(rotation.ty),
+    ]);
+    let path =
+      transform * super::text_warp_projection::common_commands_to_bez_path(&source.commands);
+    let bounds = path.bounding_box();
+    source.bounds = Rect {
+      origin: super::Point {
+        x: super::Pt(bounds.x0 as f32),
+        y: super::Pt(bounds.y0 as f32),
+      },
+      size: super::Size {
+        width: super::Pt(bounds.width() as f32),
+        height: super::Pt(bounds.height() as f32),
+      },
+    };
+    source.commands = super::drawingml_geometry::bez_path_commands(path);
+  }
+  Some(source)
+}
+
 struct RasterTextOutline {
   commands: Vec<PathCommand>,
   width_pt: f32,
+}
+
+fn replay_glyph_outline(path: &BezPath, pen: &mut impl OutlinePen) {
+  for element in path.elements() {
+    match *element {
+      kurbo::PathEl::MoveTo(p) => pen.move_to(p.x as f32, p.y as f32),
+      kurbo::PathEl::LineTo(p) => pen.line_to(p.x as f32, p.y as f32),
+      kurbo::PathEl::QuadTo(c, p) => {
+        pen.quad_to(c.x as f32, c.y as f32, p.x as f32, p.y as f32);
+      }
+      kurbo::PathEl::CurveTo(a, b, p) => pen.curve_to(
+        a.x as f32, a.y as f32, b.x as f32, b.y as f32, p.x as f32, p.y as f32,
+      ),
+      kurbo::PathEl::ClosePath => pen.close(),
+    }
+  }
 }
 
 fn text_baseline_y(item: &TextRun<'static>, text_metrics: &mut TextMetrics) -> f32 {
@@ -3814,7 +4221,8 @@ fn text_outline(
       width_pt: 0.0,
     });
   }
-  let mut shaped = text_metrics.shape_text(item.text.as_ref(), &item.style)?;
+  let mut shaped =
+    text_shaped_with_layout_positions(item.text.as_ref(), &item.style, text_metrics)?;
   let explicit_advances = apply_explicit_character_advances(
     &mut shaped,
     item.text.as_ref(),
@@ -3880,7 +4288,18 @@ fn text_outline(
       rotation_center: item.rotation_center,
       current: None,
     };
-    if let Some(glyph_outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
+    if item
+      .style
+      .pdf_glyph_outline_options
+      .as_ref()
+      .is_some_and(|options| options.gdi_synthetic_bold)
+      && let Some(path) = text_metrics.gdi_synthetic_bold_outline(face_data, glyph.glyph_id)
+    {
+      // The native glyph path is built at the design em, even when the
+      // surrounding bitmap uses a different sampling density.
+      outline.scale = glyph.font_size_pt / units_per_em;
+      replay_glyph_outline(path, &mut outline);
+    } else if let Some(glyph_outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
       if let Some(ppem) = hinted_ppem {
         let outlines = face.outline_glyphs();
         let preserve_linear_metrics = text_hinting.is_some_and(|(mode, _)| {
@@ -3986,7 +4405,7 @@ pub(crate) fn vml_text_warp_glyph_bounds(
 ) -> Option<kurbo::Rect> {
   let options = item.style.pdf_glyph_outline_options.as_deref()?;
   let warp = options.text_warp.as_deref()?;
-  warp.vml_fit_path?;
+  warp.vml_fit_path.as_ref()?;
   let path = vml_envelope_text_outline(item, warp, text_metrics)?;
   (!path.is_empty()).then(|| path.bounding_box())
 }
@@ -4001,12 +4420,12 @@ pub(crate) fn vml_wordart_paint_bounds(
 ) -> Option<VmlWordartPaintBounds> {
   let options = item.style.pdf_glyph_outline_options.as_deref()?;
   let warp = options.text_warp.as_deref()?;
-  // Multi-line VML envelopes have one boundary pair per band. They use the
-  // same projected glyph, outline and shadow enclosure as a single band.
-  // Excluding them loses the inline advance and auto-fit host's effect bounds.
+  // VML uses either a single centerline (rigid glyphs fitted to a path) or
+  // one boundary pair per envelope band. Both need the complete glyph and
+  // effect enclosure; rejecting the centerline loses its inline outsets.
   if warp.vml_fit_path.is_none()
-    || warp.boundaries.len() < 2
-    || !warp.boundaries.len().is_multiple_of(2)
+    || warp.boundaries.is_empty()
+    || (warp.boundaries.len() != 1 && !warp.boundaries.len().is_multiple_of(2))
   {
     return None;
   }
@@ -4059,9 +4478,10 @@ pub(crate) fn vml_wordart_paint_bounds(
     return None;
   }
   let shadow = options
-    .vml_text_shadow
-    .and_then(|shadow| shadow.project_path(&path))
-    .map(|path| path.bounding_box());
+    .vml_text_shadows()
+    .filter_map(|shadow| shadow.project_path(&path))
+    .map(|path| path.bounding_box())
+    .reduce(|bounds, shadow| bounds.union(shadow));
   let mut bounds = path.bounding_box();
   let stroke = options.outline_stroke.as_ref();
   let width = stroke.map_or(item.style.outline_width.0, |stroke| stroke.width.0);
@@ -4146,7 +4566,10 @@ pub(crate) fn vml_wordart_paint_bounds(
   })
 }
 
-fn vml_envelope_shaped_text(
+/// Completed text retains logical positions while its glyph outlines use the
+/// realized output em. This is shared by ordinary canvas paths and envelopes;
+/// consuming only the paint size loses the separate layout-size contract.
+fn text_shaped_with_layout_positions(
   text: &str,
   style: &super::TextStyle<'_>,
   text_metrics: &mut TextMetrics,
@@ -4159,9 +4582,7 @@ fn vml_envelope_shaped_text(
     logical_style.font_size = sizes.primary;
     logical_style.complex_font_size = sizes.complex;
     let logical = text_metrics.shape_text(text, &logical_style)?;
-    // The PDF envelope retains logical positions while painting realized
-    // outlines. Its layout preview must enclose those same glyphs. Reject a
-    // changed shaping topology completely rather than transferring another
+    // Reject a changed shaping topology rather than transferring another
     // cluster's origin or advance. Absolute spacing remains in point units.
     if paint.glyphs.len() == logical.glyphs.len()
       && paint
@@ -4186,6 +4607,15 @@ fn vml_envelope_shaped_text(
       paint.width_pt = logical.width_pt;
     }
   }
+  Some(paint)
+}
+
+fn vml_envelope_shaped_text(
+  text: &str,
+  style: &super::TextStyle<'_>,
+  text_metrics: &mut TextMetrics,
+) -> Option<crate::text_metrics::ShapedText> {
+  let mut paint = text_shaped_with_layout_positions(text, style, text_metrics)?;
   apply_explicit_character_advances(
     &mut paint,
     text,
@@ -4197,7 +4627,7 @@ fn vml_envelope_shaped_text(
 // Completed GDI/Word line cells already own the distances between source
 // characters. Both rigid shape outlines and WordArt effect sources must use
 // those cells just as the PDF foreground does, including multi-byte clusters.
-fn apply_explicit_character_advances(
+pub(crate) fn apply_explicit_character_advances(
   paint: &mut crate::text_metrics::ShapedText,
   text: &str,
   advances: Option<&[f32]>,
@@ -4231,7 +4661,8 @@ fn vml_envelope_text_outline(
   use super::text_warp_projection::{
     GlyphOutlinePath, TextFollowPathFontCell, TextWarpBoundary, append_mapped_outline,
     common_commands_to_bez_path, split_outline_at_warp_seams, text_follow_path_glyph_transform,
-    text_warp_point, text_warp_source_seams,
+    text_warp_point, text_warp_source_seams, vml_fit_path_centerline_offset,
+    vml_fit_path_glyph_point,
   };
 
   let boundaries = warp
@@ -4240,12 +4671,27 @@ fn vml_envelope_text_outline(
     .filter(|_| warp.follow_path.is_none())
     .map(|commands| TextWarpBoundary::new(commands).ok())
     .collect::<Option<Vec<_>>>()?;
-  let seams = if warp.vml_trim_band.is_none() && warp.follow_path.is_none() {
+  let fit_path = (boundaries.len() == 1)
+    .then_some(warp.vml_fit_path.as_ref())
+    .flatten();
+  let authored_path = fit_path.and_then(|fit| fit.authored_path.as_ref());
+  let seams = if warp.vml_trim_band.is_none() && warp.follow_path.is_none() && fit_path.is_none() {
     text_warp_source_seams(warp, &boundaries)
   } else {
     Vec::new()
   };
   let shaped = vml_envelope_shaped_text(item.text.as_ref(), &item.style, text_metrics)?;
+  let authored_metrics = authored_path.map(|_| {
+    shaped
+      .font_faces
+      .iter()
+      .map(|data| {
+        FontRef::from_index(data.data.as_ref(), data.index)
+          .ok()
+          .map(|face| face.glyph_metrics(Size::unscaled(), LocationRef::default()))
+      })
+      .collect::<Vec<_>>()
+  });
   let baseline_y = text_baseline_y(item, text_metrics);
   let horizontal_scale = item.style.horizontal_scale.unwrap_or(1.0);
   let mut cursor_x = item.origin.x.0;
@@ -4261,12 +4707,22 @@ fn vml_envelope_text_outline(
     let origin_y = baseline_y - glyph.y_offset_em * glyph.font_size_pt;
     if let Some(outline) = face.outline_glyphs().get(GlyphId::new(glyph.glyph_id)) {
       let mut raw = GlyphOutlinePath::default();
-      outline
-        .draw(
-          DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
-          &mut raw,
-        )
-        .ok()?;
+      if item
+        .style
+        .pdf_glyph_outline_options
+        .as_ref()
+        .is_some_and(|options| options.gdi_synthetic_bold)
+        && let Some(path) = text_metrics.gdi_synthetic_bold_outline(face_data, glyph.glyph_id)
+      {
+        replay_glyph_outline(path, &mut raw);
+      } else {
+        outline
+          .draw(
+            DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+            &mut raw,
+          )
+          .ok()?;
+      }
       let scale = glyph.font_size_pt / units_per_em;
       let glyph_to_page = |point: KurboPoint| {
         let x = if face_data.synthetic_italic {
@@ -4290,6 +4746,30 @@ fn vml_envelope_text_outline(
       } else {
         None
       };
+      let glyph_center_x = f64::from(origin_x)
+        + authored_metrics
+          .as_ref()
+          .and_then(|metrics| metrics.get(glyph.font_index)?.as_ref())
+          .and_then(|metrics| metrics.bounds(GlyphId::new(glyph.glyph_id)))
+          .map_or_else(
+            || f64::from(glyph.x_advance_em * glyph.font_size_pt) / 2.0,
+            |bounds| {
+              (f64::from(bounds.x_min) + f64::from(bounds.x_max) + 1.0) / 2.0
+                * f64::from(scale * horizontal_scale)
+            },
+          );
+      let centerline_y = f64::from(origin_y)
+        - fit_path.map_or(0.0, |_| {
+          vml_fit_path_centerline_offset(&face, units_per_em, scale, authored_path.is_some())
+        });
+      let vml_transform = fit_path.zip(authored_path).and_then(|(fit, path)| {
+        path.glyph_transform(
+          f64::from(fit.start_x.0),
+          f64::from(fit.advance_width.0),
+          glyph_center_x,
+          centerline_y,
+        )
+      });
       if warp.word_envelope {
         super::text_warp_projection::append_word_envelope_outline(
           &raw.path,
@@ -4305,10 +4785,13 @@ fn vml_envelope_text_outline(
           split.as_ref().unwrap_or(&raw.path),
           |point| {
             let point = glyph_to_page(point);
-            follow_path_transform.map_or_else(
-              || text_warp_point(warp, &boundaries, point),
-              |transform| transform * point,
-            )
+            if let Some(transform) = follow_path_transform.or(vml_transform) {
+              transform * point
+            } else if let (Some(fit), [boundary]) = (fit_path, boundaries.as_slice()) {
+              vml_fit_path_glyph_point(fit, boundary, glyph_center_x, centerline_y, point)
+            } else {
+              text_warp_point(warp, &boundaries, point)
+            }
           },
           &mut commands,
         )
@@ -4493,7 +4976,86 @@ fn draw_image(
   page_to_raster: SkTransform,
   primitive_antialiasing: RasterPrimitiveAntialiasing,
 ) -> Option<()> {
+  let region = image_raster_sample_region(item, page_to_raster, pixmap.width(), pixmap.height());
+  draw_image_on_sample_region(pixmap, item, page_to_raster, primitive_antialiasing, region)
+}
+
+/// Conservative device bounds limit sampling, while the inverse-map test below
+/// still owns exact coverage. Include a pixel of float/edge enclosure, as with
+/// ordinary clipped raster primitives; no resampling or source grid changes.
+fn image_raster_sample_region(
+  item: &ImageItem<'static>,
+  page_to_raster: SkTransform,
+  width: u32,
+  height: u32,
+) -> (u32, u32, u32, u32) {
+  let half_width = item.bounds.size.width.0 * 0.5;
+  let half_height = item.bounds.size.height.0 * 0.5;
+  let center_x = item.bounds.origin.x.0 + half_width;
+  let center_y = item.bounds.origin.y.0 + half_height;
+  let (sin, cos) = item.rotation_degrees.to_radians().sin_cos();
+  let mut corners = [
+    (-half_width, -half_height),
+    (half_width, -half_height),
+    (half_width, half_height),
+    (-half_width, half_height),
+  ]
+  .map(|(x, y)| {
+    SkPoint::from_xy(
+      cos.mul_add(x, (-sin).mul_add(y, center_x)),
+      sin.mul_add(x, cos.mul_add(y, center_y)),
+    )
+  });
+  page_to_raster.map_points(&mut corners);
+  if corners.iter().any(|p| !p.x.is_finite() || !p.y.is_finite()) {
+    return (0, 0, width, height);
+  }
+  let left = corners.iter().map(|p| p.x).fold(f32::INFINITY, f32::min);
+  let top = corners.iter().map(|p| p.y).fold(f32::INFINITY, f32::min);
+  let right = corners
+    .iter()
+    .map(|p| p.x)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let bottom = corners
+    .iter()
+    .map(|p| p.y)
+    .fold(f32::NEG_INFINITY, f32::max);
+  (
+    (left.floor() - 1.0).clamp(0.0, width as f32) as u32,
+    (top.floor() - 1.0).clamp(0.0, height as f32) as u32,
+    (right.ceil() + 1.0).clamp(0.0, width as f32) as u32,
+    (bottom.ceil() + 1.0).clamp(0.0, height as f32) as u32,
+  )
+}
+
+fn draw_image_on_sample_region(
+  pixmap: &mut Pixmap,
+  item: &ImageItem<'static>,
+  page_to_raster: SkTransform,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+  (left, top, right, bottom): (u32, u32, u32, u32),
+) -> Option<()> {
   let source = decode_effect_source_image(&item.bytes, Some(item.content_type.as_ref()))?;
+  draw_decoded_image_on_sample_region(
+    pixmap,
+    item,
+    page_to_raster,
+    primitive_antialiasing,
+    (left, top, right, bottom),
+    &source,
+    (source.width() as f32, source.height() as f32),
+  )
+}
+
+fn draw_decoded_image_on_sample_region(
+  pixmap: &mut Pixmap,
+  item: &ImageItem<'static>,
+  page_to_raster: SkTransform,
+  primitive_antialiasing: RasterPrimitiveAntialiasing,
+  (left, top, right, bottom): (u32, u32, u32, u32),
+  source: &RgbaImage,
+  (source_width, source_height): (f32, f32),
+) -> Option<()> {
   let crop = item.crop.unwrap_or_default();
   let visible_width = 1.0 - crop.left - crop.right;
   let visible_height = 1.0 - crop.top - crop.bottom;
@@ -4507,10 +5069,10 @@ fn draw_image(
     return None;
   }
 
-  let mut mask = Pixmap::new(pixmap.width(), pixmap.height())?;
-  if item.clip_path.is_empty() {
-    mask.fill(SkColor::WHITE);
+  let mask = if item.clip_path.is_empty() {
+    None
   } else {
+    let mut mask = Pixmap::new(pixmap.width(), pixmap.height())?;
     let clip_path = path_from_commands(&item.clip_path, &[], true)?;
     let mut mask_paint = Paint::default();
     mask_paint.set_color_rgba8(255, 255, 255, 255);
@@ -4528,19 +5090,21 @@ fn draw_image(
         None,
       );
     }
-  }
+    Some(mask)
+  };
 
   let raster_to_page = page_to_raster.invert()?;
   let center_x = item.bounds.origin.x.0 + width_pt * 0.5;
   let center_y = item.bounds.origin.y.0 + height_pt * 0.5;
   let angle = item.rotation_degrees.to_radians();
   let (sin, cos) = angle.sin_cos();
-  let source_width = source.width() as f32;
-  let source_height = source.height() as f32;
 
-  for y in 0..pixmap.height() {
-    for x in 0..pixmap.width() {
-      let mask_alpha = mask.pixel(x, y)?.alpha();
+  for y in top..bottom {
+    for x in left..right {
+      let mask_alpha = match &mask {
+        Some(mask) => mask.pixel(x, y)?.alpha(),
+        None => 255,
+      };
       if mask_alpha == 0 {
         continue;
       }
@@ -4565,7 +5129,7 @@ fn draw_image(
       u = crop.left + u * visible_width;
       v = crop.top + v * visible_height;
       let sample = bilinear_sample(
-        &source,
+        source,
         u.mul_add(source_width, -0.5),
         v.mul_add(source_height, -0.5),
       );
@@ -6146,6 +6710,289 @@ mod tests {
   use tiny_skia::{FillRule as SkFillRule, PathBuilder as SkPathBuilder, Pixmap as SkPixmap};
 
   #[test]
+  fn black_rectangle_mask_preserves_rgba_coverage_and_filtering() {
+    let items: Vec<_> = [
+      (0.12, 0.37, 23.8, 0.48),
+      (314.0 / 100.0, -0.25, 0.5, 35.0),
+      (3.2, 7.1, 18.0, 0.5),
+      (8.31, 2.35, 0.36, 28.4),
+      (17.0, 30.2, 11.0, 5.5),
+    ]
+    .into_iter()
+    .map(|(x, y, width, height)| {
+      DisplayItem::Rect(RectItem {
+        bounds: rect(x, y, width, height),
+        fill: Fill::Solid(Color {
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 255,
+        }),
+        stroke: None,
+      })
+    })
+    .collect();
+    for phase in [0.0, 0.3, 0.5, 0.75] {
+      let mapping = PageToRasterMapping {
+        width_px: 257,
+        height_px: 311,
+        scale_x: 600.0 / 72.0,
+        scale_y: 600.0 / 72.0,
+        translate_x: phase,
+        translate_y: -phase,
+        text_hinting: None,
+      };
+      let rgba = super::rasterize_vector_items_at_mapping(
+        &items,
+        mapping,
+        RasterPrimitiveAntialiasing::Aliased,
+      )
+      .unwrap();
+      for (width_px, height_px) in [(41, 49), (85, 103)] {
+        for filter in [
+          super::RasterResolveFilter::Triangle,
+          super::RasterResolveFilter::Area,
+        ] {
+          let target = super::RasterTargetSurface {
+            width_px,
+            height_px,
+            filter,
+          };
+          let actual = super::rasterize_black_rectangles_via_mask(&items, mapping, target).unwrap();
+          let expected = if filter == super::RasterResolveFilter::Area {
+            super::resize_premultiplied_rgba_area(&rgba, width_px, height_px)
+          } else {
+            super::resize_premultiplied_rgba(
+              &rgba,
+              width_px,
+              height_px,
+              image::imageops::FilterType::Triangle,
+            )
+          };
+          assert_eq!(
+            actual, expected,
+            "phase={phase}, target={width_px}x{height_px}, {filter:?}"
+          );
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn locked_canvas_source_grid_matches_native_rotated_phase_controls() {
+    // Actual 30-degree rectangles: six positive/negative phases, no pen or
+    // a 0.75pt miter pen, at 192 and 600 DPI. Native page-anchor controls keep
+    // these local device rectangles unchanged. Bounds and grid are distinct
+    // owners: axis-aligned primitives may realize their geometry beforehand.
+    let native: [(f64, [f32; 4], [i32; 4]); 24] = [
+      (
+        192.0,
+        [-29.227_293, -7.395_378_6, 114.764_3, 121.968_37],
+        [-78, -20, 307, 326],
+      ),
+      (
+        600.0,
+        [-29.227_293, -7.395_378_6, 114.764_3, 121.968_37],
+        [-244, -62, 957, 1017],
+      ),
+      (
+        192.0,
+        [-12.007_293, -24.615_38, 131.984_3, 104.748_37],
+        [-33, -66, 352, 280],
+      ),
+      (
+        600.0,
+        [-12.007_293, -24.615_38, 131.984_3, 104.748_37],
+        [-101, -206, 1100, 873],
+      ),
+      (
+        192.0,
+        [-11.977_293, -24.645_378, 132.014_3, 104.718_37],
+        [-32, -66, 353, 280],
+      ),
+      (
+        600.0,
+        [-11.977_293, -24.645_378, 132.014_3, 104.718_37],
+        [-100, -206, 1101, 873],
+      ),
+      (
+        192.0,
+        [-11.947_293, -24.675_379, 132.044_3, 104.688_37],
+        [-32, -66, 353, 280],
+      ),
+      (
+        600.0,
+        [-11.947_293, -24.675_379, 132.044_3, 104.688_37],
+        [-100, -206, 1101, 873],
+      ),
+      (
+        192.0,
+        [-11.847_293, -24.775_38, 132.144_3, 104.588_37],
+        [-32, -67, 353, 279],
+      ),
+      (
+        600.0,
+        [-11.847_293, -24.775_38, 132.144_3, 104.588_37],
+        [-99, -207, 1102, 872],
+      ),
+      (
+        192.0,
+        [5.272_707, -41.895_38, 149.264_3, 87.468_37],
+        [14, -112, 399, 234],
+      ),
+      (
+        600.0,
+        [5.272_707, -41.895_38, 149.264_3, 87.468_37],
+        [43, -350, 1244, 729],
+      ),
+      (
+        192.0,
+        [-29.739_553, -7.907_638, 115.276_56, 122.480_63],
+        [-80, -22, 308, 327],
+      ),
+      (
+        600.0,
+        [-29.739_553, -7.907_638, 115.276_56, 122.480_63],
+        [-248, -66, 961, 1021],
+      ),
+      (
+        192.0,
+        [-12.519_553, -25.127_638, 132.496_57, 105.260_63],
+        [-34, -68, 354, 281],
+      ),
+      (
+        600.0,
+        [-12.519_553, -25.127_638, 132.496_57, 105.260_63],
+        [-105, -210, 1105, 878],
+      ),
+      (
+        192.0,
+        [-12.489_552_5, -25.157_639, 132.526_57, 105.230_63],
+        [-34, -68, 354, 281],
+      ),
+      (
+        600.0,
+        [-12.489_552_5, -25.157_639, 132.526_57, 105.230_63],
+        [-105, -210, 1105, 877],
+      ),
+      (
+        192.0,
+        [-12.459_553, -25.187_637, 132.556_56, 105.200_63],
+        [-34, -68, 354, 281],
+      ),
+      (
+        600.0,
+        [-12.459_553, -25.187_637, 132.556_56, 105.200_63],
+        [-104, -210, 1105, 877],
+      ),
+      (
+        192.0,
+        [-12.359_552, -25.287_638, 132.656_56, 105.100_63],
+        [-33, -68, 354, 281],
+      ),
+      (
+        600.0,
+        [-12.359_552, -25.287_638, 132.656_56, 105.100_63],
+        [-103, -211, 1106, 876],
+      ),
+      (
+        192.0,
+        [4.760_447_5, -42.407_64, 149.776_57, 87.980_63],
+        [12, -114, 400, 235],
+      ),
+      (
+        600.0,
+        [4.760_447_5, -42.407_64, 149.776_57, 87.980_63],
+        [39, -354, 1249, 734],
+      ),
+    ];
+    for (dpi, [left, top, right, bottom], [x0, y0, x1, y1]) in native {
+      for (x, y) in [(0.0, 0.0), (151.7, 108.333_79), (151.85, 108.483_79)] {
+        let origin = Point { x: Pt(x), y: Pt(y) };
+        let mapping = super::enclosing_source_grid_mapping(
+          rect(x + left, y + top, right - left, bottom - top),
+          origin,
+          dpi,
+          None,
+        )
+        .unwrap();
+        assert_eq!(mapping.width_px, (x1 - x0) as u32);
+        assert_eq!(mapping.height_px, (y1 - y0) as u32);
+        let scale = dpi as f32 / 72.0;
+        assert!((x * scale + mapping.translate_x + x0 as f32).abs() < 0.0002);
+        assert!((y * scale + mapping.translate_y + y0 as f32).abs() < 0.0002);
+      }
+    }
+    assert!(
+      super::enclosing_source_grid_mapping(
+        rect(0.0, 0.0, f32::INFINITY, 1.0),
+        Point {
+          x: Pt(0.0),
+          y: Pt(0.0)
+        },
+        600.0,
+        None,
+      )
+      .is_none()
+    );
+  }
+
+  #[test]
+  fn large_black_rectangle_surface_retains_density_with_bounded_mask_storage() {
+    let mut items = vec![DisplayItem::Rect(RectItem {
+      bounds: rect(20.0, 20.0, 0.5, 580.0),
+      fill: Fill::Solid(Color {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 255,
+      }),
+      stroke: None,
+    })];
+    let effects = crate::common::drawingml_image_effects::ImageEffectContainer {
+      kind: crate::common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+      effects: Vec::new(),
+    };
+    let source = super::RasterSourceSurface {
+      bounds: rect(0.0, 0.0, 384.0, 601.2),
+      dpi: 600.0,
+      extent: RasterSourceExtent::Round,
+      device_grid_origin: None,
+      text_hinting: None,
+      primitive_antialiasing: RasterPrimitiveAntialiasing::Aliased,
+    };
+    let target = super::RasterTargetSurface {
+      width_px: 64,
+      height_px: 100,
+      filter: super::RasterResolveFilter::Area,
+    };
+    let raster = super::rasterize_vector_items_for_effects_via_source_surface(
+      &items, &effects, source, target,
+    )
+    .expect("a black grid needs one coverage byte per source pixel");
+    assert_eq!(raster.image.dimensions(), (64, 100));
+    assert_eq!(raster.pixels_per_point, 600.0 / 72.0);
+    assert!(raster.image.pixels().any(|pixel| pixel[3] > 0));
+    assert!(raster.image.pixels().all(|pixel| pixel.0[..3] == [0; 3]));
+    let DisplayItem::Rect(item) = &mut items[0] else {
+      unreachable!()
+    };
+    item.fill = Fill::Solid(Color {
+      r: 255,
+      g: 0,
+      b: 0,
+      a: 255,
+    });
+    assert!(
+      super::rasterize_vector_items_for_effects_via_source_surface(
+        &items, &effects, source, target,
+      )
+      .is_none(),
+      "other materials retain the existing RGBA allocation guard"
+    );
+  }
+
+  #[test]
   fn curve_winding_index_preserves_open_closed_and_boundary_queries() {
     use kurbo::{BezPath, Point, Shape};
     let mut path = BezPath::new();
@@ -6239,6 +7086,7 @@ mod tests {
             bounds: rect(0.0, 0.0, width, height),
             dpi: 600.0,
             extent: RasterSourceExtent::Outward,
+            device_grid_origin: None,
             text_hinting: None,
             primitive_antialiasing: RasterPrimitiveAntialiasing::Direct2dStandard4,
           },
@@ -6786,6 +7634,7 @@ mod tests {
         RasterPrimitiveAntialiasing::PerPrimitive,
         RasterPrimitiveAntialiasing::Direct2dStandard4,
         RasterPrimitiveAntialiasing::OfficeAntiAlias8x4,
+        RasterPrimitiveAntialiasing::OfficeAntiAlias8x4PixelOffsetHalf,
       ] {
         let mapping = PageToRasterMapping {
           width_px: 32,
@@ -7500,6 +8349,54 @@ mod tests {
       // the bounded 32-sample coverage grid used here.
       [0, 255, 255, 0, 112, 255, 255, 104]
     );
+  }
+
+  #[test]
+  fn picture_material_hairline_uses_device_coverage_on_both_axes() {
+    let bounds = rect(20.0, 10.0, 317.05, 238.337_86);
+    let mut outline = PathItem {
+      bounds,
+      commands: super::static_3d_picture_frame(bounds, 0.0),
+      closed: true,
+      stroke: Some(Stroke {
+        width: Pt(0.5),
+        color: Color {
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 255,
+        },
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let (path, _) = super::picture_material_hairline(&outline, 512, 256).unwrap();
+    // Straight portions of the native roundRect have the same pen samples.
+    let coverage = |x: u32, y: u32| {
+      let grid = super::Pixmap::new(8, 4).unwrap();
+      let band = super::SkTransform::from_row(
+        8.0,
+        0.0,
+        0.0,
+        4.0,
+        -(x as f32 * 8.0 + 4.0),
+        -(y as f32 * 4.0 + 2.0),
+      );
+      let mask =
+        super::office_8x4_sample_mask(&grid, &path, super::FillRule::Winding, band).unwrap();
+      (mask.data().iter().map(|&v| u32::from(v)).sum::<u32>() + 16) / 32
+    };
+    assert_eq!(
+      [
+        coverage(256, 0),
+        coverage(256, 255),
+        coverage(0, 128),
+        coverage(511, 128)
+      ],
+      [255, 191, 255, 223]
+    );
+    outline.stroke.as_mut().unwrap().width = Pt(1.0);
+    assert!(super::picture_material_hairline(&outline, 512, 256).is_none());
   }
 
   #[test]
@@ -8538,6 +9435,66 @@ mod tests {
       floating: false,
       behind_text: false,
     });
+    let DisplayItem::Image(template) = &item else {
+      unreachable!();
+    };
+    // Differential oracle: retain the complete pre-optimization sample region.
+    // Exercise crop, both flips, rotation, shear, reflected axes, clipping,
+    // fractional phase and partial/offscreen intersections on a colored target.
+    for transform in [
+      super::SkTransform::from_row(2.0, 0.0, 0.0, 1.5, 1.1, 2.4),
+      super::SkTransform::from_row(1.5, 0.2, 0.3, 0.75, 1.1, 2.4),
+      super::SkTransform::from_row(-1.5, 0.2, 0.3, 1.25, 48.0, 4.0),
+    ] {
+      for rotation in [0.0, 17.0, 90.0, 213.0] {
+        for flip in [false, true] {
+          for clipped in [false, true] {
+            for offset in [0.0, -30.0, 100.0] {
+              let mut image = template.clone();
+              image.bounds = rect(5.2 + offset, 7.4, 8.9, 6.3);
+              image.rotation_degrees = rotation;
+              image.flip_horizontal = flip;
+              image.flip_vertical = !flip;
+              if clipped {
+                image.clip_path = vec![
+                  PathCommand::MoveTo(Point {
+                    x: Pt(2.0),
+                    y: Pt(1.0),
+                  }),
+                  PathCommand::LineTo(Point {
+                    x: Pt(12.0),
+                    y: Pt(3.0),
+                  }),
+                  PathCommand::LineTo(Point {
+                    x: Pt(8.0),
+                    y: Pt(13.0),
+                  }),
+                  PathCommand::Close,
+                ];
+              }
+              let mut bounded = SkPixmap::new(64, 48).unwrap();
+              bounded.fill(super::SkColor::from_rgba8(17, 29, 81, 170));
+              let mut full = bounded.clone();
+              let antialiasing = super::RasterPrimitiveAntialiasing::PerPrimitive;
+              super::draw_image(&mut bounded, &image, transform, antialiasing).unwrap();
+              super::draw_image_on_sample_region(
+                &mut full,
+                &image,
+                transform,
+                antialiasing,
+                (0, 0, 64, 48),
+              )
+              .unwrap();
+              assert_eq!(
+                bounded.data(),
+                full.data(),
+                "rotation={rotation}, transform={transform:?}, flip={flip}, clip={clipped}, offset={offset}"
+              );
+            }
+          }
+        }
+      }
+    }
     let raster = rasterize_vector_items(&[item], bounds).unwrap();
     let center = raster
       .image

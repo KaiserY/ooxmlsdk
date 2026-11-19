@@ -1,4 +1,4 @@
-//! Word's paired-envelope shadow allocation, separate from visible stroke paint.
+//! Word's glyph-path shadow allocation, separate from visible stroke paint.
 
 use kurbo::{BezPath, PathEl, Point, Rect, Shape};
 
@@ -16,6 +16,84 @@ pub(super) struct Grid {
 }
 
 impl Grid {
+  pub fn flat_shape(
+    source: common::Rect,
+    shadow: WordprocessingTextShadow,
+    host: [f32; 2],
+    page: common::Rect,
+    output_dpi: f32,
+  ) -> Option<Self> {
+    if shadow.distance_px != 0.0
+      || shadow.scale_x != 1.0
+      || shadow.scale_y != 1.0
+      || shadow.skew_x_degrees != 0.0
+      || shadow.skew_y_degrees != 0.0
+      || !host.into_iter().all(f32::is_finite)
+      || !output_dpi.is_finite()
+      || output_dpi <= 0.0
+    {
+      return None;
+    }
+    let local = |rect: common::Rect| {
+      let left = f64::from(rect.origin.x.0) - f64::from(host[0]);
+      let top = f64::from(rect.origin.y.0) - f64::from(host[1]);
+      let coordinate = |point: f64| {
+        let dots = point / PRINTER_POINT;
+        let half = (dots * 2.0).round() / 2.0;
+        // Match the containing formatter's existing f32 half-cell policy.
+        // Native48pt descenders land exactly on a half source-printer dot.
+        let tolerance = f64::from(f32::EPSILON) * dots.abs().max(1.0) * 8.0;
+        if (dots - half).abs() <= tolerance {
+          half
+        } else {
+          dots
+        }
+      };
+      Rect::new(
+        coordinate(left),
+        coordinate(top),
+        coordinate(left + f64::from(rect.size.width.0)),
+        coordinate(top + f64::from(rect.size.height.0)),
+      )
+    };
+    let blur = f64::from(shadow.blur_radius_px) * 0.75 * f64::from(shadow.geometry_length_scale)
+      / PRINTER_POINT;
+    let density = super::wordprocessing_drawing_backdrop_pixels_per_point(
+      shadow.blur_radius_px * shadow.raster_length_scale,
+      output_dpi / crate::units::POINTS_PER_INCH,
+    );
+    // Native GDI path/world pairs retain the same half-sample enclosure,
+    // integer bitmap dimensions and independent axis fits as envelope paths.
+    // The source keeps its continuous host; PDF uses the realized host.
+    let mut grid = Self::from_bounds(local(source), blur, local(page), density)?;
+    if grid.pixels_per_point == density {
+      let divisor = common::drawingml_image_effects::direct2d_balanced_blur_prescale_divisor(
+        shadow.blur_radius_px * shadow.raster_length_scale,
+      );
+      let extent = |points: f32| {
+        let printer_dots = (f64::from(points) / PRINTER_POINT).round();
+        (printer_dots * f64::from(output_dpi) / (600.0 * f64::from(divisor))).round() as u32
+      };
+      // Allocate from integral600dpi extents and the selected output rate.
+      // Native Screen/Print submit the same glyph path directly to96/200dpi
+      // effect surfaces; this is not a later PDF image resample.
+      // A rounded f32 density turns the native242.5px case into242.49999px.
+      grid.width = extent(grid.raster_bounds.size.width.0);
+      grid.height = extent(grid.raster_bounds.size.height.0);
+      if grid.width == 0 || grid.height == 0 {
+        return None;
+      }
+    }
+    grid.raster_bounds.origin.x.0 += host[0];
+    grid.raster_bounds.origin.y.0 += host[1];
+    let printer = host.map(|value| {
+      (common::wordprocessing_device::source_coordinate(value) as f64 * PRINTER_POINT) as f32
+    });
+    grid.display_bounds.origin.x.0 += printer[0];
+    grid.display_bounds.origin.y.0 += printer[1];
+    Some(grid)
+  }
+
   pub fn new(
     source: &PathItem<'_>,
     shadow: WordprocessingTextShadow,
@@ -218,6 +296,238 @@ fn include_join(bounds: &mut Rect, half: f64, previous: Point, point: Point, nex
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  fn flat_shadow(font: f32, blur_pt: f32) -> WordprocessingTextShadow {
+    let scale = super::super::wordprocessing_text_geometry_render_scale(font);
+    let scale =
+      common::drawingml_image_effects::word_static_3d_shadow_length_scale(blur_pt / 0.75, scale);
+    WordprocessingTextShadow {
+      blur_radius_px: blur_pt / 0.75,
+      distance_px: 0.0,
+      raster_length_scale: scale,
+      geometry_length_scale: scale,
+      direction_degrees: 0.0,
+      scale_x: 1.0,
+      scale_y: 1.0,
+      skew_x_degrees: 0.0,
+      skew_y_degrees: 0.0,
+      alignment: (0.0, 0.0),
+      color: common::drawingml_image_effects::ResolvedEffectColor {
+        color: crate::model::RgbColor { r: 0, g: 0, b: 0 },
+        alpha: 110,
+      },
+    }
+  }
+
+  #[test]
+  fn flat_shape_grid_preserves_native_local_world_and_printer_host() {
+    // Actual GDI point buffers, world transforms and image dimensions.
+    // Original four lines plus independently authored short 18/36pt inputs;
+    // the short inputs were also observed at both additional host phases.
+    for (font, blur, phased, ink, window, dimensions) in [
+      (
+        36.0,
+        2.0,
+        false,
+        [8.887_506, 13.7578125, 330.69303, 46.875],
+        [7.44, 12.36, 332.16, 48.36],
+        [902, 100],
+      ),
+      (
+        36.0,
+        2.0,
+        false,
+        [7.446098, 65.188125, 318.09515, 98.14711],
+        [6.0, 63.72, 319.56, 99.6],
+        [871, 100],
+      ),
+      (
+        36.0,
+        2.0,
+        false,
+        [7.5339894, 116.47781, 329.93976, 149.595],
+        [6.12, 115.08, 331.32, 151.08],
+        [903, 100],
+      ),
+      (
+        36.0,
+        2.0,
+        false,
+        [7.533988, 167.90813, 289.25647, 200.76164],
+        [6.12, 166.44, 290.64, 202.2],
+        [790, 99],
+      ),
+      (
+        18.0,
+        2.0,
+        true,
+        [8.043752, 8.894062, 97.38528, 25.4175],
+        [7.08, 7.92, 98.4, 26.4],
+        [254, 51],
+      ),
+      (
+        36.0,
+        2.0,
+        true,
+        [8.887504, 13.948125, 175.81055, 46.995],
+        [7.44, 12.48, 177.24, 48.48],
+        [472, 100],
+      ),
+      (
+        18.0,
+        0.0,
+        false,
+        [8.043752, 8.174063, 97.38528, 24.6975],
+        [7.92, 8.04, 97.56, 24.84],
+        [249, 47],
+      ),
+      (
+        18.0,
+        6.0,
+        false,
+        [8.043752, 10.454062, 97.38528, 26.9775],
+        [5.52, 7.92, 99.96, 29.52],
+        [262, 60],
+      ),
+      (
+        36.0,
+        0.0,
+        false,
+        [8.887504, 12.628125, 175.81055, 45.675],
+        [8.76, 12.48, 175.92, 45.84],
+        [464, 93],
+      ),
+      (
+        36.0,
+        6.0,
+        false,
+        [8.887504, 16.468124, 175.81055, 49.515],
+        [5.04, 12.6, 179.64, 53.4],
+        [243, 57],
+      ),
+      (
+        48.0,
+        6.0,
+        false,
+        [9.450003, 20.1975, 227.77405, 64.26],
+        [4.8, 15.48, 232.44, 68.88],
+        [316, 74],
+      ),
+    ] {
+      let phases: &[f32] = if phased { &[0.0, 0.06, 0.12] } else { &[0.0] };
+      for &phase in phases {
+        let host = [39.75, 43.5 + phase];
+        let source = layout_rect(Rect::new(
+          f64::from(host[0] + ink[0]),
+          f64::from(host[1] + ink[1]),
+          f64::from(host[0] + ink[2]),
+          f64::from(host[1] + ink[3]),
+        ));
+        let grid = Grid::flat_shape(
+          source,
+          flat_shadow(font, blur),
+          host,
+          layout_rect(Rect::new(0.0, 0.0, 595.3, 841.9)),
+          200.0,
+        )
+        .unwrap();
+        assert_eq!([grid.width, grid.height], dimensions);
+        let actual = grid.raster_bounds;
+        for (actual, expected) in [
+          (actual.origin.x.0, host[0] + window[0]),
+          (actual.origin.y.0, host[1] + window[1]),
+          (actual.size.width.0, window[2] - window[0]),
+          (actual.size.height.0, window[3] - window[1]),
+        ] {
+          assert!((actual - expected).abs() < 0.0001);
+        }
+        assert!((grid.display_bounds.origin.x.0 - 39.72 - window[0]).abs() < 0.0001);
+        let printer_y = if phase == 0.12 { 43.68 } else { 43.56 };
+        assert!((grid.display_bounds.origin.y.0 - printer_y - window[1]).abs() < 0.0001);
+        let (scale_x, scale_y) = grid.scales();
+        assert!((scale_x - dimensions[0] as f32 / (window[2] - window[0])).abs() < 0.00001);
+        assert!((scale_y - dimensions[1] as f32 / (window[3] - window[1])).abs() < 0.00001);
+      }
+    }
+  }
+
+  #[test]
+  fn flat_shape_grid_keeps_native_font_scaled_density_and_stopping_cases() {
+    let source = layout_rect(Rect::new(48.0, 56.0, 140.0, 73.0));
+    let page = layout_rect(Rect::new(0.0, 0.0, 595.3, 841.9));
+    // Native large-radius controls retain 200dpi at18pt and100dpi at36/48pt.
+    for (font, density) in [(18.0, 200.0), (36.0, 100.0), (48.0, 100.0)] {
+      let grid =
+        Grid::flat_shape(source, flat_shadow(font, 6.0), [39.75, 43.5], page, 200.0).unwrap();
+      assert!((grid.pixels_per_point * 72.0 - density).abs() < 0.0001);
+    }
+    let mut shadow = flat_shadow(36.0, 2.0);
+    shadow.distance_px = 1.0;
+    assert!(Grid::flat_shape(source, shadow, [39.75, 43.5], page, 200.0).is_none());
+    shadow.distance_px = 0.0;
+    shadow.scale_y = -1.0;
+    assert!(Grid::flat_shape(source, shadow, [39.75, 43.5], page, 200.0).is_none());
+  }
+
+  #[test]
+  fn flat_shape_grid_uses_observed_screen_and_print_source_surfaces() {
+    // Same actual native path and two GDI+ worlds, independently captured
+    // before the bitmap export. Both profiles retain this printer enclosure.
+    let source = layout_rect(Rect::new(8.887_512, 13.757_812_5, 536.137_48, 46.875));
+    let page = layout_rect(Rect::new(0.0, 0.0, 595.3, 841.9));
+    for (dpi, dimensions, native_world) in [
+      (
+        96.0,
+        [707, 48],
+        [0.000_105_004_7, 0.000_104_986_87, -9.921_684, -16.48],
+      ),
+      (
+        200.0,
+        [1473, 100],
+        [0.000_218_772_17, 0.000_218_722_66, -20.671_345, -34.333_332],
+      ),
+    ] {
+      let grid = Grid::flat_shape(source, flat_shadow(36.0, 2.0), [0.0, 0.0], page, dpi)
+        .expect("native fixed-output source");
+      assert_eq!([grid.width, grid.height], dimensions);
+      let bounds = grid.raster_bounds;
+      for (actual, expected) in [
+        (bounds.origin.x.0, 7.44),
+        (bounds.origin.y.0, 12.36),
+        (bounds.size.width.0, 530.16),
+        (bounds.size.height.0, 36.0),
+      ] {
+        assert!((actual - expected).abs() < 0.0001);
+      }
+      let (x, y) = grid.scales();
+      for (actual, expected) in [
+        (x / 12700.0, native_world[0]),
+        (y / 12700.0, native_world[1]),
+        (-bounds.origin.x.0 * x, native_world[2]),
+        (-bounds.origin.y.0 * y, native_world[3]),
+      ] {
+        assert!((actual - expected).abs() < 0.00006);
+      }
+    }
+    for dpi in [f32::NAN, f32::INFINITY, 0.0, -96.0] {
+      assert!(Grid::flat_shape(source, flat_shadow(36.0, 2.0), [0.0, 0.0], page, dpi).is_none());
+    }
+  }
+
+  #[test]
+  fn flat_shape_grid_clips_filter_support_to_the_resolved_story() {
+    // Last of17 native paths in two independently observed overflow exports.
+    // Its filter support intersects the text-frame clip, not the page bottom.
+    let source = layout_rect(Rect::new(8.799_62, 835.637_8, 575.319_13, 868.754_96));
+    let clip = layout_rect(Rect::new(0.0, 3.6, 595.2, 838.2));
+    for (dpi, dimensions) in [(96.0, [759, 7]), (200.0, [1582, 15])] {
+      let grid = Grid::flat_shape(source, flat_shadow(36.0, 2.0), [0.0, 0.0], clip, dpi)
+        .expect("the admitted last line retains its clipped shadow");
+      assert_eq!([grid.width, grid.height], dimensions);
+      assert!((grid.raster_bounds.origin.y.0 - 834.24).abs() < 0.0001);
+      assert!((grid.raster_bounds.size.height.0 - 5.28).abs() < 0.0001);
+    }
+  }
 
   #[test]
   fn zero_limit_join_has_independent_conservative_support() {

@@ -34,8 +34,14 @@ pub(crate) enum DrawingEffectSource {
   VmlTextShadow(VmlTextShadowSource),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct VmlTextShadowSource {
+  pub primary: VmlTextShadowLayer,
+  pub secondary: Option<Box<VmlTextShadowLayer>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct VmlTextShadowLayer {
   pub color: Color,
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,

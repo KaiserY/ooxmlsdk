@@ -209,6 +209,9 @@ pub enum PdfTextSegmentation {
   #[default]
   Line,
   WordLine,
+  /// A native Word glyph-output effect segment. Keep its blanks and
+  /// decorations in one text operation while retaining Word line metrics.
+  WordGlyphRun,
   Portion,
   /// A visible hyphen inserted by Word's automatic hyphenation engine.
   ///
@@ -216,6 +219,12 @@ pub enum PdfTextSegmentation {
   /// extractors identify the line-end discretionary use (PDFium reports it as
   /// U+0002), while the same glyph at a page boundary remains a literal `-`.
   AutomaticHyphen,
+}
+
+impl PdfTextSegmentation {
+  pub fn is_word_line(self) -> bool {
+    matches!(self, Self::WordLine | Self::WordGlyphRun)
+  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -242,13 +251,29 @@ pub enum MetafileFixedOutputProfile {
   WordInlineVmlPicture,
   /// Word floating VML pictures, including embedded-object replacement graphics.
   WordFloatingVmlPicture,
-  /// Word VML EMF pictures whose classic text is independent of later
-  /// graphics. Preserve the picture's affine font transform in fixed output.
+  /// Word EMF pictures whose classic text is independent of later graphics.
+  /// DrawingML and VML share this affine font transform in fixed output;
+  /// the variant retains its original VML name for API compatibility.
   WordVmlEmfPicture,
-  /// A legacy Excel.Sheet.8 content OLE preview whose Word fixed-output text
-  /// is regenerated from the embedded BIFF workbook rather than the cached
-  /// EMF text and Dx. The workbook's default FONT height is in twips.
+  /// A VML inline OLE preview whose picture frame is realized on the Word printer.
+  WordInlineWmfObject,
+  /// The same independent EMF layers in a floating VML host, retaining its
+  /// printer-device paint origin separately from the authored layout frame.
+  WordFloatingVmlEmfPicture,
+  /// Legacy Excel.Sheet.8 fallback when a usable print presentation is absent.
+  /// The retained fallback uses the workbook's default FONT height in twips;
+  /// an available print presentation owns its LOGFONT and character advances.
   LegacyExcelContentPreview { font_size_twips: u16 },
+}
+
+impl MetafileFixedOutputProfile {
+  /// Whether classic EMF layers share Word's recording-device text transform.
+  pub const fn is_word_emf_picture(self) -> bool {
+    matches!(
+      self,
+      Self::WordVmlEmfPicture | Self::WordInlineWmfObject | Self::WordFloatingVmlEmfPicture
+    )
+  }
 }
 
 /// Compression metadata of a DrawingML `a:blip`, or its absence on another producer.
@@ -689,6 +714,8 @@ pub struct TextStyle<'doc> {
   pub wordprocessingml_east_asia_language_is_chinese: bool,
   /// Hebrew bidi language retains the family's real italic face in RTL runs.
   pub wordprocessingml_bidi_language_is_hebrew: bool,
+  /// Imported complex-script language, retained through shaping and PDF paint.
+  pub wordprocessingml_bidi_language: Option<Arc<str>>,
   pub font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub high_ansi_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
   pub wordprocessingml_east_asia_font_charset: Option<ooxmlsdk_fonts::FontCharset>,
@@ -708,6 +735,8 @@ pub struct TextStyle<'doc> {
   /// Unlike `right_to_left`, this affects shaping only and does not select
   /// WordprocessingML complex-script formatting.
   pub resolved_bidi_level: Option<u8>,
+  /// Preserve nominal LTR glyphs in an implicit Word Latin shaping portion.
+  pub wordprocessing_simple_latin_glyphs: Option<bool>,
   /// Preserve nominal metrics of a Word literal nonprinting control portion.
   pub wordprocessing_nominal_control_metrics: bool,
   pub complex_bold: Option<bool>,
@@ -763,12 +792,17 @@ pub struct TextStyle<'doc> {
   /// OOXML `w:noBreakHyphen`: retain U+2011 for line breaking, but use
   /// the U+002D font slot and glyph. Literal U+2011 text remains distinct.
   pub wordprocessingml_no_break_hyphen: bool,
+  /// Paint the font's nominal U+00AD glyph from a literal Word text portion.
+  /// This does not enable unused w:softHyphen operators or other ignorables.
+  pub wordprocessingml_literal_soft_hyphen: bool,
   /// Effective editing-session identities for Word variable-font bitmap
   /// portions. Equal identities may coalesce; distinct owners must survive
   /// lowering to the fixed-format writer.
   pub wordprocessingml_bitmap_revisions: Option<Arc<[Option<u32>; 3]>>,
   /// Word's missing-Han fallback, independently of the shared font-slot table.
   pub wordprocessingml_han_fallback: bool,
+  /// Word's geometric-symbol glyph fallback, separate from font-slot choice.
+  pub wordprocessingml_symbol_fallback: bool,
   /// Enable CJK-capable font line metrics for WordprocessingML documents
   /// carrying the `w:noLeading` compatibility setting.
   pub wordprocessingml_cjk_line_metrics: bool,
@@ -779,11 +813,22 @@ pub struct TextStyle<'doc> {
   pub wordprocessingml_no_leading: bool,
   /// Enable Word's document-level East Asian punctuation compression.
   pub cjk_punctuation_compression_ratio: f32,
+  /// Full-width bracket capacity, including Western East Asian proofing.
+  pub cjk_bracket_compression_ratio: f32,
+  /// Horizontal full-cell curly-quotation capacity after Word language resolution.
+  pub cjk_quotation_compression_ratio: f32,
+  /// Completed-line terminal byte index and independent compression ratio.
+  /// Its glyph origin is preserved independently of internal punctuation.
+  pub wordprocessing_terminal_punctuation: Option<(usize, f32)>,
   pub wordprocessing_justification_expansion_pt: Option<Arc<[f32]>>,
   /// Preserve legacy Word 95 punctuation spacing classes.
   pub wordprocessingml_legacy_punctuation_spacing: bool,
   /// Apply Word prose punctuation spacing independently of font-slot selection.
   pub wordprocessingml_punctuation_spacing: bool,
+  /// Natural bracket-pair spacing after language and kerning resolution.
+  pub wordprocessingml_bracket_spacing: bool,
+  /// Retain Word vertical quotation cells through measurement and PDF paint.
+  pub wordprocessingml_vertical_punctuation: bool,
   /// Balance qualifying ordinary spaces using the logical reference font for
   /// the WordprocessingML compatibility setting of the same name.
   pub wordprocessingml_balance_single_byte_double_byte_width: bool,
@@ -837,10 +882,13 @@ pub struct PdfGlyphOutlineOptions {
   /// Legacy VML textpath geometry retains the logical em while fitting the
   /// parent shape. Printer font-size rounding belongs to ordinary text.
   pub vml_fitted_text: bool,
-  /// The outline came from WordprocessingML `w14:textOutline`. Word's PDF
+  /// The outline came from WordprocessingML `w:outline` or `w14:textOutline`. Word's PDF
   /// writer uses a different contour start and round `sysDot` dash from the
   /// PowerPoint/Excel DrawingML text path.
   pub wordprocessing_outline: bool,
+  /// A legacy canvas glyph-path source uses GDI's synthesized TrueType
+  /// contour, independently of ordinary text and DirectWrite simulation.
+  pub gdi_synthetic_bold: bool,
   /// An unscaled WordArt text gradient uses the combined warped glyph bounds
   /// as its definition rectangle in Word's fixed-format output.
   pub wordprocessing_unscaled_linear_fill: bool,
@@ -889,6 +937,10 @@ pub struct PdfGlyphOutlineOptions {
   /// Page-space copy of a VML textpath glyph silhouette painted before its
   /// foreground fill and outline.
   pub vml_text_shadow: Option<VmlTextShadow>,
+  /// The second copy of a VML double or embossed textpath shadow. It paints
+  /// before the primary copy. Keep the uncommon layer out of the inline
+  /// options storage; ordinary and single-shadow runs allocate nothing here.
+  pub vml_text_shadow_secondary: Option<Box<VmlTextShadow>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -964,6 +1016,15 @@ impl VmlTextShadow {
 }
 
 impl PdfGlyphOutlineOptions {
+  pub fn vml_text_shadows(&self) -> impl Iterator<Item = VmlTextShadow> + '_ {
+    self
+      .vml_text_shadow_secondary
+      .as_deref()
+      .copied()
+      .into_iter()
+      .chain(self.vml_text_shadow)
+  }
+
   pub fn unresolved_definition_width(&self, text_advance: Pt, font_size: Pt) -> Pt {
     let base = match self.definition_width_basis {
       PdfGlyphDefinitionWidthBasis::AtLeastFontSize => text_advance.0.max(font_size.0),
@@ -1002,10 +1063,11 @@ pub struct TextFollowPath {
   pub(crate) translation: Point,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VmlFitPath {
   pub start_x: Pt,
   pub advance_width: Pt,
+  pub authored_path: Option<super::text_warp_projection::VmlPathProjection>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1087,8 +1149,15 @@ pub enum DynamicField<'doc> {
   NumPages {
     number_format: FieldNumberFormat,
   },
+  Section {
+    number_format: FieldNumberFormat,
+  },
+  SectionPages {
+    number_format: FieldNumberFormat,
+  },
   Sequence {
     identifier: Cow<'doc, str>,
+    bookmark_name: Option<Cow<'doc, str>>,
     number_format: FieldNumberFormat,
   },
   PageRef {

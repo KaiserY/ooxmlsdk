@@ -197,6 +197,22 @@ fn scaled_dimension_twips(authored_pt: f32, goal_twips: f64) -> Option<f64> {
   Some(goal_twips * scale / 1000.0)
 }
 
+/// Embedded objects retain their explicit PICF natural size, independently of
+/// the cached preview format. Word realizes mx/my in tenths of a percent and
+/// exposes the resulting character frame in integral twips. Ordinary w:pict
+/// metafiles instead retain their authored frame.
+pub(super) fn inline_object_dimension_pt(
+  authored_pt: f32,
+  original_twips: Option<f32>,
+) -> (f32, f32) {
+  original_twips
+    .filter(|goal| goal.is_finite() && (1.0..=f32::from(i16::MAX)).contains(goal))
+    .and_then(|goal| scaled_dimension_twips(authored_pt, f64::from(goal)))
+    .map_or((authored_pt, authored_pt), |twips| {
+      ((twips.round() / 20.0) as f32, (twips / 20.0) as f32)
+    })
+}
+
 #[cfg(test)]
 fn scaled_dimension_pt(authored_pt: f32, goal_twips: f64) -> Option<f32> {
   scaled_dimension_twips(authored_pt, goal_twips).map(|twips| (twips.round() / 20.0) as f32)
@@ -205,6 +221,7 @@ fn scaled_dimension_pt(authored_pt: f32, goal_twips: f64) -> Option<f32> {
 pub(super) struct InlineBitmapSize {
   pub(super) layout_pt: (f32, f32),
   pub(super) paint_pt: Option<(f32, f32)>,
+  pub(super) scaled_height_pt: f32,
 }
 
 pub(super) fn inline_bitmap_size(data: &[u8], width: f32, height: f32) -> Option<InlineBitmapSize> {
@@ -224,6 +241,7 @@ pub(super) fn inline_bitmap_size(data: &[u8], width: f32, height: f32) -> Option
     paint_pt: data
       .starts_with(&[0xff, 0xd8])
       .then_some(((width_twips / 20.0) as f32, (height_twips / 20.0) as f32)),
+    scaled_height_pt: (height_twips / 20.0) as f32,
   })
 }
 
@@ -246,6 +264,25 @@ pub(super) fn inline_paint_bounds(mut bounds: common::Rect) -> common::Rect {
   (bounds.origin.x.0, bounds.size.width.0) = axis(bounds.origin.x.0, bounds.size.width.0);
   (bounds.origin.y.0, bounds.size.height.0) = axis(bounds.origin.y.0, bounds.size.height.0);
   bounds
+}
+
+/// Origin of an inline object on Word's printer, before the PDF picture
+/// writer converts the two endpoints to twips. The text line supplies one
+/// baseline for all of its objects. Its displacement and the PICF picture
+/// height are each mapped to device dots independently.
+pub(super) fn inline_object_printer_top(top: f32, height: f32, baseline_gap: f32) -> f32 {
+  let dot =
+    f64::from(crate::units::POINTS_PER_INCH) / f64::from(crate::units::OFFICE_FIXED_OUTPUT_DPI);
+  let twips_per_dot = dot * f64::from(crate::units::TWIPS_PER_POINT);
+  let frame_bottom = f64::from(top) + f64::from(height);
+  let baseline_twips = ((frame_bottom + f64::from(baseline_gap)) * 20.0).round();
+  // The paint gap also compensates for the fractional PICF size. Restore
+  // the source twip displacement before converting it to the printer grid.
+  let gap_twips = (f64::from(baseline_gap) * 20.0).round();
+  let origin = (baseline_twips / twips_per_dot).round()
+    - (gap_twips / twips_per_dot).round()
+    - (f64::from(height) / dot).round();
+  (origin * dot) as f32
 }
 
 #[cfg(test)]
@@ -560,6 +597,10 @@ mod tests {
       }),
     );
     assert_eq!(png_goal_twips(&data), Some((3960.0, 4499.0)));
+    let size = inline_bitmap_size(&data, 85.5, 94.5).unwrap();
+    assert_eq!(size.layout_pt.1, 94.5);
+    assert!((size.scaled_height_pt - 94.479).abs() < 0.0001);
+    assert!(size.paint_pt.is_none());
   }
 
   #[test]
@@ -615,6 +656,43 @@ mod tests {
       )),
       Some((15.0, 15.0))
     );
+  }
+
+  #[test]
+  fn embedded_metafile_object_native_picf_dimensions() {
+    // Native Word DOC readback and independent C# InlineShape dimensions:
+    // six authored widths, ordinary-picture counterparts, and four natural
+    // width opposites. The preview WMF bytes are identical in all controls.
+    for (authored, original, expected) in [
+      (100.0, Some(7481.0), 99.85),
+      (200.0, Some(7481.0), 200.1),
+      (373.4, Some(7481.0), 373.3),
+      (373.5, Some(7481.0), 373.7),
+      (373.6, Some(7481.0), 373.7),
+      (400.0, Some(7481.0), 399.85),
+      (373.5, None, 373.5),
+      (373.5, Some(4000.0), 373.6),
+      (373.5, Some(8000.0), 373.6),
+      (373.5, Some(10000.0), 373.5),
+    ] {
+      assert_eq!(inline_object_dimension_pt(authored, original).0, expected);
+      assert_eq!(
+        inline_object_dimension_pt(authored, None),
+        (authored, authored)
+      );
+    }
+    // A 260-twip natural height at 103.8% occupies 270 character twips,
+    // but paints 112 dots at 600 DPI. Rounding the character first gives 113.
+    assert_eq!(
+      inline_object_dimension_pt(13.5, Some(260.0)),
+      (13.5, 13.494)
+    );
+    for original in [0.0, -1.0, f32::NAN, f32::INFINITY, 32768.0] {
+      assert_eq!(
+        inline_object_dimension_pt(100.0, Some(original)),
+        (100.0, 100.0)
+      );
+    }
   }
 
   #[test]

@@ -1446,6 +1446,7 @@ dependencies = [
  "unicode-script",
  "usvg",
  "uuid",
+ "write-fonts",
  "xmp-writer",
  "zune-jpeg",
 ]

@@ -1,13 +1,22 @@
 //! Preserve a completed Word line's source geometry until fixed-output paint.
 use super::*;
 
+#[derive(Clone, Copy, Debug)]
+pub(super) struct FlatShapeStory {
+  pub bottom_pt: f32,
+  pub last_paragraph: bool,
+}
+
 pub(super) struct Placement {
   pub frame_width_pt: f64,
   pub cell_baseline_reference_pt: Option<f32>,
+  pub closing_shape_bottom_pt: Option<f32>,
   pub y: f32,
   pub height: f32,
   pub before: f32,
   pub after: f32,
+  pub border_before: f32,
+  pub border_after: f32,
   pub text_extents: WordLineTextExtents,
 }
 
@@ -20,6 +29,27 @@ struct LineBox {
 }
 
 impl LineBox {
+  fn with_borders(self, before: f32, after: f32) -> Option<Self> {
+    if before == 0.0 && after == 0.0 {
+      return Some(self);
+    }
+    // Word converts each BRC reserve before adding it to the line's ideal
+    // components. Native single/double/shadow, paragraph margins and Exact/
+    // Auto controls all retain these complete inputs to the shared balancer.
+    let before = word_fixed_output_reference_units(before)?;
+    let after = word_fixed_output_reference_units(after)?;
+    let add = |points, extra| {
+      let units = word_fixed_output_reference_units(points)?.checked_add(extra)?;
+      (units <= i64::from(i32::MAX)).then_some(units as f32 / 4096.0)
+    };
+    Some(Self {
+      height: add(self.height, before.checked_add(after)?)?,
+      below: add(self.below, after)?,
+      before: add(self.before, before)?,
+      after: add(self.after, after)?,
+    })
+  }
+
   fn exact(height: f32, before: f32, after: f32) -> Option<Self> {
     // Native Exact-line inputs retain independently converted components.
     // For example, 11.15pt + .15pt is 45670 + 614 ideal units, not the
@@ -131,6 +161,32 @@ fn bind_text_metrics(
   line: LineBox,
 ) {
   for item in items {
+    if let PageItem::Line(rule) = item
+      && let LineItemKind::LegacyEquationRule {
+        y1_from_baseline_pt,
+        y2_from_baseline_pt,
+      } = rule.kind
+    {
+      let metrics = common::WordprocessingLineMetrics {
+        frame_origin_offset_x_pt: 0.0,
+        frame_width_pt: placement.frame_width_pt,
+        alignment: None,
+        bottom_offset_pt: bottom - placement.y,
+        height_pt: line.height,
+        baseline_from_bottom_pt: line.below,
+        spacing_before_pt: line.before,
+        spacing_after_pt: line.after,
+      };
+      let baseline = common::wordprocessing_device::line_baseline(metrics, placement.y)
+        .unwrap_or(bottom - line.below);
+      // Minimum-height and mixed-size alignment can already have moved a
+      // provisional graphic independently of its text. Keep the equation's
+      // relative ordinates until this completed common baseline is known.
+      rule.y1_pt = baseline + y1_from_baseline_pt;
+      rule.y2_pt = baseline + y2_from_baseline_pt;
+      rule.kind = LineItemKind::Stroke;
+      continue;
+    }
     let PageItem::Text(text) = item else { continue };
     if text.wordprocessing_effect_host.is_some() {
       // Flattening a floating WPS story does not transfer its baseline to
@@ -237,8 +293,95 @@ pub(super) fn bind(
   placement: Placement,
   text_metrics: &mut TextMetrics,
 ) {
+  let placement = if flow.text_segmentation == TextSegmentation::Body {
+    placement
+  } else {
+    // Body BRC controls establish this owner; other stories retain their
+    // independent cursor/border contracts.
+    Placement {
+      border_before: 0.0,
+      border_after: 0.0,
+      ..placement
+    }
+  };
+  for item in &mut *items {
+    if let PageItem::Image(image) = item
+      && let Some(pending) = &mut image.pending_inline_picture_3d
+    {
+      pending.line_clip_offsets = Some([
+        placement.y - placement.before - image.y_pt,
+        placement.y + placement.height + placement.after - image.y_pt,
+      ]);
+    }
+  }
   bind_line(items, paragraph, flow, placement, text_metrics);
   side_ruby::materialize(items, flow, text_metrics);
+}
+
+pub(super) fn realize_flat_shape_line(
+  items: &mut [PageItem],
+  host: WordprocessingTextEffectHost,
+  text_metrics: &mut TextMetrics,
+) {
+  let Some(PageItem::Text(first)) = items.first() else {
+    return;
+  };
+  let Some(line) = first.wordprocessing_line_metrics else {
+    return;
+  };
+  let Some(host_y) = host.paint_source_origin_y_pt else {
+    return;
+  };
+  if !items.iter().all(|item| {
+    matches!(item, PageItem::Text(text)
+      if text.style.wordprocessing_flat_text_scene
+        && text.wordprocessing_line_metrics.is_some()
+        && text.wordprocessing_effect_host.is_none()
+        && !text.origin_is_baseline)
+  }) {
+    return;
+  }
+  // GDI retains one local path while the containing drawing moves. Convert
+  // its line endpoints before adding the separately realized host; converting
+  // a combined page point loses the native half-cell anchor phase.
+  let printer_point = |point| {
+    common::wordprocessing_device::source_coordinate(point) as f32 * units::POINTS_PER_INCH
+      / WORD_FIXED_OUTPUT_PRINTER_DPI as f32
+  };
+  let Some(local_baseline) =
+    common::wordprocessing_device::line_baseline(line, first.y_pt - host_y)
+  else {
+    return;
+  };
+  let baseline = printer_point(host_y) + local_baseline;
+  let host_x = host.shape_bounds.x_pt;
+  let origin = printer_point(host_x)
+    + common::wordprocessing_device::line_origin(
+      first.x_pt - host_x,
+      line.frame_origin_offset_x_pt,
+      line.alignment,
+    );
+  let bottom = f64::from(first.y_pt) + f64::from(line.bottom_offset_pt);
+  let frame_left = f64::from(first.x_pt) + line.frame_origin_offset_x_pt;
+  // Native GDI submits the same completed glyph path to the shadow surface
+  // and printer foreground. Retain its whole-line carry before effects split
+  // these items; PDF's later advance realization cannot repair an A8 source.
+  realize_wordprocessing_shape_line_character_cells_at_origin(
+    items,
+    origin,
+    baseline,
+    true,
+    text_metrics,
+  );
+  for item in items {
+    if let PageItem::Text(text) = item
+      && text.origin_is_baseline
+      && let Some(line) = &mut text.wordprocessing_line_metrics
+    {
+      line.bottom_offset_pt = (bottom - f64::from(text.y_pt)) as f32;
+      line.frame_origin_offset_x_pt = frame_left - f64::from(text.x_pt);
+    }
+  }
 }
 
 fn bind_line(
@@ -340,7 +483,7 @@ fn bind_line(
     && paragraph.list_label.is_some()
     && (!paragraph.format.office_recovered_line_height || grid_numbering)
     && paragraph.format.vertical_text_flow.is_none()
-    && placement.text_extents.has_text
+    && (placement.text_extents.has_text || placement.text_extents.has_blank_line_metrics)
     && !numbering_body_has_cjk_text(paragraph);
   // Picture numbering uses the body font's baseline, including recovered
   // Auto spacing. A larger bitmap reserves ascent; proportional leading is
@@ -384,7 +527,49 @@ fn bind_line(
       }
       _ => true,
     });
-  let text_owned = if minimum || numbered_text || picture_body || exact_line {
+  // A fixed WPS body which excludes text from its scene still submits one
+  // completed flat line to Line Services. Its active W14 properties do not
+  // make each run a separate baseline owner. The shape formatter supplies
+  // this provenance only for its untransformed, top-aligned source frame.
+  let flat_shape_line = flow.flat_shape_story.is_some()
+    && paragraph.format.wordprocessing_shape_story
+    && matches!(paragraph.format.line_height_rule, LineHeightRule::Auto)
+    && paragraph.format.vertical_text_flow.is_none()
+    && !paragraph.format.bidi
+    && paragraph.list_label.is_none()
+    && paragraph.list_label_image.is_none()
+    && placement.text_extents.has_text
+    && items.iter().all(|item| match item {
+      PageItem::Text(text) => {
+        text.style.wordprocessing_flat_text_scene
+          && text.style.use_windows_font_metrics
+          && text.style.rotation_deg == 0.0
+          && text.style.baseline_shift_pt == 0.0
+          && text.style.automatic_escapement_font_size_pt.is_none()
+          && !text.style.semantic_only
+          && !text.origin_is_baseline
+          && text.wordprocessing_effect_host.is_none()
+          && text.style.drawingml_text_effects.is_none()
+          && text
+            .wordprocessing_auto_line_spacing_units
+            .is_some_and(|units| units >= 240)
+          && text
+            .style
+            .pdf_glyph_outline_options
+            .as_deref()
+            .is_none_or(|options| {
+              !options.vml_fitted_text && options.transform.is_none() && options.text_warp.is_none()
+            })
+          && matches!(
+            text.style.line_vertical_alignment,
+            common::LineVerticalAlignment::Auto | common::LineVerticalAlignment::Baseline
+          )
+      }
+      _ => false,
+    });
+  let text_owned = if flat_shape_line {
+    true
+  } else if minimum || numbered_text || picture_body || exact_line {
     (paragraph.list_label_image.is_none() || picture_body)
       && paragraph
         .inlines
@@ -395,13 +580,14 @@ fn bind_line(
   };
   if (!matches!(paragraph.format.line_height_rule, LineHeightRule::Auto | LineHeightRule::AtLeast)
     && !exact_line)
-    || paragraph.format.wordprocessing_shape_story
+    || (paragraph.format.wordprocessing_shape_story && !flat_shape_line)
     || paragraph.format.word_text_frame_story
     // Shape text borrows TableCell segmentation and ancestor cell bounds.
     // Its own text-frame formatter owns the baseline; bounds alone do not
     // establish the ordinary table's already-resolved-baseline contract.
     || (flow.text_segmentation == TextSegmentation::TableCell
-      && (!flow.horizontal_table_cell || flow.table_cell_cursor_is_line_top))
+      && (!flow.horizontal_table_cell || flow.table_cell_cursor_is_line_top)
+      && !flat_shape_line)
     // Inline shapes may flatten their own text story directly into these
     // items. Their host paragraph must not replace that story's baseline.
     || !text_owned
@@ -417,7 +603,7 @@ fn bind_line(
       .iter()
       .any(|item| inline_alignment_image(item).is_some())
     // Hosted and transformed effects still have a separate surface owner.
-    || (!flat_effect_line && items.iter().any(|item| {
+    || (!flat_effect_line && !flat_shape_line && items.iter().any(|item| {
       matches!(item, PageItem::Text(text)
         if text.style.text_glow.is_some()
           || text.style.text_shadow.is_some()
@@ -434,7 +620,9 @@ fn bind_line(
     // Native 4/12pt bodies and4/24pt labels receive the same completed box.
     // Preserve each provisional origin and bind its distance to that box;
     // realigning the number first would alter PDF's inferred font union.
-    if let Some(line) = LineBox::exact(placement.height, placement.before, placement.after) {
+    if let Some(line) = LineBox::exact(placement.height, placement.before, placement.after)
+      .and_then(|line| line.with_borders(placement.border_before, placement.border_after))
+    {
       // Real horizontal cells retain a resolved baseline cursor. Native
       // 34e78 controls use the same complete fixed box as body text, after
       // removing its provisional 80% ascent. Convert the complete endpoints
@@ -449,7 +637,8 @@ fn bind_line(
       } else {
         None
       }
-      .unwrap_or(placement.y - cursor_offset + placement.height + placement.after);
+      .unwrap_or(placement.y - cursor_offset + placement.height + placement.after)
+        + placement.border_after;
       bind_text_metrics(items, flow, &placement, bottom, line);
     }
     return;
@@ -464,7 +653,11 @@ fn bind_line(
       }
       _ => false,
     });
-  let metrics = if flat_effect_line || top_aligned_text {
+  let metrics = if flat_effect_line
+    || flat_shape_line
+    || top_aligned_text
+    || placement.text_extents.has_legacy_equation
+  {
     Some(WordprocessingLineMetrics {
       ascent_pt: placement
         .text_extents
@@ -613,19 +806,29 @@ fn bind_line(
     } else {
       0.0
     };
-  let bottom = placement.y - cursor_offset + placement.height + placement.after;
-  bind_text_metrics(
-    items,
-    flow,
-    &placement,
-    bottom,
-    LineBox {
-      height: placement.before + placement.height + placement.after,
-      below: placement.height - ascent + placement.after,
-      before: placement.before + leading_above,
-      after: placement.after + leading_below,
-    },
-  );
+  let mut bottom = placement.y - cursor_offset + placement.height + placement.after;
+  let mut line = LineBox {
+    height: placement.before + placement.height + placement.after,
+    below: placement.height - ascent + placement.after,
+    before: placement.before + leading_above,
+    after: placement.after + leading_below,
+  };
+  if flat_shape_line && let Some(frame_bottom) = placement.closing_shape_bottom_pt {
+    // Native WPS metric inputs close the last line at the text-frame bottom
+    // by enlarging its trailing space. Overflow keeps the ordinary line box.
+    // The independently rounded complete height can change residue assigned
+    // to ascent/descent; snapping an isolated run cannot recover that result.
+    let extension = (frame_bottom - bottom).max(0.0);
+    bottom += extension;
+    line.height += extension;
+    line.below += extension;
+    line.after += extension;
+  }
+  let Some(line) = line.with_borders(placement.border_before, placement.border_after) else {
+    return;
+  };
+  bottom += placement.border_after;
+  bind_text_metrics(items, flow, &placement, bottom, line);
   if picture_body
     && let Some(label) = paragraph.list_label_image.as_ref()
     && let Some(baseline) = items.iter().find_map(|item| {
@@ -647,6 +850,8 @@ fn bind_line(
         &label.image,
         f64::from(flow.content_left_pt),
         picture_baseline,
+        flow.fixed_output_raster_dpi,
+        flow.setup,
       );
     }
   }
@@ -672,6 +877,8 @@ fn realize_picture_numbering(
   source: &crate::docx::InlineImage,
   frame_x: f64,
   baseline: f32,
+  fixed_output_raster_dpi: f32,
+  setup: PageSetup,
 ) {
   // Paint-only resized surfaces retain their separate host contract.
   if source.picture_paint_size_pt.is_some() {
@@ -691,7 +898,7 @@ fn realize_picture_numbering(
   // effects against the same realized bitmap box rather than moving only its
   // pixels. There are no other inline object stories in this text-owned lane.
   let mut parts = Vec::new();
-  push_docx_picture_image(&mut parts, source, image);
+  push_docx_picture_image(&mut parts, source, image, fixed_output_raster_dpi, setup);
   *item = PageItem::InlineObjectGroup(parts);
 }
 
@@ -749,6 +956,49 @@ pub(super) fn align(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn paragraph_borders_complete_native_line_inputs_before_printer_balancing() {
+    // Actual WWLIB input tuples: ordinary/double/shadow borders, Auto1/2,
+    // Exact12 and independently authored 3.05/4.95pt paragraph margins.
+    for (plain, before, after, expected) in [
+      ([37680, 7088, 0, 0], 1.75, 1.75, [52016, 14256, 7168, 7168]),
+      ([51810, 9746, 0, 0], 4.0, 4.0, [84578, 26130, 16384, 16384]),
+      (
+        [65940, 12404, 0, 0],
+        5.5,
+        5.5,
+        [110996, 34932, 22528, 22528],
+      ),
+      (
+        [70448, 27363, 12493, 20275],
+        1.75,
+        1.75,
+        [84784, 34531, 19661, 27443],
+      ),
+      (
+        [75360, 44768, 0, 37680],
+        1.75,
+        1.75,
+        [89696, 51936, 7168, 44848],
+      ),
+      ([49152, 9830, 0, 0], 1.75, 1.75, [63488, 16998, 7168, 7168]),
+    ] {
+      let points = |n: i32| n as f32 / 4096.0;
+      let line = LineBox {
+        height: points(plain[0]),
+        below: points(plain[1]),
+        before: points(plain[2]),
+        after: points(plain[3]),
+      }
+      .with_borders(before, after)
+      .unwrap();
+      assert_eq!(
+        [line.height, line.below, line.before, line.after].map(|p| (p * 4096.0) as i32),
+        expected,
+      );
+    }
+  }
 
   #[test]
   fn numbered_cell_paints_reserved_ascent_without_changing_following_flow() {

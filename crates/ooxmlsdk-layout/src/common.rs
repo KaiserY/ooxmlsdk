@@ -27,7 +27,7 @@ mod geom;
 mod style;
 pub mod text_warp_projection;
 mod units;
-mod vml_path_bounds;
+pub(crate) mod vml_path_bounds;
 pub mod wordprocessing_device;
 mod wordprocessing_emphasis;
 pub use wordprocessing_emphasis::*;

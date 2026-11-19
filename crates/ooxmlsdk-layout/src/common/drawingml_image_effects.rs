@@ -186,6 +186,10 @@ pub(crate) enum ShadowBlurKernel {
   /// the authored blur radius is three standard deviations and the input
   /// alpha coverage is preserved verbatim.
   Direct2dGaussian,
+  /// Word's picture effect-list wrapper transforms the caster before its
+  /// finite Gaussian. Native GEL transform/shadow constructor identities
+  /// establish this order independently for flat and static-3-D pictures.
+  WordPictureGaussian,
   /// Word run-level fixed output realizes Direct2D's Balanced shadow profile
   /// after the W14 text-plane affine. The public 96-DPI radius selects an
   /// integer pre-scale tier before the effect is mapped to its 200-DPI work
@@ -603,6 +607,56 @@ pub(crate) fn bake_powerpoint_reflection_source_transform(
   Some(transform)
 }
 
+/// The Word picture scene submits a quad for the completed shadow. Transform
+/// the widened caster path about its painted frame before measuring extrema.
+/// Transforming its enclosing rectangle includes empty corners under shear.
+pub(crate) fn word_picture_shadow_path_bounds(
+  container: &ImageEffectContainer,
+  caster: kurbo::BezPath,
+) -> Option<kurbo::Rect> {
+  use kurbo::{Affine, Shape};
+
+  let [
+    ImageEffect::OuterShadow {
+      blur_kernel: ShadowBlurKernel::WordPictureGaussian,
+      distance_mode: ShadowDistanceMode::PostTransformOffset,
+      transform,
+      alignment,
+      distance_px,
+      distance_length_scale,
+      direction_degrees,
+      blur_radius_px,
+      bounds_radius_scale,
+      bounds_radius_offset_px,
+      ..
+    },
+  ] = container.effects.as_slice()
+  else {
+    return None;
+  };
+  let frame = caster.bounding_box();
+  let x = frame.x0 + frame.width() * f64::from(alignment.0);
+  let y = frame.y0 + frame.height() * f64::from(alignment.1);
+  let pt_per_px = f64::from(crate::units::POINTS_PER_INCH / crate::units::CSS_PIXELS_PER_INCH);
+  let distance = f64::from(*distance_px * *distance_length_scale) * pt_per_px;
+  let (sin, cos) = f64::from(*direction_degrees).to_radians().sin_cos();
+  let affine = Affine::new([
+    f64::from(transform.scale_x),
+    f64::from(transform.skew_y),
+    f64::from(transform.skew_x),
+    f64::from(transform.scale_y),
+    f64::from(transform.shift_x_px) * pt_per_px,
+    f64::from(transform.shift_y_px) * pt_per_px,
+  ]);
+  let affine = Affine::translate((x + distance * cos, y + distance * sin))
+    * affine
+    * Affine::translate((-x, -y));
+  let radius =
+    f64::from(blur_radius_px.mul_add(*bounds_radius_scale, *bounds_radius_offset_px)) * pt_per_px;
+  let bounds = (affine * caster).bounding_box().inflate(radius, radius);
+  (bounds.is_finite() && bounds.width() > 0.0 && bounds.height() > 0.0).then_some(bounds)
+}
+
 pub(crate) fn simple_outer_shadow_translation(
   container: &ImageEffectContainer,
 ) -> Option<SimpleOuterShadowTranslation> {
@@ -1002,6 +1056,17 @@ pub(crate) struct ImageEffectTransform {
   shift_y_px: f32,
 }
 
+impl ImageEffectTransform {
+  pub(crate) fn is_identity(self) -> bool {
+    self.scale_x == 1.0
+      && self.scale_y == 1.0
+      && self.skew_x == 0.0
+      && self.skew_y == 0.0
+      && self.shift_x_px == 0.0
+      && self.shift_y_px == 0.0
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ReflectionDistanceMode {
   /// DrawingML applies `dist` as a translation after the authored affine
@@ -1030,6 +1095,7 @@ enum ReflectionReference {
   /// the path-geometry fallback after an empty inset run rectangle.
   WordRunMetrics {
     ascent_px: Option<f32>,
+    baseline_shift_px: f32,
     ramp_extension_px: f32,
   },
 }
@@ -1066,6 +1132,7 @@ pub(crate) fn bind_wordprocessing_reflection_metrics(
       {
         reflection.reference = ReflectionReference::WordRunMetrics {
           ascent_px: binding.ascent_px,
+          baseline_shift_px: 0.0,
           ramp_extension_px: reflection.distance_px * binding.distance_scale * 0.5,
         };
         reflection.distance_mode = ReflectionDistanceMode::PostTransformOffset;
@@ -1076,6 +1143,42 @@ pub(crate) fn bind_wordprocessing_reflection_metrics(
       | ImageEffect::Blend {
         container: child, ..
       } => bind_wordprocessing_reflection_metrics(child, binding),
+      _ => {}
+    }
+  }
+}
+
+/// Legacy OfficeArt passes its realized ascent, descent and cell/baseline
+/// residual to GEL, separately from the glyph source's padded/path bounds.
+/// Native GFX constructor and affine observations distinguish this from both
+/// shape reflection and Word's integer-em Line Services metric binding.
+pub(crate) fn configure_locked_canvas_text_reflection(
+  container: &mut ImageEffectContainer,
+  ascent_pt: f32,
+  descent_pt: f32,
+  baseline_shift_pt: f32,
+) {
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::Reflection(reflection) => {
+        let distance_scale = descent_pt * 0.25;
+        reflection.reference = ReflectionReference::WordRunMetrics {
+          ascent_px: Some(ascent_pt * 96.0 / 72.0),
+          baseline_shift_px: baseline_shift_pt * 96.0 / 72.0,
+          ramp_extension_px: reflection.distance_px * distance_scale * 0.5,
+        };
+        reflection.distance_mode = ReflectionDistanceMode::PostTransformOffset;
+        reflection.distance_length_scale = distance_scale;
+        reflection.raster_length_scale = ascent_pt / 72.0;
+        reflection.bounds_radius_scale = ascent_pt / 72.0;
+      }
+      ImageEffect::Container(child)
+      | ImageEffect::AlphaModulate(child)
+      | ImageEffect::Blend {
+        container: child, ..
+      } => {
+        configure_locked_canvas_text_reflection(child, ascent_pt, descent_pt, baseline_shift_pt);
+      }
       _ => {}
     }
   }
@@ -1228,6 +1331,10 @@ fn word_static_3d_effect_length_scale(length_px: f32, scale: f32, floor_pixels: 
     / length_px
 }
 
+pub(crate) fn word_static_3d_shadow_length_scale(length_px: f32, scale: f32) -> f32 {
+  word_static_3d_effect_length_scale(length_px, scale, 0.4)
+}
+
 pub(crate) fn from_wordprocessing_text_effects(
   glow: Option<WordprocessingTextGlow>,
   shadow: Option<WordprocessingTextShadow>,
@@ -1299,9 +1406,7 @@ pub(crate) fn from_wordprocessing_text_effects(
   if let Some(shadow) = shadow {
     let normalized_scale = |length, scale| match host {
       WordprocessingTextEffectHost::FlatText => scale,
-      WordprocessingTextEffectHost::Static3d => {
-        word_static_3d_effect_length_scale(length, scale, 0.4)
-      }
+      WordprocessingTextEffectHost::Static3d => word_static_3d_shadow_length_scale(length, scale),
     };
     let raster_length_scale = normalized_scale(shadow.blur_radius_px, shadow.raster_length_scale);
     let prescale_divisor =
@@ -3334,12 +3439,13 @@ fn reflection_source_geometry(
     },
     ReflectionReference::WordRunMetrics {
       ascent_px,
+      baseline_shift_px,
       ramp_extension_px,
     } => {
       let (top, bottom) = match ascent_px {
         Some(ascent) => (
-          root_source.anchor.bottom - ascent,
-          root_source.anchor.bottom,
+          root_source.anchor.bottom + baseline_shift_px - ascent,
+          root_source.anchor.bottom + baseline_shift_px,
         ),
         None => (root_source.paint.top, root_source.paint.bottom),
       };
@@ -3655,7 +3761,7 @@ fn effect_output_geometry_for_domain(
       // order identical to the discrete order in `outer_shadow_image`.
       let transform_input = match blur_kernel {
         ShadowBlurKernel::Direct2dGaussian => outset(source),
-        ShadowBlurKernel::WordTextBalanced { .. } => source,
+        ShadowBlurKernel::WordPictureGaussian | ShadowBlurKernel::WordTextBalanced { .. } => source,
       };
       let (transform_source, post_transform_offset) = match distance_mode {
         ShadowDistanceMode::PostTransformOffset => (transform_input, (offset_x, offset_y)),
@@ -3685,6 +3791,7 @@ fn effect_output_geometry_for_domain(
       };
       Some(match blur_kernel {
         ShadowBlurKernel::Direct2dGaussian => transformed,
+        ShadowBlurKernel::WordPictureGaussian => outset(transformed),
         ShadowBlurKernel::WordTextBalanced {
           align_padded_output,
           ..
@@ -3973,12 +4080,14 @@ pub(crate) fn scale_container_pixel_lengths(container: &mut ImageEffectContainer
         reflection.blur_radius_px *= scale;
         if let ReflectionReference::WordRunMetrics {
           ascent_px,
+          baseline_shift_px,
           ramp_extension_px,
         } = &mut reflection.reference
         {
           if let Some(ascent) = ascent_px {
             *ascent *= scale;
           }
+          *baseline_shift_px *= scale;
           *ramp_extension_px *= scale;
         }
         reflection.bounds_radius_offset_px *= scale;
@@ -4180,6 +4289,22 @@ pub(crate) fn use_word_shape_glow_profile(container: &mut ImageEffectContainer) 
       ImageEffect::AlphaModulate(container)
       | ImageEffect::Blend { container, .. }
       | ImageEffect::Container(container) => use_word_shape_glow_profile(container),
+      _ => {}
+    }
+  }
+}
+
+/// Word picture effect lists use GEL's Transform(caster) -> OuterShadow.
+/// Keep the independent polar offset and finite Gaussian unchanged.
+pub(crate) fn use_word_picture_shadow_profile(container: &mut ImageEffectContainer) {
+  for effect in &mut container.effects {
+    match effect {
+      ImageEffect::OuterShadow { blur_kernel, .. } => {
+        *blur_kernel = ShadowBlurKernel::WordPictureGaussian;
+      }
+      ImageEffect::AlphaModulate(container)
+      | ImageEffect::Blend { container, .. }
+      | ImageEffect::Container(container) => use_word_picture_shadow_profile(container),
       _ => {}
     }
   }
@@ -6246,27 +6371,24 @@ fn outer_shadow_image_with_scale(
   let alpha = image::GrayImage::from_fn(source.width(), source.height(), |x, y| {
     image::Luma([source.get_pixel(x, y).0[3]])
   });
-  let alpha = match blur_kernel {
-    ShadowBlurKernel::Direct2dGaussian => {
-      // Direct2D's documented drop-shadow graph feeds the source into the
-      // Shadow effect first, then feeds that output into a 2-D affine effect.
-      let alpha = if blur_radius_px > f32::EPSILON {
-        if raster_scale == EffectRasterScale::default() {
-          direct2d_gaussian_blur_alpha(&alpha, blur_radius_px)
-        } else {
-          floating_point_gaussian_blur_alpha_xy(
-            &alpha,
-            blur_radius_x_px.floor() as usize,
-            direct2d_gaussian_sigma(blur_radius_x_px),
-            blur_radius_y_px.floor() as usize,
-            direct2d_gaussian_sigma(blur_radius_y_px),
-          )
-        }
-      } else {
-        alpha
-      };
-      affine_gray_image(&alpha, transform)
+  let gaussian = |alpha: image::GrayImage| {
+    if blur_radius_px <= f32::EPSILON {
+      alpha
+    } else if raster_scale == EffectRasterScale::default() {
+      direct2d_gaussian_blur_alpha(&alpha, blur_radius_px)
+    } else {
+      floating_point_gaussian_blur_alpha_xy(
+        &alpha,
+        blur_radius_x_px.floor() as usize,
+        direct2d_gaussian_sigma(blur_radius_x_px),
+        blur_radius_y_px.floor() as usize,
+        direct2d_gaussian_sigma(blur_radius_y_px),
+      )
     }
+  };
+  let alpha = match blur_kernel {
+    ShadowBlurKernel::Direct2dGaussian => affine_gray_image(&gaussian(alpha), transform),
+    ShadowBlurKernel::WordPictureGaussian => gaussian(affine_gray_image(&alpha, transform)),
     ShadowBlurKernel::WordTextBalanced {
       prescale_divisor, ..
     } => {
@@ -6944,6 +7066,51 @@ fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) 
 #[cfg(test)]
 mod tests {
   #[test]
+  fn locked_canvas_text_reflection_uses_native_baseline_affine() {
+    use super::*;
+    // Actual GFX constructor/affine inputs at600DPI, Calibri and Monotype
+    // Corsiva16/32pt. Their padded/path sources share the baseline pivot.
+    for (ascent, descent, residual, translation) in [
+      (127.333_333, 40.0, 0.333_329_55, 1.454_060_7),
+      (253.666_67, 81.0, -0.333_340_9, 0.927_806_4),
+      (109.625_33, 40.0, 0.625_324_84, 2.038_051_4),
+      (218.25, 81.0, -0.750_006_53, 0.094_475_14),
+    ] {
+      let ImageEffect::Reflection(mut effect) = reflection(&a::Reflection::default()) else {
+        unreachable!()
+      };
+      effect.distance_px = 1000.0 / 9525.0;
+      effect.direction_degrees = 90.0;
+      effect.alignment = (0.0, 1.0);
+      effect.transform.scale_y = -1.0;
+      let mut graph = ImageEffectContainer {
+        kind: ImageEffectContainerKind::Tree,
+        effects: vec![ImageEffect::Reflection(effect)],
+      };
+      configure_locked_canvas_text_reflection(
+        &mut graph,
+        ascent * 0.12,
+        descent * 0.12,
+        residual * 0.12,
+      );
+      let source = EffectOutputBounds {
+        left_pt: 0.0,
+        top_pt: -20.0,
+        right_pt: 30.0,
+        bottom_pt: 5.0,
+      };
+      let anchor = EffectOutputBounds {
+        top_pt: -ascent * 0.12,
+        bottom_pt: 0.0,
+        ..source
+      };
+      let actual = container_output_bounds_with_anchor(&graph, source, anchor).unwrap();
+      assert!((actual.bottom_pt - (20.0 + translation * 0.12)).abs() < 0.0001);
+      assert!((actual.top_pt - (-5.0 + translation * 0.12)).abs() < 0.0001);
+    }
+  }
+
+  #[test]
   fn word_run_finite_mask_preserves_independently_bound_source_images() {
     use super::*;
     let root_bounds = PixelBounds {
@@ -6977,6 +7144,7 @@ mod tests {
     effect.transform.scale_y = 1.0;
     effect.reference = ReflectionReference::WordRunMetrics {
       ascent_px: Some(4.0),
+      baseline_shift_px: 0.0,
       ramp_extension_px: 0.0,
     };
     for reference in [
@@ -7086,6 +7254,7 @@ mod tests {
       distance_mode: ReflectionDistanceMode::PostTransformOffset,
       reference: ReflectionReference::WordRunMetrics {
         ascent_px: Some(4.0),
+        baseline_shift_px: 0.0,
         ramp_extension_px: 0.0,
       },
       direction_degrees: 90.0,
@@ -7222,6 +7391,7 @@ mod tests {
       let source = reflection_source_geometry(
         ReflectionReference::WordRunMetrics {
           ascent_px,
+          baseline_shift_px: 0.0,
           ramp_extension_px: 5.0,
         },
         completed,
@@ -9056,6 +9226,123 @@ mod tests {
       )
       .is_none()
     );
+  }
+
+  #[test]
+  fn word_picture_shadow_quad_encloses_the_transformed_painted_path() {
+    use kurbo::{Ellipse, Rect, RoundedRect, Shape};
+
+    // Native local quads from two separately exported pictures. The frame is
+    // the painted edge; the flat picture's rectangular face starts at -0.5pt.
+    let round_rect = RoundedRect::from_rect(
+      Rect::new(-0.25, -0.25, 317.30, 238.58786),
+      238.33786 * 0.16667 + 0.25,
+    )
+    .to_path(0.1);
+    let ellipse = Ellipse::from_rect(Rect::new(-2.5, -2.5, 293.85, 189.9774)).to_path(0.1);
+    for (path, offset, radius, sx, sy, kx, alignment, expected) in [
+      (
+        round_rect,
+        0.0,
+        6.0,
+        1.0,
+        0.23,
+        20.0_f32.to_radians().tan(),
+        (1.0, 1.0),
+        [-81.20753, 177.65517, 392.53519, 66.93271],
+      ),
+      (
+        ellipse,
+        23.0,
+        30.0,
+        -0.8,
+        -0.18,
+        0.0,
+        (0.5, 1.0),
+        [-2.86499, 182.97739, 297.08, 94.64593],
+      ),
+    ] {
+      let mut shadow = super::offset_outer_shadow_with_identity(
+        0.0,
+        offset * (96.0 / 72.0),
+        ResolvedEffectColor {
+          color: RgbColor { r: 0, g: 0, b: 0 },
+          alpha: 51,
+        },
+      );
+      shadow
+        .effects
+        .retain(|effect| matches!(effect, ImageEffect::OuterShadow { .. }));
+      let [
+        ImageEffect::OuterShadow {
+          blur_radius_px,
+          transform,
+          alignment: anchor,
+          ..
+        },
+      ] = shadow.effects.as_mut_slice()
+      else {
+        unreachable!()
+      };
+      transform.scale_x = sx;
+      transform.scale_y = sy;
+      transform.skew_x = kx;
+      *anchor = alignment;
+      *blur_radius_px = radius * (96.0 / 72.0);
+      super::use_word_picture_shadow_profile(&mut shadow);
+      let bounds = super::word_picture_shadow_path_bounds(&shadow, path).unwrap();
+      for (actual, native) in [bounds.x0, bounds.y0, bounds.width(), bounds.height()]
+        .into_iter()
+        .zip(expected)
+      {
+        assert!((actual - native).abs() < 0.03, "{actual} vs {native}");
+      }
+    }
+  }
+
+  #[test]
+  fn word_picture_shadow_keeps_physical_blur_after_signed_scale_and_skew() {
+    // Native flat-picture controls: sharp versus 6pt/30pt blur grows every
+    // shadow edge by that physical radius, despite sy=.23 and sx/sy<0.
+    // Their C# GEL observations independently connect Transform -> Shadow.
+    for (radius_pt, sx, sy, skew_x) in [(6.0, 1.0, 0.23, 0.363_970_22), (30.0, -0.8, -0.18, 0.0)] {
+      let mut sharp = super::offset_outer_shadow_with_identity(
+        0.0,
+        0.0,
+        ResolvedEffectColor {
+          color: RgbColor { r: 0, g: 0, b: 0 },
+          alpha: 51,
+        },
+      );
+      sharp
+        .effects
+        .retain(|effect| matches!(effect, ImageEffect::OuterShadow { .. }));
+      let ImageEffect::OuterShadow { transform, .. } = &mut sharp.effects[0] else {
+        unreachable!();
+      };
+      transform.scale_x = sx;
+      transform.scale_y = sy;
+      transform.skew_x = skew_x;
+      super::use_word_picture_shadow_profile(&mut sharp);
+      let mut blurred = sharp.clone();
+      let ImageEffect::OuterShadow { blur_radius_px, .. } = &mut blurred.effects[0] else {
+        unreachable!();
+      };
+      *blur_radius_px = radius_pt * 96.0 / 72.0;
+      let a = super::container_output_bounds(&sharp, 317.09, 238.37).unwrap();
+      let b = super::container_output_bounds(&blurred, 317.09, 238.37).unwrap();
+      for growth in [
+        a.left_pt - b.left_pt,
+        a.top_pt - b.top_pt,
+        b.right_pt - a.right_pt,
+        b.bottom_pt - a.bottom_pt,
+      ] {
+        assert!(
+          (growth - radius_pt).abs() < 0.0001,
+          "{growth} != {radius_pt}"
+        );
+      }
+    }
   }
 
   #[test]

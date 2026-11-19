@@ -338,6 +338,34 @@ pub(crate) fn math_run_characters(run: &m::Run) -> Vec<MathRunCharacter> {
   characters
 }
 
+pub(crate) fn math_run_is_normal_text(run: &m::Run) -> bool {
+  math_run_variant(run.math_run_properties.as_deref()).2
+}
+
+/// Preserve the source runs of a flat zone containing ordinary text. The
+/// usual math-only fast path needs no additional allocation. Built-up objects
+/// retain their separate parser/layout owner.
+pub(crate) fn wordprocessing_normal_math_runs(choice: &w::ParagraphChoice) -> Option<Vec<&m::Run>> {
+  match choice {
+    w::ParagraphChoice::MRun(run) if math_run_is_normal_text(run) => Some(vec![run]),
+    w::ParagraphChoice::OfficeMath(math)
+      if math.office_math_choice.iter().any(
+        |choice| matches!(choice, m::OfficeMathChoice::Run(run) if math_run_is_normal_text(run)),
+      ) =>
+    {
+      math
+        .office_math_choice
+        .iter()
+        .map(|choice| match choice {
+          m::OfficeMathChoice::Run(run) => Some(run.as_ref()),
+          _ => None,
+        })
+        .collect()
+    }
+    _ => None,
+  }
+}
+
 fn append_run_text(run: &m::Run, text: &mut String) {
   visit_run_characters(run, |character| text.push(character.rendered));
 }
@@ -391,11 +419,18 @@ fn math_run_variant(
     return (m::ScriptValues::Roman, m::StyleValues::Italic, false);
   };
   match properties.run_properties_choice.as_ref() {
-    Some(m::RunPropertiesChoice::NormalText(normal)) => (
-      m::ScriptValues::Roman,
-      m::StyleValues::Plain,
-      normal.val.is_none_or(math_on_off),
-    ),
+    Some(m::RunPropertiesChoice::NormalText(normal)) => {
+      let normal = normal.val.is_none_or(math_on_off);
+      (
+        m::ScriptValues::Roman,
+        if normal {
+          m::StyleValues::Plain
+        } else {
+          m::StyleValues::Italic
+        },
+        normal,
+      )
+    }
     Some(m::RunPropertiesChoice::Sequence(sequence)) => (
       sequence
         .script
@@ -627,6 +662,20 @@ mod tests {
       wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
       Some("[𝑎𝑏𝑐𝜋]")
     );
+  }
+
+  #[test]
+  fn inactive_normal_math_text_retains_the_default_math_alphabet() {
+    for value in ["0", "false", "off"] {
+      let xml = format!(
+        r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:rPr><m:nor m:val="{value}"/></m:rPr><m:t>A+-</m:t></m:r></m:oMath></w:p>"#
+      );
+      let paragraph = w::Paragraph::from_bytes(xml.as_bytes()).unwrap();
+      assert_eq!(
+        wordprocessing_math_text(&paragraph.paragraph_choice[0]).as_deref(),
+        Some("𝐴+−")
+      );
+    }
   }
 
   #[test]

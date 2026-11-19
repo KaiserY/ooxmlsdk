@@ -403,6 +403,7 @@ fn mapped_reflection_retains_logical_fade_direction() {
           distance_mode: ReflectionDistanceMode::PostTransformOffset,
           reference: ReflectionReference::WordRunMetrics {
             ascent_px: Some(10.0),
+            baseline_shift_px: 0.0,
             ramp_extension_px: 0.0,
           },
           direction_degrees: 0.0,

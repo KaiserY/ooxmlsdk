@@ -9,7 +9,7 @@ use kurbo::{BezPath, PathEl, Point, Rect};
 /// Measure in the caller's device coordinates. Office uses FLOAT path points
 /// and DOUBLE normalized tangents; preserving that distinction also avoids
 /// unstable slopes at a nearly horizontal or vertical join.
-pub(super) fn stroked_bounds(path: &BezPath, width: f32, miter_limit: f32) -> Option<Rect> {
+pub(crate) fn stroked_bounds(path: &BezPath, width: f32, miter_limit: f32) -> Option<Rect> {
   let mut walker = BoundsWalker {
     bounds: [
       f32::INFINITY,
@@ -115,6 +115,17 @@ impl BoundsWalker {
   }
 
   fn join(&mut self, previous: [f32; 2], p: [f32; 2], next: [f32; 2]) {
+    // Preserve the legacy collector's early rejection as well as its join
+    // projection. Its last comparison deliberately uses the right bound,
+    // even for Y. Native wide-triangle controls distinguish this from an
+    // ordinary rectangular containment check (MSO 16.0.20527, 0x102270).
+    if p[0] - self.miter_extent >= self.bounds[0]
+      && p[0] + self.miter_extent <= self.bounds[2]
+      && p[1] - self.miter_extent >= self.bounds[1]
+      && p[1] + self.miter_extent <= self.bounds[2]
+    {
+      return;
+    }
     let mut u = [f64::from(p[0] - previous[0]), f64::from(p[1] - previous[1])];
     let mut v = [f64::from(p[0] - next[0]), f64::from(p[1] - next[1])];
     if u[0] * v[1] == v[0] * u[1] {

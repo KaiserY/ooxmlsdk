@@ -17,6 +17,7 @@ use super::{
 #[derive(Clone, Debug, Default)]
 pub(super) struct VerticalMergeFollows {
   rows_on_page: Range<usize>,
+  last_row_height_pt: Option<f32>,
   // Only active, cross-page merges are retained. A table follow can clone
   // this small map without copying the metrics of every already closed cell.
   cursors: HashMap<(usize, usize), f32>,
@@ -43,6 +44,12 @@ impl VerticalMergeFragment {
 impl VerticalMergeFollows {
   pub fn set_rows_on_page(&mut self, rows: Range<usize>) {
     self.rows_on_page = rows;
+    self.last_row_height_pt = None;
+  }
+
+  pub fn set_rows_with_split_master(&mut self, rows: Range<usize>, height_pt: f32) {
+    self.rows_on_page = rows;
+    self.last_row_height_pt = Some(height_pt);
   }
 
   pub fn content_cursor(&self, origin_row: usize, grid_start: usize) -> Option<f32> {
@@ -90,8 +97,20 @@ impl VerticalMergeFollows {
     let before_current = height_of_rows(table, row_heights, first_row, row_index)?;
     let top_pt = row_top - before_current;
     let physical_row_height = (row_bottom - row_top).max(0.0);
+    // The retained part of a cut row is already part of this physical cell.
+    // Its height must participate before formatting earlier rows: otherwise
+    // center/bottom alignment uses only the complete-row prefix. Native
+    // cached/fresh Top/Center/Bottom controls retain the same intrinsic last
+    // row, independently of which earlier covered row owns the text.
+    let last_row_height = if last_row + 1 == self.rows_on_page.end {
+      self.last_row_height_pt
+    } else {
+      None
+    }
+    .unwrap_or(*row_heights.get(last_row)?);
+    let last_row_is_split = last_row_height + LAYOUT_EPSILON_PT < *row_heights.get(last_row)?;
     let height_pt = height_of_rows(table, row_heights, first_row, last_row)?
-      + row_heights.get(last_row)?
+      + last_row_height
       + physical_row_height
       - row_heights.get(row_index)?;
     if top_pt + height_pt > page_bottom + LAYOUT_EPSILON_PT {
@@ -114,9 +133,11 @@ impl VerticalMergeFollows {
       tracks_content: (!rotated || first_row == origin_row)
         && (first_row > origin_row
           || last_row < end_row
+          || last_row_is_split
           || (physical_row_height - row_heights.get(row_index)?).abs() > LAYOUT_EPSILON_PT),
       continues_content: !rotated
         && (last_row < end_row
+          || last_row_is_split
           || physical_row_height + LAYOUT_EPSILON_PT < *row_heights.get(row_index)?),
     })
   }
@@ -236,6 +257,7 @@ mod tests {
     };
     Table {
       recovered_absolute_grid: false,
+      wordprocessing_shape_paint_grid: false,
       column_widths_pt: vec![53.0; 3],
       preferred_width_pt: Some(159.0),
       preferred_width_pct: None,
@@ -250,6 +272,7 @@ mod tests {
       allow_overlap: true,
       split_allowed: false,
       following_text_flow: false,
+      wrap_on_all_pages: false,
       explicit_no_repeat_header: false,
       page_break_before: false,
       starts_after_last_rendered_page_break: false,
@@ -301,6 +324,7 @@ mod tests {
             width_after_pt: None,
             layout: None,
             borders: None,
+            html_division_offset_pt: 0.0,
             spacing_shading: None,
             redline_color: None,
           }
@@ -636,6 +660,183 @@ mod tests {
         assert_eq!(text_in_column(&pages[1], 0), "");
         assert_eq!(text_in_column(&pages[0], 1), "tag");
         assert_eq!(text_in_column(&pages[1], 1), "");
+      }
+    }
+  }
+
+  #[test]
+  fn native_aligned_vertical_merge_lowers_allow_a_covered_row_to_split() {
+    // Office Top/Center/Bottom x cached/fresh derivatives retain the first
+    // line of the unmerged sibling once the rowspan's own lowers fit the
+    // complete retained prefix. Alignment keeps its physical paint owner.
+    for cached in [false, true] {
+      for alignment in [
+        TableCellVerticalAlignment::Top,
+        TableCellVerticalAlignment::Center,
+        TableCellVerticalAlignment::Bottom,
+      ] {
+        let mut table = table(3, cached);
+        table.rows[0].height_pt = Some(26.6);
+        table.rows[0].cells[0].blocks = vec![paragraph("15 214,05", cached)];
+        table.rows[1].height_pt = Some(14.15);
+        table.rows[1].cells[2].blocks = vec![paragraph("one\ntwo", cached)];
+        for row in &mut table.rows {
+          for cell in &mut row.cells[..2] {
+            cell.vertical_alignment = alignment;
+          }
+        }
+        let pages = format(&table, 44.0);
+        assert_eq!(pages.len(), 2, "{alignment:?}, cached {cached}");
+        assert_eq!(text_in_column(&pages[0], 2), "5one");
+        assert_eq!(text_in_column(&pages[1], 2), "twounit");
+        assert_eq!(
+          pages
+            .iter()
+            .map(|page| text_in_column(page, 0))
+            .collect::<String>(),
+          "15214,05"
+        );
+        assert_eq!(
+          pages
+            .iter()
+            .map(|page| text_in_column(page, 1))
+            .collect::<String>(),
+          "tag"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn aligned_vertical_merge_master_includes_the_retained_split_row() {
+    // Native Top/Center/Bottom x cached/fresh controls keep the complete
+    // short merged story on the master. Its position agrees with a table
+    // ending after the retained first line of the split sibling, rather
+    // than a cell ending before that row or at the unused page deadline.
+    for cached in [false, true] {
+      for alignment in [
+        TableCellVerticalAlignment::Top,
+        TableCellVerticalAlignment::Center,
+        TableCellVerticalAlignment::Bottom,
+      ] {
+        let mut table = table(3, cached);
+        table.rows[0].height_pt = Some(26.6);
+        table.rows[0].cells[0].blocks = vec![paragraph("15 214,05", cached)];
+        table.rows[1].height_pt = Some(14.15);
+        table.rows[1].cells[2].blocks = vec![paragraph("one\ntwo", cached)];
+        for row in &mut table.rows {
+          for cell in &mut row.cells[..2] {
+            cell.vertical_alignment = alignment;
+          }
+        }
+        let mut retained = table.clone();
+        retained.rows.truncate(2);
+        retained.rows[1].cells[2].blocks = vec![paragraph("one", cached)];
+        for cell in &mut retained.rows[1].cells {
+          cell.borders.bottom = table.rows[2].cells[2].borders.bottom;
+          cell.border_suppressions.bottom = false;
+        }
+        let expected = format(&retained, 100.0);
+        let pages = format(&table, 44.0);
+        assert_eq!(pages.len(), 2, "{alignment:?}, cached {cached}");
+        let positions = |page: &Page| {
+          page
+            .items
+            .iter()
+            .filter_map(|item| match item {
+              PageItem::Text(text) if text.x_pt < 28.35 + 106.0 => {
+                Some((text.text.as_str(), text.y_pt))
+              }
+              _ => None,
+            })
+            .map(|(text, y)| (text.to_owned(), y))
+            .collect::<Vec<_>>()
+        };
+        let actual = positions(&pages[0]);
+        let expected = positions(&expected[0]);
+        assert_eq!(
+          actual.len(),
+          expected.len(),
+          "{alignment:?}, cached {cached}"
+        );
+        for ((text, y), (expected_text, expected_y)) in actual.iter().zip(&expected) {
+          assert_eq!(text, expected_text);
+          assert!(
+            (y - expected_y).abs() < 0.001,
+            "{alignment:?}, cached {cached}: {text:?} {y} != {expected_y}"
+          );
+        }
+        assert_eq!(text_in_column(&pages[1], 0), "");
+        assert_eq!(text_in_column(&pages[1], 1), "");
+      }
+    }
+  }
+
+  #[test]
+  fn vertical_merge_text_master_closes_its_own_cell_bottom() {
+    fn horizontal_ink(items: &[PageItem], x: f32, y: f32) -> bool {
+      items.iter().any(|item| match item {
+        PageItem::Fill(fill) => {
+          fill.height_pt < 1.0
+            && fill.width_pt > 20.0
+            && fill.x_pt < x
+            && x < fill.x_pt + fill.width_pt
+            && (fill.y_pt - y).abs() < 0.25
+        }
+        PageItem::Group(items)
+        | PageItem::InlineObjectGroup(items)
+        | PageItem::CompositingGroup { items, .. } => horizontal_ink(items, x, y),
+        _ => false,
+      })
+    }
+    for cached in [false, true] {
+      for alignment in [
+        TableCellVerticalAlignment::Top,
+        TableCellVerticalAlignment::Center,
+        TableCellVerticalAlignment::Bottom,
+      ] {
+        for visible_bottom in [false, true] {
+          let mut table = table(3, cached);
+          table.rows[0].height_pt = Some(26.6);
+          table.rows[0].cells[0].blocks = vec![paragraph("15 214,05", cached)];
+          table.rows[1].height_pt = Some(14.15);
+          table.rows[1].cells[2].blocks = vec![paragraph("one\ntwo", cached)];
+          for row in &mut table.rows {
+            for cell in &mut row.cells[..2] {
+              cell.vertical_alignment = alignment;
+              cell.borders.bottom = visible_bottom.then_some(BorderStyle {
+                width_pt: 0.75,
+                ..BorderStyle::default()
+              });
+              cell.border_suppressions.bottom = !visible_bottom;
+            }
+          }
+          let pages = format(&table, 44.0);
+          assert_eq!(pages.len(), 2, "{alignment:?}, cached {cached}");
+          let row_bottom = |index| {
+            pages[0]
+              .frame_fragments
+              .iter()
+              .find(|fragment| {
+                fragment.kind == FrameFragmentKind::TableRow && fragment.row_index == index
+              })
+              .and_then(|fragment| fragment.bounds)
+              .map(|bounds| bounds.y_pt + bounds.height_pt)
+              .expect("retained row")
+          };
+          for column in 0..2 {
+            let x = 28.35 + (column as f32 + 0.5) * 53.0;
+            assert!(
+              !horizontal_ink(&pages[0].items, x, row_bottom(0)),
+              "an interior covered edge stays hidden"
+            );
+            assert_eq!(
+              horizontal_ink(&pages[0].items, x, row_bottom(1)),
+              visible_bottom,
+              "{alignment:?}, cached {cached}, column {column}, bottom {visible_bottom}"
+            );
+          }
+        }
       }
     }
   }

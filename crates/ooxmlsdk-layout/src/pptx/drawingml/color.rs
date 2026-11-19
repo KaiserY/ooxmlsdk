@@ -873,12 +873,30 @@ pub(crate) fn resolve_word_fixed_output_effect_rgb(
   rgb: [u8; 3],
   transformations: impl IntoIterator<Item = ColorTransformation>,
 ) -> [u8; 3] {
+  let resolved = resolve_rgb_color_graph(rgb, transformations).into_word_fixed_output_effect();
+  [resolved.r, resolved.g, resolved.b]
+}
+
+/// W14 solid text shares the precise effect color graph, but ordinary and
+/// shadowed text colors select nearest final bytes rather than the truncated
+/// texture samples used by fixed-output effects.
+pub(crate) fn resolve_word_text_fill_rgb(
+  rgb: [u8; 3],
+  transformations: impl IntoIterator<Item = ColorTransformation>,
+) -> [u8; 3] {
+  let resolved = resolve_rgb_color_graph(rgb, transformations).into_resolved();
+  [resolved.r, resolved.g, resolved.b]
+}
+
+fn resolve_rgb_color_graph(
+  rgb: [u8; 3],
+  transformations: impl IntoIterator<Item = ColorTransformation>,
+) -> PreciseResolvedColor {
   let mut color = PreciseResolvedColor::from_resolved(ResolvedColor::new(rgb[0], rgb[1], rgb[2]));
   for transformation in transformations {
     color.apply_transformation(transformation);
   }
-  let resolved = color.into_word_fixed_output_effect();
-  [resolved.r, resolved.g, resolved.b]
+  color
 }
 
 fn drawingml_ratio(value: i32) -> f64 {

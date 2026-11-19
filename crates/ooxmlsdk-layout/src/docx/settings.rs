@@ -287,6 +287,26 @@ pub(super) fn do_not_break_wrapped_tables(
     .is_some_and(do_not_break_wrapped_tables_value)
 }
 
+pub(super) fn allow_text_after_floating_table_break(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .is_some_and(allow_text_after_floating_table_break_value)
+}
+
+fn allow_text_after_floating_table_break_value(settings: &w::Settings) -> bool {
+  // MS-DOCX2.3.6: only the Microsoft compatibility URI selects this policy;
+  // omission is false. Keep the shared last-value and ST_OnOff handling.
+  compatibility_setting_value(
+    settings,
+    w::CompatSettingNameValues::AllowTextAfterFloatingTableBreak,
+  )
+  .unwrap_or(false)
+}
+
 pub(super) fn do_not_expand_shift_return(
   package: &WordprocessingDocument,
   main: &MainDocumentPart,
@@ -670,6 +690,33 @@ mod tests {
         assert_eq!(
           super::differentiate_multirow_table_headers_value(Some(&settings), mode),
           expected
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn floating_table_follow_text_setting_requires_microsoft_uri_and_defaults_off() {
+    assert!(!super::allow_text_after_floating_table_break_value(
+      &w::Settings::default()
+    ));
+    for uri in [MICROSOFT_WORD_COMPATIBILITY_URI, "urn:unrecognized"] {
+      for value in ["true", "on", "1", "false", "off", "0", "invalid"] {
+        let settings = w::Settings {
+          compatibility: vec![w::Compatibility {
+            compatibility_setting: vec![w::CompatibilitySetting {
+              w_name: w::CompatSettingNameValues::AllowTextAfterFloatingTableBreak,
+              w_uri: uri.to_owned(),
+              w_val: value.to_owned(),
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        };
+        assert_eq!(
+          super::allow_text_after_floating_table_break_value(&settings),
+          uri == MICROSOFT_WORD_COMPATIBILITY_URI && matches!(value, "true" | "on" | "1"),
+          "uri={uri}, value={value}"
         );
       }
     }

@@ -30,10 +30,13 @@ use crate::render::chart_layout_profiles as profiles;
 
 use crate::common::drawingml_geometry::bez_path_commands;
 
+mod word_date_labels;
 mod word_lathe_outline;
+mod word_legend_key;
 mod word_parallel_lines;
 mod word_pie_layout;
 mod word_pie_scene;
+mod word_pie_shadow;
 mod word_scene_tiles;
 
 const TEXT_LINE_HEIGHT_SCALE: f32 = 1.2;
@@ -590,6 +593,11 @@ pub(crate) struct RadialChartStyle {
   pub point_styles: Vec<crate::common::ShapeStyle<'static>>,
   pub point_image_effects:
     Vec<Option<crate::common::drawingml_image_effects::ImageEffectContainer>>,
+  pub word_point_3d_styles: Vec<crate::common::drawingml_3d::Static3dStyleParts>,
+  pub word_legend_key_strokes: Vec<crate::common::ShapeStyleValue<crate::common::Stroke<'static>>>,
+  /// Source-scope shadows participate in Word's scene fit even when every
+  /// individual point clears its inherited shadow paint.
+  pub word_pie_3d_shadow_support: bool,
   pub data_label_fill_colors: Vec<Option<RgbColor>>,
   pub data_label_shape_styles: Vec<Option<crate::common::ShapeStyle<'static>>>,
   pub data_label_image_effects:
@@ -1071,7 +1079,7 @@ pub(crate) fn lower_clustered_column_chart(
         })
       })
       .unwrap_or(true);
-  let (date_ticks, date_axis_increment_budget) =
+  let (mut date_ticks, mut date_axis_increment_budget) =
     if category_tick_labels_visible && chart.date_axis.is_some() {
       let preliminary_ticks = date_axis_ticks(chart).unwrap_or_default();
       let budget = estimated_date_axis_maximum_auto_main_increment_count(
@@ -2535,6 +2543,28 @@ pub(crate) fn lower_clustered_column_chart(
     category_top = plot_bottom + style.category_label.font_size_pt * 0.7;
   }
   let mut word_category_labels = None;
+  let word_date_labels = word_date_labels::layout(
+    word_date_labels::LabelSpace {
+      frame,
+      plot_top,
+      value_label_width: maximum_tick_width,
+    },
+    chart,
+    style,
+    scale,
+    &mut metrics,
+  );
+  let word_date_labels_active = word_date_labels.is_some();
+  if let Some(labels) = word_date_labels {
+    tick_left = frame.x_pt + 6.5 * style.stroke_scale;
+    plot_left = labels.plot_left;
+    plot_right = labels.plot_right;
+    plot_bottom = labels.plot_bottom;
+    category_top = plot_bottom + labels.body.label_gap;
+    date_ticks = Some(labels.ticks);
+    date_axis_increment_budget = 500;
+    word_category_labels = Some(labels.body);
+  }
   if let Some(labels) = &word_quarter_turn_labels {
     let device = style.stroke_scale;
     tick_left = frame.x_pt + 6.5 * device;
@@ -3302,7 +3332,9 @@ pub(crate) fn lower_clustered_column_chart(
   } else {
     0.0
   };
-  let primary_value_label_gap = if word_combination_layout
+  let primary_value_label_gap = if word_date_labels_active {
+    word_chart_natural_line_height(value_vertical) * 0.76
+  } else if word_combination_layout
     || word_column_layout
     || word_manual_filled_column_layout
     || word_manual_bottom_layout
@@ -3640,6 +3672,7 @@ pub(crate) fn lower_clustered_column_chart(
       && category_tick_labels_visible
       && category_label_lines.len() > 1
       && category_label_rotation.abs() <= f32::EPSILON
+      && !word_date_labels_active
       && matches!(
         chart.legend_position,
         None | Some(ChartLegendPosition::Bottom | ChartLegendPosition::Right)
@@ -3687,7 +3720,7 @@ pub(crate) fn lower_clustered_column_chart(
         style.stroke_scale,
       );
     }
-    if word_combination_layout
+    if (word_combination_layout || word_date_labels_active)
       && !chart.category_axis_reversed
       && let Some(labels) = word_category_labels.as_ref()
     {
@@ -8080,6 +8113,12 @@ pub(crate) fn lower_radial_chart(
         .plot_layout
         .is_some_and(|layout| layout.targets_inner_plot));
   let word_pie_projection = word_physical_pie.then(|| {
+    if word_pie_3d_layout
+      && style.word_pie_3d_shadow_support
+      && let Some(projection) = word_pie_shadow::projection(plot, view_3d, maximum_explosion)
+    {
+      return projection;
+    }
     if maximum_explosion <= f32::EPSILON {
       word_pie_3d_projection(plot, view_3d)
     } else {
@@ -12382,11 +12421,23 @@ fn lower_radial_legend(
     }
     return;
   }
-  if word_pie_3d_title_band.is_some()
+  let word_automatic_side_legend = style.layout_profile == ChartLayoutProfile::Word
+    && chart.legend_layout.is_none()
+    && !chart.legend_overlay
+    && matches!(
+      position,
+      ChartLegendPosition::Left | ChartLegendPosition::Right | ChartLegendPosition::TopRight
+    )
+    && !chart_shape_has_paint(&style.legend_frame_style);
+  if word_automatic_side_legend
+    || word_pie_3d_title_band.is_some()
     || (word_auto_side_center_y.is_some() && !chart_shape_has_paint(&style.legend_frame_style))
   {
     // Native unframed 2-D and 3-D pies share the natural-line row and filled
     // key slots of Word's Cartesian legend (8/10/14pt and left/right).
+    // A manual plot rectangle does not turn its automatic legend into the
+    // generic host grid: native manual/automatic plot controls retain the
+    // same legend frame and Windows symbol metrics.
     let legend = word_filled_legend_metrics(
       chart
         .visible_legend_indices
@@ -12966,6 +13017,7 @@ fn push_radial_legend_key(
   style: &RadialChartStyle,
 ) {
   let point_style = style.point_styles.get(point_index);
+  let start = items.len();
   push_chart_shape_rect(
     items,
     PlotRect {
@@ -12976,11 +13028,57 @@ fn push_radial_legend_key(
     },
     ChartShapePaint {
       fill: point_style.map(|style| &style.fill),
-      stroke: point_style.map(|style| &style.stroke),
+      stroke: style
+        .word_legend_key_strokes
+        .get(point_index)
+        .or_else(|| point_style.map(|style| &style.stroke)),
       fallback_fill_color: Some(style.point_colors[point_index % style.point_colors.len()]),
       stroke_width_scale: 1.0,
     },
   );
+  let Some(parts) = style.word_point_3d_styles.get(point_index) else {
+    return;
+  };
+  let Some((scene, shape)) = parts.scene.as_deref().zip(parts.shape.as_deref()) else {
+    return;
+  };
+  if items.len() != start + 1 {
+    return;
+  }
+  let Some(PageItem::Path(mut path)) = items.pop() else {
+    unreachable!("the legend rectangle producer emits one path");
+  };
+  // Native Circle/Angle/SoftRound controls only differ here: keys retain
+  // the source shape's actual DrawingML geometry, independently of the pie
+  // body's circular lathe. Inner-shadow/empty-effect exports are identical.
+  path.commands = path
+    .points
+    .iter()
+    .enumerate()
+    .map(|(i, point)| {
+      if i == 0 {
+        crate::common::PathCommand::MoveTo(*point)
+      } else {
+        crate::common::PathCommand::LineTo(*point)
+      }
+    })
+    .chain(std::iter::once(crate::common::PathCommand::Close))
+    .collect();
+  if let Some(image) =
+    word_legend_key::lower(&path, scene, shape, parts, style.fixed_output_raster_dpi)
+  {
+    items.push(PageItem::Image(image));
+  } else if !push_chart_shape_effect_raster(
+    items,
+    &path,
+    None,
+    Some(ChartStatic3dSurface::DrawingMl { scene, shape }),
+    parts.extrusion_color,
+    parts.contour_color,
+    false,
+  ) {
+    items.push(PageItem::Path(path));
+  }
 }
 
 fn single_line_vertical_anchor_offset(
@@ -22727,12 +22825,19 @@ impl WordHorizontalCategoryLabels {
     style: &ClusteredColumnStyle,
     metrics: &mut TextMetrics,
   ) -> (f32, f32) {
-    let mut visible = self.lines.iter().filter(|lines| !lines.is_empty());
+    let mut visible = self
+      .lines
+      .iter()
+      .enumerate()
+      .filter(|(_, lines)| !lines.is_empty());
     let Some(first) = visible.next() else {
       return current;
     };
     let last = visible.next_back().unwrap_or(first);
-    let mut width = |lines: &[String]| {
+    let mut width = |(index, lines): (usize, &Vec<String>)| {
+      if let Some(Some(width)) = self.alignment_widths.get(index) {
+        return *width;
+      }
       lines
         .iter()
         .map(|line| word_chart_tick_label_width(line, &style.category_label, metrics))
@@ -28150,6 +28255,115 @@ fn push_data_table_text(items: &mut Vec<PageItem>, x: f32, y: f32, text: String,
 #[cfg(test)]
 mod tests {
   #[test]
+  fn word_date_labels_match_native_capacity_and_overflow_controls() {
+    let dates = (0..5)
+      .map(|i| format!(r#"<c:pt idx="{i}"><c:v>{}</c:v></c:pt>"#, 37261 + i))
+      .collect::<String>();
+    let values = (0..5)
+      .map(|i| format!(r#"<c:pt idx="{i}"><c:v>32</c:v></c:pt>"#))
+      .collect::<String>();
+    for (width, height, font, value_font, overflow, angle, visible, left, bottom) in [
+      (
+        216.75, 168.0, 9.0, 9.0, "ellipsis", -45.0, "2002/1/5", 35.260_866, 100.883_23,
+      ),
+      (
+        236.0, 168.0, 9.0, 9.0, "ellipsis", -45.0, "2002/1/5", 35.260_866, 100.883_23,
+      ),
+      (
+        244.0, 168.0, 9.0, 9.0, "ellipsis", 0.0, "2002/1/5", 28.155_04, 121.926_61,
+      ),
+      (
+        252.0, 168.0, 9.0, 18.0, "ellipsis", -45.0, "2002/1/5", 41.450_867, 100.883_23,
+      ),
+      (
+        260.0, 168.0, 9.0, 18.0, "ellipsis", 0.0, "2002/1/5", 41.450_867, 121.926_61,
+      ),
+      (
+        216.75, 168.0, 14.0, 9.0, "ellipsis", -45.0, "2002/…", 34.889_687, 93.764_1,
+      ),
+      (
+        216.75, 168.0, 14.0, 9.0, "clip", -45.0, "2002/1/", 43.728_584, 84.925_2,
+      ),
+      (
+        216.75, 120.0, 9.0, 9.0, "ellipsis", -45.0, "20…", 23.969_135, 70.695_274,
+      ),
+      (
+        216.75, 120.0, 14.0, 9.0, "ellipsis", -45.0, "2…", 23.969_135, 64.636_93,
+      ),
+    ] {
+      let xml = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:areaChart><c:grouping val="standard"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Series1</c:v></c:tx><c:cat><c:numLit><c:formatCode>yyyy/m/d</c:formatCode><c:ptCount val="5"/>{dates}</c:numLit></c:cat><c:val><c:numLit><c:ptCount val="5"/>{values}</c:numLit></c:val></c:ser><c:axId val="1"/><c:axId val="2"/></c:areaChart><c:dateAx><c:axId val="1"/><c:scaling/><c:axPos val="b"/><c:numFmt formatCode="yyyy/m/d" sourceLinked="0"/><c:txPr><a:bodyPr rot="-60000000" wrap="square" vertOverflow="{overflow}"/><a:lstStyle/><a:p/></c:txPr><c:crossAx val="2"/><c:baseTimeUnit val="days"/></c:dateAx><c:valAx><c:axId val="2"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/><c:crossBetween val="midCat"/></c:valAx></c:plotArea><c:legend><c:legendPos val="b"/></c:legend></c:chart></c:chartSpace>"#
+      );
+      let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+      let chart = crate::render::chart::cartesian_chart_for_ui_language(&source, None).unwrap();
+      let mut style = word_cartesian_test_style();
+      style.category_label.font_size_pt = font;
+      style.value_label.font_size_pt = value_font;
+      style.legend.font_size_pt = 9.0;
+      let mut metrics = TextMetrics::new();
+      let value_width = super::word_chart_tick_label_width("40", &style.value_label, &mut metrics);
+      let scale =
+        super::cartesian_axis_scales(&chart, ChartLayoutProfile::Word, 5, 10, 10, None)[0].y;
+      let frame = super::ChartFrame {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: width,
+        height_pt: height,
+      };
+      let labels = super::word_date_labels::layout(
+        super::word_date_labels::LabelSpace {
+          frame,
+          plot_top: if value_font == 18.0 { 49.19748 } else { 44.21 },
+          value_label_width: value_width,
+        },
+        &chart,
+        &style,
+        scale,
+        &mut metrics,
+      )
+      .unwrap();
+      assert_eq!(labels.body.rotation, angle, "{width}/{font}/{value_font}");
+      assert_eq!(
+        labels.body.lines[0][0], visible,
+        "{width}/{height}/{font}/{overflow}"
+      );
+      assert_eq!(labels.ticks.len(), 5);
+      let bounds = labels.body.endpoint_plot_bounds(
+        frame,
+        (labels.plot_left, labels.plot_right),
+        false,
+        &style,
+        &mut metrics,
+      );
+      assert!(
+        (bounds.0 - left).abs() < 0.04,
+        "{width}/{font}/{overflow}: {} vs {left}",
+        bounds.0
+      );
+      assert!(
+        (labels.plot_bottom - bottom).abs() < 0.04,
+        "{width}/{height}/{font}/{overflow}: {} vs {bottom}",
+        labels.plot_bottom
+      );
+      style.layout_profile = ChartLayoutProfile::PowerPoint;
+      assert!(
+        super::word_date_labels::layout(
+          super::word_date_labels::LabelSpace {
+            frame,
+            plot_top: 44.21,
+            value_label_width: value_width
+          },
+          &chart,
+          &style,
+          scale,
+          &mut metrics
+        )
+        .is_none()
+      );
+    }
+  }
+
+  #[test]
   fn word_parallel_box_gradient_lighting_matches_native_face_attributes() {
     // 48 actual native boxes: stacked/clustered, height/depth controls.
     for (normal, byte) in [
@@ -32469,6 +32683,9 @@ mod tests {
       }],
       point_styles: Vec::new(),
       point_image_effects: Vec::new(),
+      word_point_3d_styles: Vec::new(),
+      word_legend_key_strokes: Vec::new(),
+      word_pie_3d_shadow_support: false,
       data_label_fill_colors: Vec::new(),
       data_label_shape_styles: Vec::new(),
       data_label_image_effects: Vec::new(),
@@ -32548,6 +32765,57 @@ mod tests {
     assert_eq!(bounds[0][0], bounds[0][1]);
     assert!(bounds[3][1][0].1 > bounds[3][0][0].1);
     assert!(bounds[3][0][0].1 > bounds[0][0][0].1);
+    // Native manual-plot controls retain the same automatic legend grid.
+    // Exercise both radial producers and change the plot origin/extent while
+    // keeping the independently owned legend configuration unchanged.
+    let mut legend_positions = Vec::new();
+    for kind in ["pieChart", "pie3DChart"] {
+      for layout in [
+        "",
+        r#"<c:layout><c:manualLayout><c:layoutTarget val="inner"/><c:x val="0.14"/><c:y val="0.16"/><c:w val="0.72"/><c:h val="0.83"/></c:manualLayout></c:layout>"#,
+        r#"<c:layout><c:manualLayout><c:layoutTarget val="inner"/><c:x val="0.2"/><c:y val="0.3"/><c:w val="0.6"/><c:h val="0.5"/></c:manualLayout></c:layout>"#,
+      ] {
+        let xml = format!(
+          r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:autoTitleDeleted val="1"/><c:view3D><c:rotX val="30"/><c:rotY val="317"/><c:rAngAx val="0"/><c:perspective val="90"/></c:view3D><c:plotArea>{layout}<c:{kind}><c:ser><c:idx val="0"/><c:order val="0"/><c:cat><c:strLit><c:ptCount val="2"/><c:pt idx="0"><c:v>HUU</c:v></c:pt><c:pt idx="1"><c:v>HAA</c:v></c:pt></c:strLit></c:cat><c:val><c:numLit><c:ptCount val="2"/><c:pt idx="0"><c:v>490</c:v></c:pt><c:pt idx="1"><c:v>379</c:v></c:pt></c:numLit></c:val></c:ser></c:{kind}></c:plotArea><c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend></c:chart></c:chartSpace>"#
+        );
+        let source = c::ChartSpace::from_bytes(xml.as_bytes()).unwrap();
+        let chart = crate::render::chart::pie_chart_model_for_host(
+          &source,
+          crate::render::chart::ChartHostApplication::Wordprocessing,
+        )
+        .unwrap();
+        let items = super::lower_radial_chart(
+          super::ChartFrame {
+            x_pt: 0.0,
+            y_pt: 0.0,
+            width_pt: 235.0,
+            height_pt: 181.0,
+          },
+          &chart,
+          "",
+          &style,
+        );
+        let positions: Vec<_> = items
+          .iter()
+          .filter_map(|item| match item {
+            PageItem::Text(text) if matches!(text.text.as_str(), "HUU" | "HAA") => {
+              Some((text.x_pt, text.y_pt))
+            }
+            _ => None,
+          })
+          .collect();
+        assert_eq!(positions.len(), 2);
+        legend_positions.push(positions);
+      }
+    }
+    for positions in &legend_positions[1..] {
+      for (actual, expected) in positions.iter().zip(&legend_positions[0]) {
+        assert!(
+          (actual.0 - expected.0).abs() < 0.001 && (actual.1 - expected.1).abs() < 0.001,
+          "manual plot moved its automatic legend: {actual:?} vs {expected:?}"
+        );
+      }
+    }
   }
 
   #[test]
@@ -32589,6 +32857,9 @@ mod tests {
       ],
       point_styles: Vec::new(),
       point_image_effects: Vec::new(),
+      word_point_3d_styles: Vec::new(),
+      word_legend_key_strokes: Vec::new(),
+      word_pie_3d_shadow_support: false,
       data_label_fill_colors: Vec::new(),
       data_label_shape_styles: Vec::new(),
       data_label_image_effects: Vec::new(),

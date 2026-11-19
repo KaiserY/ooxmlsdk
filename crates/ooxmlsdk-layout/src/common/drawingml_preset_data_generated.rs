@@ -26624,7 +26624,7 @@ pub(super) fn text_rectangle(preset: a::ShapeTypeValues) -> Option<[&'static str
     a::ShapeTypeValues::Octagon => Some(["il", "il", "ir", "ib"]),
     a::ShapeTypeValues::Parallelogram => Some(["il", "it", "ir", "ib"]),
     a::ShapeTypeValues::Pentagon => Some(["x2", "it", "x3", "y2"]),
-    a::ShapeTypeValues::Pie => Some(["il", "ir", "it", "ib"]),
+    a::ShapeTypeValues::Pie => Some(["il", "it", "ir", "ib"]),
     a::ShapeTypeValues::PieWedge => Some(["x1", "y1", "r", "b"]),
     a::ShapeTypeValues::Plaque => Some(["il", "il", "ir", "ib"]),
     a::ShapeTypeValues::PlaqueTabs => Some(["dx", "dx", "x1", "y1"]),
@@ -26676,5 +26676,18 @@ pub(super) fn text_rectangle(preset: a::ShapeTypeValues) -> Option<[&'static str
     a::ShapeTypeValues::WedgeEllipseCallout => Some(["il", "it", "ir", "ib"]),
     a::ShapeTypeValues::WedgeRectangleCallout => Some(["l", "t", "r", "b"]),
     a::ShapeTypeValues::WedgeRoundRectangleCallout => Some(["il", "il", "ir", "ib"]),
+  }
+}
+pub(super) fn adjustment_is_angle(preset: a::ShapeTypeValues, name: &str) -> bool {
+  match preset {
+    a::ShapeTypeValues::Arc => matches!(name, "adj1" | "adj2"),
+    a::ShapeTypeValues::BlockArc => matches!(name, "adj1" | "adj2"),
+    a::ShapeTypeValues::Chord => matches!(name, "adj1" | "adj2"),
+    a::ShapeTypeValues::CircularArrow => matches!(name, "adj2" | "adj3" | "adj4"),
+    a::ShapeTypeValues::LeftCircularArrow => matches!(name, "adj2" | "adj3" | "adj4"),
+    a::ShapeTypeValues::LeftRightCircularArrow => matches!(name, "adj2" | "adj3" | "adj4"),
+    a::ShapeTypeValues::MathNotEqual => matches!(name, "adj2"),
+    a::ShapeTypeValues::Pie => matches!(name, "adj1" | "adj2"),
+    _ => false,
   }
 }

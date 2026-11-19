@@ -88,11 +88,23 @@ fn fit(height: i64, below: i64, before: i64, after: i64) -> Line {
   line
 }
 
-pub fn realize(metrics: common::WordprocessingLineMetrics, origin_y: f32) -> Option<f32> {
-  let ideal = |value: f64| {
-    let units = (value * IDEAL).round();
-    (units.is_finite() && units.abs() <= f64::from(i32::MAX)).then_some(units as i64)
-  };
+fn ideal(value: f64) -> Option<i64> {
+  let units = (value * IDEAL).round();
+  (units.is_finite() && units.abs() <= f64::from(i32::MAX)).then_some(units as i64)
+}
+
+struct PositionedLine {
+  line: Line,
+  bottom: i64,
+  height: i64,
+  below: i64,
+  ideal_bottom: i64,
+  ideal_height: i64,
+  ideal_before: i64,
+  ideal_after: i64,
+}
+
+fn position(metrics: common::WordprocessingLineMetrics, origin_y: f32) -> Option<PositionedLine> {
   let height = ideal(f64::from(metrics.height_pt))?;
   let below = ideal(f64::from(metrics.baseline_from_bottom_pt))?;
   let before = ideal(f64::from(metrics.spacing_before_pt))?;
@@ -112,12 +124,80 @@ pub fn realize(metrics: common::WordprocessingLineMetrics, origin_y: f32) -> Opt
   let positioned_height = device(bottom) - device(bottom - height);
   let adjusted_below =
     line.descent + line.after + (positioned_height - line.height).max(-line.after);
-  Some(((device(bottom) - adjusted_below) as f64 * 72.0 / TARGET_DPI as f64) as f32)
+  Some(PositionedLine {
+    line,
+    bottom: device(bottom),
+    height: positioned_height,
+    below: adjusted_below,
+    ideal_bottom: bottom,
+    ideal_height: height,
+    ideal_before: before,
+    ideal_after: after,
+  })
+}
+
+pub fn realize(metrics: common::WordprocessingLineMetrics, origin_y: f32) -> Option<f32> {
+  let line = position(metrics, origin_y)?;
+  Some(((line.bottom - line.below) as f64 * 72.0 / TARGET_DPI as f64) as f32)
+}
+
+/// Realize an enclosing paragraph box from the same completed line as its text.
+/// Native Word metric/PatBlt observations retain balanced upper/lower spacing,
+/// then add local enclosure distances (including Auto-line leading) separately.
+pub fn frame(
+  metrics: common::WordprocessingLineMetrics,
+  origin_y: f32,
+  bounds: (f32, f32),
+) -> Option<(f32, f32)> {
+  let line = position(metrics, origin_y)?;
+  let local_top =
+    ideal(f64::from(bounds.0))? - (line.ideal_bottom - line.ideal_height + line.ideal_before);
+  let local_bottom = ideal(f64::from(bounds.1))? - (line.ideal_bottom - line.ideal_after);
+  let top = line.bottom - line.height + line.line.before + device(local_top);
+  let bottom = line.bottom - line.line.after + device(local_bottom);
+  (bottom >= top).then_some((
+    (top as f64 * 72.0 / TARGET_DPI as f64) as f32,
+    (bottom as f64 * 72.0 / TARGET_DPI as f64) as f32,
+  ))
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn bordered_line_frame_reuses_balanced_components_and_local_leading() {
+    // Native first-page Times8 single/double-shadow boxes. Source frame top
+    // is72pt; font/BRC components remain independent before device rounding.
+    // Auto2 extends the enclosure by its separately realized lower leading.
+    for (height, below, before, after, origin, logical_height, expected) in [
+      (52016, 14256, 7168, 7168, 73.75, 37680, (615, 691)),
+      (82736, 29616, 22528, 22528, 77.5, 37680, (646, 722)),
+      (89696, 51936, 7168, 44848, 73.75, 75360, (615, 768)),
+    ] {
+      let metrics = common::WordprocessingLineMetrics {
+        frame_origin_offset_x_pt: 0.0,
+        frame_width_pt: 0.0,
+        alignment: None,
+        bottom_offset_pt: (height - before) as f32 / 4096.0,
+        height_pt: height as f32 / 4096.0,
+        baseline_from_bottom_pt: below as f32 / 4096.0,
+        spacing_before_pt: before as f32 / 4096.0,
+        spacing_after_pt: after as f32 / 4096.0,
+      };
+      assert_eq!(
+        frame(
+          metrics,
+          origin,
+          (origin, origin + logical_height as f32 / 4096.0)
+        ),
+        Some((
+          (expected.0 as f64 * 72.0 / 600.0) as f32,
+          (expected.1 as f64 * 72.0 / 600.0) as f32
+        )),
+      );
+    }
+  }
 
   #[test]
   fn word_line_metric_components_match_native_controls() {

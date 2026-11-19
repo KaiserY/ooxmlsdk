@@ -377,7 +377,8 @@ pub(crate) enum ParagraphFieldEvent {
   /// Word's fixed-format exporter refreshes this span from the referenced
   /// bookmark without mutating the open document. Keep the span internal to
   /// import/refresh so unrelated cached fields remain authoritative.
-  /// Exact imported run owning a top-level complex PAGEREF result. A missing
+  /// Exact imported run owning a complex PAGEREF result, including a nested
+  /// result buffered by its containing field. A missing
   /// bookmark's application diagnostic takes the separator's character
   /// properties, independently of the successful result's code/cache style.
   /// Consumed by the main-story structural refresh before line layout.
@@ -388,10 +389,12 @@ pub(crate) enum ParagraphFieldEvent {
   ReferenceResultSpan {
     field_id: u64,
     bookmark_name: String,
+    reference_kind: super::field_reference::Kind,
     inline_start: usize,
     inline_end: usize,
     merge_format: bool,
     copy_text: bool,
+    numbering_only: bool,
     separator_style: Option<Box<TextStyle>>,
   },
   /// An unlocked positional formula's exact cache span. The complete table
@@ -402,6 +405,45 @@ pub(crate) enum ParagraphFieldEvent {
     inline_start: usize,
     inline_end: usize,
   },
+  /// Cached pagination-dependent rich IF result. Repeating stories select
+  /// its branch after the final page numbers and page count are available.
+  ConditionalResultSpan {
+    inline_start: usize,
+    inline_end: usize,
+    field: super::conditional_field::Field,
+  },
+}
+
+impl ParagraphFieldEvent {
+  pub(crate) fn remap_inline_offsets(&mut self, mut map: impl FnMut(usize) -> usize) {
+    match self {
+      Self::DeferredParagraphBreak { inline_offset }
+      | Self::GeneratedParagraphBreak { inline_offset, .. }
+      | Self::DeferredReferenceParagraphBreak { inline_offset, .. }
+      | Self::PageReferenceResultStyle { inline_offset, .. } => {
+        *inline_offset = map(*inline_offset);
+      }
+      Self::ReferenceResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      }
+      | Self::FormulaResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      }
+      | Self::ConditionalResultSpan {
+        inline_start,
+        inline_end,
+        ..
+      } => {
+        *inline_start = map(*inline_start);
+        *inline_end = map(*inline_end);
+      }
+      _ => {}
+    }
+  }
 }
 
 /// `dxa=0` keeps separate cell edges; `nil` selects collapsed borders.
@@ -428,6 +470,9 @@ pub(crate) struct Table {
   /// Word preserves these recovered separators and breaks overflowing text
   /// inside them instead of redistributing the normalized grid a second time.
   pub recovered_absolute_grid: bool,
+  /// WPG/WPC table rules use the shape's 600-DPI paint grid. This ownership
+  /// is independent of the table-cell paragraphs and of page EMF replay.
+  pub wordprocessing_shape_paint_grid: bool,
   pub column_widths_pt: Vec<f32>,
   pub preferred_width_pt: Option<f32>,
   pub preferred_width_pct: Option<f32>,
@@ -442,6 +487,9 @@ pub(crate) struct Table {
   pub allow_overlap: bool,
   pub split_allowed: bool,
   pub following_text_flow: bool,
+  /// MS-DOCX2.3.6 permits later body content beside every split fly fragment.
+  /// Ordinary parent-cell following-text-flow ownership remains independent.
+  pub wrap_on_all_pages: bool,
   pub explicit_no_repeat_header: bool,
   pub page_break_before: bool,
   pub starts_after_last_rendered_page_break: bool,
@@ -484,6 +532,7 @@ pub(crate) struct TableRow {
   pub borders: Option<TableBordersModel>,
   /// Row-scoped `w:tblPrEx/w:shd`, with the table-level paint as its base.
   pub spacing_shading: Option<ShadingPaint>,
+  pub html_division_offset_pt: f32,
   pub redline_color: Option<RgbColor>,
 }
 
@@ -653,6 +702,9 @@ impl ParagraphBorderOverrides {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ParagraphFormat {
+  /// Import-time source restarts retained when Word recovers repeated sizes.
+  /// These character offsets belong to this paragraph, not an inherited style.
+  pub complex_source_restarts: Vec<usize>,
   /// A VML textpath string retains authored trailing blanks when fitted to
   /// its envelope; ordinary paragraph-edge blank trimming does not apply.
   pub vml_text_path: bool,
@@ -680,6 +732,11 @@ pub(crate) struct ParagraphFormat {
   pub spacing_after_auto_pt: Option<f32>,
   pub spacing_before_set: bool,
   pub spacing_after_set: bool,
+  /// An empty source paragraph with a deleted mark precedes this paragraph's
+  /// current content. Its removed boundary still supplies the matching-style
+  /// context for contextualSpacing before the surviving paragraph. Spaces and
+  /// tabs are real source content; they do not establish this empty boundary.
+  pub empty_deleted_paragraph_prefix: bool,
   /// `w:doNotUseHTMLParagraphAutoSpacing` selects Word's historical
   /// non-HTML paragraph-spacing model. Adjacent ordinary margins add instead
   /// of collapsing to their maximum; keep the document setting on each
@@ -745,6 +802,9 @@ pub(crate) struct ParagraphFormat {
   /// Paragraphs in an actual table nested inside the textbox remain ordinary
   /// table-cell stories and deliberately leave this false.
   pub wordprocessing_shape_story: bool,
+  /// A SmartArt paragraph retains DrawingML's text-cell baseline protocol;
+  /// reusing the Word block formatter does not turn it into a WPS story.
+  pub drawingml_diagram_story: bool,
   /// A standalone WPS story uses `bodyPr@vert=vert/vert270`. Its automatic
   /// line spacing advances columns with Word's vertical font-height basis;
   /// rotating a horizontal shape, grouped drawings, and nested table cells
@@ -774,6 +834,9 @@ pub(crate) struct ParagraphFormat {
   pub line_vertical_alignment: Option<common::LineVerticalAlignment>,
   pub indent_left_pt: f32,
   pub indent_right_pt: f32,
+  /// Physical HTML division edges, independent of logical paragraph indents and tab stops.
+  pub html_division_left_pt: f32,
+  pub html_division_right_pt: f32,
   pub first_line_indent_pt: f32,
   pub indent_left_character_units: Option<f32>,
   pub indent_right_character_units: Option<f32>,
@@ -791,7 +854,11 @@ pub(crate) struct ParagraphFormat {
   /// This is independent of the generated entry style's own tab stops.
   pub toc_default_tab_leader: Option<TabLeader>,
   pub list_label_width_aware_tab: bool,
+  /// DrawingML bullets reserve the hanging margin without a Word list suffix.
+  pub drawingml_character_bullet: bool,
   pub list_label_uses_explicit_tab_stop: bool,
+  /// Enabled transitional w:legacy geometry, independent of the tab ruler.
+  pub list_label_legacy: Option<LegacyNumberingGeometry>,
   /// w:doNotUseIndentAsNumberingTabStop disables the hanging indent's
   /// virtual stop when the numbering suffix advances to an authored tab.
   pub list_label_ignores_indent_tab_stop: bool,
@@ -826,6 +893,10 @@ pub(crate) struct ParagraphFormat {
   /// inherits through the style hierarchy, while `w:val="none"` is an
   /// authored side whose effective border is deliberately empty.
   pub border_overrides: ParagraphBorderOverrides,
+  /// Word's right-border record can suppress hanging punctuation even when
+  /// its line style paints nothing. A completely empty `none` record does
+  /// not; retain this independently of side overrides and visible paint.
+  pub right_border_blocks_overflow_punctuation: Option<bool>,
   pub page_break_before: bool,
   pub page_break_before_set: bool,
   pub keep_with_next: bool,
@@ -835,8 +906,9 @@ pub(crate) struct ParagraphFormat {
   pub widow_control: Option<bool>,
   pub contextual_spacing: bool,
   pub contextual_spacing_set: bool,
-  /// The final cell paragraph shares the implicit cell-end marker's default
-  /// paragraph style. Keep this boundary when page fragments clone its blocks.
+  /// The cell's final paragraph matches the next source cell's first style,
+  /// or the implicit default mark at row end. Preserve this logical boundary
+  /// when physical page fragments clone its blocks.
   pub cell_end_style_matches: bool,
   pub suppress_auto_hyphens: Option<bool>,
   pub suppress_line_numbers: Option<bool>,
@@ -969,6 +1041,12 @@ pub(crate) enum LineHeightRule {
   Auto,
   AtLeast,
   Exact,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct LegacyNumberingGeometry {
+  pub indent_pt: f32,
+  pub space_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1189,6 +1267,32 @@ pub(crate) struct OverstrikeInline {
   pub alignment: OverstrikeAlignment,
 }
 
+/// Legacy EQ \a is one inline box containing a row-major array, not hard breaks.
+#[derive(Clone, Debug)]
+pub(crate) struct EqArrayInline {
+  pub cells: Vec<Vec<TextRun>>,
+  pub columns: usize,
+  pub alignment: RubyAlignment,
+  pub horizontal_gap_pt: f32,
+  pub vertical_gap_pt: f32,
+  pub style: TextStyle,
+}
+
+/// One regular line containing two smaller sub-lines, with styled source
+/// runs retained in reading order. It is independent of ruby and EQ fields.
+#[derive(Clone, Debug)]
+pub(crate) struct TwoLinesInline {
+  pub settings: crate::model::WordprocessingTwoLines,
+  pub runs: Vec<TextRun>,
+  pub justify: bool,
+  pub auto_space_de: bool,
+  pub auto_space_dn: bool,
+  pub auto_space_like_word95: bool,
+  pub compatibility_mode: u16,
+  pub strict_japanese: bool,
+  pub kashida: bool,
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct FormWidgetIdAllocator {
   next_id: u32,
@@ -1217,12 +1321,19 @@ pub(crate) enum InlineItem {
   PositionalTab(PositionalTab),
   Ruby(RubyInline),
   Overstrike(OverstrikeInline),
+  EqArray(EqArrayInline),
+  LegacyEquation(Box<super::eq::ExpressionInline>),
+  TwoLines(TwoLinesInline),
   LegacyFormCheckBox(LegacyFormCheckBox),
   Image(InlineImage),
   Shape(InlineShape),
   DrawingGroupStart(InlineDrawingGroup),
   DrawingGroupEnd,
   BookmarkStart(String),
+  /// A field-code SEQ is evaluated without contributing a visible portion.
+  /// Unlike cached result content, this effect survives an entry field's
+  /// discarded result. Keep it in story order until field resolution.
+  SequenceCounter(Arc<str>),
   FormWidgetStart(u32),
   FormWidgetEnd(u32),
   LastRenderedPageBreak,
@@ -1244,7 +1355,11 @@ impl InlineItem {
       | Self::PositionalTab(_)
       | Self::Ruby(_)
       | Self::Overstrike(_)
+      | Self::EqArray(_)
+      | Self::LegacyEquation(_)
+      | Self::TwoLines(_)
       | Self::BookmarkStart(_)
+      | Self::SequenceCounter(_)
       | Self::FormWidgetStart(_)
       | Self::FormWidgetEnd(_)
       | Self::LastRenderedPageBreak
@@ -1331,8 +1446,26 @@ pub(crate) struct InlineDrawingGroup {
   /// space; layout then fits their realized paint union into this host
   /// extent as one object.
   pub locked_canvas_viewport: Option<InlineLockedCanvasViewport>,
+  /// VML AutoSize changes a shared local viewport before children are mapped
+  /// into the page. Preserve authored identity and source order across the
+  /// separate geometry/text import passes.
+  pub vml_viewport: Option<Box<InlineVmlGroupViewport>>,
   pub rotation_deg: f32,
   pub placement: ImagePlacement,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InlineVmlGroupViewport {
+  pub coordinates: [f64; 4],
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub children: Vec<InlineVmlGroupChild>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InlineVmlGroupChild {
+  pub id: Arc<str>,
+  pub coordinates: [f64; 4],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1351,12 +1484,12 @@ pub(crate) enum InlineImageLineBox {
   /// picture, shape, OLE preview, or metafile.
   #[default]
   CharacterLike,
-  /// A legacy embedded-object preview remains a character-like frame for
+  /// A legacy picture or embedded-object preview remains a character-like frame for
   /// line measurement, while its parent run's w:position supplies the shared
   /// inline baseline. This is distinct from an object's intrinsic baseline:
   /// the run displacement must not shrink a grid line around the cached
   /// presentation.
-  EmbeddedObjectRunPosition,
+  LegacyImageRunPosition,
   /// The OfficeMath renderer has already expanded the ink bounds with the
   /// OpenType MATH `MathLeading` contract. The host must not add the ordinary
   /// paragraph auto-line-spacing excess a second time.
@@ -1428,14 +1561,19 @@ pub(crate) struct OfficeMathDisplayLayout {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InlineImage {
-  /// Logical font em of the owning DrawingML run, before picture realization.
+  /// Character-indent unit of the owning run, including its scale and pitch.
   /// Word uses this for a leading inline picture's firstLineChars indent.
-  pub source_run_font_size_pt: Option<f32>,
+  pub source_run_character_indent_unit_pt: Option<f32>,
   pub run_border: Option<BorderStyle>,
   pub data: Bytes,
+  /// Physical METAFILEPICT retained by an embedded print presentation.
+  pub metafile_external_header: Option<crate::render::emf_wmf::WmfExternalHeader>,
   pub content_type: Option<String>,
   pub blip_compression_state: common::BlipCompressionState,
   pub picture_frame: Option<Box<InlineShape>>,
+  /// Legacy Word picture borders are independent of the VML host's outline.
+  /// Their per-side printer extents also participate in the inline line box.
+  pub vml_picture_borders: Option<Box<ParagraphBordersModel>>,
   /// Whether the picture frame geometry clips the image surface. DrawingML
   /// picture geometry does; VML `imagedata` is painted on top of its host
   /// shape and therefore keeps the image's implied rectangle un-clipped.
@@ -1443,6 +1581,9 @@ pub(crate) struct InlineImage {
   /// DrawingML picture geometry fitted inside its Wordprocessing host.
   /// The host width/height still own wrapping and the paragraph line box.
   pub picture_paint_size_pt: Option<(f32, f32)>,
+  /// Unrounded PICF goal times scale for a legacy inline bitmap's baseline.
+  /// Its character height remains integral twips.
+  pub picture_scaled_height_pt: Option<f32>,
   pub effects: Option<common::DrawingEffectSource>,
   pub static3d: Option<common::drawingml_3d::Static3dStyle>,
   pub width_pt: f32,
@@ -1488,6 +1629,8 @@ pub(crate) struct InlineImage {
   /// separate from the static preview LOGFONT because the Office host may
   /// provide its document font when TextProps omits FontName.
   pub semantic_metafile_font_family: Option<Arc<str>>,
+  /// A Word OLE object owns a terminal paragraph mark when its preview overhangs the line.
+  pub embedded_object: bool,
   pub native_ole_equation: Option<super::math_type::MathTypeEquation>,
   /// Whether Word should paint a near-native EMF Header.Frame inside the
   /// authored DrawingML extent.
@@ -1500,8 +1643,29 @@ pub(crate) struct InlineImage {
   pub contour_owned_wrap: Option<ImageWrapMode>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum VmlAutoShapeKind {
+  Rectangle,
+  RoundRectangle { adjustment_21600: u16 },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct VmlAutoShape {
+  pub kind: VmlAutoShapeKind,
+  /// Alignment overrides positioning margins, but their original values
+  /// still determine Word's authored device enclosure.
+  pub authored_offset_pt: (f32, f32),
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct InlineShape {
+  /// Character-indent unit of an authored VML picture run. Even a floating shape
+  /// owns a leading positive firstLineChars indent independently of its
+  /// painted extent and the following text's font.
+  pub source_run_character_indent_unit_pt: Option<f32>,
+  /// Authored wrapping retained when an independent polygon owns exclusions.
+  /// Position constraints still belong to this visible DrawingML host.
+  pub contour_owned_wrap: Option<ImageWrapMode>,
   /// Run decoration is independent of the DrawingML shape/chart outline.
   pub run_border: Option<BorderStyle>,
   pub width_pt: f32,
@@ -1536,12 +1700,17 @@ pub(crate) struct InlineShape {
   /// VML `v:line` keeps its paragraph-relative origin inside a table cell
   /// even when `o:allowincell="f"` lets its stroke extend across cell edges.
   pub vml_line: bool,
+  /// Retain the legacy preset handle independently of its initially resolved
+  /// path: percentage sizing changes the shape's physical dimensions.
+  pub vml_auto_shape: Option<VmlAutoShape>,
   /// Recognized legacy AutoShape fold faces use a shaded solid primary fill,
   /// independently of the gradient that paints the main serialized path.
   pub vml_autoshape_shaded_faces: bool,
   /// Authored legacy identity joins the paint and rich-text import passes.
   /// Equal extents alone cannot establish that two frames share an owner.
   pub vml_shape_id: Option<Arc<str>>,
+  /// Authored VML textbox successor; distinct from WPS numeric story IDs.
+  pub vml_next_textbox: Option<Box<str>>,
   /// Word's legacy VML horizontal-rule object is exposed as an inline shape,
   /// but it owns a complete physical line and resolves its width against the
   /// current text frame.  Keep that semantic object distinct from an
@@ -1560,14 +1729,22 @@ pub(crate) struct InlineShape {
   /// the foreground, rather than first allocating separate effect bitmaps.
   pub legacy_locked_canvas: bool,
   pub text_warp: Option<Box<a::PresetTextWarp>>,
+  /// DrawingML envelope insets from the shape's text rectangle, independent
+  /// of the body margins used to lay out its unwarped paragraphs.
+  pub drawingml_text_warp_insets_pt: Option<[f32; 4]>,
   /// Parent-realized authored WPG frame for a single-path WPS text story.
   /// Ordinary paint geometry retains its independent DrawingML transform.
   pub wordprocessing_text_warp_frame: Option<Box<WordprocessingTextWarpFrame>>,
+  /// SmartArt text has its own rectangle and rotation, independently of paint.
+  pub diagram_text_frame: Option<Box<DiagramTextFrame>>,
   /// The unpainted root box of an inline VML group still supplies the
   /// character baseline shared with text following that group.
   pub vml_group_flow_frame: bool,
   pub vml_text_fit_shape: bool,
   pub vml_text_fit_path: bool,
+  /// Integer textpath controls, independent of the approximate preset used
+  /// for unsupported path operators and multi-boundary envelopes.
+  pub vml_text_path_source: Option<Arc<common::text_warp_projection::VmlPathSource>>,
   pub vml_text_trim: bool,
   pub text_fill: Option<Box<common::Fill<'static>>>,
   /// Bitmap `v:fill` on legacy WordArt paints the textpath glyphs, not its
@@ -1594,6 +1771,9 @@ pub(crate) struct InlineShape {
   /// Half the effective WPS outline width added to the text frame insets.
   /// Retain it even for `a:noFill`, whose outline has no drawable stroke.
   pub wordprocessing_shape_outline_text_inset_pt: f32,
+  /// Fixed WPG table paint uses the parent-realized text rectangle, distinct
+  /// from the floating-point outline geometry and paragraph layout.
+  pub wordprocessing_table_story_frame: Option<Box<WordprocessingTableStoryFrame>>,
   /// Authored standalone `wp:docPr@id` joins the WPS geometry and rich story
   /// import passes. Equal extents alone do not prove a shared drawing owner.
   pub wordprocessing_shape_id: Option<u32>,
@@ -1632,6 +1812,40 @@ pub(crate) struct InlineShape {
   pub text_vertical_alignment: TextBoxVerticalAlignment,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct WordprocessingTableStoryFrame {
+  pub size_twips: [i64; 2],
+  pub inset_twips: [i64; 4],
+  pub horizontal_margin_dots: [i64; 2],
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DiagramTextFrame {
+  pub offset_x_pt: f32,
+  pub offset_y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub rotation_deg: f32,
+  pub flip_vertical: bool,
+  pub auto_fit: Option<DiagramTextAutoFit>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DiagramTextAutoFit {
+  pub maximum_font_size_pt: f32,
+  pub minimum_font_size_pt: f32,
+  pub sync_group: Option<String>,
+  pub font_scaled_insets: [bool; 4],
+  pub paragraphs: Vec<DiagramAutoFitParagraph>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DiagramAutoFitParagraph {
+  pub properties: Option<Box<a::ParagraphProperties>>,
+  pub synthesized_bullet_left_margin: bool,
+  pub synthesized_bullet_indent: bool,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct WordprocessingTextWarpFrame {
   pub bounds_emu: [i64; 4],
@@ -1655,6 +1869,8 @@ pub(crate) struct InlineHorizontalRule {
   pub alignment: InlineHorizontalRuleAlignment,
   pub standard: bool,
   pub no_shade: bool,
+  /// Resolved run background, independent of the VML rectangle's fill.
+  pub run_background: Option<RgbColor>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1760,6 +1976,7 @@ pub(crate) struct InlineChart {
     Vec<Option<common::drawingml_image_effects::ImageEffectContainer>>,
   pub pie_point_colors: Vec<RgbColor>,
   pub pie_point_styles: Vec<common::ShapeStyle<'static>>,
+  pub pie_legend_key_strokes: Vec<common::ShapeStyleValue<common::Stroke<'static>>>,
   pub leader_line_style: common::ShapeStyle<'static>,
   pub title_fill_color: Option<RgbColor>,
   pub legend_frame_style: common::ShapeStyle<'static>,
@@ -1903,10 +2120,29 @@ pub(crate) struct FloatingImagePlacement {
   pub margin_left_pt: f32,
 }
 
+/// Components of a rotated OfficeArt child's placement that move with the
+/// opposite root axis during nonuniform resizing. Ordinary groups use zero.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct VmlChildResize {
+  pub left_from_height_pt: f32,
+  pub top_from_width_pt: f32,
+  pub axes_exchanged: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct FloatingAlignmentExtent {
+  pub vml_child_resize: VmlChildResize,
   pub width_pt: f32,
   pub height_pt: f32,
+  /// The VML owner has already fitted its children and resolved their common
+  /// viewport. Do not fit an individual child again after that transaction.
+  pub vml_auto_fit_resolved: bool,
+  /// A root floating WPG sizes and aligns its effect enclosure while retaining
+  /// the authored group transform. Other group producers have separate rules.
+  pub wordprocessing_effect_extent_pt: Option<[f32; 4]>,
+  /// Legacy VML path groups align their 96-DPI conservative enclosure, then
+  /// round the content origin to document twips before placing children.
+  pub vml_path_effect_extent_pt: Option<[f32; 4]>,
   pub relative_width_to: Option<HorizontalImageReference>,
   pub relative_width_pct: Option<f32>,
   pub relative_height_to: Option<VerticalImageReference>,

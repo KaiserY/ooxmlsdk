@@ -6,6 +6,7 @@
 
 mod error;
 mod model;
+mod wordprocessing_arabic_plan;
 
 pub use error::{FontError, Result};
 pub use model::*;

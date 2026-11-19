@@ -345,6 +345,9 @@ pub struct DiagramTextBody {
   pub body_properties: Option<Box<a::BodyProperties>>,
   pub list_style: Option<Box<a::ListStyle>>,
   pub auto_fit: bool,
+  /// Insets resolved from font-size constraints must follow the fitted font;
+  /// authored point/shape-relative distances retain their own owners.
+  pub font_scaled_insets: [bool; 4],
   pub paragraphs: Vec<DiagramTextParagraph>,
   custom_text: bool,
   descendant_text: bool,
@@ -361,6 +364,22 @@ impl DiagramTextBody {
       .iter()
       .filter_map(|paragraph| paragraph.source_order)
       .min()
+  }
+
+  fn uses_secondary_font_size(&self) -> bool {
+    // Mixed parent/descendant bodies still own a primary font variable. The
+    // body's aggregate descendant flag records any child text for anchoring;
+    // only an entirely secondary body selects a secFontSz synchronization
+    // group. Preserve the semantic binding even when child bullets are hidden.
+    !self.paragraphs.is_empty()
+      && self.paragraphs.iter().all(|paragraph| {
+        paragraph.descendant_text
+          || paragraph
+            .paragraph_properties
+            .as_deref()
+            .and_then(|properties| properties.paragraph_properties_choice4.as_ref())
+            .is_some_and(|bullet| !matches!(bullet, a::ParagraphPropertiesChoice4::NoBullet))
+      })
   }
 
   fn append_point(&mut self, point: &dgm::Point, depth: i32) {
@@ -515,6 +534,17 @@ impl DiagramTextBody {
         continue;
       };
       let margin = Coordinate32Value::Emu(points_to_emu(margin_pt));
+      let index = match constraint.target {
+        dgm::ConstraintValues::LeftMargin => 0,
+        dgm::ConstraintValues::TopMargin => 1,
+        dgm::ConstraintValues::RightMargin => 2,
+        dgm::ConstraintValues::BottomMargin => 3,
+        _ => unreachable!("filtered to text margins"),
+      };
+      self.font_scaled_insets[index] = matches!(
+        constraint.reference,
+        dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize
+      );
       let mut body_properties = self.body_properties.clone().unwrap_or_default();
       match constraint.target {
         dgm::ConstraintValues::LeftMargin => body_properties.left_inset = Some(margin),
@@ -632,7 +662,12 @@ impl DiagramTextBody {
       return;
     };
     for paragraph in &mut self.paragraphs {
-      let child = paragraph.level.unwrap_or(base_level) > base_level;
+      // A presentation node can bind only descendants of its associated
+      // semantic point. Their first displayed level is still child text;
+      // normalizing that level must not select the parent spacing defaults
+      // (ECMA-376 L.4.15.6.1.8, lnSpCh/lnSpAfChP). Keep the binding on each
+      // paragraph so a mixed parent/descendant body retains both owners.
+      let child = paragraph.descendant_text || paragraph.level.unwrap_or(base_level) > base_level;
       // MS-OI29500 §21.4.7.49: omitted tx parameters use 90% line
       // spacing and 35%/15% spacing after parent/child paragraphs. These
       // are layout defaults; authored paragraph spacing remains authoritative.
@@ -676,6 +711,7 @@ impl DiagramTextBody {
 pub struct DiagramTextParagraph {
   pub source_order: Option<usize>,
   pub level: Option<u8>,
+  pub descendant_text: bool,
   pub paragraph_properties: Option<Box<a::ParagraphProperties>>,
   pub end_paragraph_run_properties: Option<Box<a::EndParagraphRunProperties>>,
   pub runs: Vec<DiagramTextRun>,
@@ -695,6 +731,7 @@ impl DiagramTextParagraph {
     Self {
       source_order: None,
       level,
+      descendant_text: false,
       paragraph_properties,
       end_paragraph_run_properties: source.end_paragraph_run_properties.clone(),
       runs: source
@@ -2591,6 +2628,9 @@ impl<'a> DiagramShapeCreationVisitor<'a> {
             };
             if parent.model_id == association {
               text_body.descendant_text = true;
+              for paragraph in &mut text_body.paragraphs[first_new_paragraph..] {
+                paragraph.descendant_text = true;
+              }
               break;
             }
             current = parent;
@@ -3201,22 +3241,59 @@ fn parse_constraints_unfiltered(constraints: &dgm::Constraints) -> Vec<DiagramCo
     .collect()
 }
 
+fn is_user_defined_constraint(value: dgm::ConstraintValues) -> bool {
+  matches!(
+    value,
+    dgm::ConstraintValues::UserDefinedA
+      | dgm::ConstraintValues::UserDefinedB
+      | dgm::ConstraintValues::UserDefinedC
+      | dgm::ConstraintValues::UserDefinedD
+      | dgm::ConstraintValues::UserDefinedE
+      | dgm::ConstraintValues::UserDefinedF
+      | dgm::ConstraintValues::UserDefinedG
+      | dgm::ConstraintValues::UserDefinedH
+      | dgm::ConstraintValues::UserDefinedI
+      | dgm::ConstraintValues::UserDefinedJ
+      | dgm::ConstraintValues::UserDefinedK
+      | dgm::ConstraintValues::UserDefinedL
+      | dgm::ConstraintValues::UserDefinedM
+      | dgm::ConstraintValues::UserDefinedN
+      | dgm::ConstraintValues::UserDefinedO
+      | dgm::ConstraintValues::UserDefinedP
+      | dgm::ConstraintValues::UserDefinedQ
+      | dgm::ConstraintValues::UserDefinedR
+      | dgm::ConstraintValues::UserDefinedS
+      | dgm::ConstraintValues::UserDefinedT
+      | dgm::ConstraintValues::UserDefinedU
+      | dgm::ConstraintValues::UserDefinedV
+      | dgm::ConstraintValues::UserDefinedW
+      | dgm::ConstraintValues::UserDefinedX
+      | dgm::ConstraintValues::UserDefinedY
+      | dgm::ConstraintValues::UserDefinedZ
+  )
+}
+
 fn parse_constraint(
   constraint: &dgm::Constraint,
   require_for_name: bool,
 ) -> Option<DiagramConstraint> {
   let mut require_for_name = require_for_name;
   if require_for_name {
-    if matches!(
-      constraint.r#type,
-      dgm::ConstraintValues::Spacing
-        | dgm::ConstraintValues::LeftMargin
-        | dgm::ConstraintValues::RightMargin
-        | dgm::ConstraintValues::TopMargin
-        | dgm::ConstraintValues::BottomMargin
-        | dgm::ConstraintValues::PrimaryFontSize
-        | dgm::ConstraintValues::SecondaryFontSize
-    ) {
+    // ECMA-376 §21.4.2.8/§21.4.7.21: userA..userZ can store a
+    // scalar on the current layout node for later child references. Such a
+    // self constraint has neither a named child nor a point-type selector.
+    if is_user_defined_constraint(constraint.r#type)
+      || matches!(
+        constraint.r#type,
+        dgm::ConstraintValues::Spacing
+          | dgm::ConstraintValues::LeftMargin
+          | dgm::ConstraintValues::RightMargin
+          | dgm::ConstraintValues::TopMargin
+          | dgm::ConstraintValues::BottomMargin
+          | dgm::ConstraintValues::PrimaryFontSize
+          | dgm::ConstraintValues::SecondaryFontSize
+      )
+    {
       require_for_name = false;
     }
     if constraint.point_type == Some(dgm::ElementValues::SiblingTransition) {
@@ -4013,6 +4090,7 @@ fn set_pyramid_trapezoid_adjustment(node: &mut DiagramShapeNode, adjustment: f32
 #[derive(Clone)]
 struct DiagramFontSyncGroup {
   key: String,
+  target: dgm::ConstraintValues,
   for_name: String,
   point_type: Option<dgm::ElementValues>,
 }
@@ -4021,11 +4099,17 @@ fn assign_diagram_font_sync_groups(
   node: &mut DiagramShapeNode,
   inherited_groups: &[DiagramFontSyncGroup],
 ) {
+  let target = if node.text_body.uses_secondary_font_size() {
+    dgm::ConstraintValues::SecondaryFontSize
+  } else {
+    dgm::ConstraintValues::PrimaryFontSize
+  };
   node.font_sync_group = inherited_groups
     .iter()
     .rev()
     .find(|group| {
-      (group.for_name.is_empty() || group.for_name == node.internal_name)
+      group.target == target
+        && (group.for_name.is_empty() || group.for_name == node.internal_name)
         && group
           .point_type
           .is_none_or(|point_type| diagram_element_type_matches(node.data_node_type, point_type))
@@ -4034,19 +4118,45 @@ fn assign_diagram_font_sync_groups(
 
   let mut descendant_groups = inherited_groups.to_vec();
   for (index, constraint) in node.direct_constraints.iter().enumerate() {
-    if constraint.target == dgm::ConstraintValues::PrimaryFontSize
-      && constraint.relationship == Some(dgm::ConstraintRelationshipValues::Descendant)
+    if matches!(
+      constraint.target,
+      dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize
+    ) && constraint.relationship == Some(dgm::ConstraintRelationshipValues::Descendant)
       && constraint.operator == Some(dgm::BoolOperatorValues::Equal)
     {
       descendant_groups.push(DiagramFontSyncGroup {
         key: format!("{}:{index}", node.internal_name),
+        target: constraint.target,
         for_name: constraint.for_name.clone(),
         point_type: constraint.point_type,
       });
     }
   }
+  let inherited_count = descendant_groups.len();
   for child in &mut node.children {
+    for (index, constraint) in node.direct_constraints.iter().enumerate() {
+      if matches!(
+        constraint.target,
+        dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize
+      ) && constraint.relationship == Some(dgm::ConstraintRelationshipValues::Child)
+        && constraint.operator == Some(dgm::BoolOperatorValues::Equal)
+        && (constraint.for_name.is_empty() || constraint.for_name == child.internal_name)
+        && constraint
+          .point_type
+          .is_none_or(|point_type| diagram_element_type_matches(child.data_node_type, point_type))
+      {
+        // A selected child owns the requested font variable throughout its
+        // text subtree. Primary and secondary variables remain independent.
+        descendant_groups.push(DiagramFontSyncGroup {
+          key: format!("{}:{index}", node.internal_name),
+          target: constraint.target,
+          for_name: String::new(),
+          point_type: None,
+        });
+      }
+    }
     assign_diagram_font_sync_groups(child, &descendant_groups);
+    descendant_groups.truncate(inherited_count);
   }
 }
 
@@ -4247,11 +4357,16 @@ fn apply_text_algorithm(
   }
   // ECMA-376 Part 1 §21.4.2.24 defines a primFontSz rule value as the
   // lower limit used while the tx algorithm shrinks text to fit.
+  let minimum_font_target = if node.text_body.uses_secondary_font_size() {
+    dgm::ConstraintValues::SecondaryFontSize
+  } else {
+    dgm::ConstraintValues::PrimaryFontSize
+  };
   node.minimum_font_size_pt = rules
     .iter()
     .rev()
     .find(|rule| {
-      rule.target == dgm::ConstraintValues::PrimaryFontSize
+      rule.target == minimum_font_target
         && (rule.for_name.is_empty() || rule.for_name == node.internal_name)
         && rule
           .point_type
@@ -4391,15 +4506,7 @@ fn diagram_layout_preset_geometry(shape: &dgm::Shape) -> Option<Box<a::PresetGeo
     shape_guide: adjustments
       .into_iter()
       .filter_map(|adjustment| {
-        Some(a::ShapeGuide {
-          // dgm:adj@idx addresses the preset definition, whose first guide
-          // may be `adj` (roundRect), `adj1`, or another authored name.
-          name: drawingml_preset_data::adjustment_name(preset, adjustment.index as usize)?.into(),
-          formula: format!(
-            "val {}",
-            (adjustment.val * DRAWINGML_ADJUST_FULL_SCALE).round()
-          ),
-        })
+        drawingml_preset_data::diagram_adjustment(preset, adjustment.index as usize, adjustment.val)
       })
       .collect(),
   });
@@ -4836,11 +4943,20 @@ fn composite_layout_tree(
     let mut height = node.height;
     let mut x = 0.0;
     let mut y = 0.0;
+    let mut fitted_aspect = false;
     if let Some(properties_for_child) = properties_for_child {
-      let left = layout_property_value(properties_for_child, dgm::ConstraintValues::Left);
-      let right = layout_property_value(properties_for_child, dgm::ConstraintValues::Right);
-      let top = layout_property_value(properties_for_child, dgm::ConstraintValues::Top);
-      let bottom = layout_property_value(properties_for_child, dgm::ConstraintValues::Bottom);
+      // Only authored/resolved anchor properties constrain placement. A top
+      // inferred from ctrY and the old height is not a second top anchor when
+      // the canvas bounds an explicitly proportional slot.
+      let anchor = |property| {
+        properties_for_child
+          .get(&property)
+          .and_then(|_| layout_property_value(properties_for_child, property))
+      };
+      let left = anchor(dgm::ConstraintValues::Left);
+      let right = anchor(dgm::ConstraintValues::Right);
+      let top = anchor(dgm::ConstraintValues::Top);
+      let bottom = anchor(dgm::ConstraintValues::Bottom);
       if let Some(value) = layout_property_value(properties_for_child, dgm::ConstraintValues::Width)
       {
         width = value;
@@ -4856,20 +4972,48 @@ fn composite_layout_tree(
       if let (Some(top), Some(bottom)) = (top, bottom) {
         height = bottom - top;
       }
-      x = left
-        .or_else(|| {
-          layout_property_value(properties_for_child, dgm::ConstraintValues::CenterHeight)
-            .map(|center| center - width / 2.0)
-        })
-        .or_else(|| right.map(|right| right - width))
-        .unwrap_or_default();
-      y = top
-        .or_else(|| {
-          layout_property_value(properties_for_child, dgm::ConstraintValues::CenterWidth)
-            .map(|center| center - height / 2.0)
-        })
-        .or_else(|| bottom.map(|bottom| bottom - height))
-        .unwrap_or_default();
+      let center_x =
+        layout_property_value(properties_for_child, dgm::ConstraintValues::CenterHeight);
+      let center_y =
+        layout_property_value(properties_for_child, dgm::ConstraintValues::CenterWidth);
+      let position = |width, height| {
+        (
+          left
+            .or_else(|| center_x.map(|center| center - width / 2.0))
+            .or_else(|| right.map(|right| right - width))
+            .unwrap_or_default(),
+          top
+            .or_else(|| center_y.map(|center| center - height / 2.0))
+            .or_else(|| bottom.map(|bottom| bottom - height))
+            .unwrap_or_default(),
+        )
+      };
+      (x, y) = position(width, height);
+      let fixed_aspect = constraints.iter().any(|constraint| {
+        constraint.for_name == child.internal_name
+          && constraint.ref_for_name == child.internal_name
+          && constraint.operator == Some(dgm::BoolOperatorValues::Equal)
+          && constraint.factor > 0.0
+          && matches!(
+            (constraint.target, constraint.reference),
+            (dgm::ConstraintValues::Width, dgm::ConstraintValues::Height)
+              | (dgm::ConstraintValues::Height, dgm::ConstraintValues::Width)
+          )
+      });
+      if fixed_aspect && width > 0.0 && height > 0.0 {
+        // An explicit h=w (or proportional equivalent) keeps its ratio when
+        // the containing canvas bounds the slot. Recompute its anchor with
+        // that fitted size; clipping only h leaves an ellipse above the box.
+        let scale = ((node.width - (x + parent_x_offset).max(0.0)).max(0.0) / width)
+          .min((node.height - y.max(0.0)).max(0.0) / height)
+          .min(1.0);
+        if scale < 1.0 {
+          width *= scale;
+          height *= scale;
+          (x, y) = position(width, height);
+          fitted_aspect = true;
+        }
+      }
     }
     x += parent_x_offset;
     child.x = if x.is_finite() { x } else { 0.0 };
@@ -4917,6 +5061,30 @@ fn composite_layout_tree(
         .max(child.height)
         .min((node.height - child.y.max(0.0)).max(0.0));
     }
+    if fitted_aspect
+      && let Some(properties_for_child) = properties.get_mut(child.internal_name.as_str())
+    {
+      // Later siblings reference the bounded slot, not the discarded larger
+      // approximation. Keep its independently authored offsets as offsets.
+      for (dimension, offset, value) in [
+        (
+          dgm::ConstraintValues::Width,
+          dgm::ConstraintValues::WidthOffset,
+          child.width,
+        ),
+        (
+          dgm::ConstraintValues::Height,
+          dgm::ConstraintValues::HeightOffset,
+          child.height,
+        ),
+      ] {
+        let offset = properties_for_child
+          .get(&offset)
+          .copied()
+          .unwrap_or_default();
+        properties_for_child.insert(dimension, value - offset);
+      }
+    }
     vertical_min = vertical_min.min(child.y);
     vertical_max = vertical_max.max(child.y + child.height);
   }
@@ -4926,10 +5094,13 @@ fn composite_layout_tree(
   // internally (hList1 is the common counterexample to treating those as a
   // canvas-level anchor).
   if vertical_min >= 0.0 && vertical_min <= vertical_max && vertical_max <= node.height {
-    let diff = node.height - (vertical_max - vertical_min);
-    if diff > 0.0 {
+    // The children may already have a nonzero, centered origin from ctrY.
+    // Center their full extent, not just its height: adding half the spare
+    // height again would translate an already centered layout a second time.
+    let offset = (node.height - (vertical_max - vertical_min)) / 2.0 - vertical_min;
+    if offset != 0.0 {
       for child in &mut node.children {
-        child.y += diff / 2.0;
+        child.y += offset;
       }
     }
   }
@@ -4944,18 +5115,20 @@ fn apply_constraint_to_layout(
 ) -> bool {
   let reference = properties.get(constraint.ref_for_name.as_str());
   let value = if constraint.reference == dgm::ConstraintValues::None {
-    // A constraint without either `refType` or `val` does not prescribe the
-    // literal value zero.  DrawingML layout definitions use this form with
-    // `op="equ"` to keep a relationship set uniform after its members have
-    // been measured (for example, equal-height SmartArt siblings).  Until we
-    // have a measured group value, retain the existing property.
-    if !constraint.has_value {
+    // CT_Constraint.val defaults to zero when there is no reference or
+    // comparison operator: a zero-width spacer still owns its position.
+    // A no-value `op="equ"` instead keeps a relationship set uniform after
+    // measuring its members (for example, equal-height SmartArt siblings).
+    // Preserve that measured-group owner, and unresolved comparisons.
+    if !constraint.has_value
+      && constraint.operator.unwrap_or_default() != dgm::BoolOperatorValues::None
+    {
       return false;
     }
     constraint_value_points(constraint)
   } else {
     let value = reference
-      .and_then(|properties| layout_property_value(properties, constraint.reference))
+      .and_then(|properties| layout_constraint_reference_value(properties, constraint.reference))
       .map(|value| value * constraint.factor);
     match value {
       Some(value) => value,
@@ -5004,6 +5177,32 @@ fn solve_layout_constraints(
   }
 }
 
+fn layout_constraint_reference_value(
+  properties: &HashMap<dgm::ConstraintValues, f32>,
+  property: dgm::ConstraintValues,
+) -> Option<f32> {
+  let span = match property {
+    dgm::ConstraintValues::Width => {
+      Some((dgm::ConstraintValues::Left, dgm::ConstraintValues::Right))
+    }
+    dgm::ConstraintValues::Height => {
+      Some((dgm::ConstraintValues::Top, dgm::ConstraintValues::Bottom))
+    }
+    _ => None,
+  };
+  if span.is_some_and(|(near, far)| properties.contains_key(&near) && properties.contains_key(&far))
+  {
+    return layout_property_value(properties, property);
+  }
+  // h/w and hOff/wOff are independent constraint properties. Referencing h
+  // copies its base value; applying a target hOff must not charge the source
+  // hOff again. Missing positions can still be derived from completed bounds.
+  properties
+    .get(&property)
+    .copied()
+    .or_else(|| layout_property_value(properties, property))
+}
+
 fn layout_property_value(
   properties: &HashMap<dgm::ConstraintValues, f32>,
   property: dgm::ConstraintValues,
@@ -5028,6 +5227,27 @@ fn layout_property_value(
           .unwrap_or_default()
     })
   };
+  // Opposed anchors prescribe the same span used by composite placement.
+  // A provisional seeded width/height must not hide that resolved extent.
+  match property {
+    dgm::ConstraintValues::Width
+      if properties.contains_key(&dgm::ConstraintValues::Left)
+        && properties.contains_key(&dgm::ConstraintValues::Right) =>
+    {
+      return get(dgm::ConstraintValues::Right)
+        .zip(get(dgm::ConstraintValues::Left))
+        .map(|(right, left)| right - left);
+    }
+    dgm::ConstraintValues::Height
+      if properties.contains_key(&dgm::ConstraintValues::Top)
+        && properties.contains_key(&dgm::ConstraintValues::Bottom) =>
+    {
+      return get(dgm::ConstraintValues::Bottom)
+        .zip(get(dgm::ConstraintValues::Top))
+        .map(|(bottom, top)| bottom - top);
+    }
+    _ => {}
+  }
   if let Some(value) = get(property) {
     return Some(value);
   }
@@ -5096,42 +5316,19 @@ fn layout_property_value(
 }
 
 fn constraint_value_points(constraint: &DiagramConstraint) -> f32 {
-  if matches!(
-    constraint.target,
-    dgm::ConstraintValues::PrimaryFontSize
-      | dgm::ConstraintValues::SecondaryFontSize
-      | dgm::ConstraintValues::PyramidAccentRatio
-      | dgm::ConstraintValues::AlignmentOffset
-      | dgm::ConstraintValues::UserDefinedA
-      | dgm::ConstraintValues::UserDefinedB
-      | dgm::ConstraintValues::UserDefinedC
-      | dgm::ConstraintValues::UserDefinedD
-      | dgm::ConstraintValues::UserDefinedE
-      | dgm::ConstraintValues::UserDefinedF
-      | dgm::ConstraintValues::UserDefinedG
-      | dgm::ConstraintValues::UserDefinedH
-      | dgm::ConstraintValues::UserDefinedI
-      | dgm::ConstraintValues::UserDefinedJ
-      | dgm::ConstraintValues::UserDefinedK
-      | dgm::ConstraintValues::UserDefinedL
-      | dgm::ConstraintValues::UserDefinedM
-      | dgm::ConstraintValues::UserDefinedN
-      | dgm::ConstraintValues::UserDefinedO
-      | dgm::ConstraintValues::UserDefinedP
-      | dgm::ConstraintValues::UserDefinedQ
-      | dgm::ConstraintValues::UserDefinedR
-      | dgm::ConstraintValues::UserDefinedS
-      | dgm::ConstraintValues::UserDefinedT
-      | dgm::ConstraintValues::UserDefinedU
-      | dgm::ConstraintValues::UserDefinedV
-      | dgm::ConstraintValues::UserDefinedW
-      | dgm::ConstraintValues::UserDefinedX
-      | dgm::ConstraintValues::UserDefinedY
-      | dgm::ConstraintValues::UserDefinedZ
-  ) || matches!(
-    constraint.reference,
-    dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize
-  ) {
+  if is_user_defined_constraint(constraint.target)
+    || matches!(
+      constraint.target,
+      dgm::ConstraintValues::PrimaryFontSize
+        | dgm::ConstraintValues::SecondaryFontSize
+        | dgm::ConstraintValues::PyramidAccentRatio
+        | dgm::ConstraintValues::AlignmentOffset
+    )
+    || matches!(
+      constraint.reference,
+      dgm::ConstraintValues::PrimaryFontSize | dgm::ConstraintValues::SecondaryFontSize
+    )
+  {
     constraint.value
   } else {
     constraint.value * 72.0 / 25.4
@@ -7130,6 +7327,305 @@ mod tests {
   use super::*;
 
   #[test]
+  fn unnamed_parent_user_constraints_resolve_named_child_dimensions() {
+    use ooxmlsdk::sdk::SdkType;
+    for letter in 'A'..='Z' {
+      for (source, expected) in [
+        ("refType=\"w\" fact=\"0.2\"", 160.0),
+        ("refType=\"w\" fact=\"0.3\"", 240.0),
+        ("refType=\"w\" fact=\"0.4\"", 320.0),
+        ("val=\"5.1\"", 10.2),
+      ] {
+        for parent_first in [false, true] {
+          let parent = format!("<dgm:constr type=\"user{letter}\" {source}/>");
+          let child = format!(
+            "<dgm:constr type=\"w\" for=\"ch\" forName=\"circle\" refType=\"user{letter}\" fact=\"2\"/>\
+             <dgm:constr type=\"h\" for=\"ch\" forName=\"circle\" refType=\"w\" refFor=\"ch\" refForName=\"circle\" op=\"equ\"/>"
+          );
+          let entries = if parent_first {
+            format!("{parent}{child}")
+          } else {
+            format!("{child}{parent}")
+          };
+          let xml = format!(
+            "<dgm:constrLst xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">{entries}</dgm:constrLst>"
+          );
+          let parsed = dgm::Constraints::from_bytes(xml.as_bytes()).unwrap();
+          let constraints = parse_constraints(&parsed, true);
+          assert_eq!(
+            constraints.len(),
+            3,
+            "parent user{letter} must survive import"
+          );
+          let mut properties = HashMap::from([
+            (
+              String::new(),
+              HashMap::from([(dgm::ConstraintValues::Width, 400.0)]),
+            ),
+            ("circle".into(), HashMap::new()),
+          ]);
+          solve_layout_constraints(&constraints, &mut properties);
+          for dimension in [dgm::ConstraintValues::Width, dgm::ConstraintValues::Height] {
+            assert!(
+              (properties["circle"][&dimension] - expected).abs() < 0.0001,
+              "user{letter}: {source}, parent_first={parent_first}"
+            );
+          }
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn omitted_constraint_value_keeps_a_zero_width_spacer_and_measured_equality() {
+    use ooxmlsdk::sdk::SdkType;
+    for literal in ["", " val=\"0\""] {
+      let xml = format!(
+        "<dgm:constrLst xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">\
+         <dgm:constr type=\"l\" forName=\"space\" refType=\"w\" fact=\"0.25\"/>\
+         <dgm:constr type=\"w\" forName=\"space\"{literal}/>\
+         <dgm:constr type=\"l\" forName=\"panel\" refType=\"r\" refForName=\"space\"/>\
+         <dgm:constr type=\"r\" forName=\"panel\" refType=\"w\"/>\
+         <dgm:constr type=\"h\" forName=\"panel\" op=\"equ\"/>\
+         </dgm:constrLst>"
+      );
+      let parsed = dgm::Constraints::from_bytes(xml.as_bytes()).unwrap();
+      let constraints = parse_constraints(&parsed, true);
+      let mut properties = HashMap::from([
+        (
+          String::new(),
+          HashMap::from([(dgm::ConstraintValues::Width, 400.0)]),
+        ),
+        (
+          "space".into(),
+          HashMap::from([(dgm::ConstraintValues::Width, 400.0)]),
+        ),
+        (
+          "panel".into(),
+          HashMap::from([(dgm::ConstraintValues::Height, 60.0)]),
+        ),
+      ]);
+      solve_layout_constraints(&constraints, &mut properties);
+      assert_eq!(properties["space"][&dgm::ConstraintValues::Width], 0.0);
+      assert_eq!(
+        layout_property_value(&properties["panel"], dgm::ConstraintValues::Left),
+        Some(100.0)
+      );
+      assert_eq!(
+        layout_property_value(&properties["panel"], dgm::ConstraintValues::Width),
+        Some(300.0)
+      );
+      assert_eq!(properties["panel"][&dgm::ConstraintValues::Height], 60.0);
+    }
+  }
+
+  #[test]
+  fn composite_centering_retains_a_constraint_centered_child_origin() {
+    for height in [100.0, 300.0] {
+      for fraction in [0.2_f32, 0.5, 0.8] {
+        let mut tree = spacer_snake_tree(1, 1.0, 0.0, true);
+        tree.height = height;
+        let mut algorithm = tree.algorithms[0].clone();
+        algorithm.kind = dgm::AlgorithmValues::Composite;
+        let constraints = [
+          (dgm::ConstraintValues::Height, fraction),
+          (dgm::ConstraintValues::CenterWidth, 0.5),
+        ]
+        .map(|(target, factor)| {
+          parse_constraint_unfiltered(&dgm::Constraint {
+            r#type: target,
+            for_name: Some("item".into()),
+            reference_type: Some(dgm::ConstraintValues::Height),
+            fact: Some(f64::from(factor)),
+            ..Default::default()
+          })
+          .unwrap()
+        });
+        composite_layout_tree(&mut tree, algorithm, &constraints);
+        assert_eq!(tree.children.len(), 1);
+        let child = &tree.children[0];
+        assert!((child.height - height * fraction).abs() < 0.0001);
+        assert!((child.y + child.height / 2.0 - height / 2.0).abs() < 0.0001);
+      }
+    }
+  }
+
+  #[test]
+  fn constraint_references_keep_dimension_offsets_and_anchor_spans_independent() {
+    use ooxmlsdk::sdk::SdkType;
+    let xml =
+      br#"<dgm:constrLst xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram">
+      <dgm:constr type="h" forName="circle" refType="h" fact="0.5"/>
+      <dgm:constr type="hOff" forName="circle" refType="h" fact="-0.05"/>
+      <dgm:constr type="w" forName="circle" refType="h" refForName="circle" op="equ"/>
+      <dgm:constr type="wOff" forName="circle" refType="hOff" refForName="circle"/>
+      <dgm:constr type="b" forName="circle" refType="h"/>
+      <dgm:constr type="h" forName="panel" refType="h" refForName="circle"/>
+      <dgm:constr type="hOff" forName="panel" refType="hOff" refForName="circle"/>
+      <dgm:constr type="b" forName="panel" refType="b" refForName="circle"/>
+      <dgm:constr type="l" forName="panel" refType="w" fact="0.25"/>
+      <dgm:constr type="r" forName="panel" refType="w"/>
+      <dgm:constr type="w" forName="text" refType="w" refForName="panel" fact="0.5"/>
+      <dgm:constr type="t" forName="text" refType="t" refForName="panel"/>
+    </dgm:constrLst>"#;
+    let constraints = parse_constraints(&dgm::Constraints::from_bytes(xml).unwrap(), true);
+    let mut properties = HashMap::from([
+      (
+        String::new(),
+        HashMap::from([
+          (dgm::ConstraintValues::Width, 400.0),
+          (dgm::ConstraintValues::Height, 200.0),
+        ]),
+      ),
+      ("circle".into(), HashMap::new()),
+      (
+        "panel".into(),
+        HashMap::from([(dgm::ConstraintValues::Width, 400.0)]),
+      ),
+      ("text".into(), HashMap::new()),
+    ]);
+    solve_layout_constraints(&constraints, &mut properties);
+    for (name, dimension, expected) in [
+      ("circle", dgm::ConstraintValues::Width, 90.0),
+      ("circle", dgm::ConstraintValues::Height, 90.0),
+      ("panel", dgm::ConstraintValues::Height, 90.0),
+      ("panel", dgm::ConstraintValues::Width, 300.0),
+      ("text", dgm::ConstraintValues::Width, 150.0),
+      ("text", dgm::ConstraintValues::Top, 110.0),
+    ] {
+      assert_eq!(
+        layout_property_value(&properties[name], dimension),
+        Some(expected)
+      );
+    }
+  }
+
+  #[test]
+  fn composite_proportional_dimensions_fit_the_canvas_before_sibling_references() {
+    for (width, height) in [(400.0_f32, 200.0_f32), (300.0, 400.0)] {
+      let mut tree = spacer_snake_tree(1, 1.0, 0.0, true);
+      tree.width = width;
+      tree.height = height;
+      tree.children[0].internal_name = "circle".into();
+      let mut panel = tree.children[0].clone();
+      panel.internal_name = "panel".into();
+      tree.children.push(panel);
+      let mut algorithm = tree.algorithms[0].clone();
+      algorithm.kind = dgm::AlgorithmValues::Composite;
+      let constraint = |name: &str, target, reference, reference_name: &str, factor, operator| {
+        parse_constraint_unfiltered(&dgm::Constraint {
+          for_name: Some(name.into()),
+          r#type: target,
+          reference_type: Some(reference),
+          reference_for_name: Some(reference_name.into()),
+          fact: Some(factor),
+          operator,
+          ..Default::default()
+        })
+        .unwrap()
+      };
+      use dgm::ConstraintValues::{CenterHeight, CenterWidth, Height, Left, None, Right, Width};
+      let constraints = [
+        constraint("circle", Width, Width, "", 0.75, std::option::Option::None),
+        constraint(
+          "circle",
+          Height,
+          Width,
+          "circle",
+          1.0,
+          Some(dgm::BoolOperatorValues::Equal),
+        ),
+        constraint("circle", Left, None, "", 1.0, std::option::Option::None),
+        constraint(
+          "circle",
+          CenterWidth,
+          Height,
+          "",
+          0.5,
+          std::option::Option::None,
+        ),
+        constraint(
+          "panel",
+          Left,
+          CenterHeight,
+          "circle",
+          1.0,
+          std::option::Option::None,
+        ),
+        constraint("panel", Right, Width, "", 1.0, std::option::Option::None),
+        constraint(
+          "panel",
+          Height,
+          Height,
+          "circle",
+          1.0,
+          std::option::Option::None,
+        ),
+        constraint(
+          "panel",
+          CenterWidth,
+          Height,
+          "",
+          0.5,
+          std::option::Option::None,
+        ),
+      ];
+      composite_layout_tree(&mut tree, algorithm, &constraints);
+      let circle = &tree.children[0];
+      let panel = &tree.children[1];
+      let diameter = (width * 0.75).min(height);
+      assert!((circle.width - diameter).abs() < 0.0001);
+      assert!((circle.height - diameter).abs() < 0.0001);
+      assert!((circle.y + circle.height / 2.0 - height / 2.0).abs() < 0.0001);
+      assert!((panel.x - diameter / 2.0).abs() < 0.0001);
+      assert!((panel.width - (width - diameter / 2.0)).abs() < 0.0001);
+      assert!((panel.height - diameter).abs() < 0.0001);
+    }
+  }
+
+  #[test]
+  fn child_font_equalities_retain_independent_primary_and_secondary_groups() {
+    let mut tree = spacer_snake_tree(2, 1.0, 0.0, true);
+    tree.direct_constraints = [
+      dgm::ConstraintValues::PrimaryFontSize,
+      dgm::ConstraintValues::SecondaryFontSize,
+    ]
+    .map(|target| {
+      parse_constraint_unfiltered(&dgm::Constraint {
+        r#type: target,
+        r#for: Some(dgm::ConstraintRelationshipValues::Child),
+        operator: Some(dgm::BoolOperatorValues::Equal),
+        val: Some(65.0),
+        ..Default::default()
+      })
+      .unwrap()
+    })
+    .to_vec();
+    assign_diagram_font_sync_groups(&mut tree, &[]);
+    let primary = tree.children[0].font_sync_group.clone();
+    assert!(primary.is_some());
+    assert_eq!(tree.children[2].font_sync_group, primary);
+    tree.children[2].text_body.descendant_text = true;
+    tree.children[2].text_body.paragraphs = vec![DiagramTextParagraph {
+      descendant_text: true,
+      ..Default::default()
+    }];
+    assign_diagram_font_sync_groups(&mut tree, &[]);
+    assert_eq!(tree.children[0].font_sync_group, primary);
+    assert!(tree.children[2].font_sync_group.is_some());
+    assert_ne!(tree.children[2].font_sync_group, primary);
+    tree.children[2]
+      .text_body
+      .paragraphs
+      .insert(0, DiagramTextParagraph::default());
+    assign_diagram_font_sync_groups(&mut tree, &[]);
+    assert_eq!(
+      tree.children[2].font_sync_group, primary,
+      "a mixed parent/descendant body keeps the primary synchronization owner"
+    );
+  }
+
+  #[test]
   fn linear_fit_matches_native_precision_and_exact_boundaries() {
     // Seven repeated composite slots, six 5% transitions. These are observed
     // Office COM widths; the controls span both sides of 1/8 and 1/16 and a
@@ -7540,6 +8036,59 @@ mod tests {
         (Decimal(90_000), Decimal(15_000))
       ]
     );
+
+    let distinct = layout_algorithm(&dgm::Algorithm::from_bytes(br#"<dgm:alg xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" type="tx"><dgm:param type="lnSpPar" val="110"/><dgm:param type="lnSpCh" val="80"/><dgm:param type="lnSpAfParP" val="40"/><dgm:param type="lnSpAfChP" val="20"/></dgm:alg>"#).unwrap());
+    let mut descendants = make_body();
+    for paragraph in &mut descendants.paragraphs {
+      paragraph.descendant_text = true;
+    }
+    descendants.apply_algorithm_spacing(&distinct);
+    assert_eq!(
+      spacing(&descendants),
+      vec![(Decimal(80_000), Decimal(20_000)); 2],
+      "a descendant-only binding never promotes its first item to parent text"
+    );
+    let mut mixed = make_body();
+    mixed.paragraphs[1].level = Some(0);
+    mixed.paragraphs[1].descendant_text = true;
+    mixed.apply_algorithm_spacing(&distinct);
+    assert_eq!(
+      spacing(&mixed),
+      vec![
+        (Decimal(110_000), Decimal(40_000)),
+        (Decimal(80_000), Decimal(20_000))
+      ],
+      "semantic descendant ownership survives equal normalized list levels"
+    );
+    let mut authored_descendant = make_body();
+    authored_descendant.paragraphs[0].descendant_text = true;
+    authored_descendant.paragraphs[0].paragraph_properties =
+      custom_body.paragraphs[0].paragraph_properties.clone();
+    authored_descendant.apply_algorithm_spacing(&distinct);
+    assert_eq!(
+      spacing(&authored_descendant)[0],
+      (Decimal(120_000), Decimal(70_000)),
+      "authored spacing remains authoritative for a descendant binding"
+    );
+  }
+
+  #[test]
+  fn diagram_polar_angles_keep_degree_units_and_independent_radius_ratios() {
+    use ooxmlsdk::sdk::SdkType;
+    for name in ["pie", "arc", "chord", "blockArc"] {
+      let shape = dgm::Shape::from_bytes(format!(
+        r#"<dgm:shape xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" type="{name}"><dgm:adjLst><dgm:adj idx="1" val="90"/><dgm:adj idx="2" val="270"/><dgm:adj idx="3" val="0.1"/></dgm:adjLst></dgm:shape>"#
+      ).as_bytes()).unwrap();
+      let preset = diagram_layout_preset_geometry(&shape).unwrap();
+      let guides = &preset.adjust_value_list.as_ref().unwrap().shape_guide;
+      assert_eq!(guides[0].formula, "val 5400000");
+      assert_eq!(guides[1].formula, "val 16200000");
+      if name == "blockArc" {
+        assert_eq!(guides[2].formula, "val 10000");
+      } else {
+        assert_eq!(guides.len(), 2);
+      }
+    }
   }
 
   #[test]

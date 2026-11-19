@@ -1,8 +1,9 @@
 pub use emfsdk::render::{
   DecodedMetafile, EmfTextAdvanceQuantization, MetafileBitmapLayer, MetafileBitmapPicture,
   MetafileImageBounds, MetafilePhysicalSize, MetafileSolidRect, MetafileVectorDraw,
-  MetafileVectorDrawing, MetafileVectorFill, MetafileVectorFillRule, MetafileVectorPoint,
-  MetafileVectorScene, RenderOptions, WmfConversionProfile, WmfExternalHeader,
+  MetafileVectorDrawing, MetafileVectorFill, MetafileVectorFillRule, MetafileVectorLineCap,
+  MetafileVectorPoint, MetafileVectorPrefix, MetafileVectorScene, RenderOptions,
+  WmfConversionProfile, WmfExternalHeader, WmfSystemFontProfile,
 };
 
 #[derive(Clone, Debug)]
@@ -62,11 +63,24 @@ pub fn extract_metafile_vector_drawing_with_options(
     .map_err(|err| err.to_string())
 }
 
+pub fn extract_metafile_vector_prefix_with_options(
+  data: &[u8],
+  content_type: Option<&str>,
+  options: RenderOptions,
+) -> Result<Option<MetafileVectorPrefix>, String> {
+  emfsdk::render::extract_metafile_vector_prefix_with_options(data, content_type, options)
+    .map_err(|err| err.to_string())
+}
+
 pub fn metafile_physical_size(
   data: &[u8],
   content_type: Option<&str>,
 ) -> Option<MetafilePhysicalSize> {
   emfsdk::render::metafile_physical_size(data, content_type)
+}
+
+pub fn metafile_text_frame_size(data: &[u8], content_type: Option<&str>) -> Option<[u32; 2]> {
+  emfsdk::render::metafile_text_frame_size(data, content_type)
 }
 
 pub fn metafile_image_bounds(data: &[u8]) -> Option<MetafileImageBounds> {
@@ -103,7 +117,7 @@ pub fn extract_metafile_text_runs_with_options(
     // tdf133035 counterexample retains its following text as PDF text.
     .filter(|run| include_raster_backdrop || !run.requires_raster_backdrop)
     .map(|run| {
-      let text = metafile_semantic_text(&run.text, run.font_family.as_deref());
+      let text = metafile_semantic_text(run.text, run.font_family.as_deref());
       MetafileTextRun {
         text,
         x: run.x,
@@ -138,6 +152,18 @@ pub fn metafile_text_requires_raster_backdrop(data: &[u8], content_type: Option<
 
 pub fn metafile_text_can_be_lifted(data: &[u8], content_type: Option<&str>) -> bool {
   emfsdk::render::metafile_text_can_be_lifted(data, content_type)
+}
+
+pub fn word_metafile_text_can_be_lifted(data: &[u8], content_type: Option<&str>) -> bool {
+  emfsdk::render::metafile_text_can_be_lifted_with_options(
+    data,
+    content_type,
+    RenderOptions {
+      word_emf_vector_pens: true,
+      word_emf_logical_font_metrics: true,
+      ..RenderOptions::default()
+    },
+  )
 }
 
 pub fn extract_metafile_solid_rects(
@@ -184,18 +210,25 @@ pub fn extract_metafile_full_bitmap_with_options(
   emfsdk::render::extract_metafile_full_bitmap_with_options(data, options)
 }
 
-fn metafile_semantic_text(text: &str, font_family: Option<&str>) -> String {
+fn metafile_semantic_text(text: String, font_family: Option<&str>) -> String {
+  if font_family.is_some_and(|family| {
+    family.eq_ignore_ascii_case("Symbol") || family.eq_ignore_ascii_case("SymbolMT")
+  }) {
+    // Preserve legacy selectors through glyph selection. Word's WMF output
+    // keeps F03C/F03E and digit selectors, while its sparse printable aliases
+    // are resolved by the PDF semantic layer after shaping. Converting every
+    // ASCII-looking glyph here loses that distinction and the original code.
+    // The extracted run already owns this string, so retain its allocation.
+    return text;
+  }
   text
     .chars()
     .map(|character| {
       let mapped =
         super::symbol::font_symbol_code(font_family, character as u32).unwrap_or(character);
-      // ASCII Symbol operators can be exposed directly: the text shaper
-      // converts them back to the selected font's F0XX transport cmap while
-      // PDF semantics retain the ordinary scalar. Keep non-ASCII mappings in
-      // transport form so Greek and operators such as Symbol F02D stay in the
-      // authored face; the PDF ToUnicode layer standardizes the few codes for
-      // which Office does so as well.
+      // Retain the existing normalization for other legacy font families.
+      // Only the verified physical Symbol path above delegates all selector
+      // semantics to the PDF layer after shaping.
       if mapped.is_ascii() { mapped } else { character }
     })
     .collect()
@@ -230,10 +263,21 @@ mod tests {
   }
 
   #[test]
-  fn symbol_ascii_operators_drop_transport_codes_without_remapping_greek() {
+  fn symbol_selectors_reach_glyph_selection_before_pdf_semantics() {
+    let source = "\u{f02b}\u{f03d}\u{f077}\u{f02d}\u{f03c}\u{f03e}\u{f030}\u{f031}";
+    for family in ["Symbol", "SymbolMT", "sYmBoL"] {
+      assert_eq!(
+        metafile_semantic_text(source.to_owned(), Some(family)),
+        source
+      );
+    }
     assert_eq!(
-      metafile_semantic_text("\u{f02b}\u{f03d}\u{f077}\u{f02d}", Some("Symbol")),
-      "+=\u{f077}\u{f02d}"
+      metafile_semantic_text("<>01".to_owned(), Some("Arial")),
+      "<>01"
+    );
+    assert_eq!(
+      metafile_semantic_text("\u{f0e8}".to_owned(), Some("Wingdings")),
+      "\u{f0e8}"
     );
   }
 }

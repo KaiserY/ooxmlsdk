@@ -16,6 +16,11 @@ use super::{
 use crate::common::drawingml_shape_raster::PageToRasterMapping;
 use crate::common::{Fill, GradientFill, GradientStop, ShapeStyleValue};
 use image::{Rgba, RgbaImage};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
+
+mod bevel;
+mod material;
+mod shadow_plane;
 
 type Point3 = [f64; 3];
 
@@ -24,6 +29,9 @@ struct Vertex {
   point: [f64; 2],
   depth: f64,
   color: [f64; 3],
+  alpha: f64,
+  // D3D adds the separately interpolated specular color after texturing.
+  specular: f64,
   // u/W, v/W and 1/W; lighting remains a screen-linear vertex attribute.
   texture: [f64; 3],
 }
@@ -145,6 +153,7 @@ pub(super) fn projected_linear_gradient(
 pub(super) struct Scene {
   triangles: Vec<Triangle>,
   materials: Vec<LinearMaterial>,
+  backdrop: Option<shadow_plane::ImagePlane>,
 }
 
 struct Projector {
@@ -153,6 +162,73 @@ struct Projector {
   sine: f64,
   cosine: f64,
   parallel: bool,
+  camera: Option<PieCamera>,
+  material: Option<a::PresetMaterialTypeValues>,
+}
+
+#[derive(Clone, Copy)]
+struct PieCamera {
+  top_y: f64,
+  top_distance: f64,
+}
+
+impl PieCamera {
+  fn from_projection(
+    projection: RadialPerspectiveProjection,
+    view: Chart3DView,
+    plot: PlotRect,
+  ) -> Option<Self> {
+    if view.right_angle_axes {
+      return None;
+    }
+    let fov = if view.perspective_half_degrees <= f32::EPSILON {
+      0.1
+    } else {
+      f64::from(view.perspective_half_degrees) * 0.5
+    };
+    let focal = f64::from(plot.height) / (2.0 * (fov * 0.5).to_radians().tan());
+    let cosine = f64::from(view.rotate_x_deg.clamp(0.0, 90.0))
+      .to_radians()
+      .cos();
+    let top_distance = ((focal / f64::from(projection.radii.0)).powi(2) + cosine * cosine).sqrt();
+    let hub_y = f64::from(projection.conic_center.1)
+      - f64::from(projection.radii.1) * f64::from(projection.strength)
+      - f64::from(plot.top + plot.height * 0.5);
+    Some(Self {
+      top_y: hub_y * top_distance / focal,
+      top_distance,
+    })
+  }
+
+  fn specular(self, point: Point3, normal: [f32; 3], sine: f64, cosine: f64) -> f64 {
+    // MS-OI29500 warmMatte: white .3 Phong highlight with power8. Native
+    // black/gray/white meshes at 30/70/90 degrees separate this eight-bit
+    // attribute from seven-bit diffuse light. Use each source vertex's eye
+    // vector; a constant viewing direction loses the native 10/11 ramp.
+    let light = -0.75 / 3.0_f64.sqrt();
+    let normal = normal.map(f64::from);
+    let normal_light = normal.iter().sum::<f64>() * light;
+    let reflected = normal.map(|n| 2.0 * normal_light * n - light);
+    let view = [
+      -point[0],
+      -(sine * point[1] - cosine * point[2] + self.top_y),
+      -(self.top_distance - cosine * point[1] - sine * point[2]),
+    ];
+    let length = view.iter().map(|v| v * v).sum::<f64>().sqrt();
+    let reflected_view =
+      reflected.iter().zip(view).map(|(r, v)| r * v).sum::<f64>() / (0.75 * length);
+    (255.0 * 0.3 * 0.75 * reflected_view.max(0.0).powi(8)).floor()
+  }
+
+  fn view(self, point: Point3, sine: f64, cosine: f64) -> Point3 {
+    let view = [
+      -point[0],
+      -(sine * point[1] - cosine * point[2] + self.top_y),
+      -(self.top_distance - cosine * point[1] - sine * point[2]),
+    ];
+    let length = view.iter().map(|v| v * v).sum::<f64>().sqrt();
+    view.map(|v| v / length)
+  }
 }
 
 impl Projector {
@@ -177,6 +253,8 @@ impl Projector {
         denominator.recip()
       },
       color,
+      alpha: 255.0,
+      specular: 0.0,
       texture: [
         0.0,
         0.0,
@@ -198,6 +276,21 @@ fn diffuse(color: RgbColor, normal: [f32; 3]) -> [f64; 3] {
   // Recover the native seven-bit vertex attributes before interpolation,
   // matching the existing FixedGouraud7 scene gradient path.
   vertex_rgb(office_perspective_chart_diffuse_color(color, normal))
+}
+
+#[derive(Clone, Copy)]
+struct VertexLight {
+  diffuse: [f64; 3],
+  normal: [f32; 3],
+  source_color: RgbColor,
+}
+
+fn lighting(color: RgbColor, normal: [f32; 3]) -> VertexLight {
+  VertexLight {
+    diffuse: diffuse(color, normal),
+    normal,
+    source_color: color,
+  }
 }
 
 fn vertex_rgb(color: RgbColor) -> [f64; 3] {
@@ -240,10 +333,10 @@ fn pie_ring(start: f32, sweep: f32, segments: usize) -> Vec<(f32, Point3)> {
     .collect()
 }
 
-fn cut_light(color: RgbColor, angle: f32, elevation: f32, direction: f32) -> [f64; 3] {
+fn cut_light(color: RgbColor, angle: f32, elevation: f32, direction: f32) -> VertexLight {
   let (s, c) = elevation.to_radians().sin_cos();
   let normal = [direction * angle.cos(), direction * angle.sin()];
-  diffuse(color, [normal[0], s * normal[1], -c * normal[1]])
+  lighting(color, [normal[0], s * normal[1], -c * normal[1]])
 }
 
 pub(super) fn lower(
@@ -254,17 +347,7 @@ pub(super) fn lower(
   plot: PlotRect,
 ) -> Option<ImageItem> {
   // Retain the prior realization for materials the mesh cannot represent.
-  let mut outlined = false;
-  let mut textured = false;
   for slice in slices {
-    if style
-      .point_image_effects
-      .get(slice.index)
-      .and_then(Option::as_ref)
-      .is_some_and(|effects| !effects.effects.is_empty())
-    {
-      return None;
-    }
     if let Some(paint) = style.point_styles.get(slice.index) {
       match &paint.fill {
         ShapeStyleValue::Paint(Fill::Solid(c)) if c.a == 255 => {}
@@ -274,44 +357,67 @@ pub(super) fn lower(
             && gradient.definition_bounds.is_none()
             && gradient.rotate_with_shape != Some(false)
             && !gradient.stops.is_empty()
-            && gradient.stops.iter().all(|stop| stop.color.a == 255) =>
-        {
-          textured = true;
-        }
+            && gradient.stops.iter().all(|stop| stop.color.a == 255) => {}
         ShapeStyleValue::Paint(Fill::None)
         | ShapeStyleValue::NoPaint
         | ShapeStyleValue::Unspecified => {}
         _ => return None,
       }
-      if let ShapeStyleValue::Paint(stroke) = &paint.stroke {
-        if stroke.color.a != 255
+      if let ShapeStyleValue::Paint(stroke) = &paint.stroke
+        && (stroke.color.a != 255
           || stroke.dash.is_some()
           || stroke.pattern.is_some()
           || stroke.gradient.is_some()
-          || stroke.compound.is_some()
-        {
-          return None;
-        }
-        outlined = true;
+          || stroke.compound.is_some())
+      {
+        return None;
       }
     }
   }
-  if !outlined && !textured {
-    return None;
-  }
   let thickness = f64::from(0.24 * (view.height_percent / 100.0).clamp(0.05, 5.0));
   let (s, c) = view.rotate_x_deg.clamp(0.0, 90.0).to_radians().sin_cos();
-  let mut scene = Scene::default();
+  let projector = Projector {
+    plane: projection,
+    thickness,
+    sine: f64::from(s),
+    cosine: f64::from(c),
+    parallel: view.right_angle_axes,
+    camera: PieCamera::from_projection(projection, view, plot),
+    material: None,
+  };
+  let mut scene = Scene {
+    backdrop: shadow_plane::lower(slices, style, &projector).ok()?,
+    ..Default::default()
+  };
   for slice in slices {
+    let source_3d = style.word_point_3d_styles.get(slice.index);
+    // Unobserved material/large-profile consumers keep their existing mesh
+    // rather than falling back to the older vector realization merely
+    // because a previously ignored 3-D node is now retained.
+    let (shape_3d, bevels) = source_3d
+      .and_then(|source| source.shape.as_deref())
+      .filter(|shape| {
+        matches!(
+          shape.preset_material,
+          None | Some(a::PresetMaterialTypeValues::WarmMatte)
+        ) || (shape.preset_material == Some(a::PresetMaterialTypeValues::Clear)
+          && projector.camera.is_some())
+      })
+      .and_then(|shape| {
+        bevel::Bevels::resolve(shape, plot.width, thickness).map(|bevels| (Some(shape), bevels))
+      })
+      .unwrap_or_default();
+    let material_preset = shape_3d.and_then(|shape| shape.preset_material);
     let projector = Projector {
       plane: projection.with_plane_offset(slice.perspective_plane_offset),
-      thickness,
-      sine: f64::from(s),
-      cosine: f64::from(c),
-      parallel: view.right_angle_axes,
+      material: material_preset,
+      ..projector
     };
     let paint = style.point_styles.get(slice.index);
-    let pen_radius = match paint.map(|p| &p.stroke) {
+    // Native NoFill/.25/2/4pt controls leave the beveled pie body pixel-
+    // identical; only the independent legend solids retain those pens.
+    let body_stroke = paint.map(|p| &p.stroke).filter(|_| !bevels.active());
+    let pen_radius = match body_stroke {
       Some(ShapeStyleValue::Paint(stroke)) => pie_model_pen_radius(stroke.width.0, plot.width),
       _ => 0.0,
     };
@@ -356,65 +462,77 @@ pub(super) fn lower(
     };
     let hub = [0.0; 3];
     if let Some(color) = fill {
-      let cap = diffuse(color, [0.0, -c, -s]);
-      let base = diffuse(color, [0.0, c, s]);
-      for pair in ring.windows(2) {
-        let [(a, first), (b, second)] = pair else {
-          unreachable!()
-        };
-        scene.face(
+      if shape_3d.is_some() {
+        bevel::body(
+          &mut scene,
           &projector,
-          [hub, *first, *second],
-          [cap; 3],
-          material,
+          slice,
+          (color, material),
           bounds,
+          &bevels,
         );
-        scene.face(
-          &projector,
-          [bottom(hub), bottom(*second), bottom(*first)],
-          [base; 3],
-          material,
-          bounds,
-        );
-        let light = |angle: f32| diffuse(color, [angle.sin(), -s * angle.cos(), c * angle.cos()]);
-        let (ca, cb) = (light(*a), light(*b));
-        scene.face(
-          &projector,
-          [*first, bottom(*first), *second],
-          [ca, ca, cb],
-          material,
-          bounds,
-        );
-        scene.face(
-          &projector,
-          [*second, bottom(*first), bottom(*second)],
-          [cb, ca, cb],
-          material,
-          bounds,
-        );
-      }
-      for (direction, (angle, outer)) in [(1.0, ring[0]), (-1.0, ring[segments])] {
-        // Native uploaded cut normals belong to the start/end plane, even
-        // when it is back-facing. An angle-sign shortcut only works after
-        // visibility rejection and reverses a cut at a complete-turn seam.
-        let color = cut_light(color, angle, view.rotate_x_deg, direction);
-        scene.face(
-          &projector,
-          [hub, outer, bottom(outer)],
-          [color; 3],
-          material,
-          bounds,
-        );
-        scene.face(
-          &projector,
-          [hub, bottom(outer), bottom(hub)],
-          [color; 3],
-          material,
-          bounds,
-        );
+      } else {
+        let cap = lighting(color, [0.0, -c, -s]);
+        let base = lighting(color, [0.0, c, s]);
+        for pair in ring.windows(2) {
+          let [(a, first), (b, second)] = pair else {
+            unreachable!()
+          };
+          scene.face(
+            &projector,
+            [hub, *first, *second],
+            [cap; 3],
+            material,
+            bounds,
+          );
+          scene.face(
+            &projector,
+            [bottom(hub), bottom(*second), bottom(*first)],
+            [base; 3],
+            material,
+            bounds,
+          );
+          let light =
+            |angle: f32| lighting(color, [angle.sin(), -s * angle.cos(), c * angle.cos()]);
+          let (ca, cb) = (light(*a), light(*b));
+          scene.face(
+            &projector,
+            [*first, bottom(*first), *second],
+            [ca, ca, cb],
+            material,
+            bounds,
+          );
+          scene.face(
+            &projector,
+            [*second, bottom(*first), bottom(*second)],
+            [cb, ca, cb],
+            material,
+            bounds,
+          );
+        }
+        for (direction, (angle, outer)) in [(1.0, ring[0]), (-1.0, ring[segments])] {
+          // Native uploaded cut normals belong to the start/end plane, even
+          // when it is back-facing. An angle-sign shortcut only works after
+          // visibility rejection and reverses a cut at a complete-turn seam.
+          let color = cut_light(color, angle, view.rotate_x_deg, direction);
+          scene.face(
+            &projector,
+            [hub, outer, bottom(outer)],
+            [color; 3],
+            material,
+            bounds,
+          );
+          scene.face(
+            &projector,
+            [hub, bottom(outer), bottom(hub)],
+            [color; 3],
+            material,
+            bounds,
+          );
+        }
       }
     }
-    if let Some(ShapeStyleValue::Paint(stroke)) = paint.map(|p| &p.stroke) {
+    if let Some(ShapeStyleValue::Paint(stroke)) = body_stroke {
       // The independent arc pens share the body's source chord budget.
       // Their six-sided section is transported from the last endpoint;
       // flat-capped tubes per chord lose the native joins and end caps.
@@ -566,6 +684,8 @@ impl Scene {
         point: points[i],
         depth: depth[i],
         color: [255.0 * f64::from(diffuse); 3],
+        alpha: 255.0,
+        specular: 0.0,
         texture: [uv[i][0] * depth[i], uv[i][1] * depth[i], depth[i]],
       }),
       material: Some(material),
@@ -585,6 +705,8 @@ impl Scene {
         point: points[i],
         depth: depth[i],
         color: rgb(color),
+        alpha: 255.0,
+        specular: 0.0,
         texture: [0.0, 0.0, 1.0],
       }),
       material: None,
@@ -602,17 +724,45 @@ impl Scene {
     &mut self,
     projector: &Projector,
     points: [Point3; 3],
-    colors: [[f64; 3]; 3],
+    lights: [VertexLight; 3],
     material: Option<usize>,
     bounds: [f64; 4],
   ) {
     let vertices = std::array::from_fn(|i| {
-      let mut vertex = projector.vertex(points[i], colors[i]);
+      let mut vertex = projector.vertex(points[i], lights[i].diffuse);
+      if let Some(camera) = projector.camera {
+        let mut point = points[i];
+        point[0] += f64::from(projector.plane.plane_offset.0);
+        point[1] += f64::from(projector.plane.plane_offset.1);
+        let (color, alpha) = material::diffuse(projector, point, lights[i]);
+        vertex.color = color;
+        vertex.alpha = alpha;
+        vertex.specular = if projector.material == Some(a::PresetMaterialTypeValues::Clear) {
+          material::specular(
+            camera,
+            point,
+            lights[i].normal,
+            projector.sine,
+            projector.cosine,
+            projector.material,
+          )
+        } else {
+          camera.specular(point, lights[i].normal, projector.sine, projector.cosine)
+        };
+      }
       let q = vertex.texture[2];
       vertex.texture[0] = (points[i][0] - bounds[0]) / (bounds[2] - bounds[0]) * q;
       vertex.texture[1] = (points[i][1] - bounds[1]) / (bounds[3] - bounds[1]) * q;
       vertex
     });
+    if projector.material == Some(a::PresetMaterialTypeValues::Clear)
+      && edge(vertices[0].point, vertices[1].point, vertices[2].point) <= 0.0
+    {
+      // Native source-buffer rays against the actual PDF reject back faces.
+      // Blending those hidden surfaces darkens Clear caps before their
+      // visible front face arrives; opaque depth tests mask this omission.
+      return;
+    }
     self.triangles.push(Triangle { vertices, material });
   }
 
@@ -669,19 +819,25 @@ impl Scene {
       })
       .collect();
     let mut depth = vec![f64::NEG_INFINITY; count];
-    let mut colors = vec![[0_u8; 3]; count];
+    let has_alpha = triangles
+      .iter()
+      .any(|triangle| triangle.vertices.iter().any(|v| v.alpha < 255.0));
+    let mut colors = vec![[0_u8; 4]; count];
     let mut sums = vec![[0_u16; 4]; count];
     for (sx, sy) in crate::common::drawingml_3d::DIRECT3D_STANDARD_8_SAMPLES {
       depth.fill(f64::NEG_INFINITY);
+      if has_alpha {
+        colors.fill([0; 4]);
+      }
       for triangle in &triangles {
         raster_triangle(
           &triangle.vertices,
-          width,
-          height,
+          [width, height],
           [f64::from(sx), f64::from(sy)],
           &mut depth,
           &mut colors,
           triangle.material.map(|index| &self.materials[index]),
+          has_alpha,
         );
       }
       for ((z, color), sum) in depth.iter().zip(&colors).zip(&mut sums) {
@@ -689,13 +845,21 @@ impl Scene {
           for i in 0..3 {
             sum[i] += u16::from(color[i]);
           }
-          sum[3] += 1;
+          sum[3] += if has_alpha { u16::from(color[3]) } else { 1 };
         }
       }
     }
     let mut image = RgbaImage::new(mapping.width_px, mapping.height_px);
     for (pixel, sum) in image.pixels_mut().zip(sums) {
       let n = sum[3];
+      if has_alpha {
+        if n > 0 {
+          let channel =
+            |i| ((u32::from(sum[i]) * 255 + u32::from(n) / 2) / u32::from(n)).min(255) as u8;
+          *pixel = Rgba([channel(0), channel(1), channel(2), ((n + 4) / 8) as u8]);
+        }
+        continue;
+      }
       if let Some(red) = (sum[0] + n / 2).checked_div(n) {
         *pixel = Rgba([
           red as u8,
@@ -704,6 +868,11 @@ impl Scene {
           ((255 * n + 4) / 8) as u8,
         ]);
       }
+    }
+    if let Some(backdrop) = &self.backdrop {
+      let mut background = backdrop.rasterize(mapping)?;
+      image::imageops::overlay(&mut background, &image, 0, 0);
+      image = background;
     }
     Some(image)
   }
@@ -715,13 +884,14 @@ fn edge(a: [f64; 2], b: [f64; 2], p: [f64; 2]) -> f64 {
 
 fn raster_triangle(
   triangle: &[Vertex; 3],
-  width: usize,
-  height: usize,
+  size: [usize; 2],
   sample: [f64; 2],
   depth: &mut [f64],
-  colors: &mut [[u8; 3]],
+  colors: &mut [[u8; 4]],
   material: Option<&LinearMaterial>,
+  blend_alpha: bool,
 ) {
+  let [width, height] = size;
   let mut t = *triangle;
   let mut area = edge(t[0].point, t[1].point, t[2].point);
   if area.abs() <= 1e-12 {
@@ -795,13 +965,78 @@ fn raster_triangle(
         let texture = material.color([uvw[0] / uvw[2], uvw[1] / uvw[2]]);
         color = std::array::from_fn(|i| color[i] * texture[i] / 255.0);
       }
-      colors[index] = color.map(|v| v.round().clamp(0.0, 255.0) as u8);
+      let specular = if t[0].specular == t[1].specular && t[0].specular == t[2].specular {
+        t[0].specular
+      } else {
+        let value = (0..3).map(|i| weights[i] * t[i].specular).sum::<f64>();
+        let low = t.iter().map(|v| v.specular).fold(f64::INFINITY, f64::min);
+        let high = t
+          .iter()
+          .map(|v| v.specular)
+          .fold(f64::NEG_INFINITY, f64::max);
+        value.clamp(low, high)
+      };
+      color = color.map(|c| c + specular);
+      if blend_alpha {
+        let alpha = (0..3)
+          .map(|i| weights[i] * t[i].alpha)
+          .sum::<f64>()
+          .clamp(0.0, 255.0);
+        let remaining = 1.0 - alpha / 255.0;
+        let previous = colors[index];
+        colors[index] = std::array::from_fn(|i| {
+          let value = if i == 3 { alpha } else { color[i] };
+          (value + f64::from(previous[i]) * remaining)
+            .round()
+            .clamp(0.0, 255.0) as u8
+        });
+      } else {
+        colors[index] =
+          [color[0], color[1], color[2], 255.0].map(|v| v.round().clamp(0.0, 255.0) as u8);
+      }
     }
   }
 }
 
 #[cfg(test)]
 mod tests {
+
+  #[test]
+  fn warm_matte_highlight_matches_independent_native_black_vertices() {
+    // Native VF15 black meshes: camera fit is independently observed, and
+    // the eight-bit specular attribute survives a zero diffuse material.
+    let sine = 70.0_f64.to_radians().sin();
+    let cosine = 70.0_f64.to_radians().cos();
+    let camera = PieCamera {
+      top_distance: (115_530.671_875 - 12.0 * sine) / 100.0,
+      top_y: (-12.0 * cosine - 0.020_006_455_48) / 100.0,
+    };
+    for (source, expected) in [
+      ([0.0, 0.0, 24.0], 10.0),
+      ([0.0, 100.0, 24.0], 10.0),
+      ([-8.557_519_912_719_727, 99.633_171_081_542_97, 24.0], 11.0),
+      ([-80.901_679_992_675_78, 58.778_553_009_033_2, 24.0], 11.0),
+      ([0.0, 0.0, 0.0], 10.0),
+      ([0.0, 100.0, 0.0], 10.0),
+      ([-8.557_519_912_719_727, 99.633_171_081_542_97, 0.0], 11.0),
+    ] {
+      let point = [
+        source[0] / 100.0,
+        -source[1] / 100.0,
+        (source[2] - 24.0) / 100.0,
+      ];
+      let sign = if source[2] == 0.0 { 1.0 } else { -1.0 };
+      assert_eq!(
+        camera.specular(
+          point,
+          [0.0, (sign * cosine) as f32, (sign * sine) as f32],
+          sine,
+          cosine
+        ),
+        expected,
+      );
+    }
+  }
 
   #[test]
   fn pie_arc_tubes_match_native_end_caps_and_transported_sections() {
@@ -989,7 +1224,7 @@ mod tests {
       (360.0, -1.0, 106),
     ] {
       assert_eq!(
-        cut_light(white, angle.to_radians(), 30.0, direction),
+        cut_light(white, angle.to_radians(), 30.0, direction).diffuse,
         [255.0 * f64::from(channel) / 128.0; 3]
       );
     }
@@ -1027,9 +1262,11 @@ mod tests {
       point,
       texture,
       color: [255.0; 3],
+      alpha: 255.0,
+      specular: 0.0,
       depth: 1.0,
     };
-    let scene = Scene {
+    let mut scene = Scene {
       triangles: vec![Triangle {
         vertices: [
           vertex([0.0, 0.0], [0.0, 0.0, 1.0]),
@@ -1039,6 +1276,7 @@ mod tests {
         material: Some(0),
       }],
       materials: vec![LinearMaterial::new(&gradient, [0.0, 0.0, 1.0, 1.0])],
+      backdrop: None,
     };
     let image = scene
       .rasterize(PageToRasterMapping {
@@ -1054,6 +1292,26 @@ mod tests {
     // At pixel center u=(.25*.5)/(.5+.25*.5+.25)=1/7.
     // An affine interpolation would instead produce gray 191.
     assert_eq!(image.get_pixel(0, 0).0, [219, 219, 219, 255]);
+    // The highlight is added after the texture cascade. Multiplying it
+    // by the gradient would tint/dim even an entirely black diffuse face.
+    for triangle in &mut scene.triangles {
+      for vertex in &mut triangle.vertices {
+        vertex.color = [0.0; 3];
+        vertex.specular = 11.0;
+      }
+    }
+    let highlighted = scene
+      .rasterize(PageToRasterMapping {
+        width_px: 2,
+        height_px: 2,
+        scale_x: 1.0,
+        scale_y: 1.0,
+        translate_x: 0.0,
+        translate_y: 0.0,
+        text_hinting: None,
+      })
+      .unwrap();
+    assert_eq!(highlighted.get_pixel(0, 0).0, [11, 11, 11, 255]);
   }
 
   #[test]
@@ -1068,6 +1326,8 @@ mod tests {
           [0.0, 0.0, 255.0]
         },
         texture: [0.0, 0.0, 1.0],
+        specular: 0.0,
+        alpha: 255.0,
       };
       let corners = [
         vertex(0.0, 0.0),
@@ -1099,6 +1359,7 @@ mod tests {
         })
         .collect(),
       materials: Vec::new(),
+      backdrop: None,
     };
     let forward = scene.rasterize(mapping).unwrap();
     scene.triangles.reverse();

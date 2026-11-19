@@ -1,4 +1,4 @@
-//! Import the standard SmartArt model when no persisted drawing is available.
+//! Import Word SmartArt frame paint and lay out diagrams without a persisted drawing.
 //!
 //! ECMA-376 DrawingML `relIds` identifies the data, layout, style and color
 //! parts independently. The optional MS-ODRAWXML drawing records the last
@@ -55,6 +55,7 @@ pub(super) fn layout_shapes(
       b: 0xbd,
     }),
   );
+  let paint = frame_paint(data, context.styles);
   let children: Vec<_> = shapes
     .iter()
     .filter_map(|shape| {
@@ -63,6 +64,9 @@ pub(super) fn layout_shapes(
         DrawingShapeImportContext {
           effect_extent: DrawingEffectExtent::default(),
           smartart_text_colors_by_model_id: None,
+          wordprocessing_canvas_has_background_paint: context
+            .wordprocessing_canvas_has_background_paint
+            || paint.fill_override.is_some(),
           ..context
         },
       )
@@ -73,31 +77,205 @@ pub(super) fn layout_shapes(
     return None;
   }
 
+  let effect_extent = generated_effect_extent(
+    &children,
+    &layout.layout_node,
+    width,
+    height,
+    context.effect_extent,
+    &paint,
+  );
   Some(wrap_in_host(
     children,
     width,
     height,
     placement,
-    context.effect_extent,
+    effect_extent,
+    paint,
   ))
 }
 
+fn generated_effect_extent(
+  children: &[InlineItem],
+  root: &dgm::LayoutNode,
+  width: f32,
+  height: f32,
+  stored: DrawingEffectExtent,
+  paint: &WordprocessingCanvasBackgroundPaint,
+) -> DrawingEffectExtent {
+  // wp:effectExtent can describe an older diagram layout. Word recomputes it
+  // when rebuilding an explicitly constrained composite. The geometric
+  // rectangle alone is not an enclosure contract for the flow algorithms:
+  // native snake controls retain nonzero reserves with identical contained
+  // children, independently of stored distances and placeholder text. Keep
+  // their stored enclosure until that separate native owner is resolved.
+  // Check the composite's serialized EMU grid rather than fitting an offset.
+  // Persisted drawings keep their separate stored-frame path. Until their
+  // actual effect support is resolved, retain the enclosure for external
+  // paint, rotations, 3-D, and a separately authored whole-diagram outline.
+  let explicit_composite = root.layout_node_choice.iter().find_map(|choice| {
+    if let dgm::LayoutNodeChoice::Algorithm(algorithm) = choice {
+      Some(algorithm.r#type)
+    } else {
+      None
+    }
+  }) == Some(dgm::AlgorithmValues::Composite);
+  let emu = |value: f32| (f64::from(value) * 12_700.0).round() as i64;
+  let contained = explicit_composite
+    && width.is_finite()
+    && height.is_finite()
+    && width >= 0.0
+    && height >= 0.0
+    && paint.stroke_override.is_none()
+    && children.iter().all(|item| {
+      let InlineItem::Shape(shape) = item else {
+        return false;
+      };
+      let no_effects = match shape.effects.as_ref() {
+        None => true,
+        Some(common::DrawingEffectSource::List {
+          resolved: Some(effects),
+          ..
+        })
+        | Some(common::DrawingEffectSource::Dag {
+          resolved: Some(effects),
+          ..
+        }) => effects.effects.is_empty(),
+        _ => false,
+      };
+      no_effects
+        && shape.static3d.is_none()
+        && shape.rotation_deg == 0.0
+        && [
+          shape.offset_x_pt,
+          shape.offset_y_pt,
+          shape.width_pt,
+          shape.height_pt,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+        && shape.width_pt >= 0.0
+        && shape.height_pt >= 0.0
+        && emu(shape.offset_x_pt) >= 0
+        && emu(shape.offset_y_pt) >= 0
+        // Independent x/width and y/height rounding can put their sum one
+        // serialized EMU beyond the parent's separately rounded endpoint.
+        && emu(shape.offset_x_pt) + emu(shape.width_pt) <= emu(width) + 1
+        && emu(shape.offset_y_pt) + emu(shape.height_pt) <= emu(height) + 1
+    });
+  if contained {
+    DrawingEffectExtent::default()
+  } else {
+    stored
+  }
+}
+
+pub(super) fn frame_paint(
+  data: &dgm::DataModelRoot,
+  styles: &StylesCatalog,
+) -> WordprocessingCanvasBackgroundPaint {
+  let theme = &styles.theme_colors;
+  let background = data
+    .background
+    .as_deref()
+    .and_then(|background| background.background_choice1.as_ref());
+  let fill_override = match background {
+    Some(dgm::BackgroundChoice::SolidFill(fill)) => resolve_drawingml_solid_fill(fill, theme)
+      .map(|color| common::Fill::Solid(common_rgb(color.color, color.opacity))),
+    Some(dgm::BackgroundChoice::GradientFill(fill)) => drawingml_gradient_fill(fill, theme),
+    Some(dgm::BackgroundChoice::PatternFill(fill)) => {
+      drawingml_pattern_fill(fill, theme).map(common::Fill::Pattern)
+    }
+    _ => None,
+  };
+  let stroke_override = data
+    .whole
+    .as_deref()
+    .and_then(|whole| whole.outline.as_deref())
+    .and_then(|outline| {
+      let mut stroke = drawingml_outline_common_stroke(outline, theme)?;
+      if outline.width == Some(0) {
+        stroke.width = common::Pt(units::emu_to_points(WORD_FIXED_OUTPUT_HAIRLINE_WIDTH_EMU));
+      }
+      // Native Word uses a round join for the whole-diagram rectangle when
+      // no join is authored. Preserve an explicit join from a:ln.
+      stroke.join.get_or_insert(common::StrokeJoin::Round);
+      Some(stroke)
+    });
+  WordprocessingCanvasBackgroundPaint {
+    fill_override,
+    fill_image: None,
+    stroke_override,
+  }
+}
+
 pub(super) fn wrap_in_host(
-  children: Vec<InlineItem>,
+  mut children: Vec<InlineItem>,
   width: f32,
   height: f32,
   placement: ImagePlacement,
   effect_extent: DrawingEffectExtent,
+  paint: WordprocessingCanvasBackgroundPaint,
 ) -> Vec<InlineItem> {
   // wp:extent belongs to the whole diagram. In particular an inline
   // diagram advances once, and an anchored diagram has one wrap owner.
   // Children use the established canvas coordinate-space formatter.
   let mut host = chart_shape(width, height, 0.0, placement, None);
+  let effect_extent = if matches!(placement, ImagePlacement::Floating(_))
+    && let Some(stroke) = paint.stroke_override.as_ref()
+  {
+    // The explicit whole-diagram outline owns this frame's outsets in Word.
+    // Without that outline, retain the stored enclosure of the child paint
+    // (ECMA-376 Part 1 §20.4.2.6), which can extend beyond wp:extent.
+    let outset = if stroke.alignment == Some(common::StrokeAlignment::Inside) {
+      0.0
+    } else {
+      stroke.width.0 / 2.0
+    };
+    DrawingEffectExtent {
+      left_pt: outset,
+      top_pt: outset,
+      right_pt: outset,
+      bottom_pt: outset,
+    }
+  } else {
+    effect_extent
+  };
   apply_drawing_effect_extent_to_shape(&mut host, effect_extent);
   // Like a WordprocessingCanvas, SmartArt has one DrawingML content origin
   // inside the inline effect frame (ECMA-376 Part 1 §20.4.2.6). The children
   // must start after the host's left/top outsets, not at the line-frame edge.
   host.wordprocessing_canvas_host = true;
+  host.wordprocessing_diagram_host = true;
+  let extent = Some((width, height));
+  if paint.fill_override.is_some()
+    && let Some(background) = wordprocessing_canvas_background_shape(
+      ImagePlacement::Inline,
+      extent,
+      WordprocessingCanvasBackgroundPaint {
+        fill_override: paint.fill_override,
+        fill_image: None,
+        stroke_override: None,
+      },
+    )
+  {
+    children.insert(0, InlineItem::Shape(background));
+  }
+  // dgm:whole owns the outline of the entire diagram. Paint it after the
+  // children so their strokes can meet the edge without covering the frame.
+  if paint.stroke_override.is_some()
+    && let Some(outline) = wordprocessing_canvas_background_shape(
+      ImagePlacement::Inline,
+      extent,
+      WordprocessingCanvasBackgroundPaint {
+        fill_override: None,
+        fill_image: None,
+        stroke_override: paint.stroke_override,
+      },
+    )
+  {
+    children.push(InlineItem::Shape(outline));
+  }
   host.canvas_children = Some(children);
   vec![InlineItem::Shape(host)]
 }
@@ -282,6 +460,44 @@ fn import_shape(
       source.apply_connector_ends(stroke);
     }
   }
+  if source.text_body.auto_fit && !imported.text_box_blocks.is_empty() {
+    let maximum_font_size_pt = imported
+      .text_box_blocks
+      .iter()
+      .filter_map(|block| {
+        if let Block::Paragraph(paragraph) = block {
+          Some(paragraph.base_style.font_size_pt)
+        } else {
+          None
+        }
+      })
+      .fold(0.0_f32, f32::max);
+    imported.diagram_text_frame = Some(Box::new(DiagramTextFrame {
+      offset_x_pt: 0.0,
+      offset_y_pt: 0.0,
+      width_pt: imported.width_pt,
+      height_pt: imported.height_pt,
+      rotation_deg: source.text_rotation_deg,
+      flip_vertical: false,
+      auto_fit: Some(DiagramTextAutoFit {
+        maximum_font_size_pt,
+        minimum_font_size_pt: source.minimum_font_size_pt.unwrap_or(1.0),
+        sync_group: source.font_sync_group.clone(),
+        font_scaled_insets: source.text_body.font_scaled_insets,
+        paragraphs: source
+          .text_body
+          .paragraphs
+          .iter()
+          .filter(|paragraph| paragraph.runs.iter().any(|run| !run.text.is_empty()))
+          .map(|paragraph| DiagramAutoFitParagraph {
+            properties: paragraph.paragraph_properties.clone(),
+            synthesized_bullet_left_margin: paragraph.synthesized_bullet_left_margin,
+            synthesized_bullet_indent: paragraph.synthesized_bullet_indent,
+          })
+          .collect(),
+      }),
+    }));
+  }
   Some(imported)
 }
 
@@ -382,7 +598,12 @@ pub(super) fn apply_paragraph_spacing(
   last: bool,
 ) {
   // ECMA-376 §21.1.2.2.5/10/11: percentage line spacing is relative to the
-  // natural line; paragraph spacing percentages refer to the text size.
+  // natural line; standard paragraph-spacing percentages refer to text size.
+  // Word SmartArt retains the legacy 1.2em basis independently of lnSpc.
+  // Native fixed-font controls also retain it with explicit compatLnSpc=false;
+  // PowerPoint's standard/compatible switch therefore cannot be copied here.
+  // The same legacy text-cell basis is documented by [MS-PPT] §2.2.20.
+  let paragraph_spacing_basis = font_size_pt * 1.2;
   if let Some(spacing) = properties
     .line_spacing
     .as_ref()
@@ -410,7 +631,9 @@ pub(super) fn apply_paragraph_spacing(
       .and_then(|spacing| spacing.space_before_choice.as_ref())
   {
     format.spacing_before_pt = match spacing {
-      a::SpaceBeforeChoice::SpacingPercent(spacing) => font_size_pt * spacing.val.as_ratio() as f32,
+      a::SpaceBeforeChoice::SpacingPercent(spacing) => {
+        paragraph_spacing_basis * spacing.val.as_ratio() as f32
+      }
       a::SpaceBeforeChoice::SpacingPoints(spacing) => {
         sdk_units::points100_to_points(spacing.val) as f32
       }
@@ -424,7 +647,9 @@ pub(super) fn apply_paragraph_spacing(
       .and_then(|spacing| spacing.space_after_choice.as_ref())
   {
     format.spacing_after_pt = match spacing {
-      a::SpaceAfterChoice::SpacingPercent(spacing) => font_size_pt * spacing.val.as_ratio() as f32,
+      a::SpaceAfterChoice::SpacingPercent(spacing) => {
+        paragraph_spacing_basis * spacing.val.as_ratio() as f32
+      }
       a::SpaceAfterChoice::SpacingPoints(spacing) => {
         sdk_units::points100_to_points(spacing.val) as f32
       }
@@ -436,6 +661,100 @@ pub(super) fn apply_paragraph_spacing(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn generated_diagram_effect_frame_keeps_unresolved_external_paint() {
+    let stored = DrawingEffectExtent {
+      left_pt: 3.0,
+      top_pt: 5.0,
+      right_pt: 7.0,
+      bottom_pt: 9.0,
+    };
+    let paint = WordprocessingCanvasBackgroundPaint::default();
+    let root = dgm::LayoutNode {
+      layout_node_choice: vec![dgm::LayoutNodeChoice::Algorithm(Box::new(dgm::Algorithm {
+        r#type: dgm::AlgorithmValues::Composite,
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut shape = chart_shape(100.0, 50.0, 0.0, ImagePlacement::Inline, None);
+    shape.offset_x_pt = 20.0;
+    shape.offset_y_pt = 10.0;
+    let extent = |shape: &InlineShape| {
+      generated_effect_extent(
+        &[InlineItem::Shape(shape.clone())],
+        &root,
+        120.0,
+        60.0,
+        stored,
+        &paint,
+      )
+    };
+    assert_eq!(extent(&shape).left_pt, 0.0);
+    shape.offset_x_pt = -1.0;
+    assert_eq!(extent(&shape).left_pt, stored.left_pt);
+    shape.offset_x_pt = 20.0;
+    shape.rotation_deg = 30.0;
+    assert_eq!(extent(&shape).top_pt, stored.top_pt);
+    shape.rotation_deg = 0.0;
+    shape.effects = Some(common::DrawingEffectSource::List {
+      source: Box::new(a::EffectList::default()),
+      resolved: None,
+    });
+    assert_eq!(extent(&shape).right_pt, stored.right_pt);
+    shape.effects = Some(common::DrawingEffectSource::List {
+      source: Box::new(a::EffectList::default()),
+      resolved: Some(common::drawingml_image_effects::ImageEffectContainer {
+        kind: common::drawingml_image_effects::ImageEffectContainerKind::Sibling,
+        effects: Vec::new(),
+      }),
+    });
+    assert_eq!(extent(&shape).bottom_pt, 0.0);
+  }
+
+  #[test]
+  fn smartart_kerning_default_keeps_the_drawingml_cascade() {
+    let styles = StylesCatalog {
+      doc_default_run: TextStyle {
+        kerning_minimum_size_pt: Some(f32::INFINITY),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    for (list, paragraph, run, expected) in [
+      ("", "", "", 12.0),
+      (
+        "<a:lvl1pPr><a:defRPr kern=\"2400\"/></a:lvl1pPr>",
+        "",
+        "",
+        24.0,
+      ),
+      (
+        "<a:lvl1pPr><a:defRPr kern=\"2400\"/></a:lvl1pPr>",
+        "<a:pPr><a:defRPr kern=\"3600\"/></a:pPr>",
+        "",
+        36.0,
+      ),
+      (
+        "<a:lvl1pPr><a:defRPr kern=\"2400\"/></a:lvl1pPr>",
+        "<a:pPr><a:defRPr kern=\"3600\"/></a:pPr>",
+        "kern=\"0\"",
+        f32::INFINITY,
+      ),
+    ] {
+      let shape = dsp::Shape::from_bytes(format!(r#"<dsp:sp xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" modelId="1"><dsp:nvSpPr><dsp:cNvPr id="1" name="kerning"/><dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr/><dsp:txBody><a:bodyPr/><a:lstStyle>{list}</a:lstStyle><a:p>{paragraph}<a:r><a:rPr {run}/><a:t>AVATAR</a:t></a:r></a:p></dsp:txBody></dsp:sp>"#).as_bytes()).unwrap();
+      let body = drawingml_diagram_shape_text_box(&shape, &styles, None).unwrap();
+      let Block::Paragraph(paragraph) = &body.blocks[0] else {
+        panic!("SmartArt paragraph");
+      };
+      assert_eq!(paragraph.base_style.kerning_minimum_size_pt, Some(expected));
+      let InlineItem::Text(run) = &paragraph.inlines[0] else {
+        panic!("SmartArt run");
+      };
+      assert_eq!(run.style.kerning_minimum_size_pt, Some(expected));
+    }
+  }
 
   #[test]
   fn smartart_line_default_preserves_explicit_and_inherited_widths() {
@@ -507,7 +826,7 @@ mod tests {
         apply_paragraph_spacing(&mut format, &properties, 9.0, first, last);
         assert_eq!(format.line_height_pt, Some(expected));
         assert_eq!(format.line_height_rule, rule);
-        assert_eq!(format.spacing_before_pt, if first { 0.0 } else { 2.25 });
+        assert!((format.spacing_before_pt - if first { 0.0 } else { 2.7 }).abs() < 0.00001);
         assert_eq!(format.spacing_after_pt, if last { 0.0 } else { 3.0 });
       }
     }
@@ -641,7 +960,8 @@ mod tests {
       };
       assert_eq!(
         (host.width_pt, host.height_pt, host.effect_left_pt),
-        (120.0, 60.0, 3.0)
+        (120.0, 60.0, 3.0),
+        "a flow layout keeps its unresolved enclosure independently of child containment"
       );
       assert!(host.wordprocessing_canvas_host);
       let children = host.canvas_children.as_ref().expect("layout children");

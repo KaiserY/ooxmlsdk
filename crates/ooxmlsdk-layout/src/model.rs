@@ -40,6 +40,7 @@ pub enum BorderCompoundPattern {
   Double,
   ThinThickSmallGap,
   ThickThinSmallGap,
+  ThinThickThinSmallGap,
   ThinThickMediumGap,
   ThickThinMediumGap,
   ThinThickLargeGap,
@@ -137,6 +138,13 @@ pub(crate) struct WordprocessingFitText {
   pub width_pt: f32,
 }
 
+/// Contiguous two-lines-in-one runs (ECMA-376 §17.3.2.10).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct WordprocessingTwoLines {
+  pub id: Option<i32>,
+  pub brackets: w::CombineBracketValues,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   pub embedded_fonts: Option<Arc<crate::fonts::EmbeddedFontSet>>,
@@ -214,6 +222,11 @@ pub struct TextStyle {
   /// portion. This controls glyph order and mirroring without selecting the
   /// WordprocessingML complex-script formatting attached to `w:rtl`.
   pub(crate) resolved_bidi_level: Option<u8>,
+  /// Word's ordinary non-complex Latin portions retain nominal glyphs and
+  /// LTR glyph order inside an automatically resolved RTL layout portion.
+  /// Authored directional controls and complex formatting keep bidi shaping.
+  /// None retains the unresolved source protocol; false selects complex glyphs.
+  pub(crate) wordprocessing_simple_latin_glyphs: Option<bool>,
   /// Nested w:dir/w:bdo boundaries used by paragraph bidi resolution. These
   /// are layout metadata, not additional characters in PDF semantic text.
   pub(crate) wordprocessing_bidi_scopes: Option<Arc<[WordprocessingBidiScope]>>,
@@ -290,9 +303,16 @@ pub struct TextStyle {
   /// OOXML `w:noBreakHyphen`: retain U+2011 for line breaking, but use
   /// the U+002D font slot and glyph. Literal U+2011 text remains distinct.
   pub wordprocessingml_no_break_hyphen: bool,
+  /// A literal U+00AD in w:t is painted; w:softHyphen remains discretionary.
+  /// Import isolates literal portions so preserving their glyphs cannot expose
+  /// unrelated default-ignorable characters in the same shaping buffer.
+  pub wordprocessingml_literal_soft_hyphen: bool,
   /// Use Word's missing-Han policy for a logical font without CJK charsets.
   /// DrawingML also uses rFonts-like slots, with a separate fallback policy.
   pub wordprocessingml_han_fallback: bool,
+  /// Use Word's missing-geometric-symbol glyph chain, independently of
+  /// DrawingML's shared rFonts-like slot dispatch.
+  pub wordprocessingml_symbol_fallback: bool,
   /// Enable the CJK-capable font line metrics selected by the document-level
   /// WordprocessingML `w:noLeading` compatibility setting.
   pub wordprocessingml_cjk_line_metrics: bool,
@@ -300,6 +320,9 @@ pub struct TextStyle {
   pub wordprocessingml_no_leading: bool,
   /// Fraction of Word's maximum full-width punctuation compression to apply.
   pub cjk_punctuation_compression_ratio: f32,
+  /// Completed-line terminal byte index and independent compression ratio.
+  /// Its glyph origin is preserved independently of internal punctuation.
+  pub wordprocessing_terminal_punctuation: Option<(usize, f32)>,
   /// Completed-line character adjustments, including negative trailing
   /// side-bearing compression for hanging punctuation.
   pub wordprocessing_justification_expansion_pt: Option<Arc<[f32]>>,
@@ -307,6 +330,9 @@ pub struct TextStyle {
   pub wordprocessingml_legacy_punctuation_spacing: bool,
   /// Apply Word prose punctuation spacing, excluded from OMML math zones.
   pub wordprocessingml_punctuation_spacing: bool,
+  /// Word paragraph-frame writing uses vertical cells for curly quotation
+  /// marks, independently of the glyph's painted sideways orientation.
+  pub wordprocessingml_vertical_punctuation: bool,
   /// Apply WordprocessingML's document-level half-width/full-width space
   /// balancing compatibility rule before line justification.
   pub wordprocessingml_balance_single_byte_double_byte_width: bool,
@@ -342,17 +368,24 @@ pub struct TextStyle {
   pub(crate) legacy_relief: LegacyTextRelief,
   /// Logical paragraph/cell background used by legacy text effects.
   pub(crate) legacy_effect_background: Option<RgbColor>,
+  /// Document compatibility permits legacy effects to paint one shaped run
+  /// per layer. The physical font and kerning must also qualify at layout.
+  pub(crate) legacy_effect_glyph_runs: bool,
   /// Resolved DrawingML `a:effectLst`/`a:effectDag` attached to character
   /// properties. This remains on the implementation-side style until the
   /// owning text body materializes the visible glyph raster.
   pub(crate) drawingml_text_effects: Option<common::drawingml_image_effects::ImageEffectContainer>,
   /// DrawingML `a:bodyPr/a:scene3d` plus `a:sp3d` text extrusion.
   pub(crate) drawingml_text_static3d: Option<common::drawingml_3d::Static3dStyle>,
+  /// WPS `upright`/`flatTx` excludes this story from its authored body scene.
+  /// Keep run 3-D properties for line formatting and glyph-path ownership;
+  /// only fixed-output physical paint is flattened.
+  pub(crate) wordprocessing_flat_text_scene: bool,
   /// Direct WordprocessingML `w:b` state applicable to generated field text.
   ///
-  /// This is distinct from `bold`: a generated Word field diagnostic supplies
-  /// its own bold default, but explicit result-run or paragraph-mark
-  /// `w:b w:val="false"` suppresses that resource formatting.
+  /// Generated diagnostics combine this direct state with their resource
+  /// formatting. Most use it as an explicit override. PAGEREF and STYLEREF
+  /// diagnostics apply their bold toggle to the effective field owner.
   pub(crate) wordprocessingml_field_bold_override: Option<bool>,
   /// Whether this run contains an application-generated field diagnostic.
   ///
@@ -381,6 +414,10 @@ pub struct TextStyle {
   /// mail-merge placeholder in the fixed PDF stream; it is a layout advance,
   /// not visible normalized paragraph text.
   pub(crate) wordprocessingml_mail_merge_placeholder: bool,
+  /// A w:eastAsianLayout/@w:vert inline portion, before its font cell and
+  /// baseline have been realized. Whole-cell/frame rotation has another owner.
+  pub(crate) wordprocessingml_vertical_run: bool,
+  pub(crate) wordprocessingml_two_lines: Option<WordprocessingTwoLines>,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
@@ -396,6 +433,9 @@ pub struct TextStyle {
   /// Whether the WordprocessingML text color is still automatic and may
   /// adapt to an inherited run background.
   pub(crate) color_is_automatic: bool,
+  /// Word's run shading can govern automatic ink even when a highlight
+  /// replaces its visible background.
+  pub(crate) wordprocessing_run_shading: Option<RgbColor>,
   pub opacity: f32,
   pub outline_color: Option<RgbColor>,
   pub outline_opacity: f32,
@@ -405,6 +445,77 @@ pub struct TextStyle {
 }
 
 impl TextStyle {
+  fn cjk_punctuation_language_enabled(&self) -> bool {
+    !self.wordprocessingml_font_slots
+      || self.east_asia_language.as_deref().is_none_or(|language| {
+        let primary = language.split(['-', '_']).next().unwrap_or_default();
+        primary.eq_ignore_ascii_case("zh") || primary.eq_ignore_ascii_case("ja")
+      })
+  }
+
+  fn cjk_bracket_language_enabled(&self) -> bool {
+    !self.wordprocessingml_font_slots
+      || self.east_asia_language.as_deref().is_none_or(|language| {
+        !language
+          .split(['-', '_'])
+          .next()
+          .is_some_and(|primary| primary.eq_ignore_ascii_case("ko"))
+      })
+  }
+
+  pub(crate) fn effective_cjk_punctuation_compression_ratio(&self) -> f32 {
+    // Commas, stops and centered punctuation require Chinese/Japanese
+    // proofing. Full-width brackets have a separate native language policy.
+    // Retain the raw setting through the language cascade and line fitting.
+    if self.cjk_punctuation_language_enabled() {
+      self.cjk_punctuation_compression_ratio
+    } else {
+      0.0
+    }
+  }
+
+  pub(crate) fn effective_cjk_bracket_compression_ratio(&self) -> f32 {
+    if self.cjk_bracket_language_enabled() {
+      self.cjk_punctuation_compression_ratio
+    } else {
+      0.0
+    }
+  }
+
+  pub(crate) fn effective_cjk_quotation_compression_ratio(&self) -> f32 {
+    if self.cjk_punctuation_compression_ratio > 0.0
+      && self.wordprocessingml_font_slots
+      && !self.wordprocessingml_vertical_punctuation
+      && self.east_asia_language.as_deref().is_none_or(|language| {
+        let mut subtags = language.split(['-', '_']);
+        let primary = subtags.next().unwrap_or_default();
+        primary.eq_ignore_ascii_case("ja")
+          || (primary.eq_ignore_ascii_case("zh")
+            && !subtags.any(|subtag| {
+              ["Hant", "TW", "HK", "MO"]
+                .iter()
+                .any(|value| subtag.eq_ignore_ascii_case(value))
+            }))
+      })
+    {
+      self.cjk_punctuation_compression_ratio
+    } else {
+      0.0
+    }
+  }
+
+  pub(crate) fn effective_wordprocessing_punctuation_spacing(&self) -> bool {
+    self.wordprocessingml_punctuation_spacing
+      && crate::fonts::FontStyleRef::kerning_enabled(self)
+      && self.cjk_punctuation_language_enabled()
+  }
+
+  pub(crate) fn effective_wordprocessing_bracket_spacing(&self) -> bool {
+    self.wordprocessingml_punctuation_spacing
+      && crate::fonts::FontStyleRef::kerning_enabled(self)
+      && self.cjk_bracket_language_enabled()
+  }
+
   pub(crate) fn resolved_wordprocessing_emphasis(&self) -> Option<common::WordprocessingEmphasis> {
     use common::EmphasisMark;
     let mark = match self.wordprocessing_emphasis_mark? {
@@ -462,6 +573,7 @@ impl Default for TextStyle {
       complex_script: None,
       right_to_left: None,
       resolved_bidi_level: None,
+      wordprocessing_simple_latin_glyphs: None,
       wordprocessing_bidi_scopes: None,
       wordprocessing_nominal_control_metrics: false,
       wordprocessing_bidi_prefix: None,
@@ -497,13 +609,17 @@ impl Default for TextStyle {
       wordprocessingml_font_slots: false,
       wordprocessingml_complex_numbering: false,
       wordprocessingml_no_break_hyphen: false,
+      wordprocessingml_literal_soft_hyphen: false,
       wordprocessingml_han_fallback: false,
+      wordprocessingml_symbol_fallback: false,
       wordprocessingml_cjk_line_metrics: false,
       wordprocessingml_no_leading: false,
       cjk_punctuation_compression_ratio: 0.0,
+      wordprocessing_terminal_punctuation: None,
       wordprocessing_justification_expansion_pt: None,
       wordprocessingml_legacy_punctuation_spacing: false,
       wordprocessingml_punctuation_spacing: false,
+      wordprocessingml_vertical_punctuation: false,
       wordprocessingml_balance_single_byte_double_byte_width: false,
       wordprocessingml_balanced_space_portion: false,
       wordprocessingml_math_run: false,
@@ -519,8 +635,10 @@ impl Default for TextStyle {
       legacy_shadow: false,
       legacy_relief: LegacyTextRelief::None,
       legacy_effect_background: None,
+      legacy_effect_glyph_runs: false,
       drawingml_text_effects: None,
       drawingml_text_static3d: None,
+      wordprocessing_flat_text_scene: false,
       wordprocessingml_field_bold_override: None,
       wordprocessingml_generated_field_diagnostic: false,
       wordprocessingml_field_group: false,
@@ -528,6 +646,8 @@ impl Default for TextStyle {
       wordprocessingml_bitmap_revisions: None,
       wordprocessingml_form_text_blank_cell: false,
       wordprocessingml_mail_merge_placeholder: false,
+      wordprocessingml_vertical_run: false,
+      wordprocessingml_two_lines: None,
       bold: false,
       italic: false,
       underline: false,
@@ -538,6 +658,7 @@ impl Default for TextStyle {
       rotation_deg: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
       wordprocessing_run_color: None,
+      wordprocessing_run_shading: None,
       color_is_automatic: true,
       opacity: 1.0,
       outline_color: None,
@@ -675,6 +796,11 @@ impl Default for PageSetup {
 pub enum PageBorderArt {
   BasicWideMidline,
   MapleMuffins,
+  Holly,
+  Gems,
+  WeavingAngles,
+  CakeSlice,
+  PeopleHats,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -701,8 +827,18 @@ pub enum DynamicFieldKind {
   NumPages {
     number_format: FieldNumberFormat,
   },
+  Section {
+    number_format: FieldNumberFormat,
+    section_index: Option<usize>,
+  },
+  SectionPages {
+    number_format: FieldNumberFormat,
+    section_index: Option<usize>,
+  },
   Sequence {
     identifier: Arc<str>,
+    /// Read the sequence at this bookmark instead of advancing it.
+    bookmark_name: Option<Arc<str>>,
     number_format: FieldNumberFormat,
   },
   PageRef {
@@ -712,8 +848,14 @@ pub enum DynamicFieldKind {
   },
   StyleRef {
     style_name: Arc<str>,
+    /// The source style namespace (or builtin heading shorthand) defines this target.
+    /// A defined style without eligible text has a different diagnostic from a missing style.
+    target_style_exists: bool,
     from_bottom: bool,
     numbering_only: bool,
+    /// Word's caption switch `\s` requests a chapter number, with zero for
+    /// an unnumbered target and no surrounding label text or delimiters.
+    chapter_number: bool,
     suppress_non_numerical: bool,
     full_context: bool,
   },
@@ -896,6 +1038,11 @@ pub(crate) fn common_page_setup(setup: PageSetup) -> common::PageSetup {
 
 pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> {
   let wordprocessing_emphasis = style.resolved_wordprocessing_emphasis();
+  let cjk_punctuation_compression_ratio = style.effective_cjk_punctuation_compression_ratio();
+  let cjk_bracket_compression_ratio = style.effective_cjk_bracket_compression_ratio();
+  let cjk_quotation_compression_ratio = style.effective_cjk_quotation_compression_ratio();
+  let wordprocessingml_punctuation_spacing = style.effective_wordprocessing_punctuation_spacing();
+  let wordprocessingml_bracket_spacing = style.effective_wordprocessing_bracket_spacing();
   common::TextStyle {
     wordprocessing_emphasis,
     embedded_fonts: style.embedded_fonts,
@@ -946,6 +1093,7 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
       .is_some_and(|language| {
         language.eq_ignore_ascii_case("he") || language.eq_ignore_ascii_case("iw")
       }),
+    wordprocessingml_bidi_language: style.bidi_language,
     font_charset: style.font_charset,
     high_ansi_font_charset: style.high_ansi_font_charset,
     wordprocessingml_east_asia_font_charset: style.east_asia_font_charset,
@@ -960,6 +1108,9 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     complex_script: style.complex_script,
     right_to_left: style.right_to_left,
     resolved_bidi_level: style.resolved_bidi_level,
+    wordprocessing_simple_latin_glyphs: style
+      .wordprocessing_simple_latin_glyphs
+      .or_else(|| style.wordprocessing_bidi_scopes.as_ref().map(|_| false)),
     wordprocessing_nominal_control_metrics: style.wordprocessing_nominal_control_metrics,
     complex_bold: style.complex_bold,
     complex_italic: style.complex_italic,
@@ -989,16 +1140,23 @@ pub(crate) fn common_text_style(style: TextStyle) -> common::TextStyle<'static> 
     wordprocessingml_font_slots: style.wordprocessingml_font_slots,
     wordprocessingml_complex_numbering: style.wordprocessingml_complex_numbering,
     wordprocessingml_no_break_hyphen: style.wordprocessingml_no_break_hyphen,
+    wordprocessingml_literal_soft_hyphen: style.wordprocessingml_literal_soft_hyphen,
     wordprocessingml_bitmap_revisions: style.wordprocessingml_bitmap_revisions.clone(),
     wordprocessingml_han_fallback: style.wordprocessingml_han_fallback,
+    wordprocessingml_symbol_fallback: style.wordprocessingml_symbol_fallback,
     wordprocessingml_cjk_line_metrics: style.wordprocessingml_cjk_line_metrics,
     wordprocessingml_no_leading: style.wordprocessingml_no_leading,
-    cjk_punctuation_compression_ratio: style.cjk_punctuation_compression_ratio,
+    cjk_punctuation_compression_ratio,
+    cjk_bracket_compression_ratio,
+    cjk_quotation_compression_ratio,
+    wordprocessing_terminal_punctuation: style.wordprocessing_terminal_punctuation,
     wordprocessing_justification_expansion_pt: style
       .wordprocessing_justification_expansion_pt
       .clone(),
     wordprocessingml_legacy_punctuation_spacing: style.wordprocessingml_legacy_punctuation_spacing,
-    wordprocessingml_punctuation_spacing: style.wordprocessingml_punctuation_spacing,
+    wordprocessingml_punctuation_spacing,
+    wordprocessingml_bracket_spacing,
+    wordprocessingml_vertical_punctuation: style.wordprocessingml_vertical_punctuation,
     wordprocessingml_balance_single_byte_double_byte_width: style
       .wordprocessingml_balance_single_byte_double_byte_width,
     wordprocessingml_balanced_space_portion: style.wordprocessingml_balanced_space_portion,

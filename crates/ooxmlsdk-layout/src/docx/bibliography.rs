@@ -10,6 +10,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_bibliogra
 use super::*;
 
 mod apa;
+mod sist;
 
 /// None means no preceding text; Some(None) retains an unsupported language.
 #[derive(Clone, Copy, Debug, Default)]
@@ -20,6 +21,7 @@ pub(super) struct Catalog {
   books: Vec<Book>,
   internet_sites: Vec<InternetSite>,
   apa: Vec<apa::Entry>,
+  sist: Vec<sist::Entry>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -58,27 +60,22 @@ pub(super) struct Result {
 
 impl Catalog {
   pub fn generates_paragraphs(&self) -> bool {
-    !self.books.is_empty() || !self.apa.is_empty()
+    !self.books.is_empty() || !self.apa.is_empty() || !self.sist.is_empty()
   }
 
   pub fn preceding_locale(&self, inlines: &[InlineItem], previous: LocaleContext) -> LocaleContext {
-    if self.apa.is_empty() {
+    if self.apa.is_empty() && self.sist.is_empty() {
       return previous;
     }
     // Native Word controls vary preceding runs/paragraphs independently of
     // field-code, paragraph-mark and trailing-space language. DefaultLCID
     // follows the nearest non-whitespace text, falling back to the configured
     // authoring language only when no preceding text exists in this story.
-    inlines
-      .iter()
-      .rev()
-      .find_map(|inline| match inline {
-        InlineItem::Text(run) if run.text.chars().any(|ch| !ch.is_whitespace()) => {
-          Some(LocaleContext(Some(apa::Locale::language(
-            run.style.language.as_deref().unwrap_or("en-US"),
-          ))))
-        }
-        _ => None,
+    field_language::preceding_text_language(inlines)
+      .map(|language| {
+        LocaleContext(Some(apa::Locale::language(
+          language.map_or("en-US", Arc::as_ref),
+        )))
       })
       .unwrap_or(previous)
   }
@@ -146,6 +143,12 @@ impl Catalog {
     if apa {
       return Some(Self {
         apa: apa::parse(&sources, xml)?,
+        ..Self::default()
+      });
+    }
+    if style.eq_ignore_ascii_case("SIST02.XSL") {
+      return Some(Self {
+        sist: sist::parse(&sources)?,
         ..Self::default()
       });
     }
@@ -273,6 +276,9 @@ impl Catalog {
   ) -> Option<Result> {
     if !self.apa.is_empty() {
       return apa::refresh(&self.apa, instruction, styles, context, preceding_locale);
+    }
+    if !self.sist.is_empty() {
+      return sist::refresh(&self.sist, instruction, styles, context, preceding_locale);
     }
     if self.books.is_empty() {
       return None;
@@ -729,7 +735,7 @@ fn name(parts: &[ooxmlsdk::simple_type::StringValue]) -> Option<&str> {
   }
 }
 
-fn supported_source_xml(xml: &str, allow_doi: bool) -> bool {
+fn supported_source_xml(xml: &str, apa: bool) -> bool {
   use quick_xml::{events::Event, name::ResolveResult};
   let mut reader = quick_xml::NsReader::from_reader(xml.as_bytes());
   let mut stack: Vec<(Vec<u8>, HashSet<Vec<u8>>)> = Vec::new();
@@ -776,11 +782,16 @@ fn supported_source_xml(xml: &str, allow_doi: bool) -> bool {
                 | b"JournalName"
                 | b"Volume"
                 | b"Issue"
-            ) || (allow_doi && local == b"DOI")
+                | b"ConferenceName"
+                | b"PeriodicalTitle"
+            ) || (apa && local == b"DOI")
           }
-          Some(b"Author") if stack.len() == 3 => matches!(local, b"Author" | b"BookAuthor"),
+          Some(b"Author") if stack.len() == 3 => {
+            matches!(local, b"Author" | b"BookAuthor")
+              || (apa && matches!(local, b"Interviewee" | b"Interviewer"))
+          }
           Some(b"Author") => matches!(local, b"NameList" | b"Corporate"),
-          Some(b"BookAuthor") => local == b"NameList",
+          Some(b"BookAuthor" | b"Interviewee" | b"Interviewer") => local == b"NameList",
           Some(b"NameList") => local == b"Person",
           Some(b"Person") => matches!(local, b"Last" | b"First" | b"Middle"),
           _ => false,
@@ -808,7 +819,14 @@ fn supported_source_xml(xml: &str, allow_doi: bool) -> bool {
         let container = stack.last().is_none_or(|(name, _)| {
           matches!(
             name.as_slice(),
-            b"Sources" | b"Source" | b"Author" | b"BookAuthor" | b"NameList" | b"Person"
+            b"Sources"
+              | b"Source"
+              | b"Author"
+              | b"BookAuthor"
+              | b"Interviewee"
+              | b"Interviewer"
+              | b"NameList"
+              | b"Person"
           )
         });
         if container && !text.iter().all(u8::is_ascii_whitespace) {

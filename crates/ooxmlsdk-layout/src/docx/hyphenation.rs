@@ -72,12 +72,23 @@ pub(super) fn visible_text(text: &str) -> Cow<'_, str> {
   }
 }
 
+pub(super) fn visible_text_for_style<'a>(text: &'a str, style: &TextStyle) -> Cow<'a, str> {
+  if style.wordprocessingml_literal_soft_hyphen {
+    Cow::Borrowed(text)
+  } else {
+    visible_text(text)
+  }
+}
+
 pub(super) fn candidates(
   text: &str,
   style: &TextStyle,
   automatic: bool,
   do_not_hyphenate_caps: bool,
 ) -> Vec<Candidate> {
+  if style.wordprocessingml_literal_soft_hyphen {
+    return Vec::new();
+  }
   let mut output = explicit_candidates(text);
   // An authored soft hyphen is the authoritative discretionary opportunity
   // for its source word. UAX #14 says it overrides automatic hyphenation for
@@ -278,6 +289,21 @@ mod tests {
   };
   use crate::model::TextStyle;
   use std::sync::Arc;
+
+  #[test]
+  fn literal_soft_hyphen_is_visible_and_has_no_discretionary_candidate() {
+    let mut style = TextStyle::default();
+    assert_eq!(super::visible_text_for_style("\u{00ad}", &style), "");
+    assert_eq!(candidates("\u{00ad}", &style, false, false).len(), 1);
+    style.wordprocessingml_literal_soft_hyphen = true;
+    assert_eq!(
+      super::visible_text_for_style("\u{00ad}", &style),
+      "\u{00ad}"
+    );
+    for automatic in [false, true] {
+      assert!(candidates("\u{00ad}", &style, automatic, false).is_empty());
+    }
+  }
 
   fn english_style() -> TextStyle {
     TextStyle {

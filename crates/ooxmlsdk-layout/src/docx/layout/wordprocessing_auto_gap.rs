@@ -1,4 +1,4 @@
-//! Native Word can contract automatic script gaps to half their nominal width.
+//! Native Word contracts automatic script gaps within their reference-cell interval.
 use super::*;
 
 pub(super) fn materialize(
@@ -28,7 +28,6 @@ pub(super) fn materialize(
       || text.style.semantic_only
       || text.style.rotation_deg != 0.0
       || text.style.horizontal_scale.unwrap_or(1.0) != 1.0
-      || text.style.character_spacing_pt != 0.0
       || text.word_spacing_pt != 0.0
     {
       previous = None;
@@ -46,7 +45,7 @@ pub(super) fn materialize(
       let gap = text.x_pt - end;
       if auto_script_spacing_enabled(left.class, right.class, format)
         && gap > LAYOUT_EPSILON_PT
-        && gap >= left.normal_gap_pt * 0.5 - LAYOUT_EPSILON_PT
+        && gap >= left.minimum_gap_pt - LAYOUT_EPSILON_PT
         && gap <= left.normal_gap_pt + LAYOUT_EPSILON_PT
       {
         gaps.push((previous_index, gap));
@@ -101,6 +100,7 @@ pub(super) fn materialize(
 }
 
 pub(super) struct Fit<'a> {
+  pub compatibility_mode: u16,
   pub modern_justified: bool,
   pub items: &'a mut [PageItem],
   pub start: usize,
@@ -113,6 +113,7 @@ pub(super) struct Fit<'a> {
   pub style: &'a TextStyle,
   pub format: &'a crate::docx::ParagraphFormat,
   pub right: f32,
+  /// Candidate width excluding its separately owned, unmaterialized leading gap.
   pub width: f32,
   pub overflow_punctuation: WordprocessingOverflowPunctuationPolicy,
   pub line_used_punctuation_fit: bool,
@@ -189,6 +190,7 @@ pub(super) fn contract(fit: Fit<'_>, metrics: &mut TextMetrics) {
   // pull-in rule still rejects. That would alter a line before moving it on.
   let (natural, limit) = line_cjk_compression_fit(
     CjkLineFit {
+      compatibility_mode: fit.compatibility_mode,
       overflow_punctuation: fit.overflow_punctuation,
       modern_justified: fit.modern_justified,
       x: *fit.x + *fit.leading - needed as f32 / 4096.0,
@@ -206,7 +208,14 @@ pub(super) fn contract(fit: Fit<'_>, metrics: &mut TextMetrics) {
     .chars()
     .next()
     .filter(|_| fit.text.chars().count() == 1);
-  if blocks_cjk_compression_only_fit(natural, limit, fit.line_used_punctuation_fit, character) {
+  // A whole Western word can contract its script gaps, but it does not
+  // inherit the half-em punctuation pull-in budget of a CJK candidate.
+  if blocks_cjk_compression_only_fit(
+    natural,
+    limit || !cjk_compression_fit_candidate(fit.text),
+    fit.line_used_punctuation_fit,
+    character,
+  ) {
     return;
   }
   let mut cumulative = 0i64;
@@ -245,7 +254,7 @@ fn append_gap(
   }
   let units = (gap * 4096.0).round() as i64;
   let normal = (left.normal_gap_pt * 4096.0).round() as i64;
-  let minimum = normal / 2;
+  let minimum = (left.minimum_gap_pt * 4096.0).round() as i64;
   // Recognize only the automatic gap's native interval, not a tab or an
   // independently positioned portion. Already contracted gaps stay eligible.
   if units > minimum && units <= normal {
@@ -288,4 +297,23 @@ fn observe(
     .find(|&character| auto_script_class(character, word95) != AutoScriptClass::Transparent)
     .and_then(|character| auto_script_edge(character, style, word95, metrics));
   *previous = edge.map(|edge| (edge, x + width));
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn automatic_gaps_exclude_enclosed_and_roman_symbols() {
+    for character in ['①', '⑳', '⑴', '⒈', 'Ⓐ', 'Ⅳ', '㊀', '㆒', '㈠', '½', '²'] {
+      assert_eq!(
+        auto_script_class(character, false),
+        AutoScriptClass::Boundary,
+        "{character}"
+      );
+    }
+    assert_eq!(auto_script_class('1', false), AutoScriptClass::Number);
+    assert_eq!(auto_script_class('A', false), AutoScriptClass::Letter);
+    assert_eq!(auto_script_class('甲', false), AutoScriptClass::EastAsian);
+  }
 }

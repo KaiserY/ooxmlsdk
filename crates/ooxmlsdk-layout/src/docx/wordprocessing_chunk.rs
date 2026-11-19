@@ -34,13 +34,14 @@ pub(super) fn import(
   }
   let package = WordprocessingDocument::new(std::io::Cursor::new(resource.data.as_ref())).ok()?;
   let main = package.main_document_part().ok()?;
-  let document = drawing_position_recovery::root(&main.try_data_bytes(&package).ok()?, || {
-    main.root_element(&package)
-  })
-  .ok()?;
-  let mut body = document.body.as_deref()?.clone();
   let source =
     StylesCatalog::load(&package, &main, host.import_settings, &host.locales, None).ok()?;
+  let document =
+    drawing_position_recovery::root(&main.try_data_bytes(&package).ok()?, &source, || {
+      main.root_element(&package)
+    })
+    .ok()?;
+  let mut body = document.body.as_deref()?.clone();
   let keep_source = chunk
     .alt_chunk_properties
     .as_deref()

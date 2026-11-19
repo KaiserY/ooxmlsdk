@@ -21,6 +21,7 @@ pub(super) struct RepeatingStoryImport<'a> {
   pub styles: &'a StylesCatalog,
   pub numbering: &'a mut HeaderDocumentNumbering,
   pub own_later_section: bool,
+  pub vml_shape_types: &'a mut Vec<super::v::Shapetype>,
 }
 
 impl HeaderDocumentNumbering {

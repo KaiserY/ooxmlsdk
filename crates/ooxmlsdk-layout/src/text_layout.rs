@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use parley::fontique::{Blob, FontInfoOverride};
 use parley::{
-  FontContext, FontFamily, FontFamilyName, FontStyle, FontWeight, LayoutContext, TextStyle,
+  FontContext, FontFamily, FontFamilyName, FontStyle, FontWeight, LayoutContext, OverflowWrap,
+  TextStyle,
 };
 use rustc_hash::FxHashMap as HashMap;
 
@@ -44,12 +45,31 @@ pub(crate) fn break_text_lines<S: FontStyleRef + ?Sized>(
   max_advance: Option<f32>,
   text_metrics: &mut TextMetrics,
 ) -> Option<Vec<Range<usize>>> {
+  break_text_lines_with_overflow(text, spans, max_advance, OverflowWrap::Normal, text_metrics)
+}
+
+/// Allows a caller to opt into breaking an otherwise overflowing word without
+/// changing the Unicode line-breaking policy of existing text flows.
+pub(crate) fn break_text_lines_with_overflow<S: FontStyleRef + ?Sized>(
+  text: &str,
+  spans: &[StyledTextSpan<'_, S>],
+  max_advance: Option<f32>,
+  overflow_wrap: OverflowWrap,
+  text_metrics: &mut TextMetrics,
+) -> Option<Vec<Range<usize>>> {
   if text.is_empty() || spans.is_empty() {
     return Some(std::iter::once(0..0).collect());
   }
 
   PARLEY_TEXT_CONTEXT.with_borrow_mut(|context| {
-    break_text_lines_with_context(text, spans, max_advance, text_metrics, context)
+    break_text_lines_with_context(
+      text,
+      spans,
+      max_advance,
+      overflow_wrap,
+      text_metrics,
+      context,
+    )
   })
 }
 
@@ -57,6 +77,7 @@ fn break_text_lines_with_context<S: FontStyleRef + ?Sized>(
   text: &str,
   spans: &[StyledTextSpan<'_, S>],
   max_advance: Option<f32>,
+  overflow_wrap: OverflowWrap,
   text_metrics: &mut TextMetrics,
   context: &mut ParleyTextContext,
 ) -> Option<Vec<Range<usize>>> {
@@ -121,6 +142,7 @@ fn break_text_lines_with_context<S: FontStyleRef + ?Sized>(
       FontStyle::Normal
     };
     style.letter_spacing = span.style.character_spacing_pt();
+    style.overflow_wrap = overflow_wrap;
     let style_index = builder.push_style(style);
     builder.push_style_run(style_index, span.range.clone());
   }

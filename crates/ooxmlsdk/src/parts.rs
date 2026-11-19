@@ -50,6 +50,8 @@ pub mod font_table_part;
 pub mod footer_part;
 pub mod footnotes_part;
 pub mod glossary_document_part;
+#[path = "part_graph.rs"]
+pub mod graph;
 pub mod handout_master_part;
 pub mod header_part;
 pub mod image_part;

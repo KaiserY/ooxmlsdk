@@ -1,5 +1,13 @@
 # Change Log
 
+## Unreleased
+
+- Added `parts::graph` for inspecting part types and editing relationships using
+  `PartRef` values. Typed and value-based operations share package rules.
+- Package main parts now use the selected document type, including Visio
+  templates and stencils. Variable-content children such as thumbnails require
+  their own MIME. Failed cross-package imports leave the destination intact.
+
 ## 0.15.0
 
 ### Breaking Changes

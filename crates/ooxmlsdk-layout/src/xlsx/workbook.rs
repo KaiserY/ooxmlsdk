@@ -76,17 +76,22 @@ impl WorkbookFragment {
     // WorkbookFragment::finalizeImport imports theme/styles/shared strings
     // before creating all sheet globals/fragments in workbook sheet order.
     self.styles = StylesCatalog::from_workbook_part(package, &self.workbook_part, locales)?;
-    self.shared_strings = shared_strings(package, &self.workbook_part)?;
-    self.defined_names = DefinedNamesCatalog::from_workbook(&self.workbook);
-    let date_1904 = self
+    self.styles.date_1904 = self
       .workbook
       .workbook_properties
       .as_ref()
       .and_then(|properties| properties.date1904)
       .is_some_and(|value| value.as_bool());
-
+    self.shared_strings = shared_strings(package, &self.workbook_part)?;
+    self.defined_names = DefinedNamesCatalog::from_workbook(&self.workbook);
     let active_workbook_sheet = active_workbook_sheet(&self.workbook);
 
+    let context = WorkbookSheetContext {
+      shared_strings: &self.shared_strings,
+      styles: &self.styles,
+      date_1904: self.styles.date_1904,
+      producer,
+    };
     self
       .workbook
       .sheets
@@ -94,75 +99,27 @@ impl WorkbookFragment {
       .iter()
       .enumerate()
       .map(|(workbook_index, sheet)| {
-        let rel_id = sheet.id.as_str();
-        let state = sheet.state;
-        if let Some(PartRef::WorksheetPart(part)) =
-          self.workbook_part.get_part_by_id(package, rel_id)
-        {
-          return worksheet_sheet(
-            package,
-            &part,
-            sheet,
-            WorkbookSheetContext {
-              workbook_index,
-              state,
-              active: active_workbook_sheet == Some(workbook_index),
-              shared_strings: &self.shared_strings,
-              styles: &self.styles,
-              date_1904,
-              producer,
-            },
-          );
-        }
-
-        if let Some(PartRef::ChartsheetPart(part)) =
-          self.workbook_part.get_part_by_id(package, rel_id)
-        {
-          return chartsheet(
-            package,
-            &part,
-            sheet,
-            workbook_index,
-            state,
-            active_workbook_sheet == Some(workbook_index),
-            &self.styles,
-          );
-        }
-
-        if let Some(PartRef::DialogsheetPart(part)) =
-          self.workbook_part.get_part_by_id(package, rel_id)
-        {
-          return dialogsheet(
-            package,
-            &part,
-            sheet,
-            WorkbookSheetContext {
-              workbook_index,
-              state,
-              active: active_workbook_sheet == Some(workbook_index),
-              shared_strings: &self.shared_strings,
-              styles: &self.styles,
-              date_1904,
-              producer,
-            },
-          );
-        }
-
-        Ok(CalcSheet::unresolved(SheetIdentity {
+        let identity = SheetIdentity {
           workbook_index,
-          name: sheet.name.as_str().to_string(),
-          state,
+          name: sheet.name.as_str().to_owned(),
+          state: sheet.state,
           active: active_workbook_sheet == Some(workbook_index),
-        }))
+        };
+        match self
+          .workbook_part
+          .get_part_by_id(package, sheet.id.as_str())
+        {
+          Some(PartRef::WorksheetPart(part)) => worksheet_sheet(package, &part, identity, &context),
+          Some(PartRef::ChartsheetPart(part)) => chartsheet(package, &part, identity, &self.styles),
+          Some(PartRef::DialogsheetPart(part)) => dialogsheet(package, &part, identity, &context),
+          _ => Ok(CalcSheet::unresolved(identity)),
+        }
       })
       .collect()
   }
 }
 
 struct WorkbookSheetContext<'a> {
-  workbook_index: usize,
-  state: Option<x::SheetStateValues>,
-  active: bool,
   shared_strings: &'a [SharedStringModel],
   styles: &'a StylesCatalog,
   date_1904: bool,
@@ -172,15 +129,15 @@ struct WorkbookSheetContext<'a> {
 fn worksheet_sheet(
   package: &SpreadsheetDocument,
   part: &WorksheetPart,
-  sheet: &x::Sheet,
-  context: WorkbookSheetContext<'_>,
+  identity: SheetIdentity,
+  context: &WorkbookSheetContext<'_>,
 ) -> Result<CalcSheet> {
   let worksheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_worksheet_part(
     package,
     part,
     WorksheetResourceImportContext {
-      sheet_name: sheet.name.as_str(),
+      sheet_name: &identity.name,
       worksheet: &worksheet,
       shared_strings: context.shared_strings,
       styles: context.styles,
@@ -188,12 +145,7 @@ fn worksheet_sheet(
     },
   )?;
   let sheet = CalcSheet::from_worksheet(
-    SheetIdentity {
-      workbook_index: context.workbook_index,
-      name: sheet.name.as_str().to_string(),
-      state: context.state,
-      active: context.active,
-    },
+    identity,
     worksheet,
     resources,
     context.shared_strings,
@@ -206,41 +158,24 @@ fn worksheet_sheet(
 fn chartsheet(
   package: &SpreadsheetDocument,
   part: &ChartsheetPart,
-  sheet: &x::Sheet,
-  workbook_index: usize,
-  state: Option<x::SheetStateValues>,
-  active: bool,
+  identity: SheetIdentity,
   styles: &StylesCatalog,
 ) -> Result<CalcSheet> {
   let chartsheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_chartsheet_part(package, part, styles)?;
-  Ok(CalcSheet::from_chartsheet(
-    SheetIdentity {
-      workbook_index,
-      name: sheet.name.as_str().to_string(),
-      state,
-      active,
-    },
-    chartsheet,
-    resources,
-  ))
+  Ok(CalcSheet::from_chartsheet(identity, chartsheet, resources))
 }
 
 fn dialogsheet(
   package: &SpreadsheetDocument,
   part: &DialogsheetPart,
-  sheet: &x::Sheet,
-  context: WorkbookSheetContext<'_>,
+  identity: SheetIdentity,
+  context: &WorkbookSheetContext<'_>,
 ) -> Result<CalcSheet> {
   let dialogsheet = part.root_element(package)?.clone();
   let resources = SheetResourceCatalog::from_dialogsheet_part(package, part, context.styles)?;
   Ok(CalcSheet::from_dialogsheet(
-    SheetIdentity {
-      workbook_index: context.workbook_index,
-      name: sheet.name.as_str().to_string(),
-      state: context.state,
-      active: context.active,
-    },
+    identity,
     dialogsheet,
     resources,
     context.shared_strings,

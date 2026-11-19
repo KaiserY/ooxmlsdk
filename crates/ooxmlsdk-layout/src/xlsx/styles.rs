@@ -33,6 +33,7 @@ pub(crate) struct StylesCatalog {
   theme_minor_east_asian: Option<Arc<str>>,
   missing_theme_minor_from_document_language: bool,
   modern_excel_stylesheet_extensions: bool,
+  pub(crate) date_1904: bool,
   builtin_number_formats: BuiltinNumberFormatCodes,
   locales: OfficeLocaleContext,
 }
@@ -376,6 +377,7 @@ impl StylesCatalog {
       })
       .unwrap_or_default();
     Self {
+      date_1904: false,
       custom_number_formats: stylesheet
         .numbering_formats
         .as_ref()

@@ -58,6 +58,45 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     }
   });
 
+  let graph_types = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let ty = &variant.ty;
+    quote! { #( #attrs )* crate::parts::graph::PartType::of::<#ty>(), }
+  });
+  let graph_metadata = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let name = &variant.ident;
+    let ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      Self::#name => &const { crate::parts::graph::Metadata::of::<#ty>(stringify!(#name)) },
+    }
+  });
+  let graph_parent_constraints = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let name = &variant.ident;
+    let ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      Self::#name => <#ty as crate::sdk::SdkPart>::child_part_constraint(child),
+    }
+  });
+  let graph_package_validation = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let name = &variant.ident;
+    let ty = &variant.ty;
+    quote! {
+      #( #attrs )*
+      Self::#name => package.validate_child_part::<#ty>(content_type),
+    }
+  });
+  let graph_ref_types = variants.iter().map(|variant| {
+    let attrs = cfg_attrs(&variant.attrs);
+    let name = &variant.ident;
+    let ty = &variant.ty;
+    quote! { #( #attrs )* Self::#name(_) => crate::parts::graph::PartType::of::<#ty>(), }
+  });
+
   let descriptor_impls = variants
     .iter()
     .filter(|variant| !variant.extended)
@@ -364,7 +403,28 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
       #( #part_kind_variants )*
     }
 
+    impl crate::parts::graph::PartType {
+      /// Lists all part types enabled in this build.
+      pub const fn all() -> &'static [Self] {
+        const { &[ #( #graph_types )* ] }
+      }
+    }
+
     impl PartKind {
+      pub(crate) const fn metadata(self) -> &'static crate::parts::graph::Metadata {
+        match self { #( #graph_metadata )* }
+      }
+
+      pub(crate) fn child_constraint(self, child: Self) -> Option<crate::sdk::PartConstraint> {
+        match self { #( #graph_parent_constraints )* }
+      }
+
+      pub(crate) fn validate_in_package<P: crate::sdk::SdkPackage>(
+        self, package: &P, content_type: &str,
+      ) -> Result<crate::sdk::PartConstraint, crate::common::SdkError> {
+        match self { #( #graph_package_validation )* }
+      }
+
       pub(crate) fn classify(
         relationship_type: Option<&[u8]>,
         content_type: &[u8],
@@ -461,6 +521,11 @@ pub(crate) fn expand_sdk_part_ref(input: &DeriveInput) -> syn::Result<proc_macro
     }
 
     impl #ident {
+      /// The model type of this handle, available without loading its payload.
+      pub const fn part_type(&self) -> crate::parts::graph::PartType {
+        match self { #( #graph_ref_types )* }
+      }
+
       #[inline]
       pub fn path<'a, P: crate::sdk::SdkPackage>(&self, package: &'a P) -> Option<&'a str> {
         let storage = crate::sdk::SdkPackage::storage(package);

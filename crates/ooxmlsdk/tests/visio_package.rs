@@ -1,3 +1,5 @@
+#![cfg(feature = "parts")]
+
 use std::io::Cursor;
 
 use ooxmlsdk::parts::vba_project_part::VbaProjectPart;
@@ -17,10 +19,8 @@ fn round_trip(kind: VisioDocumentType) {
       | VisioDocumentType::MacroEnabledTemplate
   );
   let mut document = VisioDocument::create(kind);
-  document.add_visio_document_part().expect("add main part");
-  document
-    .change_document_type(kind)
-    .expect("set main content type");
+  let main = document.add_visio_document_part().expect("add main part");
+  assert_eq!(main.content_type(&document), Some(kind.content_type()));
   if with_vba {
     let main = document
       .visio_document_part()

@@ -105,6 +105,15 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         <#part_ty as crate::sdk::SdkPartDescriptor>::RELATIONSHIP_TYPE;
     }
   });
+  let main_content_type_method = main_child.map(|child| {
+    let part_ty = &child.part_ty;
+    quote! {
+      fn main_part_content_type(&self, kind: crate::parts::PartKind) -> Option<&'static str> {
+        (kind == <#part_ty as crate::sdk::SdkPartDescriptor>::KIND)
+          .then(|| self.document_type().content_type())
+      }
+    }
+  });
   let main_part_method = main_child.map(|child| {
     let attrs = &child.attrs;
     let field_ident = &child.field_ident;
@@ -147,19 +156,9 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
         let relationship_id =
           crate::sdk::SdkPackage::relationships(self).next_relationship_id();
-        let content_type =
-          crate::sdk::typed_main_part_content_type::<#part_ty>(
-            crate::sdk::SdkPackage::storage(self),
-          );
-        let part =
-          crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension::<#part_ty>(
-            self,
-            relationship_id.clone(),
-            content_type,
-            <#part_ty as crate::sdk::SdkPartDescriptor>::EXTENSION,
-            crate::common::NewPartTargetMode::Fixed,
-          )?;
-        Ok(part)
+        crate::sdk::SdkPackage::add_new_part_with_target_mode::<#part_ty>(
+          self, relationship_id, crate::common::NewPartTargetMode::Fixed,
+        )
       }
     }
   });
@@ -291,6 +290,13 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
   Ok(quote! {
     impl crate::sdk::SdkPackage for #ident {
       #constraint_impl
+
+      fn validate_child_part_type(
+        &self, ty: crate::parts::graph::PartType, content_type: &str,
+      ) -> Result<crate::sdk::PartConstraint, crate::common::SdkError> {
+        crate::sdk::validate_package_child(self, ty, content_type)
+      }
+      #main_content_type_method
 
       #[inline]
       fn storage(&self) -> &crate::common::SdkPackageStorage {

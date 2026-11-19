@@ -243,6 +243,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   Ok(quote! {
     #( #mod_list )*
     pub mod extended_part;
+    #[path = "part_graph.rs"]
+    pub mod graph;
 
     #[derive(Clone, Debug, Eq, Hash, PartialEq, ooxmlsdk_derive::SdkPartRef)]
     pub enum PartRef {

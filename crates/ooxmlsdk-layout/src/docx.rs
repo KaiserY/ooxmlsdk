@@ -17626,7 +17626,7 @@ pub(super) fn drawingml_text_outline_effect_common_fill(
   match outline.text_outline_effect_choice1.as_ref()? {
     w14::TextOutlineEffectChoice::NoFillEmpty => Some(common::Fill::None),
     w14::TextOutlineEffectChoice::SolidColorFillProperties(fill) => {
-      let resolved = resolve_solid_text_fill(fill, theme_colors)?;
+      let resolved = resolve_solid_text_outline(fill, theme_colors)?;
       Some(common::Fill::Solid(common_rgb(
         resolved.color,
         resolved.opacity,
@@ -39158,18 +39158,36 @@ pub(super) fn resolve_text_outline(
   outline: &w14::TextOutlineEffect,
   theme_colors: &ThemeColors,
 ) -> Option<ResolvedColor> {
-  let resolved = match outline.text_outline_effect_choice1.as_ref()? {
-    w14::TextOutlineEffectChoice::NoFillEmpty => return None,
-    w14::TextOutlineEffectChoice::SolidColorFillProperties(fill) => {
-      resolve_solid_text_fill(fill, theme_colors)?
-    }
-    w14::TextOutlineEffectChoice::GradientFillProperties(_) => return None,
+  let w14::TextOutlineEffectChoice::SolidColorFillProperties(fill) =
+    outline.text_outline_effect_choice1.as_ref()?
+  else {
+    return None;
   };
+  resolve_solid_text_outline(fill, theme_colors)
+}
 
-  Some(ResolvedColor {
-    color: resolved.color,
-    opacity: resolved.opacity,
-  })
+fn resolve_solid_text_outline(
+  fill: &w14::SolidColorFillProperties,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  // Word truncates the final stroke channels, including for an opaque outline.
+  // The solid text foreground uses nearest-byte conversion.
+  match fill.solid_color_fill_properties_choice.as_ref()? {
+    w14::SolidColorFillPropertiesChoice::RgbColorModelHex(color) => Some(ResolvedColor {
+      color: apply_w14_rgb_effect_transforms(
+        parse_hex_color(color.val.as_str())?,
+        &color.rgb_color_model_hex_choice,
+      ),
+      opacity: opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice),
+    }),
+    w14::SolidColorFillPropertiesChoice::SchemeColor(color) => Some(ResolvedColor {
+      color: apply_w14_scheme_effect_transforms(
+        theme_colors.resolve_word2010(color.val)?,
+        &color.scheme_color_choice,
+      ),
+      opacity: opacity_from_w14_scheme_transforms(&color.scheme_color_choice),
+    }),
+  }
 }
 
 fn resolve_solid_text_fill(

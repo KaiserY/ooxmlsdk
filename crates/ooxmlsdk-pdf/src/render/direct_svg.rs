@@ -74,9 +74,13 @@ fn office_svg_viewport(data: &[u8]) -> Result<Cow<'_, [u8]>> {
   } else {
     Cow::Borrowed(data)
   };
-  let mut reader = Reader::from_reader(data.as_ref());
+  // quick-xml reports event offsets from the first byte after the UTF-8 BOM.
+  // Splice the rewritten root into the original bytes, including its prolog.
+  let xml = data.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&data);
+  let xml_offset = data.len() - xml.len();
+  let mut reader = Reader::from_reader(xml);
   loop {
-    let begin = reader.buffer_position() as usize;
+    let begin = xml_offset + reader.buffer_position() as usize;
     let event = reader.read_event().map_err(svg_viewport_error)?;
     let empty = matches!(&event, Event::Empty(_));
     let start = match event {
@@ -155,7 +159,7 @@ fn office_svg_viewport(data: &[u8]) -> Result<Cow<'_, [u8]>> {
       .map_err(svg_viewport_error)?;
     writer
       .get_mut()
-      .extend_from_slice(&data[reader.buffer_position() as usize..]);
+      .extend_from_slice(&data[xml_offset + reader.buffer_position() as usize..]);
     return Ok(Cow::Owned(writer.into_inner()));
   }
 }

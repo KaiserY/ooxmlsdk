@@ -454,31 +454,25 @@ fn media_resource_from_relationship(
   }
 }
 
-fn collect_image_resources<P>(
-  package: &PresentationDocument,
-  part: &P,
-) -> HashMap<String, ImageResource>
-where
-  P: SdkPart,
-{
+fn related_images<'a>(
+  package: &'a PresentationDocument,
+  part: &'a impl SdkPart,
+) -> impl Iterator<Item = (String, ImageResource)> + 'a {
   part
     .related_parts_of_type::<_, ImagePart>(package)
-    .filter_map(|related_part| {
+    .filter_map(|related| {
+      let data = related.try_data_bytes(package).ok()?;
       Some((
-        related_part.relationship_id().to_string(),
+        related.relationship_id().to_owned(),
         ImageResource {
-          data: related_part.part().try_data_bytes(package).ok()?,
-          content_type: related_part
-            .part()
-            .content_type(package)
-            .map(str::to_string),
+          data,
+          content_type: related.content_type(package).map(str::to_owned),
           monochrome_dib_palette_override: None,
           metafile_external_header: None,
           metafile_semantic_text_includes_raster_backdrop: false,
         },
       ))
     })
-    .collect()
 }
 
 fn chart_resource(package: &PresentationDocument, chart_part: &ChartPart) -> Result<ChartResource> {
@@ -487,7 +481,7 @@ fn chart_resource(package: &PresentationDocument, chart_part: &ChartPart) -> Res
   let theme_override_part = chart_part.theme_override_part(package);
   let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
   let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
-  let image_resources = collect_image_resources(package, chart_part);
+  let image_resources = related_images(package, chart_part).collect();
 
   Ok(ChartResource {
     path: chart_part.path(package).map(str::to_string),
@@ -524,7 +518,7 @@ fn extended_chart_resource(
   let theme_override_part = chart_part.theme_override_part(package);
   let chart_style_parts: Vec<_> = chart_part.chart_style_parts(package).collect();
   let chart_color_style_parts: Vec<_> = chart_part.chart_color_style_parts(package).collect();
-  let image_resources = collect_image_resources(package, chart_part);
+  let image_resources = related_images(package, chart_part).collect();
 
   Ok(ExtendedChartResource {
     path: chart_part.path(package).map(str::to_string),
@@ -556,7 +550,7 @@ fn chart_drawing_resource(
   package: &PresentationDocument,
   part: &ChartDrawingPart,
 ) -> Result<ChartDrawingResource> {
-  let image_resources = collect_image_resources(package, part);
+  let image_resources = related_images(package, part).collect();
   Ok(ChartDrawingResource {
     path: part.path(package).map(str::to_string),
     user_shapes: part.root_element(package)?.clone(),
@@ -568,7 +562,7 @@ fn theme_override_resource(
   package: &PresentationDocument,
   part: &ThemeOverridePart,
 ) -> Result<ThemeOverrideResource> {
-  let image_resources = collect_image_resources(package, part);
+  let image_resources = related_images(package, part).collect();
   Ok(ThemeOverrideResource {
     path: part.path(package).map(str::to_string),
     theme_override: part.root_element(package)?.clone(),
@@ -1021,32 +1015,7 @@ impl SlidePersist {
       .extend(comments.comment.iter().map(SlideComment::from_modern));
   }
 
-  pub(crate) fn import_image_parts<P>(&mut self, package: &PresentationDocument, part: &P)
-  where
-    P: SdkPart,
-  {
-    // embed IDs against the current fragment's relationships, so cache image
-    // bytes on the owning slide/layout/master persist before display lowering.
-    for related_part in part.related_parts_of_type::<_, ImagePart>(package) {
-      let relationship_id = related_part.relationship_id().to_string();
-      let image_part = related_part.part();
-      let Ok(data) = image_part.try_data_bytes(package) else {
-        continue;
-      };
-      self.image_resources.insert(
-        relationship_id,
-        ImageResource {
-          data,
-          content_type: image_part.content_type(package).map(str::to_string),
-          monochrome_dib_palette_override: None,
-          metafile_external_header: None,
-          metafile_semantic_text_includes_raster_backdrop: false,
-        },
-      );
-    }
-  }
-
-  pub(crate) fn import_media_reference_parts<P>(&mut self, package: &PresentationDocument, part: &P)
+  fn import_media_reference_parts<P>(&mut self, package: &PresentationDocument, part: &P)
   where
     P: SdkPart,
   {
@@ -1073,11 +1042,8 @@ impl SlidePersist {
     }
   }
 
-  pub(crate) fn import_hyperlink_reference_parts<P>(
-    &mut self,
-    package: &PresentationDocument,
-    part: &P,
-  ) where
+  fn import_hyperlink_reference_parts<P>(&mut self, package: &PresentationDocument, part: &P)
+  where
     P: SdkPart,
   {
     // a:hlinkClick r:id through the current fragment relationships.
@@ -1096,7 +1062,7 @@ impl SlidePersist {
     }
   }
 
-  pub(crate) fn import_graphic_frame_related_parts<P>(
+  pub(crate) fn import_related_part_resources<P>(
     &mut self,
     package: &PresentationDocument,
     part: &P,
@@ -1104,128 +1070,74 @@ impl SlidePersist {
   where
     P: SdkPart,
   {
+    self.image_resources.extend(related_images(package, part));
+    self.import_media_reference_parts(package, part);
+    self.import_hyperlink_reference_parts(package, part);
+
     // oox/source/ppt/slidefragmenthandler.cxx resolve graphicFrame targets
     // against the owning fragment. Cache targets here before inherited
     // master/layout shapes are cloned into another relationship scope.
-    let chart_parts: Vec<_> = part
-      .related_parts_of_type::<_, ChartPart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, chart_part) in chart_parts {
-      self
-        .chart_resources
-        .insert(relationship_id, chart_resource(package, &chart_part)?);
+    for related in part.related_parts_of_type::<_, ChartPart>(package) {
+      self.chart_resources.insert(
+        related.relationship_id().to_owned(),
+        chart_resource(package, related.part())?,
+      );
     }
-    let extended_chart_parts: Vec<_> = part
-      .related_parts_of_type::<_, ExtendedChartPart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, chart_part) in extended_chart_parts {
+    for related in part.related_parts_of_type::<_, ExtendedChartPart>(package) {
       self.extended_chart_resources.insert(
-        relationship_id,
-        extended_chart_resource(package, &chart_part)?,
+        related.relationship_id().to_owned(),
+        extended_chart_resource(package, related.part())?,
       );
     }
-    let diagram_data_parts: Vec<_> = part
-      .related_parts_of_type::<_, DiagramDataPart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, diagram_part) in diagram_data_parts {
-      self.import_image_parts(package, &diagram_part);
+    for related in part.related_parts_of_type::<_, DiagramDataPart>(package) {
+      let mut images = HashMap::new();
+      for (id, image) in related_images(package, related.part()) {
+        self.image_resources.insert(id.clone(), image.clone());
+        images.insert(id, image);
+      }
       self.diagram_data_resources.insert(
-        relationship_id,
+        related.relationship_id().to_owned(),
         DiagramDataResource {
-          path: diagram_part.path(package).map(str::to_string),
-          model: diagram_part.root_element(package)?.clone(),
-          image_resources: collect_image_resources(package, &diagram_part),
+          path: related.path(package).map(str::to_string),
+          model: related.root_element(package)?.clone(),
+          image_resources: images,
         },
       );
     }
-    let diagram_layout_parts: Vec<_> = part
-      .related_parts_of_type::<_, DiagramLayoutDefinitionPart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, diagram_part) in diagram_layout_parts {
+    for related in part.related_parts_of_type::<_, DiagramLayoutDefinitionPart>(package) {
       self.diagram_layout_resources.insert(
-        relationship_id,
+        related.relationship_id().to_owned(),
         DiagramLayoutResource {
-          path: diagram_part.path(package).map(str::to_string),
-          layout: diagram_part.root_element(package)?.clone(),
+          path: related.path(package).map(str::to_string),
+          layout: related.root_element(package)?.clone(),
         },
       );
     }
-    let diagram_style_parts: Vec<_> = part
-      .related_parts_of_type::<_, DiagramStylePart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, diagram_part) in diagram_style_parts {
+    for related in part.related_parts_of_type::<_, DiagramStylePart>(package) {
       self.diagram_style_resources.insert(
-        relationship_id,
+        related.relationship_id().to_owned(),
         DiagramStyleResource {
-          path: diagram_part.path(package).map(str::to_string),
-          style: diagram_part.root_element(package)?.clone(),
+          path: related.path(package).map(str::to_string),
+          style: related.root_element(package)?.clone(),
         },
       );
     }
-    let diagram_color_parts: Vec<_> = part
-      .related_parts_of_type::<_, DiagramColorsPart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, diagram_part) in diagram_color_parts {
+    for related in part.related_parts_of_type::<_, DiagramColorsPart>(package) {
       self.diagram_color_resources.insert(
-        relationship_id,
+        related.relationship_id().to_owned(),
         DiagramColorResource {
-          path: diagram_part.path(package).map(str::to_string),
-          colors: diagram_part.root_element(package)?.clone(),
+          path: related.path(package).map(str::to_string),
+          colors: related.root_element(package)?.clone(),
         },
       );
     }
-    let diagram_drawing_parts: Vec<_> = part
-      .related_parts_of_type::<_, DiagramPersistLayoutPart>(package)
-      .map(|related_part| {
-        (
-          related_part.relationship_id().to_string(),
-          related_part.part().clone(),
-        )
-      })
-      .collect();
-    for (relationship_id, diagram_part) in diagram_drawing_parts {
+    for related in part.related_parts_of_type::<_, DiagramPersistLayoutPart>(package) {
       self.diagram_drawing_resources.insert(
-        relationship_id,
+        related.relationship_id().to_owned(),
         DiagramDrawingResource {
-          path: diagram_part.path(package).map(str::to_string),
-          drawing: diagram_part.root_element(package)?.clone(),
-          image_resources: collect_image_resources(package, &diagram_part),
+          path: related.path(package).map(str::to_string),
+          drawing: related.root_element(package)?.clone(),
+          image_resources: related_images(package, related.part()).collect(),
         },
       );
     }
@@ -1270,7 +1182,7 @@ impl SlidePersist {
     drawing_parts: &[VmlDrawingPart],
   ) {
     for drawing_part in drawing_parts {
-      let image_resources = collect_image_resources(package, drawing_part);
+      let image_resources: HashMap<_, _> = related_images(package, drawing_part).collect();
       let models = drawing_part
         .try_data_bytes(package)
         .ok()

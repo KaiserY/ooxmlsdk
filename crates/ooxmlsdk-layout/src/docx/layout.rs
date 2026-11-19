@@ -62966,11 +62966,13 @@ fn terminal_line_keeps_lower_spacing(
   // height; that final fragment's height is not another physical page cut.
   // Cached source slices and page-owned drawing replay also retain a parent
   // lower-space owner. None may create another text follow by charging that
-  // same source lower again in this local paragraph formatter.
+  // same source lower again in this local paragraph formatter. A legacy row
+  // with a nested follow has already admitted this line by its glyph height.
   if flow.text_segmentation == TextSegmentation::TableCell
     && flow.horizontal_table_cell
     && flow.layout_cell_bounds.is_some()
     && !flow.table_cell_parent_owns_lower_spacing
+    && !flow.table_cell_legacy_nested_row_follow
     && flow.table_cell_replay.is_none()
   {
     return true;
@@ -63015,6 +63017,16 @@ struct ParagraphFormatPass<'a> {
   position: ParagraphLayoutPosition,
   allow_reflow: bool,
   pictures: Option<&'a legacy_picture_nonoverlap::Plan>,
+}
+
+enum ParagraphRetry<'a> {
+  LinePictures,
+  Pictures(legacy_picture_nonoverlap::Plan),
+  Reflow {
+    layout: Box<TextFrameLayout<'a>>,
+    position: ParagraphLayoutPosition,
+    allow_reflow: bool,
+  },
 }
 
 struct ParagraphPicturePass<'a> {
@@ -63327,6 +63339,31 @@ impl<'a> TextFrameLayout<'a> {
       hyphenation_bottom_line_slots: Vec::new(),
       hyphenation_reflow_depth: 0,
     }
+  }
+
+  fn reflow_frame<'p>(
+    &self,
+    paragraph: &'p crate::docx::Paragraph,
+    flow: FlowContext,
+    text_metrics: &mut TextMetrics,
+  ) -> TextFrameLayout<'p> {
+    TextFrameLayout::new(
+      paragraph,
+      flow,
+      self.line_frame_width(flow),
+      self.spacing_after_pt,
+      text_metrics,
+    )
+    .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
+    .with_border_context(self.border_context)
+    .with_shading_spacing(
+      ParagraphShadingContext {
+        joins_previous: self.shading_before_pt > 0.0,
+        joins_next: self.shading_after_pt > 0.0,
+      },
+      self.spacing_before_pt,
+    )
+    .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
   }
 
   fn line_frame_width(&self, flow: FlowContext) -> f64 {
@@ -64693,60 +64730,66 @@ impl<'a> TextFrameLayout<'a> {
     &self,
     current: &mut Page,
     pages: &mut Vec<Page>,
-    anchor_pages: Option<&mut Vec<AnchorPage>>,
+    mut anchor_pages: Option<&mut Vec<AnchorPage>>,
     text_metrics: &mut TextMetrics,
     position: ParagraphLayoutPosition,
     allow_reflow: bool,
   ) -> (FlowContext, f32, Vec<LineFragment>) {
-    let pictures =
+    let mut pictures =
       legacy_picture_nonoverlap::prepare(self.paragraph, self.flow, self.frame, position);
-    self.format_with_picture_positions(
-      current,
-      pages,
-      anchor_pages,
-      text_metrics,
-      ParagraphFormatPass {
-        position,
-        allow_reflow,
-        pictures: pictures.as_ref(),
-      },
-    )
-  }
-
-  fn format_with_picture_positions(
-    &self,
-    current: &mut Page,
-    pages: &mut Vec<Page>,
-    mut anchor_pages: Option<&mut Vec<AnchorPage>>,
-    text_metrics: &mut TextMetrics,
-    pass: ParagraphFormatPass<'_>,
-  ) -> (FlowContext, f32, Vec<LineFragment>) {
     let mut line_pictures = cell_line_picture_wrap::Plan::default();
     loop {
+      // Release the formatting pass stack before retrying the paragraph. A
+      // follow can traverse several short columns before it reaches a new page.
+      let prepared = vml_group_autofit::prepare(self.paragraph, self.flow, text_metrics);
       match self.format_picture_pass(
+        prepared.as_ref(),
         current,
         pages,
         anchor_pages.as_deref_mut(),
         text_metrics,
         ParagraphPicturePass {
-          format: pass,
+          format: ParagraphFormatPass {
+            position,
+            allow_reflow,
+            pictures: pictures.as_ref(),
+          },
           line_pictures: &mut line_pictures,
         },
       ) {
         ControlFlow::Continue(formatted) => return formatted,
-        ControlFlow::Break(()) => {}
+        ControlFlow::Break(ParagraphRetry::LinePictures) => {}
+        ControlFlow::Break(ParagraphRetry::Pictures(plan)) => {
+          pictures = Some(plan);
+          line_pictures = cell_line_picture_wrap::Plan::default();
+        }
+        ControlFlow::Break(ParagraphRetry::Reflow {
+          layout,
+          position,
+          allow_reflow,
+        }) => {
+          return layout.format_with_reflow(
+            current,
+            pages,
+            anchor_pages,
+            text_metrics,
+            position,
+            allow_reflow,
+          );
+        }
       }
     }
   }
 
-  fn format_picture_pass(
+  fn format_picture_pass<'p>(
     &self,
+    paragraph: &'p crate::docx::Paragraph,
     current: &mut Page,
     pages: &mut Vec<Page>,
     mut anchor_pages: Option<&mut Vec<AnchorPage>>,
     text_metrics: &mut TextMetrics,
     pass: ParagraphPicturePass<'_>,
-  ) -> ControlFlow<(), (FlowContext, f32, Vec<LineFragment>)> {
+  ) -> ControlFlow<ParagraphRetry<'p>, (FlowContext, f32, Vec<LineFragment>)> {
     let ParagraphPicturePass {
       format: pass,
       line_pictures,
@@ -64758,8 +64801,6 @@ impl<'a> TextFrameLayout<'a> {
     } = pass;
     let mut y = position.y;
     let mut paragraph_anchor_top = position.anchor_top;
-    let prepared_paragraph = vml_group_autofit::prepare(self.paragraph, self.flow, text_metrics);
-    let paragraph = prepared_paragraph.as_ref();
     let mut flow = self.flow;
     let mut text_frame = self.frame;
     let start_item_index = current.items.len();
@@ -69304,7 +69345,7 @@ impl<'a> TextFrameLayout<'a> {
                   {
                     anchors.truncate(len);
                   }
-                  return ControlFlow::Break(());
+                  return ControlFlow::Break(ParagraphRetry::LinePictures);
                 }
                 extend_paragraph_wrap_exclusions_unique(
                   &mut wrap_exclusions,
@@ -73124,17 +73165,7 @@ impl<'a> TextFrameLayout<'a> {
       if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
         anchors.truncate(len);
       }
-      return ControlFlow::Continue(self.format_with_picture_positions(
-        current,
-        pages,
-        anchor_pages,
-        text_metrics,
-        ParagraphFormatPass {
-          position,
-          allow_reflow,
-          pictures: Some(&replay),
-        },
-      ));
+      return ControlFlow::Break(ParagraphRetry::Pictures(replay));
     }
     if reflow_first_line_for_inline_object || (allow_reflow && text_state.first_line_overflows) {
       // Retry the complete first line on the follow, including its text,
@@ -73160,36 +73191,17 @@ impl<'a> TextFrameLayout<'a> {
       let retry_continuous_column = pages.len() == start_pages_len
         && follow_flow.column_index > start_flow.column_index
         && continuous_column_retry_stays_on_page(current, follow_flow, paragraph);
-      return ControlFlow::Continue(
-        TextFrameLayout::new(
-          paragraph,
-          follow_flow,
-          self.line_frame_width(follow_flow),
-          self.spacing_after_pt,
-          text_metrics,
-        )
-        .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-        .with_border_context(self.border_context)
-        .with_shading_spacing(
-          ParagraphShadingContext {
-            joins_previous: self.shading_before_pt > 0.0,
-            joins_next: self.shading_after_pt > 0.0,
-          },
-          self.spacing_before_pt,
-        )
-        .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-        .with_terminal_line_follows(self.terminal_line_follows.clone())
-        .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
-        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
-        .format_with_reflow(
-          current,
-          pages,
-          anchor_pages,
-          text_metrics,
-          self.whole_paragraph_follow_position(follow_y),
-          retry_continuous_column,
+      return ControlFlow::Break(ParagraphRetry::Reflow {
+        layout: Box::new(
+          self
+            .reflow_frame(paragraph, follow_flow, text_metrics)
+            .with_terminal_line_follows(self.terminal_line_follows.clone())
+            .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+            .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth),
         ),
-      );
+        position: self.whole_paragraph_follow_position(follow_y),
+        allow_reflow: retry_continuous_column,
+      });
     }
     track_bottom_hyphenation_slots
       .retain(|slot| !self.hyphenation_bottom_line_slots.contains(slot));
@@ -73213,39 +73225,20 @@ impl<'a> TextFrameLayout<'a> {
       if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
         anchors.truncate(len);
       }
-      return ControlFlow::Continue(
-        TextFrameLayout::new(
-          paragraph,
-          start_flow,
-          self.line_frame_width(start_flow),
-          self.spacing_after_pt,
-          text_metrics,
-        )
-        .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-        .with_border_context(self.border_context)
-        .with_shading_spacing(
-          ParagraphShadingContext {
-            joins_previous: self.shading_before_pt > 0.0,
-            joins_next: self.shading_after_pt > 0.0,
-          },
-          self.spacing_before_pt,
-        )
-        .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-        .with_terminal_line_follows(self.terminal_line_follows.clone())
-        .with_hyphenation_bottom_line_slots(reserved_slots)
-        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1))
-        .format_with_reflow(
-          current,
-          pages,
-          anchor_pages,
-          text_metrics,
-          ParagraphLayoutPosition {
-            y: paragraph_top,
-            anchor_top: paragraph_anchor_top,
-          },
-          allow_reflow,
+      return ControlFlow::Break(ParagraphRetry::Reflow {
+        layout: Box::new(
+          self
+            .reflow_frame(paragraph, start_flow, text_metrics)
+            .with_terminal_line_follows(self.terminal_line_follows.clone())
+            .with_hyphenation_bottom_line_slots(reserved_slots)
+            .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth.saturating_add(1)),
         ),
-      );
+        position: ParagraphLayoutPosition {
+          y: paragraph_top,
+          anchor_top: paragraph_anchor_top,
+        },
+        allow_reflow,
+      });
     }
 
     if let Some(follow) = terminal_line_follow
@@ -73268,38 +73261,20 @@ impl<'a> TextFrameLayout<'a> {
       if let (Some(anchors), Some(len)) = (anchor_pages.as_deref_mut(), start_anchor_pages_len) {
         anchors.truncate(len);
       }
-      let mut reflow = TextFrameLayout::new(
-        paragraph,
-        start_flow,
-        self.line_frame_width(start_flow),
-        self.spacing_after_pt,
-        text_metrics,
-      )
-      .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-      .with_border_context(self.border_context)
-      .with_shading_spacing(
-        ParagraphShadingContext {
-          joins_previous: self.shading_before_pt > 0.0,
-          joins_next: self.shading_after_pt > 0.0,
-        },
-        self.spacing_before_pt,
-      )
-      .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-      .with_terminal_line_follows(follows)
-      .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
-      .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth);
+      let mut reflow = self
+        .reflow_frame(paragraph, start_flow, text_metrics)
+        .with_terminal_line_follows(follows)
+        .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+        .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth);
       reflow.widow_rebalance_page_index = self.widow_rebalance_page_index;
-      return ControlFlow::Continue(reflow.format_with_reflow(
-        current,
-        pages,
-        anchor_pages,
-        text_metrics,
-        ParagraphLayoutPosition {
+      return ControlFlow::Break(ParagraphRetry::Reflow {
+        layout: Box::new(reflow),
+        position: ParagraphLayoutPosition {
           y: paragraph_top,
           anchor_top: paragraph_anchor_top,
         },
         allow_reflow,
-      ));
+      });
     }
 
     // The paragraph's final line is not followed by a discretionary automatic
@@ -73391,34 +73366,15 @@ impl<'a> TextFrameLayout<'a> {
           let retry_continuous_column = pages.len() == start_pages_len
             && follow_flow.column_index > start_flow.column_index
             && continuous_column_retry_stays_on_page(current, follow_flow, paragraph);
-          return ControlFlow::Continue(
-            TextFrameLayout::new(
-              paragraph,
-              follow_flow,
-              self.line_frame_width(follow_flow),
-              self.spacing_after_pt,
-              text_metrics,
-            )
-            .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-            .with_border_context(self.border_context)
-            .with_shading_spacing(
-              ParagraphShadingContext {
-                joins_previous: self.shading_before_pt > 0.0,
-                joins_next: self.shading_after_pt > 0.0,
-              },
-              self.spacing_before_pt,
-            )
-            .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-            .with_terminal_line_follows(self.terminal_line_follows.clone())
-            .format_with_reflow(
-              current,
-              pages,
-              anchor_pages,
-              text_metrics,
-              self.whole_paragraph_follow_position(follow_y),
-              retry_continuous_column,
+          return ControlFlow::Break(ParagraphRetry::Reflow {
+            layout: Box::new(
+              self
+                .reflow_frame(paragraph, follow_flow, text_metrics)
+                .with_terminal_line_follows(self.terminal_line_follows.clone()),
             ),
-          );
+            position: self.whole_paragraph_follow_position(follow_y),
+            allow_reflow: retry_continuous_column,
+          });
         }
         TextSplitDecision::RebalanceWidow {
           page_index,
@@ -73459,40 +73415,21 @@ impl<'a> TextFrameLayout<'a> {
           {
             anchors.truncate(len);
           }
-          return ControlFlow::Continue(
-            TextFrameLayout::new(
-              paragraph,
-              start_flow,
-              self.line_frame_width(start_flow),
-              self.spacing_after_pt,
-              text_metrics,
-            )
-            .with_suppressed_spacing_before(self.suppressed_spacing_before_pt)
-            .with_border_context(self.border_context)
-            .with_shading_spacing(
-              ParagraphShadingContext {
-                joins_previous: self.shading_before_pt > 0.0,
-                joins_next: self.shading_after_pt > 0.0,
-              },
-              self.spacing_before_pt,
-            )
-            .with_decoration_outer_bottom(self.decoration_outer_bottom_pt)
-            .with_widow_rebalance_page(page_index)
-            .with_terminal_line_follows(terminal_line_follows)
-            .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
-            .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth)
-            .format_with_reflow(
-              current,
-              pages,
-              anchor_pages,
-              text_metrics,
-              ParagraphLayoutPosition {
-                y: paragraph_top,
-                anchor_top: paragraph_anchor_top,
-              },
-              false,
+          return ControlFlow::Break(ParagraphRetry::Reflow {
+            layout: Box::new(
+              self
+                .reflow_frame(paragraph, start_flow, text_metrics)
+                .with_widow_rebalance_page(page_index)
+                .with_terminal_line_follows(terminal_line_follows)
+                .with_hyphenation_bottom_line_slots(self.hyphenation_bottom_line_slots.clone())
+                .with_hyphenation_reflow_depth(self.hyphenation_reflow_depth),
             ),
-          );
+            position: ParagraphLayoutPosition {
+              y: paragraph_top,
+              anchor_top: paragraph_anchor_top,
+            },
+            allow_reflow: false,
+          });
         }
         TextSplitDecision::NoSplit
         | TextSplitDecision::Forced
@@ -81519,8 +81456,7 @@ fn adjust_justified_text_span(
     // Writer excludes trailing U+0020 blanks from the printable line width
     // and from the glue slots used by block adjustment. The preserved blanks
     // remain in the text portion, but have no following ink to advance.
-    let is_terminal_text = Some(index) == last_text_index
-      && last_inline_object_index.is_none_or(|object_index| object_index < index);
+    let is_terminal_text = index == last_printable_index;
     let visible_text = if is_terminal_text {
       text.text.trim_end_matches(' ')
     } else {
@@ -81704,7 +81640,7 @@ fn adjust_justified_text_span(
     .skip(start_index)
     .filter_map(|(index, item)| match item {
       PageItem::Text(text) if (text.y_pt - y).abs() < 0.01 => {
-        let visible = if Some(index) == last_text_index {
+        let visible = if index == last_printable_index {
           text.text.trim_end_matches(' ')
         } else if index > last_printable_index {
           ""
@@ -120904,16 +120840,28 @@ mod tests {
                 "a split paragraph owns its label once"
               );
               let gap = if border.is_some() { 1.0 } else { 0.0 };
-              let follow_top = if prefix { 36.0 } else { 36.0 + before + width };
+              // Word realizes each physical line edge on its 600dpi printer.
+              // The paragraph paint owns the space to the inside of its border.
+              let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+              let follow_top = if prefix {
+                36.0
+              } else {
+                ((36.0 + before + width + gap) / dot).round() * dot - gap
+              };
               assert!((fills[1].y_pt - follow_top).abs() < 0.001);
               if !prefix {
                 assert!((fills[0].y_pt - 36.0).abs() < 0.001);
-                assert!((fills[0].height_pt - 18.0).abs() < 0.001);
+                let rounding = if column && border.is_some() { dot } else { 0.0 };
+                assert!((fills[0].height_pt - 18.0).abs() <= rounding + 0.001);
                 assert!((fills[0].x_pt - 34.5).abs() < 0.001);
               }
-              assert!(
-                (fills[1].height_pt - 18.0 - gap - if prefix { 0.0 } else { gap }).abs() < 0.001
-              );
+              let follow_height = 18.0 + gap + if prefix { 0.0 } else { gap };
+              let rounding = if !prefix && border.is_some() {
+                dot
+              } else {
+                0.0
+              };
+              assert!((fills[1].height_pt - follow_height).abs() <= rounding + 0.001);
               let strokes = pages
                 .iter()
                 .flat_map(|page| page.items.iter())
@@ -120940,6 +120888,16 @@ mod tests {
                 .filter(|line| (line.y1_pt - line.y2_pt).abs() < 0.001)
                 .count();
               assert_eq!(horizontal, if border.is_some() { 2 } else { 0 });
+              if border.is_some() {
+                let follow = fills[1];
+                let bottom = follow.y_pt + follow.height_pt + width / 2.0;
+                assert!(strokes.iter().any(|line| {
+                  line.y1_pt == line.y2_pt
+                    && (line.y1_pt - bottom).abs() < 0.001
+                    && line.x1_pt <= follow.x_pt
+                    && line.x2_pt >= follow.x_pt + follow.width_pt
+                }));
+              }
             }
           }
         }
@@ -122065,6 +122023,16 @@ mod tests {
         assert_eq!(fills.len(), 2, "boundary={boundary}");
         assert_eq!(fills[0].paint, beige);
         assert_eq!(fills[1].paint, right_color);
+        // An isolated bordered paragraph ends on a printer dot. Its unbordered
+        // neighbor continues from the logical cursor, including the top
+        // border's 3pt stroke and 10pt gap in the top-only control.
+        let expected_gap = if matches!(boundary, 4..=6) {
+          let logical_bottom = 36.0 + 14.5 + if boundary == 5 { 13.0 } else { 0.0 };
+          let dot = units::POINTS_PER_INCH / units::OFFICE_FIXED_OUTPUT_DPI;
+          expected_gap + logical_bottom - (logical_bottom / dot).round() * dot
+        } else {
+          expected_gap
+        };
         let gap = fills[1].y_pt - fills[0].y_pt - fills[0].height_pt;
         assert!(
           (gap - expected_gap).abs() < 0.001,
@@ -125632,18 +125600,21 @@ mod tests {
           _ => None,
         })
         .collect::<String>();
-      assert_eq!(
-        text,
-        if painted {
-          "prefix \u{a0}\u{a0}"
-        } else {
-          "prefix"
-        }
+      assert_eq!(text, "prefix \u{a0}\u{a0}");
+      let blanks = page
+        .items
+        .iter()
+        .find_map(|item| match item {
+          PageItem::Text(text) if text.text.ends_with('\u{a0}') => Some(text),
+          _ => None,
+        })
+        .expect("width-bearing final blanks");
+      assert_eq!(blanks.style.highlight.is_some(), painted);
+      let prefix = blanks.text.trim_end_matches([' ', '\u{a0}']);
+      assert!(
+        text_metrics.measure_text(&blanks.text, &blanks.style)
+          > text_metrics.measure_text(prefix, &blanks.style)
       );
-      if painted {
-        assert!(page.items.iter().any(|item| matches!(item, PageItem::Text(text)
-          if text.style.highlight.is_some() && text_metrics.measure_text(&text.text, &text.style) > 0.0)));
-      }
     }
   }
 
@@ -160530,7 +160501,7 @@ mod tests {
         right_pt: 100.0,
         terminal_overhang_pt: 0.0,
         source_frame_right_pt: None,
-        has_character_grid: false,
+        has_character_grid: true,
         preserve_foreign_tail: false,
       },
       crate::docx::ParagraphJustification::default(),

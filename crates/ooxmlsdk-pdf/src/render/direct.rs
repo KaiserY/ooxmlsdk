@@ -8272,6 +8272,7 @@ mod tests {
         <svg xmlns="http://www.w3.org/2000/svg"/>"#,
       b"\xef\xbb\xbf<?xml version='1.0'?><?generator svg?>
         <s:svg xmlns:s='http://www.w3.org/2000/svg'/>",
+      b"\xef\xbb\xbf<svg xmlns='http://www.w3.org/2000/svg'><path d='M0 0H1'/></svg>",
       br#"<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
         "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
         <svg xmlns="http://www.w3.org/2000/svg"/>"#,
@@ -8280,7 +8281,8 @@ mod tests {
       assert!(has_svg_document_root(source));
       let mut image = test_image_item(source.to_vec());
       image.content_type = "image/unknown".into();
-      assert!(render(&image_document(image), &uncompressed_options()).is_ok());
+      render(&image_document(image), &uncompressed_options())
+        .unwrap_or_else(|error| panic!("{error}: {}", String::from_utf8_lossy(source)));
     }
     for source in [
       "<svg xmlns='urn:other'/>",

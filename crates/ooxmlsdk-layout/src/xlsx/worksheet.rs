@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -3811,7 +3812,7 @@ fn apply_automatic_text_row_heights(
       }
       let style = styles.text_style_for_cell(cell.style_index);
       let lines = super::display::cell_text_wrapped_line_count(
-        &cell.display_text,
+        &cell.wrapped_text(styles),
         width,
         &style,
         &mut text_metrics,
@@ -4446,6 +4447,23 @@ fn screen_pixel_width_pt() -> f32 {
 impl CalcCell {
   pub(crate) fn address(&self) -> Option<CellAddress> {
     self.address
+  }
+
+  pub(super) fn wrapped_text(&self, styles: &StylesCatalog) -> Cow<'_, str> {
+    // AutoFit measures the displayed number. Its cached value can contain
+    // many more decimal places than Excel paints in the cell.
+    if !matches!(self.data_type, None | Some(x::CellValues::Number)) || self.display_text.is_empty()
+    {
+      return Cow::Borrowed(&self.display_text);
+    }
+    let (text, _) = super::print::rendered_number_text_for_locale(
+      &self.display_text,
+      styles.number_format_code_for_cell(self.style_index),
+      self.data_type,
+      styles.date_1904,
+      styles.output_format_locale(),
+    );
+    Cow::Owned(text)
   }
 
   fn from_cell(

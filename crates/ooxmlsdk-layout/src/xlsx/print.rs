@@ -572,7 +572,10 @@ fn print_scale_state(
     // ECMA-376 pageSetup says fitToWidth/fitToHeight override scale. Keep the
     // metric-derived fit zoom even when it happens to equal the serialized
     // scale; equality does not switch the worksheet back to 100 percent.
-    if fit_to_width > 0
+    // A sheet that already fits horizontally at 100% keeps its natural
+    // size when the vertical page count is unlimited.
+    if zoom < 100
+      && fit_to_width > 0
       && fit_to_height == 0
       && actual_row_page_count(import, sheet, areas, named_ranges, zoom, text_metrics) > 1
     {
@@ -1928,7 +1931,7 @@ fn print_row_height_pt(
     }
     let style = import.styles.text_style_for_cell(style_index);
     let line_count = wrapped_print_line_count(
-      &cell.display_text,
+      &cell.wrapped_text(&import.styles),
       sheet.column_width_pt(address.col),
       &style,
       text_metrics,

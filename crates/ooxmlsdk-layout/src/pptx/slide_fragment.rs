@@ -41,16 +41,9 @@ impl SlideFragmentHandler {
     // The constructor imports related vmlDrawing/legacyDrawing before XML
     // contexts create shapes; destruction converts and inserts VML drawing.
     let fallback_previews = active_x_fallback_previews(&slide_part.try_data_bytes(package)?);
-    self.slide_persist.import_image_parts(package, slide_part);
     self
       .slide_persist
-      .import_media_reference_parts(package, slide_part);
-    self
-      .slide_persist
-      .import_hyperlink_reference_parts(package, slide_part);
-    self
-      .slide_persist
-      .import_graphic_frame_related_parts(package, slide_part)?;
+      .import_related_part_resources(package, slide_part)?;
     self.slide_persist.active_x_controls = collect_slide_active_x_controls(package, slide_part);
     let vml_drawing_parts = slide_part.vml_drawing_parts(package).collect::<Vec<_>>();
     self.slide_persist.drawing.imported = !vml_drawing_parts.is_empty();
@@ -85,16 +78,9 @@ impl SlideFragmentHandler {
     // notes as a slide fragment with its own relationship scope and notes-size
     // page geometry. The notes master is attached by PresentationFragmentHandler
     // before this method, mirroring SlidePersist::setMasterPersist.
-    self.slide_persist.import_image_parts(package, notes_part);
     self
       .slide_persist
-      .import_media_reference_parts(package, notes_part);
-    self
-      .slide_persist
-      .import_hyperlink_reference_parts(package, notes_part);
-    self
-      .slide_persist
-      .import_graphic_frame_related_parts(package, notes_part)?;
+      .import_related_part_resources(package, notes_part)?;
     let vml_drawing_parts = notes_part.vml_drawing_parts(package).collect::<Vec<_>>();
     self.slide_persist.drawing.imported = !vml_drawing_parts.is_empty();
     let notes = notes_part.root_element(package)?;
@@ -124,16 +110,7 @@ impl SlideFragmentHandler {
     // notes slide content so placeholder/style lookup uses notes text style.
     self
       .slide_persist
-      .import_image_parts(package, notes_master_part);
-    self
-      .slide_persist
-      .import_media_reference_parts(package, notes_master_part);
-    self
-      .slide_persist
-      .import_hyperlink_reference_parts(package, notes_master_part);
-    self
-      .slide_persist
-      .import_graphic_frame_related_parts(package, notes_master_part)?;
+      .import_related_part_resources(package, notes_master_part)?;
     let vml_drawing_parts = notes_master_part
       .vml_drawing_parts(package)
       .collect::<Vec<_>>();
